@@ -101,8 +101,8 @@ func (m *Message) Echo(str string, arg ...interface{}) string { // {{{
 type Server interface { // {{{
 	Begin() bool
 	Start() bool
-	Fork(c *Context, key string) Server
 	Spawn(c *Context, key string) Server
+	Fork(c *Context, key string) Server
 }
 
 // }}}
@@ -524,15 +524,20 @@ func (c *Context) Del(arg ...string) { // {{{
 // }}}
 // }}}
 
-var Index = &Context{Name: "ctx", Help: "根文",
+var Index = &Context{Name: "ctx", Help: "根文", // {{{
 	Caches: map[string]*Cache{},
 	Configs: map[string]*Config{
-		"开场白": &Config{"开场白", "你好，上下文", "开场白", nil},
-		"结束语": &Config{"结束语", "再见，上下文", "结束语", nil},
+		"开场白":   &Config{"开场白", "你好，上下文", "开场白", nil},
+		"结束语":   &Config{"结束语", "再见，上下文", "结束语", nil},
+		"debug": &Config{"debug", "on", "调试模式", nil},
 	},
 	Commands: map[string]*Command{},
 }
 
-func init() {
+// }}}
+
+func init() { // {{{
 	Index.Root = Index
 }
+
+// }}}

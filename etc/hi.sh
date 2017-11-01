@@ -5,6 +5,6 @@ alias $ cache
 alias & server
 alias * message
 
-~ssh
-@client no
-&
+#~ssh
+#@client no
+#&

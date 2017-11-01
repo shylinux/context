@@ -89,7 +89,6 @@ func (ssh *SSH) Print(str string, arg ...interface{}) { // {{{
 }
 
 // }}}
-
 func (ssh *SSH) End() { // {{{
 	ssh.Echo("len", ssh.len)
 	fmt.Fprintln(ssh.w)
@@ -228,7 +227,7 @@ func (ssh *SSH) Spawn(c *ctx.Context, key string) ctx.Server { // {{{
 
 // }}}
 
-var Index = &ctx.Context{Name: "ssh", Help: "运程连接",
+var Index = &ctx.Context{Name: "ssh", Help: "远程控制",
 	Caches: map[string]*ctx.Cache{
 		"status": &ctx.Cache{"status", "stop", "服务器状态", nil},
 	},

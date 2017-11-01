@@ -4,6 +4,7 @@ import (
 	_ "context"
 	"context/cli"
 	_ "context/ssh"
+	_ "context/web"
 	"os"
 )
 

@@ -8,6 +8,7 @@ import ( // {{{
 	"log"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -145,6 +146,7 @@ func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 	defer func() {
 		if e := recover(); e != nil {
 			msg.Echo("%s", e)
+			debug.PrintStack()
 			log.Println(e)
 		}
 	}()
@@ -256,7 +258,7 @@ func (cli *CLI) Spawn(c *ctx.Context, key string) ctx.Server { // {{{
 
 // }}}
 
-var Index = &ctx.Context{Name: "cli", Help: "命文",
+var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"开场白":  &ctx.Config{"开场白", "你好，命令行", "开场白", nil},
@@ -425,7 +427,7 @@ var Index = &ctx.Context{Name: "cli", Help: "命文",
 			return ""
 		}},
 		"server": &ctx.Command{"server start|stop|switch", "服务启动停止切换", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			cli := c.Server.(*CLI)
+			cli := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 1:
 				go cli.target.Start()
@@ -439,6 +441,7 @@ var Index = &ctx.Context{Name: "cli", Help: "命文",
 				}
 			}
 			return ""
+			// }}}
 		}},
 		"context": &ctx.Command{"context [find|search name [switch]]|root|back|home", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
 			cli := c.Server.(*CLI) // {{{
