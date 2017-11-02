@@ -222,14 +222,7 @@ func (cli *CLI) Start() bool { // {{{
 }
 
 // }}}
-func (cli *CLI) Fork(c *ctx.Context, key string) ctx.Server { // {{{
-	s := new(CLI)
-	s.Context = c
-	return s
-}
-
-// }}}
-func (cli *CLI) Spawn(c *ctx.Context, key string) ctx.Server { // {{{
+func (cli *CLI) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
 	s := new(CLI)
 	s.Context = c
 	return s
@@ -430,8 +423,6 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 				}
 			case 2, 3, 4, 5:
 				switch arg[1] {
-				case "fork":
-					msg.Target.Fork(arg[2])
 				case "spawn":
 					msg.Target.Spawn(arg[2])
 				case "root":
@@ -478,6 +469,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 					}
 				}
 			}
+
 			return ""
 			// }}}
 		}},

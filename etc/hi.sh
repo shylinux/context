@@ -7,4 +7,3 @@ alias * message
 
 ~root
 ~tcp
-&

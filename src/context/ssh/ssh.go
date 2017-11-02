@@ -212,14 +212,7 @@ func (ssh *SSH) Start() bool { // {{{
 }
 
 // }}}
-func (ssh *SSH) Fork(c *ctx.Context, key string) ctx.Server { // {{{
-	s := new(SSH)
-	s.Context = c
-	return s
-}
-
-// }}}
-func (ssh *SSH) Spawn(c *ctx.Context, key string) ctx.Server { // {{{
+func (ssh *SSH) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
 	s := new(SSH)
 	s.Context = c
 	return s

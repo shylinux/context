@@ -19,11 +19,8 @@ func (web *WEB) Start() bool {
 	http.ListenAndServe(web.Conf("address"), nil)
 	return true
 }
-func (web *WEB) Spawn(c *ctx.Context, key string) ctx.Server {
+func (web *WEB) Spawn(c *ctx.Context, arg ...string) ctx.Server {
 
-	return nil
-}
-func (web *WEB) Fork(c *ctx.Context, key string) ctx.Server {
 	return nil
 }
 

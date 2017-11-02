@@ -8,6 +8,7 @@ import ( // {{{
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // }}}
@@ -38,12 +39,17 @@ type Command struct { // {{{
 // }}}
 type Message struct { // {{{
 	Code int
+	Time time.Time
+
 	Meta map[string][]string
 	Data map[string]interface{}
 	Wait chan bool
 
-	Target *Context
+	Name string
 	*Context
+
+	Target *Context
+	Index  int
 }
 
 func (m *Message) Add(key string, value ...string) string { // {{{
@@ -103,7 +109,7 @@ func (m *Message) Echo(str string, arg ...interface{}) string { // {{{
 
 // }}}
 func (m *Message) End(s bool) { // {{{
-	log.Println(m.Name, "end", m.Code, ":", m.Meta["detail"])
+	// log.Println(m.Name, "end", m.Code, ":", m.Meta["detail"])
 	if m.Wait != nil {
 		m.Wait <- s
 	}
@@ -115,8 +121,7 @@ func (m *Message) End(s bool) { // {{{
 type Server interface { // {{{
 	Begin() bool
 	Start() bool
-	Spawn(c *Context, key string) Server
-	Fork(c *Context, key string) Server
+	Spawn(c *Context, arg ...string) Server
 }
 
 // }}}
@@ -135,9 +140,11 @@ type Context struct { // {{{
 	Context  *Context
 	Contexts map[string]*Context
 
-	Auth    string
 	Index   map[string]*Context
 	Shadows map[string]*Context
+
+	Session  map[string]*Message
+	Resource []*Message
 }
 
 func (c *Context) Check(e error) bool { // {{{
@@ -152,6 +159,37 @@ func (c *Context) Check(e error) bool { // {{{
 }
 
 // }}}
+
+func (c *Context) Request(arg ...string) bool { // {{{
+	if c.Session == nil {
+		c.Session = make(map[string]*Message)
+	}
+
+	m := &Message{
+		Code: c.Capi("nmessage", 1),
+		Time: time.Now(),
+		Meta: map[string][]string{},
+		Data: map[string]interface{}{},
+		Name: arg[0],
+	}
+	m.Context = c
+	return true
+}
+
+// }}}
+func (c *Context) Release(key string) bool { // {{{
+
+	return true
+}
+
+// }}}
+func (c *Context) Destroy(index int) bool { // {{{
+
+	return true
+}
+
+// }}}
+
 func (c *Context) Add(arg ...string) { // {{{
 	switch arg[0] {
 	case "context":
@@ -421,7 +459,6 @@ func (c *Context) Init(arg ...string) { // {{{
 // }}}
 
 func (c *Context) Begin() bool { // {{{
-	log.Println(c.Name, "init:")
 	for k, v := range c.Configs {
 		c.Conf(k, v.Value)
 	}
@@ -445,46 +482,19 @@ func (c *Context) Start() bool { // {{{
 
 		log.Println(c.Name, "start:")
 		c.Server.Start()
+		log.Println(c.Name, "stop:")
 	}
 
 	return true
 }
 
 // }}}
-func (c *Context) Fork(key string) *Context { // {{{
-	s := new(Context)
-	s.Name = c.Name + key
-	s.Help = c.Help
-
-	s.Caches = c.Caches
-	s.Configs = c.Configs
-	s.Commands = c.Commands
-	log.Println(c.Name, "fork:", s.Name)
-
-	if c.Messages != nil {
-		s.Messages = make(chan *Message, len(c.Messages))
-	}
-	c.Context.Register(s, c.Server.Fork(s, key))
+func (c *Context) Spawn(arg ...string) *Context { // {{{
+	s := &Context{Name: arg[0], Help: c.Help}
+	c.Register(s, c.Server.Spawn(s, arg...))
 	s.Begin()
-	return s
-}
 
-// }}}
-func (c *Context) Spawn(key string) *Context { // {{{
-	s := new(Context)
-	s.Name = c.Name + key
-	s.Help = c.Help
-
-	s.Caches = make(map[string]*Cache)
-	s.Configs = make(map[string]*Config)
-	s.Commands = make(map[string]*Command)
 	log.Println(c.Name, "spawn:", s.Name)
-
-	if c.Messages != nil {
-		s.Messages = make(chan *Message, len(c.Messages))
-	}
-	c.Register(s, c.Server.Spawn(s, key))
-	s.Begin()
 	return s
 }
 
@@ -496,7 +506,7 @@ func (c *Context) Get() *Message { // {{{
 
 	select {
 	case msg := <-c.Messages:
-		log.Println(c.Name, "get", msg.Code, ":", msg.Meta["detail"])
+		// log.Println(c.Name, "get", msg.Code, ":", msg.Meta["detail"])
 		return msg
 	}
 
@@ -510,8 +520,8 @@ func (c *Context) Post(m *Message) bool { // {{{
 	}
 
 	m.Code = c.Root.Capi("nmessage", 1)
-	log.Println(c.Name, "post", m.Code, ":", m.Meta["detail"])
-	defer log.Println(c.Name, "done", m.Code, ":", m.Meta["detail"])
+	// log.Println(c.Name, "post", m.Code, ":", m.Meta["detail"])
+	// defer log.Println(c.Name, "done", m.Code, ":", m.Meta["detail"])
 
 	c.Messages <- m
 	if m.Wait != nil {
@@ -592,7 +602,7 @@ func (c *Context) Cap(arg ...string) string { // {{{
 			if v.Hand != nil {
 				v.Value = v.Hand(c, v.Value)
 			}
-			log.Println(c.Name, "cache:", arg, v.Value)
+			// log.Println(c.Name, "cache:", arg, v.Value)
 			return v.Value
 		}
 
@@ -605,7 +615,7 @@ func (c *Context) Cap(arg ...string) string { // {{{
 			if v.Hand != nil {
 				v.Value = v.Hand(c, v.Value)
 			}
-			log.Println(c.Name, "cache:", arg)
+			// log.Println(c.Name, "cache:", arg)
 			return v.Value
 		}
 
@@ -632,6 +642,7 @@ func (c *Context) Capi(key string, value int) int { // {{{
 	n, e := strconv.Atoi(c.Cap(key))
 	c.Check(e)
 	c.Cap(key, strconv.Itoa(n+value))
+	// log.Println(c.Name, "cache:", n+value)
 	return n
 }
 
