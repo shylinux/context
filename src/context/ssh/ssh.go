@@ -228,15 +228,11 @@ func (ssh *SSH) Spawn(c *ctx.Context, key string) ctx.Server { // {{{
 // }}}
 
 var Index = &ctx.Context{Name: "ssh", Help: "远程控制",
-	Caches: map[string]*ctx.Cache{
-		"status": &ctx.Cache{"status", "stop", "服务器状态", nil},
-	},
+	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"master":  &ctx.Config{"master", "yes", "主控或被控", nil},
-		"client":  &ctx.Config{"client", "yes", "连接或监听", nil},
-		"address": &ctx.Config{"address", ":9090", "连接或监听的地址", nil},
-		"cert":    &ctx.Config{"cert", "etc/cert.pem", "证书文件", nil},
-		"key":     &ctx.Config{"key", "etc/key.pem", "私钥文件", nil},
+		"master":  &ctx.Config{Name: "master", Value: "yes", Help: "主控或被控"},
+		"client":  &ctx.Config{Name: "client", Value: "yes", Help: "连接或监听"},
+		"address": &ctx.Config{Name: "address", Value: ":9090", Help: "连接或监听的地址"},
 	},
 	Commands: map[string]*ctx.Command{
 		"remote": &ctx.Command{"remote", "远程命令", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {

@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"context/cli"
 	"net/http"
 )
 
@@ -14,12 +15,6 @@ func (web *WEB) Begin() bool {
 	return true
 }
 func (web *WEB) Start() bool {
-	if web.Cap("status") == "start" {
-		return true
-	}
-	web.Cap("status", "start")
-	defer web.Cap("status", "stop")
-
 	http.Handle("/", http.FileServer(http.Dir(web.Conf("path"))))
 	http.ListenAndServe(web.Conf("address"), nil)
 	return true
@@ -33,17 +28,15 @@ func (web *WEB) Fork(c *ctx.Context, key string) ctx.Server {
 }
 
 var Index = &ctx.Context{Name: "web", Help: "网页服务",
-	Caches: map[string]*ctx.Cache{
-		"status": &ctx.Cache{"status", "stop", "服务运行状态", nil},
-	},
+	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"path":    &ctx.Config{"path", "srv", "监听地址", nil},
-		"address": &ctx.Config{"address", ":9494", "监听地址", nil},
+		"path":    &ctx.Config{Name: "path", Value: "srv", Help: "监听地址"},
+		"address": &ctx.Config{Name: "address", Value: ":9494", Help: "监听地址"},
 	},
 }
 
 func init() {
 	web := &WEB{}
 	web.Context = Index
-	ctx.Index.Register(Index, web)
+	cli.Index.Register(Index, web)
 }

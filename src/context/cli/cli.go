@@ -24,15 +24,12 @@ type CLI struct {
 	bios []*bufio.Reader
 	out  *os.File
 
-	index   int
 	history []map[string]string
 	alias   map[string]string
+	exit    chan bool
 	next    string
 
-	loop int
-
 	target *ctx.Context
-	exit   chan bool
 	*ctx.Context
 }
 
@@ -104,6 +101,7 @@ func (cli *CLI) parse() bool { // {{{
 
 	msg := &ctx.Message{Wait: make(chan bool)}
 	msg.Context = cli.Context
+	msg.Target = cli.target
 
 	r := rune(ls[0][0])
 	if !unicode.IsNumber(r) || !unicode.IsLetter(r) || r == '$' || r == '_' {
@@ -131,8 +129,7 @@ func (cli *CLI) parse() bool { // {{{
 		}
 	}
 
-	cli.Context.Messages <- msg
-	<-msg.Wait
+	cli.Post(msg)
 
 	for _, v := range msg.Meta["result"] {
 		cli.echo(v)
@@ -159,18 +156,15 @@ func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 		}
 
 		if _, ok := cli.Commands[detail[0]]; ok {
-			cli.loop = 0
 			cli.next = cli.Cmd(msg, detail...)
 		} else if _, ok := cli.target.Commands[detail[0]]; ok {
-			cli.loop = 0
 			cli.target.Message = msg
 			cli.next = cli.target.Cmd(msg, detail...)
 		} else {
 			cmd := exec.Command(detail[0], detail[1:]...)
 			v, e := cmd.CombinedOutput()
-			if e != nil && cli.loop < 1 {
-				cli.next = cli.Conf("default") + " " + strings.Join(detail, " ")
-				cli.loop++
+			if e != nil {
+				msg.Echo("%s\n", e)
 			}
 			msg.Echo(string(v))
 			log.Println(cli.Name, "command:", detail)
@@ -178,10 +172,9 @@ func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 	}
 	cli.history = append(cli.history, map[string]string{
 		"time":  time.Now().Format("15:04:05"),
-		"index": fmt.Sprintf("%d", cli.index),
+		"index": fmt.Sprintf("%d", len(cli.history)),
 		"cli":   strings.Join(detail, " "),
 	})
-	cli.index++
 	return true
 }
 
@@ -195,9 +188,13 @@ func (cli *CLI) echo(str string, arg ...interface{}) { // {{{
 // }}}
 
 func (cli *CLI) Begin() bool { // {{{
-	// cli.Conf("log", cli.Conf("log"))
-	for k, v := range cli.Configs {
-		cli.Conf(k, v.Value)
+	cli.history = make([]map[string]string, 0, 100)
+	cli.alias = make(map[string]string, 10)
+	cli.exit = make(chan bool)
+	cli.target = cli.Context
+
+	if f, e := os.Open(cli.Conf("init.sh")); e == nil {
+		cli.push(f)
 	}
 
 	if cli.Conf("slient") != "yes" {
@@ -206,37 +203,19 @@ func (cli *CLI) Begin() bool { // {{{
 		cli.echo("\n")
 	}
 
-	cli.exit = make(chan bool)
-	cli.target = cli.Context
-	cli.history = make([]map[string]string, 0, 100)
-	cli.alias = make(map[string]string, 10)
-
-	if f, e := os.Open(cli.Conf("init.sh")); e == nil {
-		cli.push(f)
-	}
-
 	return true
 }
 
 // }}}
 func (cli *CLI) Start() bool { // {{{
-	cli.Begin()
-
 	go func() {
 		for cli.parse() {
 		}
 	}()
 
 	for {
-		select {
-		case cli.Message = <-cli.Messages:
-			cli.deal(cli.Message)
-			if cli.Message.Wait != nil {
-				cli.Message.Wait <- true
-			}
-		case <-cli.exit:
-			return true
-		}
+		msg := cli.Get()
+		msg.End(cli.deal(msg))
 	}
 
 	return true
@@ -261,10 +240,10 @@ func (cli *CLI) Spawn(c *ctx.Context, key string) ctx.Server { // {{{
 var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"开场白":  &ctx.Config{"开场白", "你好，命令行", "开场白", nil},
-		"结束语":  &ctx.Config{"结束语", "再见，命令行", "结束语", nil},
-		"mode": &ctx.Config{"mode", "local", "命令执行模式", nil},
-		"io": &ctx.Config{"io", "stdout", "输入输出", func(c *ctx.Context, arg string) string {
+		"开场白":  &ctx.Config{Name: "开场白", Value: "你好，命令行", Help: "开场白"},
+		"结束语":  &ctx.Config{Name: "结束语", Value: "再见，命令行", Help: "结束语"},
+		"mode": &ctx.Config{Name: "mode", Value: "local", Help: "命令执行模式"},
+		"io": &ctx.Config{Name: "io", Value: "stdout", Help: "输入输出", Hand: func(c *ctx.Context, arg string) string {
 			cli := c.Server.(*CLI) // {{{
 			cli.out = os.Stdout
 			cli.push(os.Stdin)
@@ -272,25 +251,14 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			return arg
 			// }}}
 		}},
-		"slient":  &ctx.Config{"slient", "yes", "静默启动", nil},
-		"init.sh": &ctx.Config{"init.sh", "etc/hi.sh", "启动脚本", nil},
-		"default": &ctx.Config{"default", "get", "默认命令", nil},
-		"log": &ctx.Config{"log", "var/bench.log", "日志文件", func(c *ctx.Context, arg string) string {
-			if l, e := os.Create(arg); e == nil { // {{{
-				log.SetOutput(l)
-			} else {
-				log.Println("log", arg, "create error")
-			}
-			return arg
-			// }}}
-		}},
-		"PS1": &ctx.Config{"PS1", "etcvpn>", "命令行提示符", func(c *ctx.Context, arg string) string {
-			cli := c.Server.(*CLI)
-			self := c.Server.(*CLI) // {{{
+		"slient":  &ctx.Config{Name: "slient", Value: "yes", Help: "静默启动"},
+		"init.sh": &ctx.Config{Name: "init.sh", Value: "etc/hi.sh", Help: "启动脚本"},
+		"PS1": &ctx.Config{Name: "PS1", Value: "etcvpn>", Help: "命令行提示符", Hand: func(c *ctx.Context, arg string) string {
+			cli := c.Server.(*CLI) // {{{
 			if cli != nil && cli.target != nil {
 				arg = cli.target.Name + ">"
 			}
-			return fmt.Sprintf("%d[%s]\033[32m%s\033[0m ", self.index, time.Now().Format("15:04:05"), arg)
+			return fmt.Sprintf("%d[%s]\033[32m%s\033[0m ", len(cli.history), time.Now().Format("15:04:05"), arg)
 			// }}}
 		}},
 	},
@@ -423,19 +391,20 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			return ""
 			// }}}
 		}},
-		"message": &ctx.Command{"message [find|search name [switch]]|root|back|home", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+		"message": &ctx.Command{"message detail...", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			msg.Meta["detail"] = arg[1:]
+			msg.Target.Post(msg)
 			return ""
 		}},
 		"server": &ctx.Command{"server start|stop|switch", "服务启动停止切换", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			cli := c.Server.(*CLI) // {{{
+			s := msg.Target // {{{
 			switch len(arg) {
 			case 1:
-				go cli.target.Start()
+				return "server start"
 			case 2:
 				switch arg[1] {
 				case "start":
-					go cli.target.Start()
-					msg.Echo("\n")
+					go s.Start()
 				case "stop":
 				case "switch":
 				}
@@ -443,7 +412,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			return ""
 			// }}}
 		}},
-		"context": &ctx.Command{"context [find|search name [switch]]|root|back|home", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+		"context": &ctx.Command{"context [spawn|fork|find|search name [switch]]|root|back|home", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
 			cli := c.Server.(*CLI) // {{{
 
 			switch len(arg) {
@@ -461,6 +430,10 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 				}
 			case 2, 3, 4, 5:
 				switch arg[1] {
+				case "fork":
+					msg.Target.Fork(arg[2])
+				case "spawn":
+					msg.Target.Spawn(arg[2])
 				case "root":
 					cli.target = cli.Context.Root
 				case "back":
@@ -471,9 +444,11 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 					cli.target = cli.Context
 				case "find":
 					cs := c.Root.Find(strings.Split(arg[2], "."))
-					msg.Echo("%s: %s\n", cs.Name, cs.Help)
-					if len(arg) == 4 {
-						cli.target = cs
+					if cs != nil {
+						msg.Echo("%s: %s\n", cs.Name, cs.Help)
+						if len(arg) == 4 {
+							cli.target = cs
+						}
 					}
 				case "search":
 					cs := c.Root.Search(arg[2])
@@ -495,13 +470,14 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 					}
 				default:
 					cs := c.Root.Find(strings.Split(arg[1], "."))
-					msg.Echo("%s: %s\n", cs.Name, cs.Help)
 					if cs != nil {
-						cli.target = cs
+						msg.Echo("%s: %s\n", cs.Name, cs.Help)
+						if cs != nil {
+							cli.target = cs
+						}
 					}
 				}
 			}
-			msg.Echo("\ncurr: %s(%s)\n", cli.target.Name, cli.target.Help)
 			return ""
 			// }}}
 		}},
