@@ -40,6 +40,7 @@ type Command struct { // {{{
 type Message struct { // {{{
 	Time time.Time
 	Code int
+	User string
 
 	Meta map[string][]string
 	Data map[string]interface{}
@@ -50,8 +51,29 @@ type Message struct { // {{{
 
 	Name string
 	*Context
+
+	Messages []*Message
+	Message  *Message
+	Root     *Message
 }
 
+func (m *Message) Spawn(c *Context, key string) *Message { // {{{
+	msg := &Message{Time: time.Now(), Code: m.Capi("nmessage", 1)}
+
+	msg.Context = m.Target
+	msg.Target = c
+
+	if m.Messages == nil {
+		m.Messages = make([]*Message, 0, 10)
+	}
+	m.Messages = append(m.Messages, msg)
+	msg.Message = m
+	msg.Root = m.Root
+	return m
+
+}
+
+// }}}
 func (m *Message) Add(key string, value ...string) string { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
@@ -211,6 +233,9 @@ func (c *Context) Init(arg ...string) { // {{{
 		}
 	}
 
+	Pulse.Context = Index
+	Pulse.Root = Pulse
+
 	if len(arg) > 2 {
 		for _, v := range arg[2:] {
 			cs = root.Search(v)
@@ -219,7 +244,10 @@ func (c *Context) Init(arg ...string) { // {{{
 			}
 		}
 	} else {
-		go root.Find(strings.Split(root.Conf("default"), ".")).Start()
+		s := root.Find(strings.Split(root.Conf("default"), "."))
+		go s.Start()
+		Pulse.Target = s
+		s.Post(Pulse)
 	}
 
 	<-make(chan bool)
@@ -426,24 +454,6 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
-func (c *Context) Request(s *Context, key string) *Message { // {{{
-	if c.Session == nil {
-		c.Session = make(map[string]*Message)
-	}
-	if s.Resource == nil {
-		s.Resource = make([]*Message, 0, c.Confi("MessageListSize"))
-	}
-
-	m := &Message{Index: len(s.Resource), Name: key}
-
-	m.Target = s
-	m.Context = c
-
-	return m
-}
-
-// }}}
-
 func (c *Context) Begin() bool { // {{{
 	c.Root.Capi("ncontext", 1)
 	for k, v := range c.Configs {
@@ -491,9 +501,10 @@ func (c *Context) Post(m *Message) bool { // {{{
 	if c.Messages == nil {
 		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
 	}
-
-	m.Time = time.Now()
-	m.Code = c.Root.Capi("nmessage", 1)
+	if c.Resource == nil {
+		c.Resource = make([]*Message, 0, c.Confi("MessageQueueSize"))
+	}
+	c.Resource = append(c.Resource, m)
 
 	c.Messages <- m
 	if m.Wait != nil {
@@ -630,8 +641,7 @@ func (c *Context) Capi(key string, value int) int { // {{{
 // }}}
 // }}}
 
-type CTX struct {
-}
+type CTX struct{}
 
 var Ctx = &CTX{}
 
@@ -664,7 +674,10 @@ var Index = &Context{Name: "ctx", Help: "根上下文",
 		}},
 	},
 	Commands: map[string]*Command{},
+	Session:  map[string]*Message{"root": Pulse},
 }
+
+var Pulse = &Message{Time: time.Now(), Code: 0}
 
 func Start() {
 	Index.Init(os.Args[1:]...)

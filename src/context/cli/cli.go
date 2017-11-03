@@ -99,6 +99,7 @@ func (cli *CLI) parse() bool { // {{{
 	ls := strings.Split(line, " ")
 
 	msg := &ctx.Message{Wait: make(chan bool)}
+	msg.Message = cli.Resource[0]
 	msg.Context = cli.Context
 	msg.Target = cli.target
 
@@ -149,6 +150,10 @@ func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 	}()
 
 	detail := msg.Meta["detail"]
+	if len(detail) == 0 {
+		msg.End(true)
+		return true
+	}
 	if a, ok := cli.alias[detail[0]]; ok {
 		detail[0] = a
 	}
@@ -352,6 +357,23 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			// }}}
 		}},
 		"message": &ctx.Command{"message detail...", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			m := ctx.Pulse
+			switch len(arg) {
+			case 1:
+				fmt.Println(msg.Code, msg.Time.Format("2006/01/02 15:04:05"))
+			case 2:
+				switch arg[1] {
+				case "home":
+					m = msg.Message
+				case "root":
+				}
+				fmt.Println(m.Code, m.Time.Format("2006/01/02 15:04:05"))
+				for i, v := range m.Messages {
+					fmt.Println(i, v.Code, v.Time.Format("2006/01/02 15:04:05"))
+				}
+			}
+
+			return ""
 			msg.Meta["detail"] = arg[1:] // {{{
 			if c == msg.Target {
 				go msg.Target.Post(msg)
