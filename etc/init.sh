@@ -5,5 +5,4 @@ alias $ cache
 alias & server
 alias * message
 
-~root
-~tcp
+remote slave listen :9393 tcp

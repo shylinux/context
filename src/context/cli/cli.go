@@ -18,11 +18,11 @@ import ( // {{{
 // }}}
 
 type CLI struct {
-	in   *os.File
-	ins  []*os.File
+	out  io.WriteCloser
+	in   io.ReadCloser
+	ins  []io.ReadCloser
 	bio  *bufio.Reader
 	bios []*bufio.Reader
-	out  *os.File
 
 	history []map[string]string
 	alias   map[string]string
@@ -31,11 +31,12 @@ type CLI struct {
 
 	target *ctx.Context
 	*ctx.Context
+	*ctx.CTX
 }
 
-func (cli *CLI) push(f *os.File) { // {{{
+func (cli *CLI) push(f io.ReadCloser) { // {{{
 	if cli.ins == nil || cli.bios == nil {
-		cli.ins = make([]*os.File, 0, 3)
+		cli.ins = make([]io.ReadCloser, 0, 3)
 		cli.bios = make([]*bufio.Reader, 0, 3)
 	}
 
@@ -47,7 +48,7 @@ func (cli *CLI) push(f *os.File) { // {{{
 
 // }}}
 func (cli *CLI) parse() bool { // {{{
-	if len(cli.ins) == 1 {
+	if len(cli.ins) == 1 || cli.Conf("slient") != "yes" {
 		cli.echo(cli.Conf("PS1"))
 	}
 
@@ -63,8 +64,6 @@ func (cli *CLI) parse() bool { // {{{
 				}
 				cli.echo("\n")
 				cli.exit <- true
-				return false
-
 			} else {
 				cli.ins = cli.ins[:l-1]
 				cli.bios = cli.bios[:l-1]
@@ -75,22 +74,22 @@ func (cli *CLI) parse() bool { // {{{
 		}
 		cli.Check(e)
 		line = l
+
+		if len(cli.ins) > 1 || cli.Conf("slient") != "yes" {
+			cli.echo(line)
+		}
+
+		if len(line) == 1 {
+			return true
+		}
 	} else {
 		line = cli.next
-		if len(cli.ins) == 1 {
+		cli.next = ""
+
+		if cli.Conf("slient") != "yes" {
 			cli.echo(line)
 			cli.echo("\n")
 		}
-	}
-
-	if len(cli.ins) > 1 {
-		cli.echo(cli.Conf("PS1"))
-		cli.echo(line)
-	}
-	cli.next = ""
-
-	if len(line) == 1 {
-		return true
 	}
 
 	line = strings.TrimSpace(line)
@@ -142,34 +141,33 @@ func (cli *CLI) parse() bool { // {{{
 func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 	defer func() {
 		if e := recover(); e != nil {
-			msg.Echo("%s", e)
+			msg.Echo("%s\n", e)
 			debug.PrintStack()
 			log.Println(e)
+			msg.End(false)
 		}
 	}()
 
 	detail := msg.Meta["detail"]
-	switch cli.Conf("mode") {
-	case "local":
-		if a, ok := cli.alias[detail[0]]; ok {
-			detail[0] = a
-		}
-
-		if _, ok := cli.Commands[detail[0]]; ok {
-			cli.next = cli.Cmd(msg, detail...)
-		} else if _, ok := cli.target.Commands[detail[0]]; ok {
-			cli.target.Message = msg
-			cli.next = cli.target.Cmd(msg, detail...)
-		} else {
-			cmd := exec.Command(detail[0], detail[1:]...)
-			v, e := cmd.CombinedOutput()
-			if e != nil {
-				msg.Echo("%s\n", e)
-			}
-			msg.Echo(string(v))
-			log.Println(cli.Name, "command:", detail)
-		}
+	if a, ok := cli.alias[detail[0]]; ok {
+		detail[0] = a
 	}
+
+	if _, ok := cli.Commands[detail[0]]; ok {
+		cli.next = cli.Cmd(msg, detail...)
+	} else if _, ok := cli.target.Commands[detail[0]]; ok {
+		cli.next = cli.target.Cmd(msg, detail...)
+	} else {
+		cmd := exec.Command(detail[0], detail[1:]...)
+		v, e := cmd.CombinedOutput()
+		if e != nil {
+			msg.Echo("%s\n", e)
+		}
+		msg.Echo(string(v))
+		log.Println(cli.Name, "command:", detail)
+	}
+	msg.End(true)
+
 	cli.history = append(cli.history, map[string]string{
 		"time":  time.Now().Format("15:04:05"),
 		"index": fmt.Sprintf("%d", len(cli.history)),
@@ -188,34 +186,39 @@ func (cli *CLI) echo(str string, arg ...interface{}) { // {{{
 // }}}
 
 func (cli *CLI) Begin() bool { // {{{
-	cli.history = make([]map[string]string, 0, 100)
-	cli.alias = make(map[string]string, 10)
-	cli.exit = make(chan bool)
-	cli.target = cli.Context
-
 	if f, e := os.Open(cli.Conf("init.sh")); e == nil {
 		cli.push(f)
 	}
 
+	cli.history = make([]map[string]string, 0, 100)
+	cli.alias = make(map[string]string, 10)
+	cli.exit = make(chan bool)
+	cli.target = cli.Context
+	return true
+}
+
+// }}}
+func (cli *CLI) Start() bool { // {{{
+	if msg, ok := cli.Session["remote"]; ok {
+		cli.push(msg.Data["result"].(io.ReadCloser))
+		cli.out = msg.Data["result"].(io.WriteCloser)
+		cli.echo(cli.Conf("开场白"))
+	}
 	if cli.Conf("slient") != "yes" {
 		cli.echo("\n")
 		cli.echo(cli.Conf("开场白"))
 		cli.echo("\n")
 	}
 
-	return true
-}
+	if cli.Conf("mode") == "local" {
+		go func() {
+			defer recover()
+			for cli.parse() {
+			}
+		}()
+	}
 
-// }}}
-func (cli *CLI) Start() bool { // {{{
-	go func() {
-		for cli.parse() {
-		}
-	}()
-
-	for {
-		msg := cli.Get()
-		msg.End(cli.deal(msg))
+	for cli.deal(cli.Get()) {
 	}
 
 	return true
@@ -223,6 +226,12 @@ func (cli *CLI) Start() bool { // {{{
 
 // }}}
 func (cli *CLI) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
+	c.Caches = map[string]*ctx.Cache{}
+	c.Configs = map[string]*ctx.Config{
+		"address":  &ctx.Config{Name: "address", Value: arg[0], Help: "监听地址"},
+		"protocol": &ctx.Config{Name: "protocol", Value: arg[1], Help: "监听协议"},
+	}
+
 	s := new(CLI)
 	s.Context = c
 	return s
@@ -240,12 +249,10 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			cli := c.Server.(*CLI) // {{{
 			cli.out = os.Stdout
 			cli.push(os.Stdin)
-
 			return arg
 			// }}}
 		}},
-		"slient":  &ctx.Config{Name: "slient", Value: "yes", Help: "静默启动"},
-		"init.sh": &ctx.Config{Name: "init.sh", Value: "etc/hi.sh", Help: "启动脚本"},
+		"slient": &ctx.Config{Name: "slient", Value: "yes", Help: "静默启动"},
 		"PS1": &ctx.Config{Name: "PS1", Value: "etcvpn>", Help: "命令行提示符", Hand: func(c *ctx.Context, arg string) string {
 			cli := c.Server.(*CLI) // {{{
 			if cli != nil && cli.target != nil {
@@ -256,95 +263,130 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 		}},
 	},
 	Commands: map[string]*ctx.Command{
-		"cache": &ctx.Command{"cache [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			cli := c.Server.(*CLI) // {{{
-
+		"context": &ctx.Command{"context [spawn|find|search name [which]]|root|back|home", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			cli, ok := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 1:
-				for k, v := range cli.target.Caches {
-					msg.Echo("%s(%s): %s\n", k, v.Value, v.Help)
+				cs := []*ctx.Context{msg.Target}
+				for i := 0; i < len(cs); i++ {
+					if len(cs[i].Contexts) > 0 {
+						msg.Echo("%s: ", cs[i].Name)
+						for k, v := range cs[i].Contexts {
+							cs = append(cs, v)
+							msg.Echo("%s, ", k)
+						}
+						msg.Echo("\n")
+					}
 				}
 			case 2:
-				if v, ok := cli.target.Caches[arg[1]]; ok {
-					msg.Echo("%s: %s\n", v.Name, v.Help)
-				}
-			case 3:
 				switch arg[1] {
-				case "delete":
-					if _, ok := cli.target.Caches[arg[2]]; ok {
-						delete(cli.target.Caches, arg[2])
+				case "root":
+					if ok {
+						cli.target = cli.Context.Root
+					} else {
+						msg.Target = msg.Target.Root
+					}
+				case "back":
+					if ok {
+						if cli.Context.Context != nil {
+							cli.target = cli.Context.Context
+						}
+					} else {
+						if msg.Target.Context != nil {
+							msg.Target = msg.Target.Context
+						}
+					}
+				case "home":
+					if ok {
+						cli.target = cli.Context
+					} else {
+						msg.Target = msg.Context
 					}
 				default:
-					if _, ok := cli.target.Caches[arg[1]]; ok {
-						msg.Echo("%s: %s\n", arg[1], cli.target.Cap(arg[1:]...))
+					if cs := msg.Target.Find(strings.Split(arg[1], ".")); cs != nil {
+						if ok {
+							cli.target = cs
+						} else {
+							msg.Target = cs
+						}
 					}
 				}
-			case 5:
-				cli.target.Cap(arg[1:]...)
+			case 3, 4:
+				switch arg[1] {
+				case "spawn":
+					msg.Target.Spawn(arg[2])
+				case "find":
+					cs := msg.Target.Find(strings.Split(arg[2], "."))
+					if cs != nil {
+						msg.Echo("%s: %s\n", cs.Name, cs.Help)
+						if len(arg) == 4 {
+							if ok {
+								cli.target = cs
+							} else {
+								msg.Target = cs
+							}
+						}
+					}
+				case "search":
+					cs := msg.Target.Search(arg[2])
+					for i, v := range cs {
+						msg.Echo("[%d] %s: %s\n", i, v.Name, v.Help)
+					}
+
+					if len(arg) == 4 {
+						n, e := strconv.Atoi(arg[3])
+						if 0 <= n && n < len(cs) && e == nil {
+							if ok {
+								cli.target = cs[n]
+							} else {
+								msg.Target = cs[n]
+							}
+						} else {
+							msg.Echo("参数错误(0<=n<%s)", len(cs))
+						}
+					}
+				}
+			}
+
+			return ""
+			// }}}
+		}},
+		"message": &ctx.Command{"message detail...", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			msg.Meta["detail"] = arg[1:] // {{{
+			if c == msg.Target {
+				go msg.Target.Post(msg)
+			} else {
+				msg.Target.Post(msg)
 			}
 			return ""
 			// }}}
 		}},
-		"config": &ctx.Command{"config [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			cli := c.Server.(*CLI) // {{{
-
+		"server": &ctx.Command{"server start|stop|switch", "服务启动停止切换", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			s := msg.Target // {{{
 			switch len(arg) {
 			case 1:
-				for k, v := range cli.target.Configs {
-					msg.Echo("%s(%s): %s\n", k, v.Value, v.Help)
-				}
+				return "server start"
 			case 2:
-				if v, ok := cli.target.Configs[arg[1]]; ok {
-					msg.Echo("%s: %s\n", v.Name, v.Help)
-				}
-			case 3:
 				switch arg[1] {
-				case "delete":
-					if _, ok := cli.target.Configs[arg[2]]; ok {
-						delete(cli.target.Configs, arg[2])
+				case "start":
+					if s != nil {
+						go s.Start()
 					}
-				default:
-					if _, ok := cli.target.Configs[arg[1]]; ok {
-						cli.target.Conf(arg[1:]...)
-					}
-				}
-			case 5:
-				cli.target.Conf(arg[1:]...)
-			}
-			return ""
-			// }}}
-		}},
-		"command": &ctx.Command{"command [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			cli := c.Server.(*CLI) // {{{
-
-			switch len(arg) {
-			case 1:
-				for k, v := range cli.target.Commands {
-					msg.Echo("%s: %s\n", k, v.Help)
-				}
-			case 2:
-				if v, ok := cli.target.Commands[arg[1]]; ok {
-					msg.Echo("%s: %s\n", v.Name, v.Help)
-				}
-			case 3:
-				switch arg[1] {
-				case "delete":
-					if _, ok := cli.target.Commands[arg[2]]; ok {
-						delete(cli.target.Commands, arg[2])
-					}
+				case "stop":
+				case "switch":
 				}
 			}
-
-			msg.Echo("\n")
 			return ""
 			// }}}
 		}},
 		"source": &ctx.Command{"source file", "运行脚本", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
 			cli := c.Server.(*CLI) // {{{
-
-			f, e := os.Open(arg[1])
-			c.Check(e)
-			cli.push(f)
+			switch len(arg) {
+			case 2:
+				f, e := os.Open(arg[1])
+				c.Check(e)
+				cli.push(f)
+			}
 
 			return ""
 			// }}}
@@ -384,101 +426,118 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			return ""
 			// }}}
 		}},
-		"message": &ctx.Command{"message detail...", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			msg.Meta["detail"] = arg[1:]
-			msg.Target.Post(msg)
-			return ""
-		}},
-		"server": &ctx.Command{"server start|stop|switch", "服务启动停止切换", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			s := msg.Target // {{{
-			switch len(arg) {
+		"command": &ctx.Command{"command [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			switch len(arg) { // {{{
 			case 1:
-				return "server start"
+				for k, v := range msg.Target.Commands {
+					msg.Echo("%s: %s\n", k, v.Help)
+				}
 			case 2:
+				if v, ok := msg.Target.Commands[arg[1]]; ok {
+					msg.Echo("%s: %s\n", v.Name, v.Help)
+				}
+			case 3:
 				switch arg[1] {
-				case "start":
-					go s.Start()
-				case "stop":
-				case "switch":
+				case "delete":
+					if _, ok := msg.Target.Commands[arg[2]]; ok {
+						delete(msg.Target.Commands, arg[2])
+					}
 				}
 			}
+
+			msg.Echo("\n")
 			return ""
 			// }}}
 		}},
-		"context": &ctx.Command{"context [spawn|fork|find|search name [switch]]|root|back|home", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			cli := c.Server.(*CLI) // {{{
-
-			switch len(arg) {
+		"config": &ctx.Command{"config [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			switch len(arg) { // {{{
 			case 1:
-				cs := []*ctx.Context{cli.target}
-				for i := 0; i < len(cs); i++ {
-					if len(cs[i].Contexts) > 0 {
-						msg.Echo("%s: ", cs[i].Name)
-						for k, v := range cs[i].Contexts {
-							cs = append(cs, v)
-							msg.Echo("%s, ", k)
-						}
-						msg.Echo("\n")
-					}
+				for k, v := range msg.Target.Configs {
+					msg.Echo("%s(%s): %s\n", k, v.Value, v.Help)
 				}
-			case 2, 3, 4, 5:
+			case 2:
+				if v, ok := msg.Target.Configs[arg[1]]; ok {
+					msg.Echo("%s: %s\n", v.Name, v.Help)
+				}
+			case 3:
 				switch arg[1] {
-				case "spawn":
-					msg.Target.Spawn(arg[2])
-				case "root":
-					cli.target = cli.Context.Root
-				case "back":
-					if cli.Context.Context != nil {
-						cli.target = cli.Context.Context
-					}
-				case "home":
-					cli.target = cli.Context
-				case "find":
-					cs := c.Root.Find(strings.Split(arg[2], "."))
-					if cs != nil {
-						msg.Echo("%s: %s\n", cs.Name, cs.Help)
-						if len(arg) == 4 {
-							cli.target = cs
-						}
-					}
-				case "search":
-					cs := c.Root.Search(arg[2])
-					for i, v := range cs {
-						msg.Echo("[%d] %s: %s\n", i, v.Name, v.Help)
-					}
-
-					if len(arg) == 5 {
-						n, e := strconv.Atoi(arg[4])
-						if 0 <= n && n < len(cs) && e == nil {
-							cli.target = cs[0]
-						} else {
-							msg.Echo("参数错误(0<=n<%s)", len(cs))
-						}
-					}
-
-					if len(arg) == 4 {
-						cli.target = cs[0]
+				case "delete":
+					if _, ok := msg.Target.Configs[arg[2]]; ok {
+						delete(msg.Target.Configs, arg[2])
 					}
 				default:
-					cs := c.Root.Find(strings.Split(arg[1], "."))
-					if cs != nil {
-						msg.Echo("%s: %s\n", cs.Name, cs.Help)
-						if cs != nil {
-							cli.target = cs
-						}
+					if _, ok := msg.Target.Configs[arg[1]]; ok {
+						msg.Target.Conf(arg[1:]...)
+					}
+				}
+			case 5:
+				msg.Target.Conf(arg[1:]...)
+			}
+			return ""
+			// }}}
+		}},
+		"cache": &ctx.Command{"cache [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			switch len(arg) { // {{{
+			case 1:
+				for k, v := range msg.Target.Caches {
+					msg.Echo("%s(%s): %s\n", k, v.Value, v.Help)
+				}
+			case 2:
+				if v, ok := msg.Target.Caches[arg[1]]; ok {
+					msg.Echo("%s: %s\n", v.Name, v.Help)
+				}
+			case 3:
+				switch arg[1] {
+				case "delete":
+					if _, ok := msg.Target.Caches[arg[2]]; ok {
+						delete(msg.Target.Caches, arg[2])
+					}
+				default:
+					if _, ok := msg.Target.Caches[arg[1]]; ok {
+						msg.Echo("%s: %s\n", arg[1], msg.Target.Cap(arg[1:]...))
+					}
+				}
+			case 5:
+				msg.Target.Cap(arg[1:]...)
+			}
+			return ""
+			// }}}
+		}},
+		"remote": &ctx.Command{"remote master|slave listen|dial address protocol", "建立远程连接", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+			switch len(arg) {
+			case 1:
+			case 5:
+				if arg[1] == "master" {
+					if arg[2] == "dial" {
+					} else {
+					}
+				} else {
+					if arg[2] == "listen" {
+						msg := &ctx.Message{Code: c.Root.Capi("nmessage", 1), Time: time.Now()}
+						msg.Add("mode", "local")
+						msg.Target = c.Root.Find(strings.Split(arg[4], "."))
+						msg.Context = m.Context
+						msg.Target.Cmd(msg, "listen", arg[3])
+					} else {
 					}
 				}
 			}
-
 			return ""
-			// }}}
+		}},
+		"accept": &ctx.Command{"accept address protocl", "建立远程连接", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
+			s := msg.Context.Spawn(arg[1], arg[2])
+			s.Session = make(map[string]*ctx.Message)
+			s.Session["remote"] = msg
+			s.Start()
+			return ""
 		}},
 	},
 	Messages: make(chan *ctx.Message, 10),
 }
 
 func init() {
-	self := &CLI{}
-	self.Context = Index
-	ctx.Index.Register(Index, self)
+	cli := &CLI{}
+	cli.CTX = ctx.Ctx
+	cli.Context = Index
+	ctx.Index.Register(Index, cli)
 }

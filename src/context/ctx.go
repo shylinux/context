@@ -38,18 +38,18 @@ type Command struct { // {{{
 
 // }}}
 type Message struct { // {{{
-	Code int
 	Time time.Time
+	Code int
 
 	Meta map[string][]string
 	Data map[string]interface{}
 	Wait chan bool
 
+	Index  int
+	Target *Context
+
 	Name string
 	*Context
-
-	Target *Context
-	Index  int
 }
 
 func (m *Message) Add(key string, value ...string) string { // {{{
@@ -109,7 +109,6 @@ func (m *Message) Echo(str string, arg ...interface{}) string { // {{{
 
 // }}}
 func (m *Message) End(s bool) { // {{{
-	// log.Println(m.Name, "end", m.Code, ":", m.Meta["detail"])
 	if m.Wait != nil {
 		m.Wait <- s
 	}
@@ -132,19 +131,20 @@ type Context struct { // {{{
 	Caches   map[string]*Cache
 	Configs  map[string]*Config
 	Commands map[string]*Command
+
 	Messages chan *Message
 	Message  *Message
 	Server
 
-	Root     *Context
-	Context  *Context
-	Contexts map[string]*Context
+	Resource []*Message
+	Session  map[string]*Message
 
 	Index   map[string]*Context
 	Shadows map[string]*Context
 
-	Session  map[string]*Message
-	Resource []*Message
+	Contexts map[string]*Context
+	Context  *Context
+	Root     *Context
 }
 
 func (c *Context) Check(e error) bool { // {{{
@@ -159,33 +159,105 @@ func (c *Context) Check(e error) bool { // {{{
 }
 
 // }}}
-
-func (c *Context) Request(arg ...string) bool { // {{{
-	if c.Session == nil {
-		c.Session = make(map[string]*Message)
+func (c *Context) Register(s *Context, self Server) bool { // {{{
+	if c.Contexts == nil {
+		c.Contexts = make(map[string]*Context)
 	}
 
-	m := &Message{
-		Code: c.Capi("nmessage", 1),
-		Time: time.Now(),
-		Meta: map[string][]string{},
-		Data: map[string]interface{}{},
-		Name: arg[0],
+	if x, ok := c.Contexts[s.Name]; ok {
+		panic(errors.New(c.Name + " 上下文已存在" + x.Name))
 	}
-	m.Context = c
+
+	c.Contexts[s.Name] = s
+	s.Context = c
+	s.Root = c.Root
+	s.Server = self
+
+	log.Println(c.Name, "register:", s.Name)
 	return true
 }
 
 // }}}
-func (c *Context) Release(key string) bool { // {{{
+func (c *Context) Init(arg ...string) { // {{{
+	if c.Root != nil {
+		return
+	}
 
-	return true
+	root := c
+	for root.Context != nil {
+		root = root.Context
+	}
+
+	if len(arg) > 0 {
+		root.Conf("bench.log", arg[0])
+	} else {
+		root.Conf("bench.log", root.Conf("bench.log"))
+	}
+
+	if len(arg) > 1 {
+		root.Conf("init.sh", arg[1])
+	} else {
+		root.Conf("init.sh", root.Conf("init.sh"))
+	}
+
+	cs := []*Context{root}
+
+	for i := 0; i < len(cs); i++ {
+		cs[i].Root = root
+		cs[i].Begin()
+
+		for _, v := range cs[i].Contexts {
+			cs = append(cs, v)
+		}
+	}
+
+	if len(arg) > 2 {
+		for _, v := range arg[2:] {
+			cs = root.Search(v)
+			for _, s := range cs {
+				go s.Start()
+			}
+		}
+	} else {
+		go root.Find(strings.Split(root.Conf("default"), ".")).Start()
+	}
+
+	<-make(chan bool)
 }
 
 // }}}
-func (c *Context) Destroy(index int) bool { // {{{
+func (c *Context) Find(name []string) *Context { // {{{
+	if x, ok := c.Contexts[name[0]]; ok {
+		log.Println(c.Name, "find:", x.Name)
+		if len(name) == 1 {
+			return x
+		}
+		return x.Find(name[1:])
+	}
 
-	return true
+	log.Println(c.Name, "not find:", name[0])
+	return nil
+}
+
+// }}}
+func (c *Context) Search(name string) []*Context { // {{{
+	ps := make([]*Context, 0, 3)
+
+	cs := []*Context{c}
+	for i := 0; i < len(cs); i++ {
+		for _, v := range cs[i].Contexts {
+			cs = append(cs, v)
+		}
+
+		if strings.Contains(cs[i].Name, name) || strings.Contains(cs[i].Help, name) {
+			ps = append(ps, cs[i])
+			log.Println(c.Name, "search:", i, cs[i].Name, "[match]")
+		} else {
+			log.Println(c.Name, "search:", i, cs[i].Name)
+		}
+	}
+
+	return ps
 }
 
 // }}}
@@ -354,125 +426,40 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
-func (c *Context) Find(name []string) *Context { // {{{
-	if x, ok := c.Contexts[name[0]]; ok {
-		log.Println(c.Name, "find:", x.Name)
-		if len(name) == 1 {
-			return x
-		}
-		return x.Find(name[1:])
+func (c *Context) Request(s *Context, key string) *Message { // {{{
+	if c.Session == nil {
+		c.Session = make(map[string]*Message)
+	}
+	if s.Resource == nil {
+		s.Resource = make([]*Message, 0, c.Confi("MessageListSize"))
 	}
 
-	log.Println(c.Name, "not find:", name[0])
-	return nil
-}
+	m := &Message{Index: len(s.Resource), Name: key}
 
-// }}}
-func (c *Context) Search(name string) []*Context { // {{{
-	ps := make([]*Context, 0, 3)
+	m.Target = s
+	m.Context = c
 
-	cs := []*Context{c}
-	for i := 0; i < len(cs); i++ {
-		for _, v := range cs[i].Contexts {
-			cs = append(cs, v)
-		}
-
-		if strings.Contains(cs[i].Name, name) || strings.Contains(cs[i].Help, name) {
-			ps = append(ps, cs[i])
-			log.Println(c.Name, "search:", i, cs[i].Name, "[match]")
-		} else {
-			log.Println(c.Name, "search:", i, cs[i].Name)
-		}
-	}
-
-	return ps
-}
-
-// }}}
-func (c *Context) Register(s *Context, self Server) bool { // {{{
-	if c.Contexts == nil {
-		c.Contexts = make(map[string]*Context)
-	}
-
-	if x, ok := c.Contexts[s.Name]; ok {
-		panic(errors.New(c.Name + " 上下文已存在" + x.Name))
-	}
-
-	c.Contexts[s.Name] = s
-	s.Context = c
-	s.Root = c.Root
-	s.Server = self
-
-	log.Println(c.Name, "register:", s.Name)
-	return true
-}
-
-// }}}
-func (c *Context) Init(arg ...string) { // {{{
-	if c.Root != nil {
-		return
-	}
-
-	root := c
-	for root.Context != nil {
-		root = root.Context
-	}
-
-	if len(arg) > 0 {
-		root.Conf("log", arg[0])
-	} else {
-		root.Conf("log", root.Conf("log"))
-	}
-
-	if len(arg) > 1 {
-		root.Conf("init.sh", arg[1])
-	} else {
-		root.Conf("init.sh", root.Conf("init.sh"))
-	}
-
-	cs := []*Context{root}
-
-	for i := 0; i < len(cs); i++ {
-		cs[i].Root = root
-		cs[i].Begin()
-
-		for _, v := range cs[i].Contexts {
-			cs = append(cs, v)
-		}
-	}
-
-	if len(arg) > 2 {
-		for _, v := range arg[2:] {
-			cs = root.Search(v)
-			for _, s := range cs {
-				log.Println(v, "match start:", s.Name)
-				go s.Start()
-			}
-		}
-	} else {
-		go root.Find(strings.Split(root.Conf("default"), ".")).Start()
-	}
-
-	<-make(chan bool)
+	return m
 }
 
 // }}}
 
 func (c *Context) Begin() bool { // {{{
+	c.Root.Capi("ncontext", 1)
 	for k, v := range c.Configs {
 		c.Conf(k, v.Value)
 	}
 
-	if c.Server != nil && c.Server.Begin() {
-		c.Root.Capi("ncontext", 1)
-		return true
+	if c.Server != nil {
+		return c.Server.Begin()
 	}
-
-	return false
+	return true
 }
 
 // }}}
 func (c *Context) Start() bool { // {{{
+	defer recover()
+
 	if c.Server != nil && c.Cap("status") != "start" {
 		c.Cap("status", "status", "start", "服务状态")
 		defer c.Cap("status", "stop")
@@ -499,35 +486,29 @@ func (c *Context) Spawn(arg ...string) *Context { // {{{
 }
 
 // }}}
-func (c *Context) Get() *Message { // {{{
-	if c.Messages == nil {
-		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
-	}
 
-	select {
-	case msg := <-c.Messages:
-		// log.Println(c.Name, "get", msg.Code, ":", msg.Meta["detail"])
-		return msg
-	}
-
-	return nil
-}
-
-// }}}
 func (c *Context) Post(m *Message) bool { // {{{
 	if c.Messages == nil {
 		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
 	}
 
+	m.Time = time.Now()
 	m.Code = c.Root.Capi("nmessage", 1)
-	// log.Println(c.Name, "post", m.Code, ":", m.Meta["detail"])
-	// defer log.Println(c.Name, "done", m.Code, ":", m.Meta["detail"])
 
 	c.Messages <- m
 	if m.Wait != nil {
 		return <-m.Wait
 	}
 	return true
+}
+
+// }}}
+func (c *Context) Get() *Message { // {{{
+	if c.Messages == nil {
+		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
+	}
+
+	return <-c.Messages
 }
 
 // }}}
@@ -642,12 +623,17 @@ func (c *Context) Capi(key string, value int) int { // {{{
 	n, e := strconv.Atoi(c.Cap(key))
 	c.Check(e)
 	c.Cap(key, strconv.Itoa(n+value))
-	// log.Println(c.Name, "cache:", n+value)
+	log.Println(c.Name, "cache:", key, n+value)
 	return n
 }
 
 // }}}
 // }}}
+
+type CTX struct {
+}
+
+var Ctx = &CTX{}
 
 var Index = &Context{Name: "ctx", Help: "根上下文",
 	Caches: map[string]*Cache{
@@ -661,22 +647,25 @@ var Index = &Context{Name: "ctx", Help: "根上下文",
 		"结束语": &Config{Name: "结束语", Value: "再见，上下文", Help: "结束语"},
 
 		"MessageQueueSize": &Config{Name: "MessageQueueSize", Value: "10", Help: "默认消息队列长度"},
+		"MessageListSize":  &Config{Name: "MessageListSize", Value: "10", Help: "默认消息列表长度"},
 
 		"cert": &Config{Name: "cert", Value: "etc/cert.pem", Help: "证书文件"},
 		"key":  &Config{Name: "key", Value: "etc/key.pem", Help: "私钥文件"},
 
 		"debug":   &Config{Name: "debug", Value: "on", Help: "调试模式"},
 		"default": &Config{Name: "default", Value: "cli", Help: "默认启动模块"},
-		"init.sh": &Config{Name: "init.sh", Value: "etc/hi.sh", Help: "默认启动脚本"},
-		"log": &Config{Name: "log", Value: "var/bench.log", Help: "默认日志文件", Hand: func(c *Context, arg string) string {
-			if l, e := os.Create(arg); e == nil { // {{{
-				log.SetOutput(l)
-			} else {
-				log.Println("log", arg, "create error")
-			}
+		"init.sh": &Config{Name: "init.sh", Value: "etc/init.sh", Help: "默认启动脚本"},
+		"bench.log": &Config{Name: "bench.log", Value: "var/bench.log", Help: "默认日志文件", Hand: func(c *Context, arg string) string {
+			l, e := os.Create(arg) // {{{
+			c.Check(e)
+			log.SetOutput(l)
 			return arg
 			// }}}
 		}},
 	},
 	Commands: map[string]*Command{},
+}
+
+func Start() {
+	Index.Init(os.Args[1:]...)
 }

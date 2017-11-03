@@ -4,23 +4,20 @@ import (
 	"context"
 	"log"
 	"net"
+	"time"
 )
 
 type TCP struct {
 	listener net.Listener
-	conn     []net.Conn
-
-	target *ctx.Context
 	*ctx.Context
+	*ctx.CTX
 }
 
 func (tcp *TCP) Begin() bool {
-	tcp.conn = make([]net.Conn, 0, 3)
 	return true
 }
 
 func (tcp *TCP) Start() bool {
-	log.Println(tcp.Conf("address"))
 	if tcp.Conf("address") == "" {
 		return true
 	}
@@ -35,8 +32,14 @@ func (tcp *TCP) Start() bool {
 		c, e := l.Accept()
 		log.Println(tcp.Name, "accept:", c.LocalAddr(), "<-", c.RemoteAddr())
 		tcp.Check(e)
-		tcp.conn = append(tcp.conn, c)
-		tcp.Capi("nclient", 1)
+
+		msg := &ctx.Message{Code: tcp.Root.Capi("nmessage", 1), Time: time.Now()}
+		msg.Context = tcp.Resource[0].Context
+		msg.Index = tcp.Capi("nclient", 1)
+		msg.Target = tcp.Context
+		msg.Put("result", c)
+		msg.Context.Cmd(msg, "accept", c.RemoteAddr().String(), "tcp")
+		tcp.Resource = append(tcp.Resource, msg)
 	}
 	return true
 }
@@ -72,6 +75,10 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 				}
 			case 2:
 				s := c.Spawn(arg[1:]...)
+				s.Resource = make([]*ctx.Message, 0, 3)
+				s.Resource = append(s.Resource, m)
+				m.Target = s
+				m.Index = 0
 				go s.Start()
 			}
 			return ""
@@ -80,13 +87,13 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			tcp := c.Server.(*TCP)
 			switch len(arg) {
 			case 1:
-				for i, v := range tcp.conn {
-					m.Echo(tcp.Name, "conn: %s %s -> %s\n", i, v.LocalAddr(), v.RemoteAddr())
+				for i, v := range tcp.Resource {
+					conn := v.Data["result"].(net.Conn)
+					m.Echo(tcp.Name, "conn: %s %s -> %s\n", i, conn.LocalAddr(), conn.RemoteAddr())
 				}
 			case 2:
 				conn, e := net.Dial("tcp", arg[1])
 				c.Check(e)
-				tcp.conn = append(tcp.conn, conn)
 				log.Println(tcp.Name, "dial:", conn.LocalAddr(), "->", conn.RemoteAddr())
 			}
 			return ""
@@ -96,6 +103,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 
 func init() {
 	tcp := &TCP{}
+	tcp.CTX = ctx.Ctx
 	tcp.Context = Index
 	ctx.Index.Register(Index, tcp)
 }

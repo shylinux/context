@@ -1,0 +1,112 @@
+snippet p
+	package ${1:main}
+
+	${2}
+snippet i
+	import (
+		"${1}"
+	)
+
+	${2}
+snippet t
+	type ${1} struct {
+		${2}
+	}
+	${3}
+snippet ti
+	type ${1} interface {
+		${2}
+	}
+	${3}
+snippet c
+	package `Filename()`
+
+	import (
+		"context"
+	)
+
+	type `toupper(substitute(expand("%:t"), ".go", "", ""))` struct {
+		*ctx.Context
+		*ctx.CTX
+	}
+
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Begin() bool {
+		return true
+	}
+
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Start() bool {
+		return true
+	}
+
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Spawn(c *ctx.Context, arg ...string) ctx.Server {
+		c.Caches = map[string]*ctx.Cache{}
+		c.Configs = map[string]*ctx.Config{}
+		c.Commands = map[string]*ctx.Command{}
+		s := new(`toupper(substitute(expand("%:t"), ".go", "", ""))`)
+		s.CTX = ctx.Ctx
+		s.Context = c
+		return s
+	}
+
+	var Index = &ctx.Context{Name: "`Filename()`", Help: "${1}",
+		Caches:   map[string]*ctx.Cache{},
+		Configs:  map[string]*ctx.Config{},
+		Commands: map[string]*ctx.Command{},
+	}
+
+	func init() {
+		`Filename()` := &`toupper(substitute(expand("%:t"), ".go", "", ""))`{}
+		`Filename()`.CTX = ctx.Ctx
+		`Filename()`.Context = Index
+		ctx.Index.Register(Index, `Filename()`)
+	}
+snippet v
+	var (
+		${1}
+	)
+	${2}
+snippet m
+	func main() {
+		${1}
+	}
+
+snippet h
+	func(w http.ResponseWriter, r *http.Request) {
+		${1}
+	})
+snippet f
+	func${1}(${2}) ${3}{
+		${4}
+	}${5}
+snippet "
+	"${1}"${2}
+snippet `
+	`${1}`${2}
+snippet (
+	(${1})${2}
+snippet [
+	[${1}]${2}
+snippet {
+	{${1}}${2}
+snippet if
+	if ${1} {
+		${2}
+	}
+	${3}
+snippet for
+	for ${1}{
+		${2}
+	}
+	${3}
+snippet switch
+	switch ${1}{
+		case ${2}:
+			${3}
+	}
+	${4}
+snippet select
+	select {
+		case ${1}:
+			${2}
+	}
+	${3}
