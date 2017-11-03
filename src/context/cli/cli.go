@@ -31,7 +31,6 @@ type CLI struct {
 
 	target *ctx.Context
 	*ctx.Context
-	*ctx.CTX
 }
 
 func (cli *CLI) push(f io.ReadCloser) { // {{{
@@ -54,16 +53,13 @@ func (cli *CLI) parse() bool { // {{{
 
 	line := ""
 	if cli.next == "" {
-		l, e := cli.bio.ReadString('\n')
+		ls, e := cli.bio.ReadString('\n')
 		if e == io.EOF {
 			l := len(cli.ins)
 			if l == 1 {
-				if cli.Conf("slient") != "yes" {
-					cli.echo("\n")
-					cli.echo(cli.Conf("结束语"))
-				}
-				cli.echo("\n")
-				cli.exit <- true
+				cli.echo("\n%s\n", cli.Conf("结束语"))
+				ls = "exit"
+				e = nil
 			} else {
 				cli.ins = cli.ins[:l-1]
 				cli.bios = cli.bios[:l-1]
@@ -73,7 +69,7 @@ func (cli *CLI) parse() bool { // {{{
 			}
 		}
 		cli.Check(e)
-		line = l
+		line = ls
 
 		if len(cli.ins) > 1 || cli.Conf("slient") != "yes" {
 			cli.echo(line)
@@ -129,6 +125,7 @@ func (cli *CLI) parse() bool { // {{{
 		}
 	}
 
+	log.Printf("%d spawn: %s->%s %v", cli.Resource[0].Code, msg.Context.Name, msg.Target.Name, msg.Meta["detail"])
 	cli.Post(msg)
 
 	for _, v := range msg.Meta["result"] {
@@ -143,9 +140,14 @@ func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 	defer func() {
 		if e := recover(); e != nil {
 			msg.Echo("%s\n", e)
-			debug.PrintStack()
-			log.Println(e)
-			msg.End(false)
+
+			if e == io.EOF {
+				panic(e)
+			} else {
+				debug.PrintStack()
+				log.Println(e)
+				msg.End(false)
+			}
 		}
 	}()
 
@@ -160,8 +162,8 @@ func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 
 	if _, ok := cli.Commands[detail[0]]; ok {
 		cli.next = cli.Cmd(msg, detail...)
-	} else if _, ok := cli.target.Commands[detail[0]]; ok {
-		cli.next = cli.target.Cmd(msg, detail...)
+	} else if _, ok := msg.Target.Commands[detail[0]]; ok {
+		cli.next = msg.Cmd()
 	} else {
 		cmd := exec.Command(detail[0], detail[1:]...)
 		v, e := cmd.CombinedOutput()
@@ -169,7 +171,6 @@ func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
 			msg.Echo("%s\n", e)
 		}
 		msg.Echo(string(v))
-		log.Println(cli.Name, "command:", detail)
 	}
 	msg.End(true)
 
@@ -190,32 +191,29 @@ func (cli *CLI) echo(str string, arg ...interface{}) { // {{{
 
 // }}}
 
-func (cli *CLI) Begin() bool { // {{{
-	if f, e := os.Open(cli.Conf("init.sh")); e == nil {
-		cli.push(f)
-	}
-
+func (cli *CLI) Begin() ctx.Server { // {{{
 	cli.history = make([]map[string]string, 0, 100)
 	cli.alias = make(map[string]string, 10)
 	cli.exit = make(chan bool)
+
 	cli.target = cli.Context
-	return true
+	return cli.Server
 }
 
 // }}}
-func (cli *CLI) Start() bool { // {{{
-	if msg, ok := cli.Session["remote"]; ok {
-		cli.push(msg.Data["result"].(io.ReadCloser))
-		cli.out = msg.Data["result"].(io.WriteCloser)
-		cli.echo(cli.Conf("开场白"))
-	}
-	if cli.Conf("slient") != "yes" {
-		cli.echo("\n")
-		cli.echo(cli.Conf("开场白"))
-		cli.echo("\n")
-	}
+func (cli *CLI) Start(m *ctx.Message) bool { // {{{
 
-	if cli.Conf("mode") == "local" {
+	if detail, ok := m.Data["detail"]; ok {
+		io := detail.(io.ReadWriteCloser)
+		cli.out = io
+		cli.push(io)
+
+		cli.echo("%s\n", cli.Conf("开场白"))
+
+		if f, e := os.Open(cli.Conf("init.sh")); e == nil {
+			cli.push(f)
+		}
+
 		go func() {
 			defer recover()
 			for cli.parse() {
@@ -231,11 +229,15 @@ func (cli *CLI) Start() bool { // {{{
 
 // }}}
 func (cli *CLI) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
-	c.Caches = map[string]*ctx.Cache{}
+	c.Caches = map[string]*ctx.Cache{
+		"status": &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
+	}
 	c.Configs = map[string]*ctx.Config{
 		"address":  &ctx.Config{Name: "address", Value: arg[0], Help: "监听地址"},
 		"protocol": &ctx.Config{Name: "protocol", Value: arg[1], Help: "监听协议"},
 	}
+	c.Commands = cli.Commands
+	c.Messages = make(chan *ctx.Message, 10)
 
 	s := new(CLI)
 	s.Context = c
@@ -247,17 +249,10 @@ func (cli *CLI) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
 var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"开场白":  &ctx.Config{Name: "开场白", Value: "你好，命令行", Help: "开场白"},
-		"结束语":  &ctx.Config{Name: "结束语", Value: "再见，命令行", Help: "结束语"},
-		"mode": &ctx.Config{Name: "mode", Value: "local", Help: "命令执行模式"},
-		"io": &ctx.Config{Name: "io", Value: "stdout", Help: "输入输出", Hand: func(c *ctx.Context, arg string) string {
-			cli := c.Server.(*CLI) // {{{
-			cli.out = os.Stdout
-			cli.push(os.Stdin)
-			return arg
-			// }}}
-		}},
-		"slient": &ctx.Config{Name: "slient", Value: "yes", Help: "静默启动"},
+		"开场白":    &ctx.Config{Name: "开场白", Value: "\n~~~  Hello Context & Message World  ~~~\n", Help: "开场白"},
+		"结束语":    &ctx.Config{Name: "结束语", Value: "\n~~~  Byebye Context & Message World  ~~~\n", Help: "结束语"},
+		"slient": &ctx.Config{Name: "slient", Value: "yes", Help: "屏蔽脚本输出"},
+
 		"PS1": &ctx.Config{Name: "PS1", Value: "etcvpn>", Help: "命令行提示符", Hand: func(c *ctx.Context, arg string) string {
 			cli := c.Server.(*CLI) // {{{
 			if cli != nil && cli.target != nil {
@@ -356,29 +351,13 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			return ""
 			// }}}
 		}},
-		"message": &ctx.Command{"message detail...", "查看上下文", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			m := ctx.Pulse
-			switch len(arg) {
-			case 1:
-				fmt.Println(msg.Code, msg.Time.Format("2006/01/02 15:04:05"))
-			case 2:
-				switch arg[1] {
-				case "home":
-					m = msg.Message
-				case "root":
-				}
-				fmt.Println(m.Code, m.Time.Format("2006/01/02 15:04:05"))
-				for i, v := range m.Messages {
-					fmt.Println(i, v.Code, v.Time.Format("2006/01/02 15:04:05"))
-				}
-			}
-
-			return ""
-			msg.Meta["detail"] = arg[1:] // {{{
-			if c == msg.Target {
-				go msg.Target.Post(msg)
-			} else {
-				msg.Target.Post(msg)
+		"message": &ctx.Command{"message detail...", "查看上下文", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+			// {{{
+			ms := []*ctx.Message{ctx.Pulse}
+			for i := 0; i < len(ms); i++ {
+				m.Echo("%d %s.%s -> %s.%d\n", ms[i].Code, ms[i].Context.Name, ms[i].Name, ms[i].Target.Name, ms[i].Index)
+				// m.Echo("%d %s %s.%s -> %s.%d\n", ms[i].Code, ms[i].Time.Format("2006/01/02 15:03:04"), ms[i].Context.Name, ms[i].Name, ms[i].Target.Name, ms[i].Index)
+				ms = append(ms, ms[i].Messages...)
 			}
 			return ""
 			// }}}
@@ -392,7 +371,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 				switch arg[1] {
 				case "start":
 					if s != nil {
-						go s.Start()
+						go s.Start(msg)
 					}
 				case "stop":
 				case "switch":
@@ -525,8 +504,11 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			return ""
 			// }}}
 		}},
+		"exit": &ctx.Command{"exit", "退出", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+			panic(io.EOF)
+		}},
 		"remote": &ctx.Command{"remote master|slave listen|dial address protocol", "建立远程连接", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
-			switch len(arg) {
+			switch len(arg) { // {{{
 			case 1:
 			case 5:
 				if arg[1] == "master" {
@@ -535,23 +517,19 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 					}
 				} else {
 					if arg[2] == "listen" {
-						msg := &ctx.Message{Code: c.Root.Capi("nmessage", 1), Time: time.Now()}
-						msg.Add("mode", "local")
-						msg.Target = c.Root.Find(strings.Split(arg[4], "."))
-						msg.Context = m.Context
-						msg.Target.Cmd(msg, "listen", arg[3])
+						s := c.Root.Find(strings.Split(arg[4], "."))
+						m.Message.Spawn(s, arg[3], 0).Add("detail", "listen", arg[3]).Post(c)
 					} else {
 					}
 				}
 			}
 			return ""
+			// }}}
 		}},
-		"accept": &ctx.Command{"accept address protocl", "建立远程连接", func(c *ctx.Context, msg *ctx.Message, arg ...string) string {
-			s := msg.Context.Spawn(arg[1], arg[2])
-			s.Session = make(map[string]*ctx.Message)
-			s.Session["remote"] = msg
-			s.Start()
+		"accept": &ctx.Command{"accept address protocl", "建立远程连接", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+			m.Start(arg[1:]...) // {{{
 			return ""
+			// }}}
 		}},
 	},
 	Messages: make(chan *ctx.Message, 10),
@@ -559,7 +537,6 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 
 func init() {
 	cli := &CLI{}
-	cli.CTX = ctx.Ctx
 	cli.Context = Index
 	ctx.Index.Register(Index, cli)
 }

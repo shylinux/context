@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	_ "context/cli"
-	_ "context/ssh"
 	_ "context/tcp"
-	_ "context/web"
+	// _ "context/ssh"
+	// _ "context/web"
 )
 
 func main() {

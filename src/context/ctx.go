@@ -5,6 +5,7 @@ import ( // {{{
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -38,43 +39,50 @@ type Command struct { // {{{
 
 // }}}
 type Message struct { // {{{
-	Time time.Time
 	Code int
-	User string
+	Time time.Time
 
 	Meta map[string][]string
 	Data map[string]interface{}
 	Wait chan bool
 
-	Index  int
-	Target *Context
-
-	Name string
 	*Context
+	Name   string
+	Target *Context
+	Index  int
 
 	Messages []*Message
 	Message  *Message
 	Root     *Message
 }
 
-func (m *Message) Spawn(c *Context, key string) *Message { // {{{
-	msg := &Message{Time: time.Now(), Code: m.Capi("nmessage", 1)}
+func (m *Message) Spawn(c *Context, key string, index int) *Message { // {{{
+	msg := &Message{
+		Code:    m.Capi("nmessage", 1),
+		Time:    time.Now(),
+		Target:  c,
+		Name:    key,
+		Message: m,
+		Root:    m.Root,
+	}
 
 	msg.Context = m.Target
-	msg.Target = c
+	if msg.Session == nil {
+		msg.Session = make(map[string]*Message)
+	}
+	msg.Session[key] = msg
 
 	if m.Messages == nil {
 		m.Messages = make([]*Message, 0, 10)
 	}
 	m.Messages = append(m.Messages, msg)
-	msg.Message = m
-	msg.Root = m.Root
-	return m
+	log.Printf("%d spawn %d: %s.%s->%s.%d", m.Code, msg.Code, msg.Context.Name, msg.Name, msg.Target.Name, msg.Index)
+	return msg
 
 }
 
 // }}}
-func (m *Message) Add(key string, value ...string) string { // {{{
+func (m *Message) Add(key string, value ...string) *Message { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
@@ -83,17 +91,17 @@ func (m *Message) Add(key string, value ...string) string { // {{{
 	}
 
 	m.Meta[key] = append(m.Meta[key], value...)
-	return value[0]
+	return m
 }
 
 // }}}
-func (m *Message) Put(key string, value interface{}) interface{} { // {{{
+func (m *Message) Put(key string, value interface{}) *Message { // {{{
 	if m.Data == nil {
 		m.Data = make(map[string]interface{})
 	}
 
 	m.Data[key] = value
-	return value
+	return m
 }
 
 // }}}
@@ -116,7 +124,7 @@ func (m *Message) Get(key string) string { // {{{
 }
 
 // }}}
-func (m *Message) Echo(str string, arg ...interface{}) string { // {{{
+func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
@@ -126,7 +134,7 @@ func (m *Message) Echo(str string, arg ...interface{}) string { // {{{
 
 	s := fmt.Sprintf(str, arg...)
 	m.Meta["result"] = append(m.Meta["result"], s)
-	return s
+	return m
 }
 
 // }}}
@@ -138,10 +146,37 @@ func (m *Message) End(s bool) { // {{{
 }
 
 // }}}
+func (m *Message) Cmd() string { // {{{
+	return m.Target.Cmd(m, m.Meta["detail"]...)
+}
+
+// }}}
+func (m *Message) Post(c *Context) bool { // {{{
+	if c.Messages == nil {
+		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
+	}
+
+	c.Messages <- m
+	if m.Wait != nil {
+		return <-m.Wait
+	}
+	return true
+
+}
+
+// }}}
+func (m *Message) Start(arg ...string) bool { // {{{
+	s := m.Target.Spawn(arg...).Begin()
+	m.Target = s
+	go s.Start(m)
+	return true
+}
+
+// }}}
 // }}}
 type Server interface { // {{{
-	Begin() bool
-	Start() bool
+	Begin() Server
+	Start(m *Message) bool
 	Spawn(c *Context, arg ...string) Server
 }
 
@@ -210,18 +245,6 @@ func (c *Context) Init(arg ...string) { // {{{
 		root = root.Context
 	}
 
-	if len(arg) > 0 {
-		root.Conf("bench.log", arg[0])
-	} else {
-		root.Conf("bench.log", root.Conf("bench.log"))
-	}
-
-	if len(arg) > 1 {
-		root.Conf("init.sh", arg[1])
-	} else {
-		root.Conf("init.sh", root.Conf("init.sh"))
-	}
-
 	cs := []*Context{root}
 
 	for i := 0; i < len(cs); i++ {
@@ -233,38 +256,39 @@ func (c *Context) Init(arg ...string) { // {{{
 		}
 	}
 
-	Pulse.Context = Index
 	Pulse.Root = Pulse
+	Pulse.Target = Index
+	Pulse.Context = Index
 
-	if len(arg) > 2 {
-		for _, v := range arg[2:] {
-			cs = root.Search(v)
-			for _, s := range cs {
-				go s.Start()
-			}
+	for _, s := range root.Contexts {
+		if ok, _ := regexp.MatchString(root.Conf("start"), s.Name); ok {
+			go s.Start(Pulse.Spawn(s, s.Name, 0).Put("detail", os.Stdout))
 		}
-	} else {
-		s := root.Find(strings.Split(root.Conf("default"), "."))
-		go s.Start()
-		Pulse.Target = s
-		s.Post(Pulse)
 	}
 
-	<-make(chan bool)
+	Pulse.Wait = make(chan bool)
+	for {
+		<-Pulse.Wait
+		if Index.Capi("nserver", 0) == 0 {
+			return
+		}
+	}
 }
 
 // }}}
-func (c *Context) Find(name []string) *Context { // {{{
-	if x, ok := c.Contexts[name[0]]; ok {
-		log.Println(c.Name, "find:", x.Name)
-		if len(name) == 1 {
-			return x
-		}
-		return x.Find(name[1:])
-	}
+func (c *Context) Find(name []string) (s *Context) { // {{{
+	log.Println(c.Name, "find:", name)
 
-	log.Println(c.Name, "not find:", name[0])
-	return nil
+	cs := c.Contexts
+	for _, v := range name {
+		if x, ok := cs[v]; ok {
+			s = x
+			cs = x.Contexts
+			continue
+		}
+		panic(errors.New("not find: " + v))
+	}
+	return
 }
 
 // }}}
@@ -454,32 +478,41 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
-func (c *Context) Begin() bool { // {{{
+func (c *Context) Begin() *Context { // {{{
 	c.Root.Capi("ncontext", 1)
-	for k, v := range c.Configs {
-		c.Conf(k, v.Value)
+	for _, v := range c.Configs {
+		if v.Hand != nil {
+			v.Hand(c, v.Value)
+		}
 	}
 
 	if c.Server != nil {
-		return c.Server.Begin()
+		c.Server.Begin()
 	}
-	return true
+	return c
 }
 
 // }}}
-func (c *Context) Start() bool { // {{{
-	defer recover()
+func (c *Context) Start(m *Message) bool { // {{{
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println(e)
+		}
+		Pulse.Wait <- true
+	}()
 
 	if c.Server != nil && c.Cap("status") != "start" {
+
 		c.Cap("status", "status", "start", "服务状态")
 		defer c.Cap("status", "stop")
 
 		c.Root.Capi("nserver", 1)
 		defer c.Root.Capi("nserver", -1)
 
-		log.Println(c.Name, "start:")
-		c.Server.Start()
-		log.Println(c.Name, "stop:")
+		c.Resource = []*Message{m}
+		log.Println(m.Code, "start:", c.Name)
+		c.Server.Start(m)
+		log.Println(m.Code, "stop:", c.Name)
 	}
 
 	return true
@@ -490,8 +523,6 @@ func (c *Context) Spawn(arg ...string) *Context { // {{{
 	s := &Context{Name: arg[0], Help: c.Help}
 	c.Register(s, c.Server.Spawn(s, arg...))
 	s.Begin()
-
-	log.Println(c.Name, "spawn:", s.Name)
 	return s
 }
 
@@ -501,10 +532,6 @@ func (c *Context) Post(m *Message) bool { // {{{
 	if c.Messages == nil {
 		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
 	}
-	if c.Resource == nil {
-		c.Resource = make([]*Message, 0, c.Confi("MessageQueueSize"))
-	}
-	c.Resource = append(c.Resource, m)
 
 	c.Messages <- m
 	if m.Wait != nil {
@@ -526,7 +553,6 @@ func (c *Context) Get() *Message { // {{{
 
 func (c *Context) Cmd(m *Message, arg ...string) string { // {{{
 	if x, ok := c.Commands[arg[0]]; ok {
-		log.Println(c.Name, "command:", arg)
 		return x.Hand(c, m, arg...)
 	}
 
@@ -615,12 +641,12 @@ func (c *Context) Cap(arg ...string) string { // {{{
 			return c.Context.Cap(arg...)
 		}
 	case 4:
-		if v, ok := c.Caches[arg[0]]; ok {
-			panic(errors.New(v.Name + "缓存项已存在"))
-		}
-
+		// if v, ok := c.Caches[arg[0]]; ok {
+		// 	panic(errors.New(v.Name + "缓存项已存在"))
+		// }
+		//
 		c.Caches[arg[0]] = &Cache{arg[1], arg[2], arg[3], nil}
-		log.Println(c.Name, "cache:", arg)
+		// log.Println(c.Name, "cache:", arg)
 		return arg[2]
 	default:
 		panic(errors.New(arg[0] + "缓存项参数错误"))
@@ -634,16 +660,11 @@ func (c *Context) Capi(key string, value int) int { // {{{
 	n, e := strconv.Atoi(c.Cap(key))
 	c.Check(e)
 	c.Cap(key, strconv.Itoa(n+value))
-	log.Println(c.Name, "cache:", key, n+value)
-	return n
+	return n + value
 }
 
 // }}}
 // }}}
-
-type CTX struct{}
-
-var Ctx = &CTX{}
 
 var Index = &Context{Name: "ctx", Help: "根上下文",
 	Caches: map[string]*Cache{
@@ -663,7 +684,7 @@ var Index = &Context{Name: "ctx", Help: "根上下文",
 		"key":  &Config{Name: "key", Value: "etc/key.pem", Help: "私钥文件"},
 
 		"debug":   &Config{Name: "debug", Value: "on", Help: "调试模式"},
-		"default": &Config{Name: "default", Value: "cli", Help: "默认启动模块"},
+		"start":   &Config{Name: "start", Value: "cli", Help: "默认启动模块"},
 		"init.sh": &Config{Name: "init.sh", Value: "etc/init.sh", Help: "默认启动脚本"},
 		"bench.log": &Config{Name: "bench.log", Value: "var/bench.log", Help: "默认日志文件", Hand: func(c *Context, arg string) string {
 			l, e := os.Create(arg) // {{{
@@ -675,10 +696,27 @@ var Index = &Context{Name: "ctx", Help: "根上下文",
 	},
 	Commands: map[string]*Command{},
 	Session:  map[string]*Message{"root": Pulse},
+	Resource: []*Message{Pulse},
 }
 
-var Pulse = &Message{Time: time.Now(), Code: 0}
+var Pulse = &Message{Code: 0, Time: time.Now(), Index: 0, Name: "root"}
+
+func init() {
+	if len(os.Args) > 1 {
+		Index.Conf("bench.log", os.Args[1])
+	} else {
+		Index.Conf("bench.log", Index.Conf("bench.log"))
+	}
+
+	if len(os.Args) > 2 {
+		Index.Conf("init.sh", os.Args[2])
+	}
+
+	if len(os.Args) > 3 {
+		Index.Conf("start", os.Args[3])
+	}
+}
 
 func Start() {
-	Index.Init(os.Args[1:]...)
+	Index.Init()
 }

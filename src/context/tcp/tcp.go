@@ -1,23 +1,24 @@
-package tcp
-
-import (
+package tcp // {{{
+// }}}
+import ( // {{{
 	"context"
 	"log"
 	"net"
-	"time"
 )
+
+// }}}
 
 type TCP struct {
 	listener net.Listener
 	*ctx.Context
-	*ctx.CTX
 }
 
-func (tcp *TCP) Begin() bool {
-	return true
+func (tcp *TCP) Begin() ctx.Server { // {{{
+	return tcp
 }
 
-func (tcp *TCP) Start() bool {
+// }}}
+func (tcp *TCP) Start(m *ctx.Message) bool { // {{{
 	if tcp.Conf("address") == "" {
 		return true
 	}
@@ -33,18 +34,15 @@ func (tcp *TCP) Start() bool {
 		log.Println(tcp.Name, "accept:", c.LocalAddr(), "<-", c.RemoteAddr())
 		tcp.Check(e)
 
-		msg := &ctx.Message{Code: tcp.Root.Capi("nmessage", 1), Time: time.Now()}
-		msg.Context = tcp.Resource[0].Context
-		msg.Index = tcp.Capi("nclient", 1)
-		msg.Target = tcp.Context
-		msg.Put("result", c)
-		msg.Context.Cmd(msg, "accept", c.RemoteAddr().String(), "tcp")
-		tcp.Resource = append(tcp.Resource, msg)
+		m := m.Spawn(m.Context, c.RemoteAddr().String(), 0)
+		m.Add("detail", "accept", c.RemoteAddr().String(), "tcp").Put("detail", c).Cmd()
 	}
+
 	return true
 }
 
-func (tcp *TCP) Spawn(c *ctx.Context, arg ...string) ctx.Server {
+// }}}
+func (tcp *TCP) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"nclient": &ctx.Cache{Name: "nclient", Value: "0", Help: "连接数量"},
 	}
@@ -55,7 +53,10 @@ func (tcp *TCP) Spawn(c *ctx.Context, arg ...string) ctx.Server {
 	s := new(TCP)
 	s.Context = c
 	return s
+
 }
+
+// }}}
 
 var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 	Caches: map[string]*ctx.Cache{
@@ -66,25 +67,20 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 		"address": &ctx.Config{Name: "address", Value: "", Help: "监听地址"},
 	},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{"listen", "监听端口", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
-			switch len(arg) {
+		"listen": &ctx.Command{"listen address", "监听端口", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+			switch len(arg) { // {{{
 			case 1:
-				for k, s := range c.Contexts {
-					x := s.Server.(*TCP)
-					m.Echo("%s %s\n", k, x.listener.Addr().String())
+				for k, s := range m.Target.Contexts {
+					m.Echo("%s %s\n", k, s.Server.(*TCP).listener.Addr().String())
 				}
 			case 2:
-				s := c.Spawn(arg[1:]...)
-				s.Resource = make([]*ctx.Message, 0, 3)
-				s.Resource = append(s.Resource, m)
-				m.Target = s
-				m.Index = 0
-				go s.Start()
+				m.Start(arg[1:]...)
 			}
 			return ""
+			// }}}
 		}},
 		"dial": &ctx.Command{"dial", "建立连接", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
-			tcp := c.Server.(*TCP)
+			tcp := c.Server.(*TCP) // {{{
 			switch len(arg) {
 			case 1:
 				for i, v := range tcp.Resource {
@@ -97,13 +93,13 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 				log.Println(tcp.Name, "dial:", conn.LocalAddr(), "->", conn.RemoteAddr())
 			}
 			return ""
+			// }}}
 		}},
 	},
 }
 
 func init() {
 	tcp := &TCP{}
-	tcp.CTX = ctx.Ctx
 	tcp.Context = Index
 	ctx.Index.Register(Index, tcp)
 }
