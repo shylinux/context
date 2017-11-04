@@ -1,5 +1,5 @@
-package tcp // {{{
-// }}}
+package tcp
+
 import ( // {{{
 	"context"
 	"log"
@@ -13,7 +13,7 @@ type TCP struct {
 	*ctx.Context
 }
 
-func (tcp *TCP) Begin() ctx.Server { // {{{
+func (tcp *TCP) Begin(m *ctx.Message) ctx.Server { // {{{
 	return tcp
 }
 
@@ -26,25 +26,29 @@ func (tcp *TCP) Start(m *ctx.Message) bool { // {{{
 	l, e := net.Listen("tcp", tcp.Conf("address"))
 	tcp.Check(e)
 	tcp.listener = l
-	tcp.Capi("nlisten", 1)
-	log.Println(tcp.Name, "listen:", l.Addr())
+
+	log.Printf("%s listen(%d): %v", tcp.Name, tcp.Capi("nlisten", 1), l.Addr())
+	defer tcp.Capi("nlisten", -1)
+	defer log.Println("%s close(%d): %v", tcp.Name, tcp.Capi("nlisten", 0), l.Addr())
 
 	for {
 		c, e := l.Accept()
-		log.Println(tcp.Name, "accept:", c.LocalAddr(), "<-", c.RemoteAddr())
 		tcp.Check(e)
+		log.Printf("%s accept(%d): %v<-%v", tcp.Name, tcp.Capi("nclient", 1), c.LocalAddr(), c.RemoteAddr())
+		// defer log.Println(tcp.Name, "close:", tcp.Capi("nclient", -1), c.LocalAddr(), "<-", c.RemoteAddr())
 
-		m := m.Spawn(m.Context, c.RemoteAddr().String(), 0)
-		m.Add("detail", "accept", c.RemoteAddr().String(), "tcp").Put("detail", c).Cmd()
+		msg := m.Spawn(m.Context, c.RemoteAddr().String()).Put("detail", c)
+		msg.Cmd("accept", c.RemoteAddr().String(), "tcp")
 	}
 
 	return true
 }
 
 // }}}
-func (tcp *TCP) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
+func (tcp *TCP) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"nclient": &ctx.Cache{Name: "nclient", Value: "0", Help: "连接数量"},
+		"status":  &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
 	}
 	c.Configs = map[string]*ctx.Config{
 		"address": &ctx.Config{Name: "address", Value: arg[0], Help: "监听地址"},
@@ -54,6 +58,23 @@ func (tcp *TCP) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
 	s.Context = c
 	return s
 
+}
+
+// }}}
+func (tcp *TCP) Exit(m *ctx.Message, arg ...string) bool { // {{{
+
+	if c, ok := m.Data["result"].(net.Conn); ok && m.Target == tcp.Context {
+		c.Close()
+		delete(m.Data, "result")
+		return true
+	}
+
+	if c, ok := m.Data["detail"].(net.Conn); ok && m.Context == tcp.Context {
+		c.Close()
+		delete(m.Data, "detail")
+		return true
+	}
+	return true
 }
 
 // }}}
@@ -94,6 +115,17 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			}
 			return ""
 			// }}}
+		}},
+		"exit": &ctx.Command{"exit", "退出", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+			tcp, ok := m.Target.Server.(*TCP)
+			if !ok {
+				tcp, ok = m.Context.Server.(*TCP)
+			}
+			if ok {
+				tcp.Context.Exit(m)
+			}
+
+			return ""
 		}},
 	},
 }

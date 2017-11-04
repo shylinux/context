@@ -1,14 +1,11 @@
-package cli // {{{
-// }}}
+package cli
+
 import ( // {{{
 	"bufio"
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
-	"os/exec"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -26,8 +23,8 @@ type CLI struct {
 
 	history []map[string]string
 	alias   map[string]string
-	exit    chan bool
 	next    string
+	exit    bool
 
 	target *ctx.Context
 	*ctx.Context
@@ -58,6 +55,7 @@ func (cli *CLI) parse() bool { // {{{
 			l := len(cli.ins)
 			if l == 1 {
 				cli.echo("\n%s\n", cli.Conf("结束语"))
+				return false
 				ls = "exit"
 				e = nil
 			} else {
@@ -125,60 +123,12 @@ func (cli *CLI) parse() bool { // {{{
 		}
 	}
 
-	log.Printf("%d spawn: %s->%s %v", cli.Resource[0].Code, msg.Context.Name, msg.Target.Name, msg.Meta["detail"])
-	cli.Post(msg)
+	msg.Post(cli.Context)
 
 	for _, v := range msg.Meta["result"] {
 		cli.echo(v)
 	}
 
-	return true
-}
-
-// }}}
-func (cli *CLI) deal(msg *ctx.Message) bool { // {{{
-	defer func() {
-		if e := recover(); e != nil {
-			msg.Echo("%s\n", e)
-
-			if e == io.EOF {
-				panic(e)
-			} else {
-				debug.PrintStack()
-				log.Println(e)
-				msg.End(false)
-			}
-		}
-	}()
-
-	detail := msg.Meta["detail"]
-	if len(detail) == 0 {
-		msg.End(true)
-		return true
-	}
-	if a, ok := cli.alias[detail[0]]; ok {
-		detail[0] = a
-	}
-
-	if _, ok := cli.Commands[detail[0]]; ok {
-		cli.next = cli.Cmd(msg, detail...)
-	} else if _, ok := msg.Target.Commands[detail[0]]; ok {
-		cli.next = msg.Cmd()
-	} else {
-		cmd := exec.Command(detail[0], detail[1:]...)
-		v, e := cmd.CombinedOutput()
-		if e != nil {
-			msg.Echo("%s\n", e)
-		}
-		msg.Echo(string(v))
-	}
-	msg.End(true)
-
-	cli.history = append(cli.history, map[string]string{
-		"time":  time.Now().Format("15:04:05"),
-		"index": fmt.Sprintf("%d", len(cli.history)),
-		"cli":   strings.Join(detail, " "),
-	})
 	return true
 }
 
@@ -191,18 +141,15 @@ func (cli *CLI) echo(str string, arg ...interface{}) { // {{{
 
 // }}}
 
-func (cli *CLI) Begin() ctx.Server { // {{{
+func (cli *CLI) Begin(m *ctx.Message) ctx.Server { // {{{
 	cli.history = make([]map[string]string, 0, 100)
 	cli.alias = make(map[string]string, 10)
-	cli.exit = make(chan bool)
-
 	cli.target = cli.Context
 	return cli.Server
 }
 
 // }}}
 func (cli *CLI) Start(m *ctx.Message) bool { // {{{
-
 	if detail, ok := m.Data["detail"]; ok {
 		io := detail.(io.ReadWriteCloser)
 		cli.out = io
@@ -214,21 +161,40 @@ func (cli *CLI) Start(m *ctx.Message) bool { // {{{
 			cli.push(f)
 		}
 
-		go func() {
-			defer recover()
+		go cli.Safe(m, func(c *ctx.Context, m *ctx.Message) {
 			for cli.parse() {
 			}
-		}()
+		})
 	}
 
-	for cli.deal(cli.Get()) {
+	for cli.Deal(func(msg *ctx.Message) bool {
+		arg := msg.Meta["detail"]
+		if a, ok := cli.alias[arg[0]]; ok {
+			arg[0] = a
+		}
+		return true
+
+	}, func(msg *ctx.Message) bool {
+		arg := msg.Meta["detail"]
+		cli.history = append(cli.history, map[string]string{
+			"time":  time.Now().Format("15:04:05"),
+			"index": fmt.Sprintf("%d", len(cli.history)),
+			"cli":   strings.Join(arg, " "),
+		})
+
+		if cli.exit == true {
+			return false
+		}
+		return true
+
+	}) {
 	}
 
 	return true
 }
 
 // }}}
-func (cli *CLI) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
+func (cli *CLI) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"status": &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
 	}
@@ -242,6 +208,14 @@ func (cli *CLI) Spawn(c *ctx.Context, arg ...string) ctx.Server { // {{{
 	s := new(CLI)
 	s.Context = c
 	return s
+}
+
+// }}}
+func (cli *CLI) Exit(m *ctx.Message, arg ...string) bool { // {{{
+	if cli.Context != Index {
+		delete(cli.Context.Context.Contexts, cli.Name)
+	}
+	return true
 }
 
 // }}}
@@ -303,18 +277,19 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 						msg.Target = msg.Context
 					}
 				default:
-					if cs := msg.Target.Find(strings.Split(arg[1], ".")); cs != nil {
+					// if cs := msg.Target.Find(strings.Split(arg[1], ".")); cs != nil {
+					if cs := c.Root.Search(arg[1]); cs != nil && len(cs) > 0 {
 						if ok {
-							cli.target = cs
+							cli.target = cs[0]
 						} else {
-							msg.Target = cs
+							msg.Target = cs[0]
 						}
 					}
 				}
 			case 3, 4:
 				switch arg[1] {
 				case "spawn":
-					msg.Target.Spawn(arg[2])
+					msg.Target.Spawn(msg, arg[2])
 				case "find":
 					cs := msg.Target.Find(strings.Split(arg[2], "."))
 					if cs != nil {
@@ -505,7 +480,19 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			// }}}
 		}},
 		"exit": &ctx.Command{"exit", "退出", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
-			panic(io.EOF)
+			cli, ok := m.Target.Server.(*CLI)
+			if !ok {
+				cli, ok = m.Context.Server.(*CLI)
+			}
+			if ok {
+				if !cli.exit {
+					m.Echo(c.Conf("结束语"))
+					cli.Context.Exit(m)
+				}
+				cli.exit = true
+			}
+
+			return ""
 		}},
 		"remote": &ctx.Command{"remote master|slave listen|dial address protocol", "建立远程连接", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
 			switch len(arg) { // {{{
@@ -518,7 +505,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 				} else {
 					if arg[2] == "listen" {
 						s := c.Root.Find(strings.Split(arg[4], "."))
-						m.Message.Spawn(s, arg[3], 0).Add("detail", "listen", arg[3]).Post(c)
+						m.Message.Spawn(s, arg[3]).Cmd("listen", arg[3])
 					} else {
 					}
 				}
