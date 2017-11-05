@@ -23,7 +23,7 @@ func (tcp *TCP) Start(m *ctx.Message) bool { // {{{
 		return true
 	}
 
-	l, e := net.Listen("tcp", tcp.Conf("address"))
+	l, e := net.Listen("tcp4", tcp.Conf("address"))
 	tcp.Check(e)
 	tcp.listener = l
 
@@ -88,36 +88,36 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 		"address": &ctx.Config{Name: "address", Value: "", Help: "监听地址"},
 	},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{"listen address", "监听端口", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+		"listen": &ctx.Command{"listen address", "监听端口", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
-			case 1:
+			case 0:
 				for k, s := range m.Target.Contexts {
 					m.Echo("%s %s\n", k, s.Server.(*TCP).listener.Addr().String())
 				}
-			case 2:
-				m.Start(arg[1:]...)
+			case 1:
+				m.Start(arg...)
 			}
 			return ""
 			// }}}
 		}},
-		"dial": &ctx.Command{"dial", "建立连接", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
+		"dial": &ctx.Command{"dial", "建立连接", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			tcp := c.Server.(*TCP) // {{{
 			switch len(arg) {
-			case 1:
+			case 0:
 				for i, v := range tcp.Resource {
 					conn := v.Data["result"].(net.Conn)
 					m.Echo(tcp.Name, "conn: %s %s -> %s\n", i, conn.LocalAddr(), conn.RemoteAddr())
 				}
 			case 2:
-				conn, e := net.Dial("tcp", arg[1])
+				conn, e := net.Dial("tcp", arg[0])
 				c.Check(e)
 				log.Println(tcp.Name, "dial:", conn.LocalAddr(), "->", conn.RemoteAddr())
 			}
 			return ""
 			// }}}
 		}},
-		"exit": &ctx.Command{"exit", "退出", func(c *ctx.Context, m *ctx.Message, arg ...string) string {
-			tcp, ok := m.Target.Server.(*TCP)
+		"exit": &ctx.Command{"exit", "退出", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+			tcp, ok := m.Target.Server.(*TCP) // {{{
 			if !ok {
 				tcp, ok = m.Context.Server.(*TCP)
 			}
@@ -126,6 +126,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			}
 
 			return ""
+			// }}}
 		}},
 	},
 }

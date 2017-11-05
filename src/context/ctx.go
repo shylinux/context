@@ -20,7 +20,7 @@ type Cache struct { // {{{
 	Name  string
 	Value string
 	Help  string
-	Hand  func(c *Context, arg string) string
+	Hand  func(c *Context, x *Cache, arg ...string) string
 }
 
 // }}}
@@ -28,15 +28,14 @@ type Config struct { // {{{
 	Name  string
 	Value string
 	Help  string
-	Hand  func(c *Context, arg string) string
-	Spawn bool
+	Hand  func(c *Context, x *Config, arg ...string) string
 }
 
 // }}}
 type Command struct { // {{{
 	Name string
 	Help string
-	Hand func(c *Context, m *Message, arg ...string) string
+	Hand func(c *Context, m *Message, key string, arg ...string) string
 }
 
 // }}}
@@ -158,8 +157,7 @@ func (m *Message) Cmd(arg ...string) string { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	log.Printf("%s command(%s->%s): %v", m.Target.Name, m.Context.Name, m.Target.Name, m.Meta["detail"])
-	return m.Target.Cmd(m, m.Meta["detail"]...)
+	return m.Target.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
 }
 
 // }}}
@@ -275,16 +273,16 @@ func (c *Context) Register(s *Context, x Server) *Context { // {{{
 	s.Context = c
 	s.Server = x
 
-	log.Printf("%s register(%d): %s", c.Name, Index.Capi("ncontext", 1), s.Name)
+	log.Printf("%s sub(%d): %s", c.Name, Index.Capi("ncontext", 1), s.Name)
 	return s
 }
 
 // }}}
 func (c *Context) Begin(m *Message) *Context { // {{{
-	for _, v := range c.Configs {
-		if v.Hand != nil {
-			v.Hand(c, v.Value)
-			log.Println(c.Name, "config:", v.Name, v.Value)
+	for _, x := range c.Configs {
+		if x.Hand != nil {
+			x.Hand(c, x, x.Value)
+			log.Println(c.Name, "conf:", x.Name, x.Value)
 		}
 	}
 
@@ -340,8 +338,7 @@ func (c *Context) Deal(pre func(m *Message) bool, post func(m *Message) bool) (l
 	}
 
 	c.Safe(m, func(c *Context, m *Message) {
-		c.Cmd(m, m.Meta["detail"]...)
-		log.Printf("%s command(%s->%s): %v", c.Name, m.Context.Name, m.Target.Name, m.Meta["detail"])
+		c.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
 
 	}, func(c *Context, m *Message) {
 		m.Cmd()
@@ -602,116 +599,111 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
-func (c *Context) Cmd(m *Message, arg ...string) string { // {{{
-	if x, ok := c.Commands[arg[0]]; ok {
-		return x.Hand(c, m, arg...)
+func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
+	for s := c; s != nil; s = s.Context {
+		if x, ok := s.Commands[key]; ok {
+			log.Printf("%s cmd(%s->%s): %v", c.Name, m.Context.Name, m.Target.Name, m.Meta["detail"])
+
+			if x.Hand == nil {
+				panic(errors.New(fmt.Sprintf(key + "没有权限")))
+			}
+			return x.Hand(c, m, key, arg...)
+		}
 	}
 
-	if c.Context != nil {
-		return c.Context.Cmd(m, arg...)
-	}
-
-	panic(errors.New(fmt.Sprintf(arg[0] + "命令项不存在")))
+	panic(errors.New(fmt.Sprintf(key + "命令项不存在")))
 }
 
 // }}}
-func (c *Context) Conf(arg ...string) string { // {{{
-	switch len(arg) {
-	case 1:
-		if v, ok := c.Configs[arg[0]]; ok {
-			if v.Hand != nil {
-				return v.Hand(c, v.Value)
+func (c *Context) Conf(key string, arg ...string) string { // {{{
+	for s := c; s != nil; s = s.Context {
+		if x, ok := s.Configs[key]; ok {
+			switch len(arg) {
+			case 0:
+				if x.Hand != nil {
+					return x.Hand(c, x)
+				}
+				return x.Value
+			case 1:
+				log.Println(c.Name, "conf:", key, arg[0])
+				x.Value = arg[0]
+				if x.Hand != nil {
+					return x.Hand(c, x, x.Value)
+				}
+				return x.Value
+			case 3:
+				log.Println(c.Name, "conf:", key, arg)
+				if s == c {
+					panic(errors.New(x.Name + "配置项已存在"))
+				}
+				c.Configs[key] = &Config{Name: arg[0], Value: arg[1], Help: arg[2], Hand: x.Hand}
+				return arg[1]
+			default:
+				panic(errors.New(key + "配置项参数错误"))
 			}
-			return v.Value
 		}
-
-		if c.Context != nil {
-			return c.Context.Conf(arg...)
-		}
-	case 2:
-		if v, ok := c.Configs[arg[0]]; ok {
-			v.Value = arg[1]
-			if v.Hand != nil {
-				return v.Hand(c, v.Value)
-			}
-			log.Println(c.Name, "config:", arg)
-			return v.Value
-		}
-
-		if c.Context != nil {
-			return c.Context.Conf(arg...)
-		}
-	case 4:
-		if v, ok := c.Configs[arg[0]]; ok {
-			panic(errors.New(v.Name + "配置项已存在"))
-		}
-
-		c.Configs[arg[0]] = &Config{Name: arg[1], Value: arg[2], Help: arg[3]}
-		log.Println(c.Name, "config:", arg)
-		return arg[2]
-	default:
-		panic(errors.New(arg[0] + "配置项参数错误"))
 	}
 
-	panic(errors.New(arg[0] + "配置项不存在"))
+	if len(arg) == 3 {
+		log.Println(c.Name, "conf:", key, arg)
+		c.Configs[key] = &Config{Name: arg[0], Value: arg[1], Help: arg[2]}
+		return arg[1]
+	}
+
+	panic(errors.New(key + "配置项不存在"))
 }
 
 // }}}
-func (c *Context) Confi(arg ...string) int { // {{{
-	n, e := strconv.Atoi(c.Conf(arg...))
+func (c *Context) Confi(key string, arg ...string) int { // {{{
+	n, e := strconv.Atoi(c.Conf(key, arg...))
 	c.Check(e)
 	return n
 }
 
 // }}}
-func (c *Context) Cap(arg ...string) string { // {{{
-	switch len(arg) {
-	case 1:
-		if v, ok := c.Caches[arg[0]]; ok {
-			if v.Hand != nil {
-				v.Value = v.Hand(c, v.Value)
+func (c *Context) Cap(key string, arg ...string) string { // {{{
+	for s := c; s != nil; s = s.Context {
+		if x, ok := s.Caches[key]; ok {
+			switch len(arg) {
+			case 0:
+				if x.Hand != nil {
+					return x.Hand(c, x)
+				}
+				return x.Value
+			case 1:
+				if x.Hand != nil {
+					return x.Hand(c, x, x.Value)
+				}
+				x.Value = arg[0]
+				return x.Value
+			case 3:
+				if s == c {
+					panic(errors.New(key + "缓存项已存在"))
+				}
+				c.Caches[key] = &Cache{arg[0], arg[1], arg[2], x.Hand}
+				return arg[1]
+			default:
+				panic(errors.New(key + "缓存项参数错误"))
 			}
-			// log.Println(c.Name, "cache:", arg, v.Value)
-			return v.Value
 		}
-
-		if c.Context != nil {
-			return c.Context.Cap(arg...)
-		}
-	case 2:
-		if v, ok := c.Caches[arg[0]]; ok {
-			v.Value = arg[1]
-			if v.Hand != nil {
-				v.Value = v.Hand(c, v.Value)
-			}
-			// log.Println(c.Name, "cache:", arg)
-			return v.Value
-		}
-
-		if c.Context != nil {
-			return c.Context.Cap(arg...)
-		}
-	case 4:
-		// if v, ok := c.Caches[arg[0]]; ok {
-		// 	panic(errors.New(v.Name + "缓存项已存在"))
-		// }
-		//
-		c.Caches[arg[0]] = &Cache{arg[1], arg[2], arg[3], nil}
-		// log.Println(c.Name, "cache:", arg)
-		return arg[2]
-	default:
-		panic(errors.New(arg[0] + "缓存项参数错误"))
+	}
+	if len(arg) == 3 {
+		c.Caches[key] = &Cache{arg[0], arg[1], arg[2], nil}
+		return arg[1]
 	}
 
-	panic(errors.New(arg[0] + "缓存项不存在"))
+	panic(errors.New(key + "缓存项不存在"))
 }
 
 // }}}
-func (c *Context) Capi(key string, value int) int { // {{{
+func (c *Context) Capi(key string, arg ...int) int { // {{{
 	n, e := strconv.Atoi(c.Cap(key))
 	c.Check(e)
-	c.Cap(key, strconv.Itoa(n+value))
-	return n + value
+	if len(arg) > 0 {
+		n += arg[0]
+		c.Cap(key, strconv.Itoa(n))
+	}
+	return n
 }
 
 // }}}
@@ -736,15 +728,22 @@ var Index = &Context{Name: "ctx", Help: "根上下文",
 		"debug":   &Config{Name: "debug", Value: "off", Help: "调试模式"},
 		"start":   &Config{Name: "start", Value: "cli", Help: "默认启动模块"},
 		"init.sh": &Config{Name: "init.sh", Value: "etc/init.sh", Help: "默认启动脚本"},
-		"bench.log": &Config{Name: "bench.log", Value: "var/bench.log", Help: "默认日志文件", Hand: func(c *Context, arg string) string {
-			l, e := os.Create(arg) // {{{
-			c.Check(e)
-			log.SetOutput(l)
-			return arg
+		"bench.log": &Config{Name: "bench.log", Value: "var/bench.log", Help: "默认日志文件", Hand: func(c *Context, x *Config, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				l, e := os.Create(x.Value)
+				c.Check(e)
+				log.SetOutput(l)
+			}
+			return x.Value
 			// }}}
 		}},
 	},
-	Commands: map[string]*Command{},
+	Commands: map[string]*Command{
+		"void": &Command{"void", "建立远程连接", func(c *Context, m *Message, key string, arg ...string) string {
+			m.Echo("hello void!\n")
+			return ""
+		}},
+	},
 	Session:  map[string]*Message{"root": Pulse},
 	Resource: []*Message{Pulse},
 }
