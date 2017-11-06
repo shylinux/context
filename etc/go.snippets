@@ -23,30 +23,35 @@ snippet c
 
 	import (
 		"context"
+		_ "context/cli"
 	)
 
 	type `toupper(substitute(expand("%:t"), ".go", "", ""))` struct {
 		*ctx.Context
-		*ctx.CTX
 	}
 
-	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Begin() bool {
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Begin(m *ctx.Message) ctx.Server {
+		return nil
+	}
+
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Start(m *ctx.Message) bool {
 		return true
 	}
 
-	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Start() bool {
-		return true
-	}
-
-	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Spawn(c *ctx.Context, arg ...string) ctx.Server {
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server {
 		c.Caches = map[string]*ctx.Cache{}
 		c.Configs = map[string]*ctx.Config{}
 		c.Commands = map[string]*ctx.Command{}
+
 		s := new(`toupper(substitute(expand("%:t"), ".go", "", ""))`)
-		s.CTX = ctx.Ctx
 		s.Context = c
 		return s
 	}
+
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Exit(m *ctx.Message, arg ...string) bool {
+		return true
+	}
+
 
 	var Index = &ctx.Context{Name: "`Filename()`", Help: "${1}",
 		Caches:   map[string]*ctx.Cache{},
@@ -56,7 +61,6 @@ snippet c
 
 	func init() {
 		`Filename()` := &`toupper(substitute(expand("%:t"), ".go", "", ""))`{}
-		`Filename()`.CTX = ctx.Ctx
 		`Filename()`.Context = Index
 		ctx.Index.Register(Index, `Filename()`)
 	}

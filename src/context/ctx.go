@@ -1,5 +1,5 @@
-package ctx
-
+package ctx // {{{
+// }}}
 import ( // {{{
 	"errors"
 	"fmt"
@@ -7,6 +7,7 @@ import ( // {{{
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"runtime/debug"
 	"strconv"
@@ -667,14 +668,15 @@ func (c *Context) Cap(key string, arg ...string) string { // {{{
 			switch len(arg) {
 			case 0:
 				if x.Hand != nil {
-					return x.Hand(c, x)
+					x.Value = x.Hand(c, x)
 				}
 				return x.Value
 			case 1:
 				if x.Hand != nil {
-					return x.Hand(c, x, x.Value)
+					x.Value = x.Hand(c, x, x.Value)
+				} else {
+					x.Value = arg[0]
 				}
-				x.Value = arg[0]
 				return x.Value
 			case 3:
 				if s == c {
@@ -708,7 +710,8 @@ func (c *Context) Capi(key string, arg ...int) int { // {{{
 
 // }}}
 
-var Index = &Context{Name: "ctx", Help: "根上下文",
+var Pulse = &Message{Code: 0, Time: time.Now(), Index: 0, Name: "root"}
+var Index = &Context{Name: "ctx", Help: "根上下文", // {{{
 	Caches: map[string]*Cache{
 		"status":   &Cache{Name: "status", Value: "stop", Help: "服务状态"},
 		"nserver":  &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
@@ -725,14 +728,17 @@ var Index = &Context{Name: "ctx", Help: "根上下文",
 		"cert": &Config{Name: "cert", Value: "etc/cert.pem", Help: "证书文件"},
 		"key":  &Config{Name: "key", Value: "etc/key.pem", Help: "私钥文件"},
 
+		"root":    &Config{Name: "root", Value: ".", Help: "工作目录"},
 		"debug":   &Config{Name: "debug", Value: "off", Help: "调试模式"},
 		"start":   &Config{Name: "start", Value: "cli", Help: "默认启动模块"},
 		"init.sh": &Config{Name: "init.sh", Value: "etc/init.sh", Help: "默认启动脚本"},
 		"bench.log": &Config{Name: "bench.log", Value: "var/bench.log", Help: "默认日志文件", Hand: func(c *Context, x *Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
-				l, e := os.Create(x.Value)
-				c.Check(e)
-				log.SetOutput(l)
+				if e := os.MkdirAll(path.Dir(arg[0]), os.ModePerm); e == nil {
+					if l, e := os.Create(x.Value); e == nil {
+						log.SetOutput(l)
+					}
+				}
 			}
 			return x.Value
 			// }}}
@@ -740,29 +746,42 @@ var Index = &Context{Name: "ctx", Help: "根上下文",
 	},
 	Commands: map[string]*Command{
 		"void": &Command{"void", "建立远程连接", func(c *Context, m *Message, key string, arg ...string) string {
-			m.Echo("hello void!\n")
+			m.Echo("hello void!\n") // {{{
 			return ""
+			// }}}
 		}},
 	},
 	Session:  map[string]*Message{"root": Pulse},
 	Resource: []*Message{Pulse},
 }
 
-var Pulse = &Message{Code: 0, Time: time.Now(), Index: 0, Name: "root"}
+// }}}
 
-func init() {
+func init() { // {{{
 	if len(os.Args) > 1 {
-		Index.Conf("bench.log", os.Args[1])
+		Index.Conf("root", os.Args[1])
+	}
+	if e := os.MkdirAll(Index.Conf("root"), os.ModePerm); e != nil {
+		fmt.Println(e)
+		os.Exit(1)
+	}
+	if e := os.Chdir(Index.Conf("root")); e != nil {
+		fmt.Println(e)
+		os.Exit(1)
+	}
+
+	if len(os.Args) > 2 {
+		Index.Conf("bench.log", os.Args[2])
 	} else {
 		Index.Conf("bench.log", Index.Conf("bench.log"))
 	}
 
-	if len(os.Args) > 2 {
-		Index.Conf("init.sh", os.Args[2])
+	if len(os.Args) > 3 {
+		Index.Conf("init.sh", os.Args[3])
 	}
 
-	if len(os.Args) > 3 {
-		Index.Conf("start", os.Args[3])
+	if len(os.Args) > 4 {
+		Index.Conf("start", os.Args[4])
 	}
 	log.Println("\n\n\n")
 }
@@ -783,16 +802,21 @@ func Start() {
 		}
 	}
 
+	n := 0
 	for _, s := range Index.Contexts {
 		if ok, _ := regexp.MatchString(Index.Conf("start"), s.Name); ok {
+			n++
 			go s.Start(Pulse.Spawn(s, s.Name).Put("detail", os.Stdout))
 		}
 	}
 
 	for {
 		<-Pulse.Wait
-		if Index.Capi("nserver", 0) == 0 {
+		n--
+		if n <= 0 && Index.Capi("nserver", 0) == 0 {
 			return
 		}
 	}
 }
+
+// }}}

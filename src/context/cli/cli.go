@@ -1,10 +1,13 @@
-package cli
-
+package cli // {{{
+// }}}
 import ( // {{{
 	"bufio"
 	"context"
+	_ "context/tcp"
+	_ "context/web"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -143,7 +146,6 @@ func (cli *CLI) echo(str string, arg ...interface{}) { // {{{
 
 func (cli *CLI) Begin(m *ctx.Message) ctx.Server { // {{{
 	cli.history = make([]map[string]string, 0, 100)
-	cli.alias = make(map[string]string, 10)
 	cli.target = cli.Context
 	return cli.Server
 }
@@ -223,14 +225,17 @@ func (cli *CLI) Exit(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 
-var Index = &ctx.Context{Name: "cli", Help: "本地控制",
+var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 	Caches: map[string]*ctx.Cache{
-		"nterm": &ctx.Cache{Name: "nterm", Value: "0", Help: "终端数量"},
+		"nterm":  &ctx.Cache{Name: "nterm", Value: "0", Help: "终端数量"},
+		"status": &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
 		"nhistory": &ctx.Cache{Name: "nhistory", Value: "0", Help: "终端数量", Hand: func(c *ctx.Context, x *ctx.Cache, arg ...string) string {
-			if cli, ok := c.Server.(*CLI); ok {
+			if cli, ok := c.Server.(*CLI); ok { // {{{
 				return fmt.Sprintf("%d", len(cli.history))
 			}
-			return ""
+
+			return x.Value
+			// }}}
 		}},
 	},
 	Configs: map[string]*ctx.Config{
@@ -260,7 +265,8 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			cli, ok := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 0:
-				cs := []*ctx.Context{m.Target}
+				// cs := []*ctx.Context{m.Target}
+				cs := []*ctx.Context{m.Target.Root}
 				for i := 0; i < len(cs); i++ {
 					if len(cs[i].Contexts) > 0 {
 						m.Echo("%s: ", cs[i].Name)
@@ -360,6 +366,16 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			s := m.Target // {{{
 			switch len(arg) {
 			case 0:
+				cs := []*ctx.Context{m.Target.Root}
+				for i := 0; i < len(cs); i++ {
+					if x, ok := cs[i].Caches["status"]; ok {
+						m.Echo("%s(%s): %s\n", cs[i].Name, x.Value, cs[i].Help)
+					}
+
+					for _, v := range cs[i].Contexts {
+						cs = append(cs, v)
+					}
+				}
 				return "server start"
 			case 1:
 				switch arg[0] {
@@ -415,6 +431,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 			case 1:
 				n, e := strconv.Atoi(arg[0])
 				if e == nil && 0 <= n && n < len(cli.history) {
+					log.Println("shy log why:", cli.history[n]["cli"])
 					return cli.history[n]["cli"]
 				}
 			}
@@ -543,8 +560,18 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制",
 	Messages: make(chan *ctx.Message, 10),
 }
 
-func init() {
-	cli := &CLI{}
+// }}}
+func init() { // {{{
+	cli := &CLI{alias: map[string]string{
+		"~": "context",
+		"!": "history",
+		"@": "config",
+		"$": "cache",
+		"&": "server",
+		"*": "message",
+	}}
 	cli.Context = Index
 	ctx.Index.Register(Index, cli)
 }
+
+// }}}
