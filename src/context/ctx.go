@@ -235,8 +235,8 @@ func (c *Context) Check(e error) bool { // {{{
 func (c *Context) Safe(m *Message, hand ...func(c *Context, m *Message)) (ok bool) { // {{{
 	defer func() {
 		if e := recover(); e != nil {
+			log.Println(c.Name, "error:", e)
 			if c.Conf("debug") == "on" {
-				log.Println(c.Name, "error:", e)
 				if e != io.EOF {
 					debug.PrintStack()
 				}

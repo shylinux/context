@@ -5,5 +5,8 @@ alias $ cache
 alias & server
 alias * message
 
-~web
-listen :9393 etc
+@debug on
+
+~mp
+listen :9090 ./
+
