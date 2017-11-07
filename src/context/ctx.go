@@ -601,6 +601,12 @@ func (c *Context) Del(arg ...string) { // {{{
 // }}}
 
 func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
+	if m.Meta == nil {
+		m.Meta = make(map[string][]string)
+	}
+	m.Meta["detail"] = []string{key}
+	m.Meta["detail"] = append(m.Meta["detail"], arg...)
+
 	for s := c; s != nil; s = s.Context {
 		if x, ok := s.Commands[key]; ok {
 			log.Printf("%s cmd(%s->%s): %v", c.Name, m.Context.Name, m.Target.Name, m.Meta["detail"])

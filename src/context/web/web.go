@@ -52,9 +52,24 @@ func (web *WEB) Begin(m *ctx.Message) ctx.Server { // {{{
 func (web *WEB) Start(m *ctx.Message) bool { // {{{
 
 	web.Mux.Handle("/", http.FileServer(http.Dir(web.Conf("directory"))))
-	s := &http.Server{Addr: web.Conf("address"), Handler: web.Mux}
+
 	log.Println(web.Name, "listen:", web.Conf("address"))
-	log.Println(s.ListenAndServe())
+	log.Println(web.Name, "https:", web.Conf("https"))
+
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println(e)
+		}
+	}()
+
+	if web.Conf("https") == "yes" {
+		log.Println(web.Name, "cert:", web.Conf("cert"))
+		log.Println(web.Name, "key:", web.Conf("key"))
+		http.ListenAndServeTLS(web.Conf("address"), web.Conf("cert"), web.Conf("key"), web.Mux)
+	} else {
+		http.ListenAndServe(web.Conf("address"), web.Mux)
+	}
+
 	return true
 }
 
@@ -83,7 +98,7 @@ var Index = &ctx.Context{Name: "web", Help: "网页服务",
 	Configs: map[string]*ctx.Config{
 		"address":   &ctx.Config{Name: "listen", Value: ":9090", Help: "监听地址"},
 		"directory": &ctx.Config{Name: "directory", Value: "./", Help: "服务目录"},
-		"who":       &ctx.Config{Name: "who", Value: "shylinux", Help: "服务目录"},
+		"https":     &ctx.Config{Name: "https", Value: "yes", Help: "开启安全连接"},
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{"listen address directory", "设置监听地址和目录", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {

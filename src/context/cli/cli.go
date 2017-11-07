@@ -478,9 +478,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 						delete(m.Target.Configs, arg[1])
 					}
 				default:
-					if _, ok := m.Target.Configs[arg[0]]; ok {
-						m.Target.Conf(arg[0], arg[1:]...)
-					}
+					m.Target.Conf(arg[0], arg[1])
 				}
 			case 4:
 				m.Target.Conf(arg[0], arg[1:]...)
