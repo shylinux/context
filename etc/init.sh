@@ -1,12 +1,6 @@
-alias ~ context
-alias ! history
-alias @ config
-alias $ cache
-alias & server
-alias * message
-
-@debug on
-
-~mp
-listen :9090 ./
+@debug off
+~tcp
+listen :9393
+~aaa
+login shy shy
 

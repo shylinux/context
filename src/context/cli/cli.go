@@ -155,8 +155,8 @@ func (cli *CLI) Start(m *ctx.Message) bool { // {{{
 	cli.Capi("nterm", 1)
 	defer cli.Capi("nterm", -1)
 
-	if detail, ok := m.Data["detail"]; ok {
-		io := detail.(io.ReadWriteCloser)
+	if stream, ok := m.Data["io"]; ok {
+		io := stream.(io.ReadWriteCloser)
 		cli.out = io
 		cli.push(io)
 
@@ -206,12 +206,21 @@ func (cli *CLI) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 	c.Configs = map[string]*ctx.Config{
 		"address":  &ctx.Config{Name: "address", Value: arg[0], Help: "监听地址"},
 		"protocol": &ctx.Config{Name: "protocol", Value: arg[1], Help: "监听协议"},
+		"init.sh":  &ctx.Config{Name: "init.sh", Value: "", Help: "默认启动脚本"},
 	}
 	c.Commands = cli.Commands
 	c.Messages = make(chan *ctx.Message, 10)
 
 	s := new(CLI)
 	s.Context = c
+	s.alias = map[string]string{
+		"~": "context",
+		"!": "history",
+		"@": "config",
+		"$": "cache",
+		"&": "server",
+		"*": "message",
+	}
 	return s
 }
 
@@ -225,7 +234,7 @@ func (cli *CLI) Exit(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 
-var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
+var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 	Caches: map[string]*ctx.Cache{
 		"nterm":  &ctx.Cache{Name: "nterm", Value: "0", Help: "终端数量"},
 		"status": &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
@@ -244,8 +253,8 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 		"slient": &ctx.Config{Name: "slient", Value: "yes", Help: "屏蔽脚本输出"},
 
 		"PS1": &ctx.Config{Name: "PS1", Value: "target", Help: "命令行提示符", Hand: func(c *ctx.Context, x *ctx.Config, arg ...string) string {
-			cli, ok := c.Server.(*CLI)
-			if ok && cli.target != nil { // {{{
+			cli, ok := c.Server.(*CLI) // {{{
+			if ok && cli.target != nil {
 				// c = cli.target
 				switch x.Value {
 				case "target":
@@ -261,7 +270,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 		}},
 	},
 	Commands: map[string]*ctx.Command{
-		"context": &ctx.Command{"context [spawn|find|search name [which]]|root|back|home", "查看上下文", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"context": &ctx.Command{Name: "context [spawn|find|search name [which]]|root|back|home", Help: "查看上下文", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			cli, ok := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 0:
@@ -351,7 +360,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"message": &ctx.Command{"message detail...", "查看上下文", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"message": &ctx.Command{Name: "message detail...", Help: "查看上下文", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			// {{{
 			ms := []*ctx.Message{ctx.Pulse}
 			for i := 0; i < len(ms); i++ {
@@ -362,7 +371,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"server": &ctx.Command{"server start|stop|switch", "服务启动停止切换", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"server": &ctx.Command{Name: "server start|stop|switch", Help: "服务启动停止切换", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			s := m.Target // {{{
 			switch len(arg) {
 			case 0:
@@ -390,7 +399,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"source": &ctx.Command{"source file", "运行脚本", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"source": &ctx.Command{Name: "source file", Help: "运行脚本", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			cli := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 1:
@@ -402,7 +411,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"alias": &ctx.Command{"alias [short [long]]", "查看日志", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"alias": &ctx.Command{Name: "alias [short [long]]", Help: "查看日志", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			cli := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 0:
@@ -421,7 +430,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"history": &ctx.Command{"history number", "查看日志", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"history": &ctx.Command{Name: "history number", Help: "查看日志", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			cli := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 0:
@@ -438,7 +447,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"command": &ctx.Command{"command [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"command": &ctx.Command{Name: "command [name [value [help]]]", Help: "查看修改添加配置", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 				for k, v := range m.Target.Commands {
@@ -461,7 +470,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"config": &ctx.Command{"config [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"config": &ctx.Command{Name: "config [name [value [help]]]", Help: "查看修改添加配置", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 				for k, v := range m.Target.Configs {
@@ -478,9 +487,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 						delete(m.Target.Configs, arg[1])
 					}
 				default:
-					if _, ok := m.Target.Configs[arg[0]]; ok {
-						m.Target.Conf(arg[0], arg[1:]...)
-					}
+					m.Target.Conf(arg[0], arg[1])
 				}
 			case 4:
 				m.Target.Conf(arg[0], arg[1:]...)
@@ -488,7 +495,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"cache": &ctx.Command{"cache [name [value [help]]]", "查看修改添加配置", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"cache": &ctx.Command{Name: "cache [name [value [help]]]", Help: "查看修改添加配置", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 				for k, v := range m.Target.Caches {
@@ -515,7 +522,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"exit": &ctx.Command{"exit", "退出", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"exit": &ctx.Command{Name: "exit", Help: "退出", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			cli, ok := m.Target.Server.(*CLI) // {{{
 			if !ok {
 				cli, ok = m.Context.Server.(*CLI)
@@ -531,7 +538,7 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"remote": &ctx.Command{"remote master|slave listen|dial address protocol", "建立远程连接", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"remote": &ctx.Command{Name: "remote master|slave listen|dial address protocol", Help: "建立远程连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 			case 4:
@@ -550,17 +557,18 @@ var Index = &ctx.Context{Name: "cli", Help: "本地控制", // {{{
 			return ""
 			// }}}
 		}},
-		"accept": &ctx.Command{"accept address protocl", "建立远程连接", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-			m.Start(fmt.Sprintf("PTS%d", c.Capi("nterm")), arg[1]) // {{{
-			return ""
-			// }}}
-		}},
-		"void": &ctx.Command{"", "", nil},
+		"accept": &ctx.Command{Name: "accept address protocl", Help: "建立远程连接",
+			Options: map[string]string{"io": "读写流"},
+			Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+				m.Start(fmt.Sprintf("PTS%d", c.Capi("nterm")), arg[1]) // {{{
+				return ""
+				// }}}
+			}},
+		"void": &ctx.Command{Name: "", Help: "", Hand: nil},
 	},
 	Messages: make(chan *ctx.Message, 10),
 }
 
-// }}}
 func init() { // {{{
 	cli := &CLI{alias: map[string]string{
 		"~": "context",
