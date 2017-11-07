@@ -34,9 +34,11 @@ type Config struct { // {{{
 
 // }}}
 type Command struct { // {{{
-	Name string
-	Help string
-	Hand func(c *Context, m *Message, key string, arg ...string) string
+	Name    string
+	Help    string
+	Options map[string]string
+	Appends map[string]string
+	Hand    func(c *Context, m *Message, key string, arg ...string) string
 }
 
 // }}}
@@ -86,25 +88,48 @@ func (m *Message) Spawn(c *Context, key string) *Message { // {{{
 
 // }}}
 
-func (m *Message) Add(key string, value ...string) *Message { // {{{
+func (m *Message) Add(meta string, key string, value ...string) *Message { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
-	if _, ok := m.Meta[key]; !ok {
-		m.Meta[key] = make([]string, 0, 3)
+	if _, ok := m.Meta[meta]; !ok {
+		m.Meta[meta] = make([]string, 0, 3)
 	}
-
-	m.Meta[key] = append(m.Meta[key], value...)
+	switch meta {
+	case "detail", "result":
+		m.Meta[meta] = append(m.Meta[meta], key)
+		m.Meta[meta] = append(m.Meta[meta], value...)
+	case "option", "append":
+		if _, ok := m.Meta[key]; !ok {
+			m.Meta[key] = make([]string, 0, 3)
+			m.Meta[meta] = append(m.Meta[meta], key)
+		}
+		m.Meta[key] = append(m.Meta[key], value...)
+	default:
+	}
 	return m
 }
 
 // }}}
-func (m *Message) Put(key string, value interface{}) *Message { // {{{
+func (m *Message) Put(meta string, key string, value interface{}) *Message { // {{{
+	if m.Meta == nil {
+		m.Meta = make(map[string][]string)
+	}
 	if m.Data == nil {
 		m.Data = make(map[string]interface{})
 	}
 
-	m.Data[key] = value
+	switch meta {
+	case "option", "append":
+		if _, ok := m.Meta[meta]; !ok {
+			m.Meta[meta] = make([]string, 0, 3)
+		}
+		if _, ok := m.Data[key]; !ok {
+			m.Meta[meta] = append(m.Meta[meta], key)
+		}
+		m.Data[key] = value
+	}
+
 	return m
 }
 
@@ -226,6 +251,9 @@ type Context struct {
 func (c *Context) Check(e error) bool { // {{{
 	if e != nil {
 		log.Println(c.Name, "error:", e)
+		if c.Conf("debug") == "on" {
+			fmt.Println(c.Name, "error:", e)
+		}
 		panic(e)
 	}
 	return true
@@ -235,8 +263,9 @@ func (c *Context) Check(e error) bool { // {{{
 func (c *Context) Safe(m *Message, hand ...func(c *Context, m *Message)) (ok bool) { // {{{
 	defer func() {
 		if e := recover(); e != nil {
+			log.Println(c.Name, "error:", e)
 			if c.Conf("debug") == "on" {
-				log.Println(c.Name, "error:", e)
+				fmt.Println(c.Name, "error:", e)
 				if e != io.EOF {
 					debug.PrintStack()
 				}
@@ -400,6 +429,20 @@ func (c *Context) Exit(m *Message, arg ...string) { // {{{
 
 // }}}
 
+func (c *Context) Travel(hand func(s *Context) bool) { // {{{
+	cs := []*Context{c}
+	for i := 0; i < len(cs); i++ {
+		for _, v := range cs[i].Contexts {
+			cs = append(cs, v)
+		}
+
+		if !hand(cs[i]) {
+			return
+		}
+	}
+}
+
+// }}}
 func (c *Context) Find(name []string) (s *Context) { // {{{
 	cs := c.Contexts
 	for _, v := range name {
@@ -601,6 +644,12 @@ func (c *Context) Del(arg ...string) { // {{{
 // }}}
 
 func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
+	if m.Meta == nil {
+		m.Meta = make(map[string][]string)
+	}
+	m.Meta["detail"] = nil
+	m.Add("detail", key, arg...)
+
 	for s := c; s != nil; s = s.Context {
 		if x, ok := s.Commands[key]; ok {
 			log.Printf("%s cmd(%s->%s): %v", c.Name, m.Context.Name, m.Target.Name, m.Meta["detail"])
@@ -608,6 +657,13 @@ func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 			if x.Hand == nil {
 				panic(errors.New(fmt.Sprintf(key + "没有权限")))
 			}
+
+			for _, v := range m.Meta["option"] {
+				if _, ok := x.Options[v]; !ok {
+					panic(errors.New(fmt.Sprintf(v + "未知参数")))
+				}
+			}
+
 			return x.Hand(c, m, key, arg...)
 		}
 	}
@@ -745,7 +801,7 @@ var Index = &Context{Name: "ctx", Help: "根上下文", // {{{
 		}},
 	},
 	Commands: map[string]*Command{
-		"void": &Command{"void", "建立远程连接", func(c *Context, m *Message, key string, arg ...string) string {
+		"void": &Command{Name: "void", Help: "建立远程连接", Hand: func(c *Context, m *Message, key string, arg ...string) string {
 			m.Echo("hello void!\n") // {{{
 			return ""
 			// }}}
@@ -806,7 +862,7 @@ func Start() {
 	for _, s := range Index.Contexts {
 		if ok, _ := regexp.MatchString(Index.Conf("start"), s.Name); ok {
 			n++
-			go s.Start(Pulse.Spawn(s, s.Name).Put("detail", os.Stdout))
+			go s.Start(Pulse.Spawn(s, s.Name).Put("option", "io", os.Stdout))
 		}
 	}
 

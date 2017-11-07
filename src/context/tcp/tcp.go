@@ -37,7 +37,7 @@ func (tcp *TCP) Start(m *ctx.Message) bool { // {{{
 		log.Printf("%s accept(%d): %v<-%v", tcp.Name, tcp.Capi("nclient", 1), c.LocalAddr(), c.RemoteAddr())
 		// defer log.Println(tcp.Name, "close:", tcp.Capi("nclient", -1), c.LocalAddr(), "<-", c.RemoteAddr())
 
-		msg := m.Spawn(m.Context, c.RemoteAddr().String()).Put("detail", c)
+		msg := m.Spawn(m.Context, c.RemoteAddr().String()).Put("option", "io", c)
 		msg.Cmd("accept", c.RemoteAddr().String(), "tcp")
 	}
 
@@ -88,7 +88,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 		"address": &ctx.Config{Name: "address", Value: "", Help: "监听地址"},
 	},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{"listen address", "监听端口", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"listen": &ctx.Command{Name: "listen address", Help: "监听端口", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 				for k, s := range m.Target.Contexts {
@@ -100,7 +100,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			return ""
 			// }}}
 		}},
-		"dial": &ctx.Command{"dial", "建立连接", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"dial": &ctx.Command{Name: "dial", Help: "建立连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			tcp := c.Server.(*TCP) // {{{
 			switch len(arg) {
 			case 0:
@@ -116,7 +116,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			return ""
 			// }}}
 		}},
-		"exit": &ctx.Command{"exit", "退出", func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"exit": &ctx.Command{Name: "exit", Help: "退出", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			tcp, ok := m.Target.Server.(*TCP) // {{{
 			if !ok {
 				tcp, ok = m.Context.Server.(*TCP)
