@@ -1,5 +1,3 @@
 @debug off
-~tcp
+~web
 listen :9393
-~aaa
-login shy shy

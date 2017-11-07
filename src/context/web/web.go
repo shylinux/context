@@ -2,7 +2,6 @@ package web // {{{
 // }}}
 import ( // {{{
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"path"
@@ -11,56 +10,18 @@ import ( // {{{
 // }}}
 
 type WEB struct {
-	Server *http.Server
-	Mux    *http.ServeMux
-	hands  map[string]bool
+	Run bool
 
-	run bool
+	*http.ServeMux
+	*http.Server
 
 	*ctx.Context
 }
 
-func (web *WEB) Handle(p string, h http.Handler) { // {{{
-	if web.hands == nil {
-		web.hands = make(map[string]bool)
-	}
-
-	p = path.Clean(p)
-	if _, ok := web.hands[p]; ok {
-		panic(fmt.Sprintln(web.Name, "handle exits", p))
-	}
-	web.hands[p] = true
-	if p == "/" {
-		panic(fmt.Sprintln(web.Name, "handle exits", p))
-	}
-
-	web.Mux.Handle(p+"/", http.StripPrefix(p, h))
-}
-
-// }}}
-func (web *WEB) HandleFunc(p string, h func(http.ResponseWriter, *http.Request)) { // {{{
-	if web.hands == nil {
-		web.hands = make(map[string]bool)
-	}
-
-	p = path.Clean(p)
-	if _, ok := web.hands[p]; ok {
-		panic(fmt.Sprintln(web.Name, "handle exits", p))
-	}
-	web.hands[p] = true
-	if p == "/" {
-		panic(fmt.Sprintln(web.Name, "handle exits", p))
-	}
-
-	web.Mux.HandleFunc(p, h)
-	log.Println(web.Name, "hand:", p)
-}
-
-// }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	log.Println()
 	log.Println(web.Name, r.RemoteAddr, r.Method, r.URL.Path)
-	web.Mux.ServeHTTP(w, r)
+	web.ServeMux.ServeHTTP(w, r)
 }
 
 // }}}
@@ -72,21 +33,21 @@ func (web *WEB) Begin(m *ctx.Message) ctx.Server { // {{{
 // }}}
 func (web *WEB) Start(m *ctx.Message) bool { // {{{
 
-	if !web.run {
+	if !web.Run {
 		if web.Conf("directory") != "" {
-			web.Mux.Handle("/", http.FileServer(http.Dir(web.Conf("directory"))))
+			web.Handle("/", http.FileServer(http.Dir(web.Conf("directory"))))
 			log.Println(web.Name, "directory:", web.Conf("directory"))
 		}
 
 		for _, v := range web.Contexts {
-			if s, ok := v.Server.(*WEB); ok && s.Mux != nil {
-				log.Println(web.Name, "route:", s.Conf("route"), "->", s.Name)
-				web.Handle(s.Conf("route"), s.Mux)
-				s.Start(m)
+			if s, ok := v.Server.(http.Handler); ok {
+				log.Println(web.Name, "route:", v.Conf("route"), "->", v.Name)
+				web.Handle(v.Conf("route"), http.StripPrefix(path.Dir(v.Conf("route")), s))
+				v.Start(m)
 			}
 		}
 	}
-	web.run = true
+	web.Run = true
 
 	if m.Target != web.Context {
 		return true
@@ -166,7 +127,7 @@ func init() {
 	web.Context = Index
 	ctx.Index.Register(Index, web)
 
-	web.Mux = http.NewServeMux()
+	web.ServeMux = http.NewServeMux()
 	web.HandleFunc("/hi", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(web.Conf("default")))
 	})
