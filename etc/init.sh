@@ -1,3 +1,4 @@
 @debug off
+source etc/mp.sh
 ~web
-listen :9393
+server start

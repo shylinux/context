@@ -9,8 +9,17 @@ import ( // {{{
 
 // }}}
 
+type Request struct {
+	R *http.Request
+	W http.ResponseWriter
+	X interface{}
+	*WEB
+}
+
 type WEB struct {
 	Run bool
+
+	*Request
 
 	*http.ServeMux
 	*http.Server
@@ -20,7 +29,15 @@ type WEB struct {
 
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	log.Println()
-	log.Println(web.Name, r.RemoteAddr, r.Method, r.URL.Path)
+	log.Println(web.Name, r.RemoteAddr, r.Method, r.URL)
+	defer log.Println()
+
+	r.ParseForm()
+	for k, v := range r.PostForm {
+		log.Printf("%s: %s", k, v[0])
+	}
+	log.Println()
+
 	web.ServeMux.ServeHTTP(w, r)
 }
 
@@ -92,8 +109,8 @@ var Index = &ctx.Context{Name: "web", Help: "网页服务",
 	},
 	Configs: map[string]*ctx.Config{
 		"directory": &ctx.Config{Name: "directory", Value: "./", Help: "服务目录"},
-		"protocol":  &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
-		"address":   &ctx.Config{Name: "address", Value: ":9393", Help: "监听地址"},
+		"protocol":  &ctx.Config{Name: "protocol", Value: "https", Help: "服务协议"},
+		"address":   &ctx.Config{Name: "address", Value: ":443", Help: "监听地址"},
 		"route":     &ctx.Config{Name: "route", Value: "/", Help: "请求路径"},
 		"default":   &ctx.Config{Name: "default", Value: "hello web world", Help: "默认响应体"},
 	},

@@ -60,22 +60,26 @@ type Message struct { // {{{
 	Root     *Message
 }
 
-func (m *Message) Spawn(c *Context, key string) *Message { // {{{
+func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
+
 	msg := &Message{
 		Code:    m.Capi("nmessage", 1),
 		Time:    time.Now(),
-		Name:    key,
-		Index:   0,
 		Target:  c,
 		Message: m,
 		Root:    Pulse,
 	}
 
 	msg.Context = m.Target
+	if len(key) == 0 {
+		return msg
+	}
+
 	if msg.Session == nil {
 		msg.Session = make(map[string]*Message)
 	}
-	msg.Session[key] = msg
+	msg.Session[key[0]] = msg
+	msg.Name = key[0]
 
 	if m.Messages == nil {
 		m.Messages = make([]*Message, 0, 10)
@@ -183,6 +187,7 @@ func (m *Message) Cmd(arg ...string) string { // {{{
 		m.Meta["detail"] = arg
 	}
 
+	log.Println(m.Meta)
 	return m.Target.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
 }
 
@@ -260,7 +265,7 @@ func (c *Context) Check(e error) bool { // {{{
 }
 
 // }}}
-func (c *Context) Safe(m *Message, hand ...func(c *Context, m *Message)) (ok bool) { // {{{
+func (c *Context) Safe(m *Message, hand ...func(c *Context, m *Message)) *Context { // {{{
 	defer func() {
 		if e := recover(); e != nil {
 			log.Println(c.Name, "error:", e)
@@ -274,10 +279,13 @@ func (c *Context) Safe(m *Message, hand ...func(c *Context, m *Message)) (ok boo
 				return
 			}
 
-			if len(hand) > 0 {
+			if len(hand) > 1 {
 				c.Safe(m, hand[1:]...)
+			} else {
+				panic(e)
 			}
 		}
+
 		Pulse.Wait <- true
 	}()
 
@@ -285,7 +293,7 @@ func (c *Context) Safe(m *Message, hand ...func(c *Context, m *Message)) (ok boo
 		hand[0](c, m)
 	}
 
-	return true
+	return c
 }
 
 // }}}
@@ -443,9 +451,10 @@ func (c *Context) Travel(hand func(s *Context) bool) { // {{{
 }
 
 // }}}
-func (c *Context) Find(name []string) (s *Context) { // {{{
+func (c *Context) Find(name string) (s *Context) { // {{{
+	ns := strings.Split(name, ".")
 	cs := c.Contexts
-	for _, v := range name {
+	for _, v := range ns {
 		if x, ok := cs[v]; ok {
 			s = x
 			cs = x.Contexts
@@ -643,6 +652,20 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
+func (c *Context) Create(s *Context) *Message { // {{{
+
+	msg := &Message{
+		Time:   time.Now(),
+		Target: c,
+		Root:   Pulse,
+	}
+
+	msg.Context = c
+	return msg
+
+}
+
+// }}}
 func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)

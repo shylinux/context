@@ -325,7 +325,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				case "spawn":
 					m.Target.Spawn(m, arg[1])
 				case "find":
-					cs := m.Target.Find(strings.Split(arg[1], "."))
+					cs := m.Target.Find(arg[1])
 					if cs != nil {
 						m.Echo("%s: %s\n", cs.Name, cs.Help)
 						if len(arg) == 4 {
@@ -548,7 +548,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					}
 				} else {
 					if arg[1] == "listen" {
-						s := c.Root.Find(strings.Split(arg[3], "."))
+						s := c.Root.Find(arg[3])
 						m.Message.Spawn(s, arg[2]).Cmd("listen", arg[2])
 					} else {
 					}
