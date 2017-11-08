@@ -32,13 +32,28 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	log.Println(web.Name, r.RemoteAddr, r.Method, r.URL)
 	defer log.Println()
 
-	r.ParseForm()
-	for k, v := range r.PostForm {
-		log.Printf("%s: %s", k, v[0])
+	if web.Conf("logheaders") == "yes" {
+		for k, v := range r.Header {
+			log.Println(k+":", v[0])
+		}
+		log.Println()
 	}
-	log.Println()
+
+	r.ParseForm()
+	if len(r.PostForm) > 0 {
+		for k, v := range r.PostForm {
+			log.Printf("%s: %s", k, v[0])
+		}
+		log.Println()
+	}
 
 	web.ServeMux.ServeHTTP(w, r)
+
+	if web.Conf("logheaders") == "yes" {
+		for k, v := range w.Header() {
+			log.Println(k+":", v[0])
+		}
+	}
 }
 
 // }}}
@@ -108,11 +123,12 @@ var Index = &ctx.Context{Name: "web", Help: "网页服务",
 		"status": &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
 	},
 	Configs: map[string]*ctx.Config{
-		"directory": &ctx.Config{Name: "directory", Value: "./", Help: "服务目录"},
-		"protocol":  &ctx.Config{Name: "protocol", Value: "https", Help: "服务协议"},
-		"address":   &ctx.Config{Name: "address", Value: ":443", Help: "监听地址"},
-		"route":     &ctx.Config{Name: "route", Value: "/", Help: "请求路径"},
-		"default":   &ctx.Config{Name: "default", Value: "hello web world", Help: "默认响应体"},
+		"logheaders": &ctx.Config{Name: "logheaders", Value: "yes", Help: "日志输出请求头"},
+		"directory":  &ctx.Config{Name: "directory", Value: "./", Help: "服务目录"},
+		"protocol":   &ctx.Config{Name: "protocol", Value: "https", Help: "服务协议"},
+		"address":    &ctx.Config{Name: "address", Value: ":443", Help: "监听地址"},
+		"route":      &ctx.Config{Name: "route", Value: "/", Help: "请求路径"},
+		"default":    &ctx.Config{Name: "default", Value: "hello web world", Help: "默认响应体"},
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen [route [address protocol [directory]]]", Help: "开启网页服务", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {

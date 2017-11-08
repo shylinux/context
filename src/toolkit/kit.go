@@ -24,6 +24,22 @@ func FmtSize(size int64) string {
 	return fmt.Sprintf("%dB", size)
 }
 
+func FmtNano(nano int64) string {
+	if nano > 1000000000 {
+		return fmt.Sprintf("%d.%ds", nano/1000000000, nano/100000000%100)
+	}
+
+	if nano > 1000000 {
+		return fmt.Sprintf("%d.%dms", nano/100000, nano/100000%100)
+	}
+
+	if nano > 1000 {
+		return fmt.Sprintf("%d.%dus", nano/1000, nano/100%100)
+	}
+
+	return fmt.Sprintf("%dns", nano)
+}
+
 func Check(e error) bool {
 	if e != nil {
 		panic(e)

@@ -77,7 +77,11 @@ func (cli *CLI) parse() bool { // {{{
 		}
 
 		if len(line) == 1 {
-			return true
+			if len(cli.ins) == 1 {
+				line = cli.history[len(cli.history)-1]["cli"]
+			} else {
+				return true
+			}
 		}
 	} else {
 		line = cli.next
@@ -89,6 +93,7 @@ func (cli *CLI) parse() bool { // {{{
 		}
 	}
 
+back:
 	line = strings.TrimSpace(line)
 	if line[0] == '#' {
 		return true
@@ -118,12 +123,20 @@ func (cli *CLI) parse() bool { // {{{
 
 	for i := 0; i < len(ls); i++ {
 		ls[i] = strings.TrimSpace(ls[i])
+
 		if ls[i][0] == '#' {
 			break
 		}
 		if ls[i] != "" {
 			msg.Add("detail", ls[i])
 		}
+	}
+
+	ls = msg.Meta["detail"]
+	if n, e := strconv.Atoi(ls[0]); e == nil && 0 <= n && n < len(cli.history) && ls[0] != cli.history[n]["cli"] {
+		line = cli.history[n]["cli"]
+		msg.Meta["detail"] = nil
+		goto back
 	}
 
 	msg.Post(cli.Context)
@@ -426,6 +439,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					cli.alias[arg[0]] = arg[1]
 					m.Echo("%s: %s\n", arg[0], cli.alias[arg[0]])
 				}
+			default:
+				cli.alias[arg[0]] = strings.Join(arg[1:], " ")
+				m.Echo("%s: %s\n", arg[0], cli.alias[arg[0]])
 			}
 			return ""
 			// }}}
@@ -441,7 +457,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				n, e := strconv.Atoi(arg[0])
 				if e == nil && 0 <= n && n < len(cli.history) {
 					log.Println("shy log why:", cli.history[n]["cli"])
-					return cli.history[n]["cli"]
+					cli.next = cli.history[n]["cli"]
+				}
+			default:
+				n, e := strconv.Atoi(arg[0])
+				if e == nil && 0 <= n && n < len(cli.history) {
+					cli.history[n]["cli"] = strings.Join(arg[1:], " ")
 				}
 			}
 			return ""
@@ -482,6 +503,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				}
 			case 2:
 				switch arg[0] {
+				case "void":
+					m.Target.Conf(arg[1], "")
 				case "delete":
 					if _, ok := m.Target.Configs[arg[1]]; ok {
 						delete(m.Target.Configs, arg[1])
@@ -569,7 +592,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 	Messages: make(chan *ctx.Message, 10),
 }
 
-func init() { // {{{
+func init() {
 	cli := &CLI{alias: map[string]string{
 		"~": "context",
 		"!": "history",
@@ -581,5 +604,3 @@ func init() { // {{{
 	cli.Context = Index
 	ctx.Index.Register(Index, cli)
 }
-
-// }}}

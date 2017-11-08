@@ -354,7 +354,11 @@ func (c *Context) Start(m *Message) bool { // {{{
 func (c *Context) Spawn(m *Message, arg ...string) *Context { // {{{
 	s := &Context{Name: arg[0], Help: c.Help}
 	m.Target = s
-	c.Register(s, c.Server.Spawn(s, m, arg...)).Begin(m)
+	if c.Server != nil {
+		c.Register(s, c.Server.Spawn(s, m, arg...)).Begin(m)
+	} else {
+		c.Register(s, nil).Begin(m)
+	}
 	return s
 }
 
@@ -652,7 +656,7 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
-func (c *Context) Create(s *Context) *Message { // {{{
+func (c *Context) Storm(s *Context) *Message { // {{{
 
 	msg := &Message{
 		Time:   time.Now(),
@@ -716,6 +720,9 @@ func (c *Context) Conf(key string, arg ...string) string { // {{{
 				if s == c {
 					panic(errors.New(x.Name + "配置项已存在"))
 				}
+				if c.Configs == nil {
+					c.Configs = make(map[string]*Config)
+				}
 				c.Configs[key] = &Config{Name: arg[0], Value: arg[1], Help: arg[2], Hand: x.Hand}
 				return arg[1]
 			default:
@@ -752,7 +759,7 @@ func (c *Context) Cap(key string, arg ...string) string { // {{{
 				return x.Value
 			case 1:
 				if x.Hand != nil {
-					x.Value = x.Hand(c, x, x.Value)
+					x.Value = x.Hand(c, x, arg[0])
 				} else {
 					x.Value = arg[0]
 				}
@@ -760,6 +767,9 @@ func (c *Context) Cap(key string, arg ...string) string { // {{{
 			case 3:
 				if s == c {
 					panic(errors.New(key + "缓存项已存在"))
+				}
+				if c.Caches == nil {
+					c.Caches = make(map[string]*Cache)
 				}
 				c.Caches[key] = &Cache{arg[0], arg[1], arg[2], x.Hand}
 				return arg[1]
