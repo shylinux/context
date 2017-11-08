@@ -64,6 +64,26 @@ snippet c
 		`Filename()`.Context = Index
 		ctx.Index.Register(Index, `Filename()`)
 	}
+snippet cmd
+	"${1}": &ctx.Command{Name: "${2}", Help: "${3}", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		${4}
+		return ""
+	}},
+snippet conf
+	"${1}": &ctx.Config{Name: "${2}", Value: "${3}", Help: "${4}", Hand: func(c *ctx.Context, x *ctx.Config, arg ...string) string {
+		if len(arg) > 0 {
+			${5}
+		}
+		return x.Value
+	}},
+snippet cap
+	"${1}": &ctx.Cache{Name: "${2}", Value: "${3}", Help: "${4}", Hand: func(c *ctx.Context, x *ctx.Cache, arg ...string) string {
+		if len(arg) > 0 {
+			x.Value = arg[0]
+			${5}
+		}
+		return x.Value
+	}},
 snippet v
 	var (
 		${1}
@@ -82,10 +102,6 @@ snippet f
 	func${1}(${2}) ${3}{
 		${4}
 	}${5}
-snippet "
-	"${1}"${2}
-snippet `
-	`${1}`${2}
 snippet (
 	(${1})${2}
 snippet [
