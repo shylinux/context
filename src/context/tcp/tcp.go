@@ -24,7 +24,7 @@ func (tcp *TCP) Start(m *ctx.Message) bool { // {{{
 	}
 
 	l, e := net.Listen("tcp4", tcp.Conf("address"))
-	tcp.Check(e)
+	tcp.Assert(e)
 	tcp.listener = l
 
 	log.Printf("%s listen(%d): %v", tcp.Name, tcp.Capi("nlisten", 1), l.Addr())
@@ -33,7 +33,7 @@ func (tcp *TCP) Start(m *ctx.Message) bool { // {{{
 
 	for {
 		c, e := l.Accept()
-		tcp.Check(e)
+		tcp.Assert(e)
 		log.Printf("%s accept(%d): %v<-%v", tcp.Name, tcp.Capi("nclient", 1), c.LocalAddr(), c.RemoteAddr())
 		// defer log.Println(tcp.Name, "close:", tcp.Capi("nclient", -1), c.LocalAddr(), "<-", c.RemoteAddr())
 
@@ -110,7 +110,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 				}
 			case 2:
 				conn, e := net.Dial("tcp", arg[0])
-				c.Check(e)
+				c.Assert(e)
 				log.Println(tcp.Name, "dial:", conn.LocalAddr(), "->", conn.RemoteAddr())
 			}
 			return ""

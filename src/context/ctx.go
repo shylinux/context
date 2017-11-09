@@ -42,6 +42,7 @@ type Command struct { // {{{
 }
 
 // }}}
+
 type Message struct { // {{{
 	Code int
 	Time time.Time
@@ -63,17 +64,22 @@ type Message struct { // {{{
 func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
 
 	msg := &Message{
-		Code:    m.Capi("nmessage", 1),
 		Time:    time.Now(),
 		Target:  c,
 		Message: m,
 		Root:    Pulse,
 	}
-
 	msg.Context = m.Target
+
 	if len(key) == 0 {
 		return msg
 	}
+
+	if m.Messages == nil {
+		m.Messages = make([]*Message, 0, 10)
+	}
+	m.Messages = append(m.Messages, msg)
+	msg.Code = m.Capi("nmessage", 1)
 
 	if msg.Session == nil {
 		msg.Session = make(map[string]*Message)
@@ -81,10 +87,6 @@ func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
 	msg.Session[key[0]] = msg
 	msg.Name = key[0]
 
-	if m.Messages == nil {
-		m.Messages = make([]*Message, 0, 10)
-	}
-	m.Messages = append(m.Messages, msg)
 	log.Printf("%d spawn %d: %s.%s->%s.%d", m.Code, msg.Code, msg.Context.Name, msg.Name, msg.Target.Name, msg.Index)
 	return msg
 
@@ -99,18 +101,21 @@ func (m *Message) Add(meta string, key string, value ...string) *Message { // {{
 	if _, ok := m.Meta[meta]; !ok {
 		m.Meta[meta] = make([]string, 0, 3)
 	}
+
 	switch meta {
 	case "detail", "result":
 		m.Meta[meta] = append(m.Meta[meta], key)
 		m.Meta[meta] = append(m.Meta[meta], value...)
 	case "option", "append":
 		if _, ok := m.Meta[key]; !ok {
-			m.Meta[key] = make([]string, 0, 3)
 			m.Meta[meta] = append(m.Meta[meta], key)
+			m.Meta[key] = make([]string, 0, 3)
 		}
 		m.Meta[key] = append(m.Meta[key], value...)
 	default:
+		panic(errors.New("消息参数错误"))
 	}
+
 	return m
 }
 
@@ -132,6 +137,8 @@ func (m *Message) Put(meta string, key string, value interface{}) *Message { // 
 			m.Meta[meta] = append(m.Meta[meta], key)
 		}
 		m.Data[key] = value
+	default:
+		panic(errors.New("消息参数错误"))
 	}
 
 	return m
@@ -187,18 +194,20 @@ func (m *Message) Cmd(arg ...string) string { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	log.Println(m.Meta)
 	return m.Target.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
 }
 
 // }}}
 func (m *Message) Post(c *Context, arg ...string) bool { // {{{
 	if len(arg) > 0 {
+		if m.Meta == nil {
+			m.Meta = make(map[string][]string)
+		}
 		m.Meta["detail"] = arg
 	}
 
 	if c.Messages == nil {
-		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
+		panic(m.Target.Name + " 没有开启消息处理")
 	}
 
 	c.Messages <- m
@@ -215,7 +224,7 @@ func (m *Message) Start(arg ...string) bool { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	go m.Target.Spawn(m, m.Meta["detail"]...).Begin(m).Start(m)
+	go m.Target.Spawn(m, m.Meta["detail"][0], m.Meta["detail"][1:]...).Begin(m).Start(m)
 
 	return true
 }
@@ -230,6 +239,7 @@ type Server interface { // {{{
 }
 
 // }}}
+
 type Context struct {
 	Name string
 	Help string
@@ -253,7 +263,7 @@ type Context struct {
 	Root     *Context
 }
 
-func (c *Context) Check(e error) bool { // {{{
+func (c *Context) Assert(e error) bool { // {{{
 	if e != nil {
 		log.Println(c.Name, "error:", e)
 		if c.Conf("debug") == "on" {
@@ -265,28 +275,26 @@ func (c *Context) Check(e error) bool { // {{{
 }
 
 // }}}
-func (c *Context) Safe(m *Message, hand ...func(c *Context, m *Message)) *Context { // {{{
+func (c *Context) AssertOne(m *Message, hand ...func(c *Context, m *Message)) *Context { // {{{
 	defer func() {
 		if e := recover(); e != nil {
 			log.Println(c.Name, "error:", e)
-			if c.Conf("debug") == "on" {
+			if c.Conf("debug") == "on" && e != io.EOF {
 				fmt.Println(c.Name, "error:", e)
-				if e != io.EOF {
-					debug.PrintStack()
-				}
+				debug.PrintStack()
 			}
+
 			if e == io.EOF {
 				return
 			}
 
 			if len(hand) > 1 {
-				c.Safe(m, hand[1:]...)
+				c.AssertOne(m, hand[1:]...)
 			} else {
 				panic(e)
 			}
 		}
-
-		Pulse.Wait <- true
+		// Pulse.Wait <- true
 	}()
 
 	if len(hand) > 0 {
@@ -319,8 +327,8 @@ func (c *Context) Register(s *Context, x Server) *Context { // {{{
 func (c *Context) Begin(m *Message) *Context { // {{{
 	for _, x := range c.Configs {
 		if x.Hand != nil {
-			x.Hand(c, x, x.Value)
 			log.Println(c.Name, "conf:", x.Name, x.Value)
+			x.Hand(c, x, x.Value)
 		}
 	}
 
@@ -332,27 +340,28 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
-	if c.Server != nil && c.Cap("status") != "start" {
-		c.Safe(m, func(c *Context, m *Message) {
+	if x, ok := c.Caches["status"]; ok && x.Value != "start" && c.Server != nil {
+		defer recover()
+
+		c.AssertOne(m, func(c *Context, m *Message) {
 			c.Cap("status", "start")
 			defer c.Cap("status", "stop")
 
-			log.Printf("%d start(%d): %s", m.Code, Index.Capi("nserver", 1), c.Name)
+			log.Printf("%d start(%d): %s %s", m.Code, Index.Capi("nserver", 1), c.Name, c.Help)
 			defer Index.Capi("nserver", -1)
-			defer log.Printf("%d stop(%d): %s %s", m.Code, Index.Capi("nserver", 0), c.Name, c.Help)
+			defer log.Printf("%d stop(%d): %s %s", m.Code, Index.Capi("nserver"), c.Name, c.Help)
 
 			c.Resource = []*Message{m}
 			c.Server.Start(m)
 		})
-
 	}
 
 	return true
 }
 
 // }}}
-func (c *Context) Spawn(m *Message, arg ...string) *Context { // {{{
-	s := &Context{Name: arg[0], Help: c.Help}
+func (c *Context) Spawn(m *Message, key string, arg ...string) *Context { // {{{
+	s := &Context{Name: key, Help: c.Help}
 	m.Target = s
 	if c.Server != nil {
 		c.Register(s, c.Server.Spawn(s, m, arg...)).Begin(m)
@@ -363,6 +372,7 @@ func (c *Context) Spawn(m *Message, arg ...string) *Context { // {{{
 }
 
 // }}}
+
 func (c *Context) Deal(pre func(m *Message) bool, post func(m *Message) bool) (live bool) { // {{{
 
 	if c.Messages == nil {
@@ -379,7 +389,7 @@ func (c *Context) Deal(pre func(m *Message) bool, post func(m *Message) bool) (l
 		return false
 	}
 
-	c.Safe(m, func(c *Context, m *Message) {
+	c.AssertOne(m, func(c *Context, m *Message) {
 		c.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
 
 	}, func(c *Context, m *Message) {
@@ -409,85 +419,32 @@ func (c *Context) Exit(m *Message, arg ...string) { // {{{
 	if m.Target == c {
 		for _, v := range c.Session {
 			if v.Name != "" {
-				c.Server.Exit(v, arg...)
-
 				v.Name = ""
+				v.Target.Exit(v, arg...)
 				log.Println(c.Name, c.Help, "exit: session", v.Code, v.Target.Name, v.Target.Help)
-				v.Cmd("exit")
 			}
+		}
+
+		if c.Server != nil {
+			c.Server.Exit(m, arg...)
+			log.Println(c.Name, c.Help, "exit: self", m.Code)
 		}
 
 		for _, v := range c.Resource {
 			if v.Index != -1 {
-				c.Server.Exit(v, arg...)
-
-				v.Index = -1
+				v.Context.Exit(v, arg...)
 				log.Println(c.Name, c.Help, "exit: resource", v.Code, v.Context.Name, v.Context.Help)
-				v.Context.Cmd(v, "exit")
+				v.Index = -1
 			}
 		}
 	} else if m.Context == c {
 		if m.Name != "" {
-			c.Server.Exit(m, arg...)
-
+			m.Target.Exit(m, arg...)
+			log.Println(c.Name, c.Help, "exit: session", m.Code, m.Target.Name, m.Target.Help)
 			m.Name = ""
-			m.Cmd("exit")
-		}
-	} else {
-		c.Server.Exit(m, arg...)
-	}
-
-}
-
-// }}}
-
-func (c *Context) Travel(hand func(s *Context) bool) { // {{{
-	cs := []*Context{c}
-	for i := 0; i < len(cs); i++ {
-		for _, v := range cs[i].Contexts {
-			cs = append(cs, v)
-		}
-
-		if !hand(cs[i]) {
-			return
-		}
-	}
-}
-
-// }}}
-func (c *Context) Find(name string) (s *Context) { // {{{
-	ns := strings.Split(name, ".")
-	cs := c.Contexts
-	for _, v := range ns {
-		if x, ok := cs[v]; ok {
-			s = x
-			cs = x.Contexts
-			continue
-		}
-		panic(errors.New("not find: " + v))
-	}
-	return
-}
-
-// }}}
-func (c *Context) Search(name string) []*Context { // {{{
-	ps := make([]*Context, 0, 3)
-
-	cs := []*Context{c}
-	for i := 0; i < len(cs); i++ {
-		for _, v := range cs[i].Contexts {
-			cs = append(cs, v)
-		}
-
-		if strings.Contains(cs[i].Name, name) || strings.Contains(cs[i].Help, name) {
-			ps = append(ps, cs[i])
-			log.Println(c.Name, "search:", i, cs[i].Name, "[match]")
-		} else {
-			log.Println(c.Name, "search:", i, cs[i].Name)
 		}
 	}
 
-	return ps
 }
 
 // }}}
@@ -656,20 +613,52 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
-func (c *Context) Storm(s *Context) *Message { // {{{
+func (c *Context) Travel(hand func(s *Context) bool) { // {{{
+	cs := []*Context{c}
+	for i := 0; i < len(cs); i++ {
+		for _, v := range cs[i].Contexts {
+			cs = append(cs, v)
+		}
 
-	msg := &Message{
-		Time:   time.Now(),
-		Target: c,
-		Root:   Pulse,
+		if !hand(cs[i]) {
+			return
+		}
 	}
-
-	msg.Context = c
-	return msg
-
 }
 
 // }}}
+func (c *Context) Search(name string) []*Context { // {{{
+	cs := make([]*Context, 0, 3)
+
+	c.Travel(func(s *Context) bool {
+		if strings.Contains(s.Name, name) || strings.Contains(s.Help, name) {
+			cs = append(cs, s)
+			log.Println(c.Name, "search:", s.Name, "[match]", name)
+		} else {
+			log.Println(c.Name, "search:", s.Name)
+		}
+		return true
+	})
+	return cs
+}
+
+// }}}
+func (c *Context) Find(name string) (s *Context) { // {{{
+	ns := strings.Split(name, ".")
+	cs := c.Contexts
+	for _, v := range ns {
+		if x, ok := cs[v]; ok {
+			cs = x.Contexts
+			s = x
+		} else {
+			panic(errors.New(c.Name + " not find: " + name))
+		}
+	}
+	return
+}
+
+// }}}
+
 func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
@@ -691,7 +680,15 @@ func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 				}
 			}
 
-			return x.Hand(c, m, key, arg...)
+			value := x.Hand(c, m, key, arg...)
+
+			for _, v := range m.Meta["append"] {
+				if _, ok := x.Appends[v]; !ok {
+					panic(errors.New(fmt.Sprintf(v + "未知参数")))
+				}
+			}
+
+			return value
 		}
 	}
 
@@ -712,7 +709,7 @@ func (c *Context) Conf(key string, arg ...string) string { // {{{
 				log.Println(c.Name, "conf:", key, arg[0])
 				x.Value = arg[0]
 				if x.Hand != nil {
-					return x.Hand(c, x, x.Value)
+					x.Hand(c, x, x.Value)
 				}
 				return x.Value
 			case 3:
@@ -733,6 +730,9 @@ func (c *Context) Conf(key string, arg ...string) string { // {{{
 
 	if len(arg) == 3 {
 		log.Println(c.Name, "conf:", key, arg)
+		if c.Configs == nil {
+			c.Configs = make(map[string]*Config)
+		}
 		c.Configs[key] = &Config{Name: arg[0], Value: arg[1], Help: arg[2]}
 		return arg[1]
 	}
@@ -741,9 +741,15 @@ func (c *Context) Conf(key string, arg ...string) string { // {{{
 }
 
 // }}}
-func (c *Context) Confi(key string, arg ...string) int { // {{{
-	n, e := strconv.Atoi(c.Conf(key, arg...))
-	c.Check(e)
+func (c *Context) Confi(key string, arg ...int) int { // {{{
+	if len(arg) > 0 {
+		n, e := strconv.Atoi(c.Conf(key, fmt.Sprintf("%d", arg[0])))
+		c.Assert(e)
+		return n
+	}
+
+	n, e := strconv.Atoi(c.Conf(key))
+	c.Assert(e)
 	return n
 }
 
@@ -765,6 +771,7 @@ func (c *Context) Cap(key string, arg ...string) string { // {{{
 				}
 				return x.Value
 			case 3:
+				log.Println(c.Name, "cap:", key, arg)
 				if s == c {
 					panic(errors.New(key + "缓存项已存在"))
 				}
@@ -779,6 +786,10 @@ func (c *Context) Cap(key string, arg ...string) string { // {{{
 		}
 	}
 	if len(arg) == 3 {
+		log.Println(c.Name, "cap:", key, arg)
+		if c.Caches == nil {
+			c.Caches = make(map[string]*Cache)
+		}
 		c.Caches[key] = &Cache{arg[0], arg[1], arg[2], nil}
 		return arg[1]
 	}
@@ -789,7 +800,7 @@ func (c *Context) Cap(key string, arg ...string) string { // {{{
 // }}}
 func (c *Context) Capi(key string, arg ...int) int { // {{{
 	n, e := strconv.Atoi(c.Cap(key))
-	c.Check(e)
+	c.Assert(e)
 	if len(arg) > 0 {
 		n += arg[0]
 		c.Cap(key, strconv.Itoa(n))

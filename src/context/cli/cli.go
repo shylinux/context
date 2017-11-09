@@ -69,7 +69,7 @@ func (cli *CLI) parse() bool { // {{{
 				return true
 			}
 		}
-		cli.Check(e)
+		cli.Assert(e)
 		line = ls
 
 		if len(cli.ins) > 1 || cli.Conf("slient") != "yes" {
@@ -179,7 +179,8 @@ func (cli *CLI) Start(m *ctx.Message) bool { // {{{
 			cli.push(f)
 		}
 
-		go cli.Safe(m, func(c *ctx.Context, m *ctx.Message) {
+		defer recover()
+		go cli.AssertOne(m, func(c *ctx.Context, m *ctx.Message) {
 			for cli.parse() {
 			}
 		})
@@ -417,7 +418,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			switch len(arg) {
 			case 1:
 				f, e := os.Open(arg[0])
-				c.Check(e)
+				c.Assert(e)
 				cli.push(f)
 			}
 
