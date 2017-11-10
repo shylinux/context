@@ -3,11 +3,10 @@ package cli // {{{
 import ( // {{{
 	"bufio"
 	"context"
-	_ "context/tcp"
-	_ "context/web"
+	// _ "context/tcp"
+	// _ "context/web"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -46,7 +45,7 @@ func (cli *CLI) push(f io.ReadCloser) { // {{{
 }
 
 // }}}
-func (cli *CLI) parse() bool { // {{{
+func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 	if len(cli.ins) == 1 || cli.Conf("slient") != "yes" {
 		cli.echo(cli.Conf("PS1"))
 	}
@@ -100,10 +99,8 @@ back:
 	}
 	ls := strings.Split(line, " ")
 
-	msg := &ctx.Message{Wait: make(chan bool)}
-	msg.Message = cli.Resource[0]
-	msg.Context = cli.Context
-	msg.Target = cli.target
+	msg := m.Spawn(cli.target)
+	msg.Wait = make(chan bool)
 
 	r := rune(ls[0][0])
 	if !unicode.IsNumber(r) || !unicode.IsLetter(r) || r == '$' || r == '_' {
@@ -157,55 +154,75 @@ func (cli *CLI) echo(str string, arg ...interface{}) { // {{{
 
 // }}}
 
-func (cli *CLI) Begin(m *ctx.Message) ctx.Server { // {{{
+func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	cli.history = make([]map[string]string, 0, 100)
+	cli.alias = map[string]string{
+		"~": "context",
+		"!": "history",
+		"@": "config",
+		"$": "cache",
+		"&": "server",
+		"*": "message",
+	}
+
 	cli.target = cli.Context
-	return cli.Server
+
+	cli.Caches["nhistory"] = &ctx.Cache{Name: "历史命令数量", Value: "0", Help: "当前终端已经执行命令的数量"}
+
+	return cli
 }
 
 // }}}
-func (cli *CLI) Start(m *ctx.Message) bool { // {{{
+func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	cli.Capi("nterm", 1)
 	defer cli.Capi("nterm", -1)
+
+	if cli.Messages == nil {
+		cli.Messages = make(chan *ctx.Message, cli.Confi("MessageQueueSize"))
+	}
+	if len(arg) > 0 {
+		cli.Configs["init.sh"] = &ctx.Config{Name: "启动脚本", Value: arg[0], Help: "模块启动时自动运行的脚本"}
+	}
 
 	if stream, ok := m.Data["io"]; ok {
 		io := stream.(io.ReadWriteCloser)
 		cli.out = io
 		cli.push(io)
 
-		cli.echo("%s\n", cli.Conf("开场白"))
-
 		if f, e := os.Open(cli.Conf("init.sh")); e == nil {
 			cli.push(f)
 		}
 
-		defer recover()
-		go cli.AssertOne(m, func(c *ctx.Context, m *ctx.Message) {
-			for cli.parse() {
+		cli.echo("%s\n", cli.Conf("hello"))
+
+		go cli.AssertOne(m, true, func(c *ctx.Context, m *ctx.Message) {
+			for cli.parse(m) {
 			}
 		})
 	}
 
-	for cli.Deal(func(msg *ctx.Message) bool {
-		arg := msg.Meta["detail"]
+	for cli.Deal(func(msg *ctx.Message, arg ...string) bool {
 		if a, ok := cli.alias[arg[0]]; ok {
 			arg[0] = a
 		}
 		return true
 
-	}, func(msg *ctx.Message) bool {
-		arg := msg.Meta["detail"]
+	}, func(msg *ctx.Message, arg ...string) bool {
 		cli.history = append(cli.history, map[string]string{
 			"time":  time.Now().Format("15:04:05"),
 			"index": fmt.Sprintf("%d", len(cli.history)),
 			"cli":   strings.Join(arg, " "),
 		})
 
+		if len(arg) > 0 {
+			// cli.next = arg[0]
+			// arg[0] = ""
+		}
+
 		if cli.exit == true {
 			return false
 		}
 		return true
-
 	}) {
 	}
 
@@ -214,27 +231,11 @@ func (cli *CLI) Start(m *ctx.Message) bool { // {{{
 
 // }}}
 func (cli *CLI) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
-	c.Caches = map[string]*ctx.Cache{
-		"status": &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
-	}
-	c.Configs = map[string]*ctx.Config{
-		"address":  &ctx.Config{Name: "address", Value: arg[0], Help: "监听地址"},
-		"protocol": &ctx.Config{Name: "protocol", Value: arg[1], Help: "监听协议"},
-		"init.sh":  &ctx.Config{Name: "init.sh", Value: "", Help: "默认启动脚本"},
-	}
-	c.Commands = cli.Commands
-	c.Messages = make(chan *ctx.Message, 10)
+	c.Caches = map[string]*ctx.Cache{}
+	c.Configs = map[string]*ctx.Config{}
 
 	s := new(CLI)
 	s.Context = c
-	s.alias = map[string]string{
-		"~": "context",
-		"!": "history",
-		"@": "config",
-		"$": "cache",
-		"&": "server",
-		"*": "message",
-	}
 	return s
 }
 
@@ -250,23 +251,14 @@ func (cli *CLI) Exit(m *ctx.Message, arg ...string) bool { // {{{
 
 var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 	Caches: map[string]*ctx.Cache{
-		"nterm":  &ctx.Cache{Name: "nterm", Value: "0", Help: "终端数量"},
-		"status": &ctx.Cache{Name: "status", Value: "stop", Help: "服务状态"},
-		"nhistory": &ctx.Cache{Name: "nhistory", Value: "0", Help: "终端数量", Hand: func(c *ctx.Context, x *ctx.Cache, arg ...string) string {
-			if cli, ok := c.Server.(*CLI); ok { // {{{
-				return fmt.Sprintf("%d", len(cli.history))
-			}
-
-			return x.Value
-			// }}}
-		}},
+		"nterm": &ctx.Cache{Name: "终端数量", Value: "0", Help: "已经运行的终端数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"开场白":    &ctx.Config{Name: "开场白", Value: "\n~~~  Hello Context & Message World  ~~~\n", Help: "开场白"},
-		"结束语":    &ctx.Config{Name: "结束语", Value: "\n~~~  Byebye Context & Message World  ~~~\n", Help: "结束语"},
-		"slient": &ctx.Config{Name: "slient", Value: "yes", Help: "屏蔽脚本输出"},
+		"slient": &ctx.Config{Name: "屏蔽脚本输出(yes/no)", Value: "yes", Help: "屏蔽脚本输出的信息，yes:屏蔽，no:不屏蔽"},
+		"hello":  &ctx.Config{Name: "开场白", Value: "\n~~~  Hello Context & Message World  ~~~\n", Help: "模块启动时输出的信息"},
+		"byebye": &ctx.Config{Name: "结束语", Value: "\n~~~  Byebye Context & Message World  ~~~\n", Help: "模块停止时输出的信息"},
 
-		"PS1": &ctx.Config{Name: "PS1", Value: "target", Help: "命令行提示符", Hand: func(c *ctx.Context, x *ctx.Config, arg ...string) string {
+		"PS1": &ctx.Config{Name: "命令行提示符(target/detail)", Value: "target", Help: "命令行提示符，target:显示当前模块，detail:显示详细信息", Hand: func(c *ctx.Context, x *ctx.Config, arg ...string) string {
 			cli, ok := c.Server.(*CLI) // {{{
 			if ok && cli.target != nil {
 				// c = cli.target
@@ -457,7 +449,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			case 1:
 				n, e := strconv.Atoi(arg[0])
 				if e == nil && 0 <= n && n < len(cli.history) {
-					log.Println("shy log why:", cli.history[n]["cli"])
 					cli.next = cli.history[n]["cli"]
 				}
 			default:
@@ -496,7 +487,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			switch len(arg) { // {{{
 			case 0:
 				for k, v := range m.Target.Configs {
-					m.Echo("%s(%s): %s\n", k, v.Value, v.Help)
+					m.Echo("%s(%s): %s\n", k, v.Value, v.Name)
 				}
 			case 1:
 				if v, ok := m.Target.Configs[arg[0]]; ok {
@@ -523,7 +514,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			switch len(arg) { // {{{
 			case 0:
 				for k, v := range m.Target.Caches {
-					m.Echo("%s(%s): %s\n", k, v.Value, v.Help)
+					m.Echo("%s(%s): %s\n", k, v.Value, v.Name)
 				}
 			case 1:
 				if v, ok := m.Target.Caches[arg[0]]; ok {
@@ -594,14 +585,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 }
 
 func init() {
-	cli := &CLI{alias: map[string]string{
-		"~": "context",
-		"!": "history",
-		"@": "config",
-		"$": "cache",
-		"&": "server",
-		"*": "message",
-	}}
+	cli := &CLI{}
 	cli.Context = Index
 	ctx.Index.Register(Index, cli)
 }

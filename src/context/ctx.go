@@ -43,7 +43,7 @@ type Command struct { // {{{
 
 // }}}
 
-type Message struct { // {{{
+type Message struct {
 	Code int
 	Time time.Time
 
@@ -230,10 +230,10 @@ func (m *Message) Start(arg ...string) bool { // {{{
 }
 
 // }}}
-// }}}
+
 type Server interface { // {{{
-	Begin(m *Message) Server
-	Start(m *Message) bool
+	Begin(m *Message, arg ...string) Server
+	Start(m *Message, arg ...string) bool
 	Spawn(c *Context, m *Message, arg ...string) Server
 	Exit(m *Message, arg ...string) bool
 }
@@ -275,10 +275,9 @@ func (c *Context) Assert(e error) bool { // {{{
 }
 
 // }}}
-func (c *Context) AssertOne(m *Message, hand ...func(c *Context, m *Message)) *Context { // {{{
+func (c *Context) AssertOne(m *Message, safe bool, hand ...func(c *Context, m *Message)) *Context { // {{{
 	defer func() {
 		if e := recover(); e != nil {
-			log.Println(c.Name, "error:", e)
 			if c.Conf("debug") == "on" && e != io.EOF {
 				fmt.Println(c.Name, "error:", e)
 				debug.PrintStack()
@@ -289,9 +288,12 @@ func (c *Context) AssertOne(m *Message, hand ...func(c *Context, m *Message)) *C
 			}
 
 			if len(hand) > 1 {
-				c.AssertOne(m, hand[1:]...)
+				c.AssertOne(m, safe, hand[1:]...)
 			} else {
-				panic(e)
+				if !safe {
+					log.Println(c.Name, "error:", e)
+					panic(e)
+				}
 			}
 		}
 		// Pulse.Wait <- true
@@ -333,17 +335,23 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 	}
 
 	if c.Server != nil {
-		c.Server.Begin(m)
+		if m != nil {
+			c.Server.Begin(m, m.Meta["detail"]...)
+		} else {
+			c.Server.Begin(m)
+		}
 	}
 	return c
 }
 
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
-	if x, ok := c.Caches["status"]; ok && x.Value != "start" && c.Server != nil {
-		defer recover()
+	if _, ok := c.Caches["status"]; !ok {
+		c.Caches["status"] = &Cache{Name: "status", Value: "stop", Help: "服务状态"}
+	}
 
-		c.AssertOne(m, func(c *Context, m *Message) {
+	if c.Cap("status") != "start" && c.Server != nil {
+		c.AssertOne(m, true, func(c *Context, m *Message) {
 			c.Cap("status", "start")
 			defer c.Cap("status", "stop")
 
@@ -352,7 +360,7 @@ func (c *Context) Start(m *Message) bool { // {{{
 			defer log.Printf("%d stop(%d): %s %s", m.Code, Index.Capi("nserver"), c.Name, c.Help)
 
 			c.Resource = []*Message{m}
-			c.Server.Start(m)
+			c.Server.Start(m, m.Meta["detail"]...)
 		})
 	}
 
@@ -373,7 +381,7 @@ func (c *Context) Spawn(m *Message, key string, arg ...string) *Context { // {{{
 
 // }}}
 
-func (c *Context) Deal(pre func(m *Message) bool, post func(m *Message) bool) (live bool) { // {{{
+func (c *Context) Deal(pre func(m *Message, arg ...string) bool, post func(m *Message, arg ...string) bool) (live bool) { // {{{
 
 	if c.Messages == nil {
 		c.Messages = make(chan *Message, c.Confi("MessageQueueSize"))
@@ -385,19 +393,19 @@ func (c *Context) Deal(pre func(m *Message) bool, post func(m *Message) bool) (l
 		return true
 	}
 
-	if pre != nil && !pre(m) {
+	if pre != nil && !pre(m, m.Meta["detail"]...) {
 		return false
 	}
 
-	c.AssertOne(m, func(c *Context, m *Message) {
-		c.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
+	arg := m.Meta["detail"]
+	c.AssertOne(m, true, func(c *Context, m *Message) {
+		m.Add("result", c.Cmd(m, arg[0], arg[1:]...))
 
 	}, func(c *Context, m *Message) {
-		m.Cmd()
+		m.Add("result", m.Cmd())
 
 	}, func(c *Context, m *Message) {
-		log.Printf("system command(%s->%s): %v", m.Context.Name, m.Target.Name, m.Meta["detail"])
-		arg := m.Meta["detail"]
+		log.Printf("system command(%s->%s): %v", m.Context.Name, m.Target.Name, arg)
 		cmd := exec.Command(arg[0], arg[1:]...)
 		v, e := cmd.CombinedOutput()
 		if e != nil {
@@ -407,7 +415,7 @@ func (c *Context) Deal(pre func(m *Message) bool, post func(m *Message) bool) (l
 		}
 	})
 
-	if post != nil && !post(m) {
+	if post != nil && !post(m, m.Meta["result"]...) {
 		return false
 	}
 
@@ -811,28 +819,17 @@ func (c *Context) Capi(key string, arg ...int) int { // {{{
 // }}}
 
 var Pulse = &Message{Code: 0, Time: time.Now(), Index: 0, Name: "root"}
-var Index = &Context{Name: "ctx", Help: "根上下文", // {{{
+
+var Index = &Context{Name: "ctx", Help: "所有模块的祖模块",
 	Caches: map[string]*Cache{
-		"status":   &Cache{Name: "status", Value: "stop", Help: "服务状态"},
-		"nserver":  &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
-		"ncontext": &Cache{Name: "ncontext", Value: "0", Help: "上下文数量"},
-		"nmessage": &Cache{Name: "nmessage", Value: "0", Help: "消息发送数量"},
+		"nserver":  &Cache{Name: "服务数量", Value: "0", Help: "显示已经启动运行模块的数量"},
+		"ncontext": &Cache{Name: "模块数量", Value: "1", Help: "显示功能树已经注册模块的数量"},
+		"nmessage": &Cache{Name: "消息数量", Value: "1", Help: "显示模块启动时所创建消息的数量"},
 	},
 	Configs: map[string]*Config{
-		"开场白": &Config{Name: "开场白", Value: "你好，上下文", Help: "开场白"},
-		"结束语": &Config{Name: "结束语", Value: "再见，上下文", Help: "结束语"},
-
-		"MessageQueueSize": &Config{Name: "MessageQueueSize", Value: "10", Help: "默认消息队列长度"},
-		"MessageListSize":  &Config{Name: "MessageListSize", Value: "10", Help: "默认消息列表长度"},
-
-		"cert": &Config{Name: "cert", Value: "etc/cert.pem", Help: "证书文件"},
-		"key":  &Config{Name: "key", Value: "etc/key.pem", Help: "私钥文件"},
-
-		"root":    &Config{Name: "root", Value: ".", Help: "工作目录"},
-		"debug":   &Config{Name: "debug", Value: "off", Help: "调试模式"},
-		"start":   &Config{Name: "start", Value: "cli", Help: "默认启动模块"},
-		"init.sh": &Config{Name: "init.sh", Value: "etc/init.sh", Help: "默认启动脚本"},
-		"bench.log": &Config{Name: "bench.log", Value: "var/bench.log", Help: "默认日志文件", Hand: func(c *Context, x *Config, arg ...string) string {
+		"start":   &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
+		"init.sh": &Config{Name: "启动脚本", Value: "etc/init.sh", Help: "模块启动时自动运行的脚本"},
+		"bench.log": &Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件", Hand: func(c *Context, x *Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				if e := os.MkdirAll(path.Dir(arg[0]), os.ModePerm); e == nil {
 					if l, e := os.Create(x.Value); e == nil {
@@ -843,9 +840,36 @@ var Index = &Context{Name: "ctx", Help: "根上下文", // {{{
 			return x.Value
 			// }}}
 		}},
+		"root": &Config{Name: "工作目录", Value: ".", Help: "所有模块的当前目录", Hand: func(c *Context, x *Config, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				if !path.IsAbs(x.Value) {
+					wd, e := os.Getwd()
+					c.Assert(e)
+					x.Value = path.Join(wd, x.Value)
+				}
+
+				if e := os.MkdirAll(x.Value, os.ModePerm); e != nil {
+					fmt.Println(e)
+					os.Exit(1)
+				}
+				if e := os.Chdir(x.Value); e != nil {
+					fmt.Println(e)
+					os.Exit(1)
+				}
+			}
+
+			return x.Value
+			// }}}
+		}},
+
+		"debug":              &Config{Name: "调试模式(off/no)", Value: "off", Help: "是否打印错误信息，off:不打印，on:打印)"},
+		"ContextSessionSize": &Config{Name: "会话队列长度", Value: "10", Help: "每个模块可以启动其它模块的数量"},
+		"MessageQueueSize":   &Config{Name: "消息队列长度", Value: "10", Help: "每个模块接收消息的队列长度"},
+		"cert":               &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
+		"key":                &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*Command{
-		"void": &Command{Name: "void", Help: "建立远程连接", Hand: func(c *Context, m *Message, key string, arg ...string) string {
+		"void": &Command{Name: "输出简单的信息", Help: "建立远程连接", Hand: func(c *Context, m *Message, key string, arg ...string) string {
 			m.Echo("hello void!\n") // {{{
 			return ""
 			// }}}
@@ -855,34 +879,25 @@ var Index = &Context{Name: "ctx", Help: "根上下文", // {{{
 	Resource: []*Message{Pulse},
 }
 
-// }}}
-
-func init() { // {{{
+func init() {
 	if len(os.Args) > 1 {
-		Index.Conf("root", os.Args[1])
-	}
-	if e := os.MkdirAll(Index.Conf("root"), os.ModePerm); e != nil {
-		fmt.Println(e)
-		os.Exit(1)
-	}
-	if e := os.Chdir(Index.Conf("root")); e != nil {
-		fmt.Println(e)
-		os.Exit(1)
+		Index.Conf("start", os.Args[1])
 	}
 
 	if len(os.Args) > 2 {
-		Index.Conf("bench.log", os.Args[2])
+		Index.Conf("init.sh", os.Args[2])
+	}
+
+	if len(os.Args) > 3 {
+		Index.Conf("bench.log", os.Args[3])
 	} else {
 		Index.Conf("bench.log", Index.Conf("bench.log"))
 	}
 
-	if len(os.Args) > 3 {
-		Index.Conf("init.sh", os.Args[3])
+	if len(os.Args) > 4 {
+		Index.Conf("root", os.Args[4])
 	}
 
-	if len(os.Args) > 4 {
-		Index.Conf("start", os.Args[4])
-	}
 	log.Println("\n\n\n")
 }
 
@@ -918,5 +933,3 @@ func Start() {
 		}
 	}
 }
-
-// }}}
