@@ -327,9 +327,9 @@ func (c *Context) Register(s *Context, x Server) *Context { // {{{
 
 // }}}
 func (c *Context) Begin(m *Message) *Context { // {{{
-	for _, x := range c.Configs {
+	for k, x := range c.Configs {
 		if x.Hand != nil {
-			log.Println(c.Name, "conf:", x.Name, x.Value)
+			log.Printf("%s conf: %s(%s)", c.Name, k, x.Value)
 			x.Hand(c, x, x.Value)
 		}
 	}
@@ -347,7 +347,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
 	if _, ok := c.Caches["status"]; !ok {
-		c.Caches["status"] = &Cache{Name: "status", Value: "stop", Help: "服务状态"}
+		c.Caches["status"] = &Cache{Name: "服务状态", Value: "stop", Help: "服务状态，start:正在运行，stop:未在运行"}
 	}
 
 	if c.Cap("status") != "start" && c.Server != nil {
@@ -635,6 +635,15 @@ func (c *Context) Travel(hand func(s *Context) bool) { // {{{
 }
 
 // }}}
+func (c *Context) BackTrace(hand func(s *Context) bool) { // {{{
+	for cs := c; cs != nil; cs = cs.Context {
+		if !hand(cs) {
+			return
+		}
+	}
+}
+
+// }}}
 func (c *Context) Search(name string) []*Context { // {{{
 	cs := make([]*Context, 0, 3)
 
@@ -723,7 +732,7 @@ func (c *Context) Conf(key string, arg ...string) string { // {{{
 			case 3:
 				log.Println(c.Name, "conf:", key, arg)
 				if s == c {
-					panic(errors.New(x.Name + "配置项已存在"))
+					panic(errors.New(key + "配置项已存在"))
 				}
 				if c.Configs == nil {
 					c.Configs = make(map[string]*Config)
@@ -818,7 +827,7 @@ func (c *Context) Capi(key string, arg ...int) int { // {{{
 
 // }}}
 
-var Pulse = &Message{Code: 0, Time: time.Now(), Index: 0, Name: "root"}
+var Pulse = &Message{Code: 1, Time: time.Now(), Index: 0, Name: "root"}
 
 var Index = &Context{Name: "ctx", Help: "所有模块的祖模块",
 	Caches: map[string]*Cache{
