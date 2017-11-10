@@ -184,7 +184,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		cli.Messages = make(chan *ctx.Message, cli.Confi("MessageQueueSize"))
 	}
 	if len(arg) > 0 {
-		cli.Configs["init.sh"] = &ctx.Config{Name: "启动脚本", Value: arg[0], Help: "模块启动时自动运行的脚本"}
+		cli.Conf("init.sh", "启动脚本", arg[0], "模块启动时自动运行的脚本")
 	}
 
 	if stream, ok := m.Data["io"]; ok {
@@ -214,7 +214,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		cli.history = append(cli.history, map[string]string{
 			"time":  time.Now().Format("15:04:05"),
 			"index": fmt.Sprintf("%d", len(cli.history)),
-			"cli":   strings.Join(arg, " "),
+			"cli":   strings.Join(msg.Meta["detail"], " "),
 		})
 
 		if len(arg) > 0 {
@@ -296,7 +296,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				return ""
 			}
 
-			target := m.Target.Root
+			target := m.Target
 			method := "search"
 			action := "switch"
 			which := ""
@@ -350,18 +350,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					cli.target = v
 				case "spawn":
 					msg := m.Spawn(v)
-					v.Spawn(msg, args[0], args[1:]...)
-					v.Begin(msg)
+					v.Spawn(msg, args[0], args[1:]...).Begin(msg)
 				case "start":
-					m.Spawn(v).Start(args...)
+					m.Message.Spawn(v, args[0]).Start(args...)
 				case "show":
 					m.Echo("%s: %s\n", v.Name, v.Help)
 					m.Echo("引用模块：\n")
-					for k, v := range v.Session {
+					for k, v := range v.Sessions {
 						m.Echo("\t%s(%d): %s %s\n", k, v.Code, v.Target.Name, v.Target.Help)
 					}
 					m.Echo("索引模块：\n")
-					for i, v := range v.Resource {
+					for i, v := range v.Requests {
 						m.Echo("\t%d(%d): %s %s\n", i, v.Code, v.Context.Name, v.Context.Help)
 					}
 				}
@@ -604,7 +603,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 		}},
 		"open": &ctx.Command{Name: "open address protocl", Help: "建立远程连接",
 			Options: map[string]string{"io": "读写流"},
-			Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+			Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string { // {{{
 				if m.Has("io") {
 					m.Start(fmt.Sprintf("PTS%d", c.Capi("nterm")), arg[1])
 				} else {
@@ -612,7 +611,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					case "tcp":
 					}
 				}
-				// {{{
 				return ""
 				// }}}
 			}},

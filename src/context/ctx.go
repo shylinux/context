@@ -67,7 +67,7 @@ func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
 		Time:    time.Now(),
 		Target:  c,
 		Message: m,
-		Root:    Pulse,
+		Root:    m.Root,
 	}
 	msg.Context = m.Target
 
@@ -81,10 +81,10 @@ func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
 	m.Messages = append(m.Messages, msg)
 	msg.Code = m.Capi("nmessage", 1)
 
-	if msg.Session == nil {
-		msg.Session = make(map[string]*Message)
+	if msg.Sessions == nil {
+		msg.Sessions = make(map[string]*Message)
 	}
-	msg.Session[key[0]] = msg
+	msg.Sessions[key[0]] = msg
 	msg.Name = key[0]
 
 	log.Printf("%d spawn %d: %s.%s->%s.%d", m.Code, msg.Code, msg.Context.Name, msg.Name, msg.Target.Name, msg.Index)
@@ -221,6 +221,9 @@ func (m *Message) Post(c *Context, arg ...string) bool { // {{{
 // }}}
 func (m *Message) Start(arg ...string) bool { // {{{
 	if len(arg) > 0 {
+		if m.Meta == nil {
+			m.Meta = make(map[string][]string)
+		}
 		m.Meta["detail"] = arg
 	}
 
@@ -252,11 +255,11 @@ type Context struct {
 	Message  *Message
 	Server
 
-	Resource []*Message
-	Session  map[string]*Message
+	Requests []*Message
+	Sessions map[string]*Message
 
-	Index   map[string]*Context
-	Shadows map[string]*Context
+	Index  map[string]*Context
+	Groups map[string]*Context
 
 	Contexts map[string]*Context
 	Context  *Context
@@ -329,8 +332,7 @@ func (c *Context) Register(s *Context, x Server) *Context { // {{{
 func (c *Context) Begin(m *Message) *Context { // {{{
 	for k, x := range c.Configs {
 		if x.Hand != nil {
-			log.Printf("%s conf: %s(%s)", c.Name, k, x.Value)
-			x.Hand(c, x, x.Value)
+			c.Conf(k, x.Value)
 		}
 	}
 
@@ -341,6 +343,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 			c.Server.Begin(m)
 		}
 	}
+
 	return c
 }
 
@@ -357,9 +360,9 @@ func (c *Context) Start(m *Message) bool { // {{{
 
 			log.Printf("%d start(%d): %s %s", m.Code, Index.Capi("nserver", 1), c.Name, c.Help)
 			defer Index.Capi("nserver", -1)
-			defer log.Printf("%d stop(%d): %s %s", m.Code, Index.Capi("nserver"), c.Name, c.Help)
+			defer log.Printf("%d stop(%s): %s %s", m.Code, Index.Cap("nserver"), c.Name, c.Help)
 
-			c.Resource = []*Message{m}
+			c.Requests = []*Message{m}
 			c.Server.Start(m, m.Meta["detail"]...)
 		})
 	}
@@ -425,7 +428,7 @@ func (c *Context) Deal(pre func(m *Message, arg ...string) bool, post func(m *Me
 // }}}
 func (c *Context) Exit(m *Message, arg ...string) { // {{{
 	if m.Target == c {
-		for _, v := range c.Session {
+		for _, v := range c.Sessions {
 			if v.Name != "" {
 				v.Name = ""
 				v.Target.Exit(v, arg...)
@@ -438,7 +441,7 @@ func (c *Context) Exit(m *Message, arg ...string) { // {{{
 			log.Println(c.Name, c.Help, "exit: self", m.Code)
 		}
 
-		for _, v := range c.Resource {
+		for _, v := range c.Requests {
 			if v.Index != -1 {
 				v.Context.Exit(v, arg...)
 				log.Println(c.Name, c.Help, "exit: resource", v.Code, v.Context.Name, v.Context.Help)
@@ -470,18 +473,18 @@ func (c *Context) Add(arg ...string) { // {{{
 			panic(errors.New(v.Name + "上下文已存在"))
 		}
 
-		if c.Shadows == nil {
-			c.Shadows = make(map[string]*Context)
+		if c.Groups == nil {
+			c.Groups = make(map[string]*Context)
 		}
-		c.Shadows[arg[1]] = &Context{Name: arg[2], Help: arg[3], Index: c.Index}
-		c.Index[arg[1]] = c.Shadows[arg[1]]
+		c.Groups[arg[1]] = &Context{Name: arg[2], Help: arg[3], Index: c.Index}
+		c.Index[arg[1]] = c.Groups[arg[1]]
 		log.Println(c.Name, "add context:", arg[1:])
 	case "command":
 		if len(arg) != 3 {
 			panic(errors.New("参数错误"))
 		}
 
-		if v, ok := c.Shadows[arg[1]]; ok {
+		if v, ok := c.Groups[arg[1]]; ok {
 			if v.Commands == nil {
 				v.Commands = make(map[string]*Command)
 			}
@@ -502,7 +505,7 @@ func (c *Context) Add(arg ...string) { // {{{
 			panic(errors.New("参数错误"))
 		}
 
-		if v, ok := c.Shadows[arg[1]]; ok {
+		if v, ok := c.Groups[arg[1]]; ok {
 			if v.Configs == nil {
 				v.Configs = make(map[string]*Config)
 			}
@@ -523,7 +526,7 @@ func (c *Context) Add(arg ...string) { // {{{
 			panic(errors.New("参数错误"))
 		}
 
-		if v, ok := c.Shadows[arg[1]]; ok {
+		if v, ok := c.Groups[arg[1]]; ok {
 			if v.Caches == nil {
 				v.Caches = make(map[string]*Cache)
 			}
@@ -552,14 +555,14 @@ func (c *Context) Del(arg ...string) { // {{{
 			panic(errors.New("参数错误"))
 		}
 
-		if v, ok := c.Shadows[arg[1]]; ok {
+		if v, ok := c.Groups[arg[1]]; ok {
 			cs = append(cs, v)
 			delete(c.Index, arg[1])
-			delete(c.Shadows, arg[1])
+			delete(c.Groups, arg[1])
 			log.Println(c.Name, "del context:", arg[1])
 		}
 		for i := 0; i < len(cs); i++ {
-			for k, v := range cs[i].Shadows {
+			for k, v := range cs[i].Groups {
 				cs = append(cs, v)
 				delete(c.Index, k)
 				log.Println(c.Name, "del context:", k)
@@ -570,13 +573,13 @@ func (c *Context) Del(arg ...string) { // {{{
 			panic(errors.New("参数错误"))
 		}
 
-		if v, ok := c.Shadows[arg[1]]; ok {
+		if v, ok := c.Groups[arg[1]]; ok {
 			cs = append(cs, v)
 			delete(v.Commands, arg[2])
 			log.Println(v.Name, "del command:", arg[2])
 		}
 		for i := 0; i < len(cs); i++ {
-			for _, v := range cs[i].Shadows {
+			for _, v := range cs[i].Groups {
 				cs = append(cs, v)
 				delete(v.Commands, arg[2])
 				log.Println(v.Name, "del command:", arg[2])
@@ -587,13 +590,13 @@ func (c *Context) Del(arg ...string) { // {{{
 			panic(errors.New("参数错误"))
 		}
 
-		if v, ok := c.Shadows[arg[1]]; ok {
+		if v, ok := c.Groups[arg[1]]; ok {
 			cs = append(cs, v)
 			delete(v.Configs, arg[2])
 			log.Println(v.Name, "del config:", arg[2])
 		}
 		for i := 0; i < len(cs); i++ {
-			for _, v := range cs[i].Shadows {
+			for _, v := range cs[i].Groups {
 				cs = append(cs, v)
 				delete(v.Configs, arg[2])
 				log.Println(v.Name, "del config:", arg[2])
@@ -604,13 +607,13 @@ func (c *Context) Del(arg ...string) { // {{{
 			panic(errors.New("参数错误"))
 		}
 
-		if v, ok := c.Shadows[arg[1]]; ok {
+		if v, ok := c.Groups[arg[1]]; ok {
 			cs = append(cs, v)
 			delete(v.Caches, arg[2])
 			log.Println(v.Name, "del cache:", arg[2])
 		}
 		for i := 0; i < len(cs); i++ {
-			for _, v := range cs[i].Shadows {
+			for _, v := range cs[i].Groups {
 				cs = append(cs, v)
 				delete(v.Caches, arg[2])
 				log.Println(v.Name, "del cache:", arg[2])
@@ -827,9 +830,9 @@ func (c *Context) Capi(key string, arg ...int) int { // {{{
 
 // }}}
 
-var Pulse = &Message{Code: 1, Time: time.Now(), Index: 0, Name: "root"}
+var Pulse = &Message{Code: 1, Time: time.Now(), Name: "ctx", Index: 0}
 
-var Index = &Context{Name: "ctx", Help: "所有模块的祖模块",
+var Index = &Context{Name: "ctx", Help: "根模块",
 	Caches: map[string]*Cache{
 		"nserver":  &Cache{Name: "服务数量", Value: "0", Help: "显示已经启动运行模块的数量"},
 		"ncontext": &Cache{Name: "模块数量", Value: "1", Help: "显示功能树已经注册模块的数量"},
@@ -871,21 +874,25 @@ var Index = &Context{Name: "ctx", Help: "所有模块的祖模块",
 			// }}}
 		}},
 
-		"debug":              &Config{Name: "调试模式(off/no)", Value: "off", Help: "是否打印错误信息，off:不打印，on:打印)"},
+		"ContextRequestSize": &Config{Name: "请求队列长度", Value: "10", Help: "每个模块可以被其它模块引用的的数量"},
 		"ContextSessionSize": &Config{Name: "会话队列长度", Value: "10", Help: "每个模块可以启动其它模块的数量"},
 		"MessageQueueSize":   &Config{Name: "消息队列长度", Value: "10", Help: "每个模块接收消息的队列长度"},
-		"cert":               &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
-		"key":                &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
+
+		"debug": &Config{Name: "调试模式(off/no)", Value: "off", Help: "是否打印错误信息，off:不打印，on:打印)"},
+		"cert":  &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
+		"key":   &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*Command{
-		"void": &Command{Name: "输出简单的信息", Help: "建立远程连接", Hand: func(c *Context, m *Message, key string, arg ...string) string {
-			m.Echo("hello void!\n") // {{{
+		"show": &Command{Name: "输出简单的信息", Help: "建立远程连接", Hand: func(c *Context, m *Message, key string, arg ...string) string {
+			m.Echo("nserver: %s\n", c.Cap("nserver")) // {{{
+			m.Echo("ncontext: %s\n", c.Cap("ncontext"))
+			m.Echo("nmessage: %s\n", c.Cap("nmessage"))
 			return ""
 			// }}}
 		}},
 	},
-	Session:  map[string]*Message{"root": Pulse},
-	Resource: []*Message{Pulse},
+	Requests: []*Message{Pulse},
+	Sessions: map[string]*Message{"root": Pulse},
 }
 
 func init() {
@@ -916,15 +923,11 @@ func Start() {
 	Pulse.Context = Index
 	Pulse.Wait = make(chan bool, 10)
 
-	cs := []*Context{Index}
-	for i := 0; i < len(cs); i++ {
-		cs[i].Root = Index
-		cs[i].Begin(nil)
-
-		for _, v := range cs[i].Contexts {
-			cs = append(cs, v)
-		}
-	}
+	Index.Travel(func(s *Context) bool {
+		s.Root = Index
+		s.Begin(nil)
+		return true
+	})
 
 	n := 0
 	for _, s := range Index.Contexts {
