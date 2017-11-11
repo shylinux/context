@@ -30,11 +30,11 @@ snippet c
 		*ctx.Context
 	}
 
-	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Begin(m *ctx.Message) ctx.Server {
-		return nil
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Begin(m *ctx.Message, arg ...string) ctx.Server {
+		return `Filename()`
 	}
 
-	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Start(m *ctx.Message) bool {
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Start(m *ctx.Message, arg ...string) bool {
 		return true
 	}
 

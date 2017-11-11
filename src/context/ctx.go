@@ -61,6 +61,22 @@ type Message struct {
 	Root     *Message
 }
 
+func (m *Message) Assert(e error) bool { // {{{
+	if e != nil {
+		m.Add("result", "error:", fmt.Sprintln(e))
+
+		log.Println(m.Code, "error:", e)
+		if m.Conf("debug") == "on" {
+			fmt.Println(m.Code, "error:", e)
+		}
+
+		panic(e)
+	}
+	return true
+}
+
+// }}}
+
 func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
 
 	msg := &Message{
@@ -158,7 +174,9 @@ func (m *Message) Has(key string) bool { // {{{
 // }}}
 func (m *Message) Get(key string) string { // {{{
 	if meta, ok := m.Meta[key]; ok {
-		return meta[0]
+		if len(meta) > 0 {
+			return meta[0]
+		}
 	}
 	return ""
 }
@@ -219,7 +237,7 @@ func (m *Message) Post(c *Context, arg ...string) bool { // {{{
 }
 
 // }}}
-func (m *Message) Start(arg ...string) bool { // {{{
+func (m *Message) Start(key string, arg ...string) bool { // {{{
 	if len(arg) > 0 {
 		if m.Meta == nil {
 			m.Meta = make(map[string][]string)
@@ -227,7 +245,7 @@ func (m *Message) Start(arg ...string) bool { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	go m.Target.Spawn(m, m.Meta["detail"][0], m.Meta["detail"][1:]...).Begin(m).Start(m)
+	m.Target.Spawn(m, key).Start(m)
 
 	return true
 }
@@ -349,6 +367,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
+
 	if _, ok := c.Caches["status"]; !ok {
 		c.Caches["status"] = &Cache{Name: "服务状态", Value: "stop", Help: "服务状态，start:正在运行，stop:未在运行"}
 	}
@@ -371,11 +390,11 @@ func (c *Context) Start(m *Message) bool { // {{{
 }
 
 // }}}
-func (c *Context) Spawn(m *Message, key string, arg ...string) *Context { // {{{
+func (c *Context) Spawn(m *Message, key string) *Context { // {{{
 	s := &Context{Name: key, Help: c.Help}
 	m.Target = s
 	if c.Server != nil {
-		c.Register(s, c.Server.Spawn(s, m, arg...)).Begin(m)
+		c.Register(s, c.Server.Spawn(s, m, m.Meta["detail"]...)).Begin(m)
 	} else {
 		c.Register(s, nil).Begin(m)
 	}
@@ -402,10 +421,10 @@ func (c *Context) Deal(pre func(m *Message, arg ...string) bool, post func(m *Me
 
 	arg := m.Meta["detail"]
 	c.AssertOne(m, true, func(c *Context, m *Message) {
-		m.Add("result", c.Cmd(m, arg[0], arg[1:]...))
+		m.Cmd()
 
 	}, func(c *Context, m *Message) {
-		m.Add("result", m.Cmd())
+		c.Cmd(m, arg[0], arg[1:]...)
 
 	}, func(c *Context, m *Message) {
 		log.Printf("system command(%s->%s): %v", m.Context.Name, m.Target.Name, arg)
@@ -427,7 +446,20 @@ func (c *Context) Deal(pre func(m *Message, arg ...string) bool, post func(m *Me
 
 // }}}
 func (c *Context) Exit(m *Message, arg ...string) { // {{{
+	log.Println(c.Sessions)
+	log.Println(c.Requests)
+
 	if m.Target == c {
+		if m.Index == -1 {
+			log.Println(c.Name, c.Help, "exit: resource", m.Code, m.Context.Name, m.Context.Help)
+			if c.Server != nil {
+				c.Server.Exit(m, arg...)
+				log.Println(c.Name, c.Help, "exit: self", m.Code)
+			}
+			return
+		}
+		m.Index = -1
+
 		for _, v := range c.Sessions {
 			if v.Name != "" {
 				v.Name = ""
@@ -443,16 +475,17 @@ func (c *Context) Exit(m *Message, arg ...string) { // {{{
 
 		for _, v := range c.Requests {
 			if v.Index != -1 {
+				v.Index = -1
 				v.Context.Exit(v, arg...)
 				log.Println(c.Name, c.Help, "exit: resource", v.Code, v.Context.Name, v.Context.Help)
-				v.Index = -1
 			}
 		}
 	} else if m.Context == c {
-		if m.Name != "" {
-			m.Target.Exit(m, arg...)
-			log.Println(c.Name, c.Help, "exit: session", m.Code, m.Target.Name, m.Target.Help)
-			m.Name = ""
+		m.Name = ""
+		log.Println(c.Name, c.Help, "exit: session", m.Code, m.Target.Name, m.Target.Help)
+		if c.Server != nil {
+			c.Server.Exit(m, arg...)
+			log.Println(c.Name, c.Help, "exit: self", m.Code)
 		}
 	}
 
@@ -690,29 +723,31 @@ func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 		if x, ok := s.Commands[key]; ok {
 			log.Printf("%s cmd(%s->%s): %v", c.Name, m.Context.Name, m.Target.Name, m.Meta["detail"])
 
-			if x.Hand == nil {
-				panic(errors.New(fmt.Sprintf(key + "没有权限")))
-			}
-
 			for _, v := range m.Meta["option"] {
 				if _, ok := x.Options[v]; !ok {
-					panic(errors.New(fmt.Sprintf(v + "未知参数")))
+					panic(errors.New(fmt.Sprintf("未知参数:" + v)))
 				}
 			}
 
-			value := x.Hand(c, m, key, arg...)
+			m.Meta["result"] = nil
+			c.AssertOne(m, true, func(c *Context, m *Message) {
+				x.Hand(c, m, key, arg...)
 
-			for _, v := range m.Meta["append"] {
-				if _, ok := x.Appends[v]; !ok {
-					panic(errors.New(fmt.Sprintf(v + "未知参数")))
+			})
+
+			if x.Appends != nil {
+				for _, v := range m.Meta["append"] {
+					if _, ok := x.Appends[v]; !ok {
+						panic(errors.New(fmt.Sprintf("未知参数:" + v)))
+					}
 				}
 			}
 
-			return value
+			return m.Get("result")
 		}
 	}
 
-	panic(errors.New(fmt.Sprintf(key + "命令项不存在")))
+	panic(errors.New(fmt.Sprintf("未知命令:" + key)))
 }
 
 // }}}
@@ -878,7 +913,7 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 		"ContextSessionSize": &Config{Name: "会话队列长度", Value: "10", Help: "每个模块可以启动其它模块的数量"},
 		"MessageQueueSize":   &Config{Name: "消息队列长度", Value: "10", Help: "每个模块接收消息的队列长度"},
 
-		"debug": &Config{Name: "调试模式(off/no)", Value: "off", Help: "是否打印错误信息，off:不打印，on:打印)"},
+		"debug": &Config{Name: "调试模式(off/on)", Value: "off", Help: "是否打印错误信息，off:不打印，on:打印)"},
 		"cert":  &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
 		"key":   &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
@@ -896,32 +931,29 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 }
 
 func init() {
-	if len(os.Args) > 1 {
-		Index.Conf("start", os.Args[1])
-	}
-
-	if len(os.Args) > 2 {
-		Index.Conf("init.sh", os.Args[2])
-	}
-
-	if len(os.Args) > 3 {
-		Index.Conf("bench.log", os.Args[3])
-	} else {
-		Index.Conf("bench.log", Index.Conf("bench.log"))
-	}
-
-	if len(os.Args) > 4 {
-		Index.Conf("root", os.Args[4])
-	}
-
-	log.Println("\n\n\n")
-}
-
-func Start() {
 	Pulse.Root = Pulse
 	Pulse.Target = Index
 	Pulse.Context = Index
 	Pulse.Wait = make(chan bool, 10)
+
+}
+
+func Start(args ...string) {
+	if len(args) > 0 {
+		Index.Conf("start", args[0])
+	}
+	if len(args) > 1 {
+		Index.Conf("init.sh", args[1])
+	}
+	if len(args) > 2 {
+		Index.Conf("bench.log", args[2])
+	} else {
+		Index.Conf("bench.log", Index.Conf("bench.log"))
+	}
+	if len(args) > 3 {
+		Index.Conf("root", args[3])
+	}
+	log.Println("\n\n\n")
 
 	Index.Travel(func(s *Context) bool {
 		s.Root = Index
@@ -929,19 +961,17 @@ func Start() {
 		return true
 	})
 
-	n := 0
-	for _, s := range Index.Contexts {
-		if ok, _ := regexp.MatchString(Index.Conf("start"), s.Name); ok {
-			n++
-			go s.Start(Pulse.Spawn(s, s.Name).Put("option", "io", os.Stdout))
+	if n := 0; Index.Conf("start") != "" {
+		for _, s := range Index.Contexts {
+			if ok, _ := regexp.MatchString(Index.Conf("start"), s.Name); ok {
+				go s.Start(Pulse.Spawn(s, s.Name).Put("option", "io", os.Stdout))
+				n++
+			}
 		}
-	}
 
-	for {
-		<-Pulse.Wait
-		n--
-		if n <= 0 && Index.Capi("nserver", 0) == 0 {
-			return
+		for n > 0 || Index.Capi("nserver", 0) > 0 {
+			<-Pulse.Wait
+			n--
 		}
 	}
 }

@@ -3,8 +3,6 @@ package cli // {{{
 import ( // {{{
 	"bufio"
 	"context"
-	// _ "context/tcp"
-	// _ "context/web"
 	"fmt"
 	"io"
 	"os"
@@ -350,9 +348,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					cli.target = v
 				case "spawn":
 					msg := m.Spawn(v)
-					v.Spawn(msg, args[0], args[1:]...).Begin(msg)
+					// msg.Add("detail", args[1:]...)
+					v.Spawn(msg, args[0]).Begin(msg)
 				case "start":
-					m.Message.Spawn(v, args[0]).Start(args...)
+					m.Message.Spawn(v, args[0]).Start(arg[0], args[1:]...)
 				case "show":
 					m.Echo("%s: %s\n", v.Name, v.Help)
 					m.Echo("引用模块：\n")
