@@ -204,7 +204,7 @@ func (m *Message) End(s bool) { // {{{
 
 // }}}
 
-func (m *Message) Cmd(arg ...string) string { // {{{
+func (m *Message) Start(key string, arg ...string) bool { // {{{
 	if len(arg) > 0 {
 		if m.Meta == nil {
 			m.Meta = make(map[string][]string)
@@ -212,7 +212,9 @@ func (m *Message) Cmd(arg ...string) string { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	return m.Target.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
+	m.Target.Spawn(m, key).Start(m)
+
+	return true
 }
 
 // }}}
@@ -225,7 +227,7 @@ func (m *Message) Post(c *Context, arg ...string) bool { // {{{
 	}
 
 	if c.Messages == nil {
-		panic(m.Target.Name + " 没有开启消息处理")
+		panic(c.Name + " 没有开启消息处理")
 	}
 
 	c.Messages <- m
@@ -237,7 +239,7 @@ func (m *Message) Post(c *Context, arg ...string) bool { // {{{
 }
 
 // }}}
-func (m *Message) Start(key string, arg ...string) bool { // {{{
+func (m *Message) Cmd(arg ...string) string { // {{{
 	if len(arg) > 0 {
 		if m.Meta == nil {
 			m.Meta = make(map[string][]string)
@@ -245,9 +247,7 @@ func (m *Message) Start(key string, arg ...string) bool { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	m.Target.Spawn(m, key).Start(m)
-
-	return true
+	return m.Target.Cmd(m, m.Meta["detail"][0], m.Meta["detail"][1:]...)
 }
 
 // }}}
@@ -276,6 +276,7 @@ type Context struct {
 	Requests []*Message
 	Sessions map[string]*Message
 
+	Owner  *Context
 	Index  map[string]*Context
 	Groups map[string]*Context
 
@@ -299,6 +300,7 @@ func (c *Context) Assert(e error) bool { // {{{
 func (c *Context) AssertOne(m *Message, safe bool, hand ...func(c *Context, m *Message)) *Context { // {{{
 	defer func() {
 		if e := recover(); e != nil {
+			log.Println(c.Name, e)
 			if c.Conf("debug") == "on" && e != io.EOF {
 				fmt.Println(c.Name, "error:", e)
 				debug.PrintStack()
@@ -381,10 +383,12 @@ func (c *Context) Start(m *Message) bool { // {{{
 			defer Index.Capi("nserver", -1)
 			defer log.Printf("%d stop(%s): %s %s", m.Code, Index.Cap("nserver"), c.Name, c.Help)
 
+			c.Owner = m.Owner
 			c.Requests = []*Message{m}
 			c.Server.Start(m, m.Meta["detail"]...)
 		})
 	}
+	Pulse.Wait <- true
 
 	return true
 }
@@ -657,6 +661,22 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
+func (c *Context) Check(s *Context) bool { // {{{
+	// if c.Owner != nil {
+	// 	log.Println("source:", c.Owner.Name)
+	// }
+	// if s.Owner != nil {
+	// 	log.Println("target:", s.Owner.Name)
+	// }
+	if c.Owner == s.Owner || c.Owner == Index.Owner {
+		// log.Println("match:")
+		return true
+	}
+	// log.Println("not match:")
+	return false
+}
+
+// }}}
 func (c *Context) Travel(hand func(s *Context) bool) { // {{{
 	cs := []*Context{c}
 	for i := 0; i < len(cs); i++ {
@@ -687,8 +707,6 @@ func (c *Context) Search(name string) []*Context { // {{{
 		if strings.Contains(s.Name, name) || strings.Contains(s.Help, name) {
 			cs = append(cs, s)
 			log.Println(c.Name, "search:", s.Name, "[match]", name)
-		} else {
-			log.Println(c.Name, "search:", s.Name)
 		}
 		return true
 	})
@@ -723,6 +741,11 @@ func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 		if x, ok := s.Commands[key]; ok {
 			log.Printf("%s cmd(%s->%s): %v", c.Name, m.Context.Name, m.Target.Name, m.Meta["detail"])
 
+			if !m.Context.Check(m.Target) {
+				log.Printf("没有权限:")
+				return ""
+			}
+
 			for _, v := range m.Meta["option"] {
 				if _, ok := x.Options[v]; !ok {
 					panic(errors.New(fmt.Sprintf("未知参数:" + v)))
@@ -731,8 +754,10 @@ func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 
 			m.Meta["result"] = nil
 			c.AssertOne(m, true, func(c *Context, m *Message) {
-				x.Hand(c, m, key, arg...)
-
+				ret := x.Hand(c, m, key, arg...)
+				if ret != "" {
+					m.Echo(ret)
+				}
 			})
 
 			if x.Appends != nil {
@@ -753,6 +778,7 @@ func (c *Context) Cmd(m *Message, key string, arg ...string) string { // {{{
 // }}}
 func (c *Context) Conf(key string, arg ...string) string { // {{{
 	for s := c; s != nil; s = s.Context {
+
 		if x, ok := s.Configs[key]; ok {
 			switch len(arg) {
 			case 0:
@@ -935,7 +961,6 @@ func init() {
 	Pulse.Target = Index
 	Pulse.Context = Index
 	Pulse.Wait = make(chan bool, 10)
-
 }
 
 func Start(args ...string) {

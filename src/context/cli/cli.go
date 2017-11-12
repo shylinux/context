@@ -5,6 +5,7 @@ import ( // {{{
 	"context"
 	"fmt"
 	"io"
+	// "log"
 	"os"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ type CLI struct {
 	alias   map[string]string
 	next    string
 	exit    bool
+	login   *ctx.Context
 
 	target *ctx.Context
 	*ctx.Context
@@ -44,6 +46,33 @@ func (cli *CLI) push(f io.ReadCloser) { // {{{
 
 // }}}
 func (cli *CLI) parse(m *ctx.Message) bool { // {{{
+	if len(cli.ins) == 1 && cli.Owner == nil {
+
+		username := ""
+		fmt.Fprintf(cli.out, "username>")
+		fmt.Fscanln(cli.in, &username)
+
+		password := ""
+		fmt.Fprintf(cli.out, "password>")
+		fmt.Fscanln(cli.in, &password)
+
+		if aaa := cli.Root.Find("aaa"); aaa != nil {
+			cli.Owner = Index.Owner
+			msg := m.Spawn(aaa, "user")
+
+			if msg.Cmd("login", username, password) == "" {
+				fmt.Fprintln(cli.out, "登录失败")
+				m.Post(cli.Context, "exit")
+				cli.out.Close()
+				cli.in.Close()
+				return false
+			}
+
+			cli.Owner = msg.Target
+			cli.Cap("user", msg.Target.Cap("username"))
+		}
+	}
+
 	if len(cli.ins) == 1 || cli.Conf("slient") != "yes" {
 		cli.echo(cli.Conf("PS1"))
 	}
@@ -175,6 +204,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
+	cli.Owner = nil
 	cli.Capi("nterm", 1)
 	defer cli.Capi("nterm", -1)
 
@@ -253,9 +283,11 @@ func (cli *CLI) Exit(m *ctx.Message, arg ...string) bool { // {{{
 var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 	Caches: map[string]*ctx.Cache{
 		"nterm": &ctx.Cache{Name: "终端数量", Value: "0", Help: "已经运行的终端数量"},
+		"user":  &ctx.Cache{Name: "登录用户", Value: "", Help: "登录用户名"},
 	},
 	Configs: map[string]*ctx.Config{
-		"slient": &ctx.Config{Name: "屏蔽脚本输出(yes/no)", Value: "yes", Help: "屏蔽脚本输出的信息，yes:屏蔽，no:不屏蔽"},
+		"slient":  &ctx.Config{Name: "屏蔽脚本输出(yes/no)", Value: "yes", Help: "屏蔽脚本输出的信息，yes:屏蔽，no:不屏蔽"},
+		"default": &ctx.Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
 		// "hello":  &ctx.Config{Name: "开场白", Value: "\n~~~  Hello Context & Message World  ~~~\n", Help: "模块启动时输出的信息"},
 		// "byebye": &ctx.Config{Name: "结束语", Value: "\n~~~  Byebye Context & Message World  ~~~\n", Help: "模块停止时输出的信息"},
 
@@ -278,15 +310,18 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 	},
 	Commands: map[string]*ctx.Command{
 		"context": &ctx.Command{Name: "context [root|back|home] [[find|search] name] [show|spawn|start|switch][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-			cli, ok := c.Server.(*CLI) // {{{
+			cli, ok := m.Context.Server.(*CLI) // {{{
 			if !ok {
-				return ""
+				cli, ok = c.Server.(*CLI)
+				if !ok {
+					return ""
+				}
 			}
 
 			switch len(arg) {
 			case 0:
 				m.Target.Root.Travel(func(c *ctx.Context) bool {
-					if c.Context != nil {
+					if c.Context != nil && m.Context.Check(c) {
 						m.Echo("%s: %s(%s)\n", c.Context.Name, c.Name, c.Help)
 					}
 					return true
@@ -295,6 +330,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			}
 
 			target := m.Target
+			switch c.Conf("default") {
+			case "root":
+				target = target.Root
+			case "back":
+				if target.Context != nil {
+					target = target.Context
+				}
+			case "home":
+			}
+
 			method := "search"
 			action := "switch"
 			which := ""
@@ -343,6 +388,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			}
 
 			for _, v := range cs {
+				if !m.Context.Check(v) {
+					continue
+				}
+
 				switch action {
 				case "switch":
 					cli.target = v
@@ -565,6 +614,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			return ""
 			// }}}
 		}},
+		"userinfo": &ctx.Command{Name: "userinfo", Help: "查看模块的用户信息", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+			o := m.Target.Owner // {{{
+			if o != nil {
+				m.Echo("%s\n", o.Name)
+			}
+			return ""
+			// }}}
+		}},
 		"exit": &ctx.Command{Name: "exit", Help: "退出", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			cli, ok := m.Target.Server.(*CLI) // {{{
 			if !ok {
@@ -572,9 +629,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 			}
 			if ok {
 				if !cli.exit {
-					m.Echo(c.Conf("结束语"))
+					// m.Echo(c.Conf("结束语"))
 					cli.Context.Exit(m)
 				}
+				cli.in.Close()
+				cli.out.Close()
 				cli.exit = true
 			}
 
