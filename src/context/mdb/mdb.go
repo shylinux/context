@@ -27,32 +27,32 @@ func (mdb *MDB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
-	mdb.Capi("nsource", 1)
-	defer mdb.Capi("nsource", -1)
+	m.Capi("nsource", 1)
+	defer m.Capi("nsource", -1)
 
 	if len(arg) > 0 {
-		mdb.Conf("source", arg[0])
+		m.Conf("source", arg[0])
 
 		if len(arg) > 1 {
-			mdb.Conf("driver", arg[1])
+			m.Conf("driver", arg[1])
 		}
 	}
 
-	if mdb.Conf("source") == "" || mdb.Conf("driver") == "" {
+	if m.Conf("source") == "" || m.Conf("driver") == "" {
 		return true
 	}
 
-	db, e := sql.Open(mdb.Conf("driver"), mdb.Conf("source"))
-	mdb.Assert(e)
+	db, e := sql.Open(m.Conf("driver"), m.Conf("source"))
+	m.Assert(e)
 	mdb.db = db
 	defer mdb.db.Close()
 
-	log.Println(mdb.Name, "open:", mdb.Conf("driver"), mdb.Conf("source"))
-	defer log.Println(mdb.Name, "close:", mdb.Conf("driver"), mdb.Conf("source"))
+	log.Println(mdb.Name, "open:", m.Conf("driver"), m.Conf("source"))
+	defer log.Println(mdb.Name, "close:", m.Conf("driver"), m.Conf("source"))
 
 	for _, p := range m.Meta["prepare"] {
 		_, e := db.Exec(p)
-		mdb.Assert(e)
+		m.Assert(e)
 	}
 
 	return true
@@ -86,7 +86,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 				"prepare": "打开数据库时自动执行的语句",
 			},
 			Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-				m.Start("db"+c.Cap("nsource"), arg...) // {{{
+				m.Start("db"+m.Cap("nsource"), arg...) // {{{
 				return ""
 				// }}}
 			}},
