@@ -9,37 +9,41 @@ import ( // {{{
 // }}}
 
 type TCP struct {
-	listener net.Listener
+	l     net.Listener
+	c     net.Conn
+	close bool
 	*ctx.Context
 }
 
 func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	tcp.Caches["nclient"] = &ctx.Cache{Name: "nclient", Value: "0", Help: "连接数量"}
 	return tcp
 }
 
 // }}}
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
-	if m.Conf("address") == "" {
+	if arg[0] == "dial" {
+		c, e := net.Dial(m.Conf("protocol"), m.Conf("address"))
+		m.Assert(e)
+		tcp.c = c
+
+		log.Printf("%s dial(%d): %v->%v", tcp.Name, m.Capi("nclient", 1), c.LocalAddr(), c.RemoteAddr())
+		m.Reply(c.LocalAddr().String()).Put("option", "io", c).Cmd("open")
 		return true
 	}
 
-	l, e := net.Listen("tcp4", m.Conf("address"))
+	l, e := net.Listen(m.Conf("protocol"), m.Conf("address"))
 	m.Assert(e)
-	tcp.listener = l
+	tcp.l = l
 
 	log.Printf("%s listen(%d): %v", tcp.Name, m.Capi("nlisten", 1), l.Addr())
 	defer m.Capi("nlisten", -1)
-	defer log.Println("%s close(%d): %v", tcp.Name, m.Capi("nlisten", 0), l.Addr())
+	defer log.Println("%s close(%d): %v", tcp.Name, m.Capi("nlisten"), l.Addr())
 
 	for {
 		c, e := l.Accept()
 		m.Assert(e)
 		log.Printf("%s accept(%d): %v<-%v", tcp.Name, m.Capi("nclient", 1), c.LocalAddr(), c.RemoteAddr())
-		// defer log.Println(tcp.Name, "close:", m.Capi("nclient", -1), c.LocalAddr(), "<-", c.RemoteAddr())
-
-		msg := m.Spawn(m.Source, c.RemoteAddr().String()).Put("option", "io", c)
-		msg.Cmd("open", c.RemoteAddr().String(), "tcp")
+		m.Reply(c.RemoteAddr().String()).Put("option", "io", c).Cmd("open")
 	}
 
 	return true
@@ -48,8 +52,19 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 // }}}
 func (tcp *TCP) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{
-		"address": &ctx.Config{Name: "address", Value: arg[0], Help: "监听地址"},
+	c.Configs = map[string]*ctx.Config{}
+
+	if len(arg) > 1 {
+		switch arg[0] {
+		case "listen":
+			c.Caches["nclient"] = &ctx.Cache{Name: "nclient", Value: "0", Help: "连接数量"}
+			c.Configs["address"] = &ctx.Config{Name: "address", Value: arg[1], Help: "监听地址"}
+		case "dial":
+			c.Configs["address"] = &ctx.Config{Name: "address", Value: arg[1], Help: "连接地址"}
+		}
+	}
+	if len(arg) > 2 {
+		c.Configs["security"] = &ctx.Config{Name: "security(true/false)", Value: "true", Help: "加密通信"}
 	}
 
 	s := new(TCP)
@@ -60,18 +75,28 @@ func (tcp *TCP) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 
 // }}}
 func (tcp *TCP) Exit(m *ctx.Message, arg ...string) bool { // {{{
+	switch tcp.Context {
+	case m.Source:
+		c, ok := m.Data["io"].(net.Conn)
+		if !ok {
+			c = tcp.c
+		}
+		if c != nil {
+			log.Println(tcp.Name, "close:", c.LocalAddr(), "--", c.RemoteAddr())
+			c.Close()
+		}
 
-	if c, ok := m.Data["result"].(net.Conn); ok && m.Target == tcp.Context {
-		c.Close()
-		delete(m.Data, "result")
-		return true
+	case m.Target:
+		if tcp.l != nil {
+			log.Println(tcp.Name, "close:", tcp.l.Addr())
+			tcp.l.Close()
+		}
+		if tcp.c != nil {
+			log.Println(tcp.Name, "close:", tcp.c.LocalAddr(), "->", tcp.c.RemoteAddr())
+			tcp.c.Close()
+		}
 	}
 
-	if c, ok := m.Data["detail"].(net.Conn); ok && m.Source == tcp.Context {
-		c.Close()
-		delete(m.Data, "detail")
-		return true
-	}
 	return true
 }
 
@@ -79,37 +104,40 @@ func (tcp *TCP) Exit(m *ctx.Message, arg ...string) bool { // {{{
 
 var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 	Caches: map[string]*ctx.Cache{
-		"nlisten": &ctx.Cache{Name: "nlisten", Value: "0", Help: "连接数量"},
+		"nlisten": &ctx.Cache{Name: "nlisten", Value: "0", Help: "监听数量"},
+		"nclient": &ctx.Cache{Name: "nclient", Value: "0", Help: "连接数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"address": &ctx.Config{Name: "address", Value: "", Help: "监听地址"},
+		"protocol": &ctx.Config{Name: "protocol(tcp/tcp4/tcp6)", Value: "tcp4", Help: "连接协议"},
+		"security": &ctx.Config{Name: "security(true/false)", Value: "false", Help: "加密通信"},
 	},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{Name: "listen address", Help: "监听连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"listen": &ctx.Command{Name: "listen [address [security]]", Help: "监听连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 				m.Target.Travel(func(c *ctx.Context) bool {
-					m.Echo("%s %s\n", c.Name, c.Server.(*TCP).listener.Addr().String())
+					if tcp, ok := c.Server.(*TCP); ok && tcp.l != nil {
+						m.Echo("%s %v\n", c.Name, tcp.l.Addr())
+					}
 					return true
 				})
 			case 1:
-				go m.Start(arg[0], arg[0])
+				go m.Start(arg[0], m.Meta["detail"]...)
 			}
 			return ""
 			// }}}
 		}},
-		"dial": &ctx.Command{Name: "dial", Help: "建立连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-			tcp := c.Server.(*TCP) // {{{
-			switch len(arg) {
+		"dial": &ctx.Command{Name: "dial [address [security]]", Help: "建立连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+			switch len(arg) { // {{{
 			case 0:
-				for i, v := range tcp.Requests {
-					conn := v.Data["result"].(net.Conn)
-					m.Echo(tcp.Name, "conn: %s %s -> %s\n", i, conn.LocalAddr(), conn.RemoteAddr())
-				}
-			case 2:
-				conn, e := net.Dial("tcp", arg[0])
-				m.Assert(e)
-				log.Println(tcp.Name, "dial:", conn.LocalAddr(), "->", conn.RemoteAddr())
+				m.Target.Travel(func(c *ctx.Context) bool {
+					if tcp, ok := c.Server.(*TCP); ok && tcp.c != nil {
+						m.Echo("%s %v->%v\n", c.Name, tcp.c.LocalAddr(), tcp.c.RemoteAddr())
+					}
+					return true
+				})
+			case 1:
+				m.Start(arg[0], m.Meta["detail"]...)
 			}
 			return ""
 			// }}}
