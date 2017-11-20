@@ -47,19 +47,18 @@ func (cli *CLI) push(f io.ReadCloser) { // {{{
 
 // }}}
 func (cli *CLI) parse(m *ctx.Message) bool { // {{{
-	if false && len(cli.ins) == 1 && cli.Owner == nil {
-
-		username := ""
-		fmt.Fprintf(cli.out, "username>")
-		fmt.Fscanln(cli.in, &username)
-
-		password := ""
-		fmt.Fprintf(cli.out, "password>")
-		fmt.Fscanln(cli.in, &password)
-
+	if len(cli.ins) == 1 && cli.Owner == nil {
 		if aaa := cli.Root.Find("aaa"); aaa != nil {
-			cli.Owner = Index.Owner
-			msg := m.Spawn(aaa, "user")
+
+			username := ""
+			fmt.Fprintf(cli.out, "username>")
+			fmt.Fscanln(cli.in, &username)
+
+			password := ""
+			fmt.Fprintf(cli.out, "password>")
+			fmt.Fscanln(cli.in, &password)
+
+			msg := m.Spawn(aaa, "username")
 
 			if msg.Cmd("login", username, password) == "" {
 				fmt.Fprintln(cli.out, "登录失败")
@@ -69,8 +68,7 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 				return false
 			}
 
-			cli.Owner = msg.Target
-			m.Cap("user", msg.Cap("username"))
+			m.Cap("username", msg.Cap("username"))
 		}
 	}
 
@@ -218,6 +216,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		"$": "cache",
 		"&": "server",
 		"*": "message",
+		":": "command",
 	}
 
 	return cli
@@ -293,6 +292,7 @@ func (cli *CLI) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
+	c.Owner = nil
 	s := new(CLI)
 	s.Context = c
 	return s
@@ -332,9 +332,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 
 				switch len(arg) {
 				case 0:
-					m.Target.Root.Travel(func(c *ctx.Context) bool {
-						if c.Context != nil && m.Source.Check(c) {
-							m.Echo("%s: %s(%s)\n", c.Context.Name, c.Name, c.Help)
+					m.Travel(m.Target.Root, func(m *ctx.Message) bool {
+						if m.Target.Context != nil {
+							target := m.Target
+							m.Target = m.Target.Owner
+							if m.Target != nil && m.Check(m.Target, "caches", "username") && m.Check(m.Target, "caches", "group") {
+								m.Echo("%s: %s(%s) %s %s\n", target.Context.Name, target.Name, target.Help, m.Cap("username"), m.Cap("group"))
+							} else {
+								m.Echo("%s: %s(%s)\n", target.Context.Name, target.Name, target.Help)
+							}
+							m.Target = target
 						}
 						return true
 					})
@@ -355,7 +362,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				cs := []*ctx.Context{}
 				switch {
 				case m.Has("search"):
-					if s := target.Search(m.Get("search")); len(s) > 0 {
+					if s := m.Search(target, m.Get("search")); len(s) > 0 {
 						cs = append(cs, s...)
 					}
 				case m.Has("find"):
@@ -363,7 +370,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 						cs = append(cs, s)
 					}
 				case m.Has("args"):
-					if s := target.Search(m.Get("args")); len(s) > 0 {
+					if s := m.Search(target, m.Get("args")); len(s) > 0 {
 						cs = append(cs, s...)
 					}
 				default:
@@ -501,6 +508,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 		"void": &ctx.Command{Name: "", Help: "", Hand: nil},
 	},
 	Messages: make(chan *ctx.Message, 10),
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{Name: "void",
+			Commands: map[string]*ctx.Command{
+				"open": &ctx.Command{},
+			},
+		},
+	},
 }
 
 func init() {
