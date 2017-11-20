@@ -115,9 +115,9 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 		"listen": &ctx.Command{Name: "listen [address [security]]", Help: "监听连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
-				m.Target.Travel(func(c *ctx.Context) bool {
-					if tcp, ok := c.Server.(*TCP); ok && tcp.l != nil {
-						m.Echo("%s %v\n", c.Name, tcp.l.Addr())
+				m.Travel(m.Target, func(m *ctx.Message) bool {
+					if tcp, ok := m.Target.Server.(*TCP); ok && tcp.l != nil {
+						m.Echo("%s %v\n", m.Target.Name, tcp.l.Addr())
 					}
 					return true
 				})
@@ -130,9 +130,9 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 		"dial": &ctx.Command{Name: "dial [address [security]]", Help: "建立连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
-				m.Target.Travel(func(c *ctx.Context) bool {
-					if tcp, ok := c.Server.(*TCP); ok && tcp.c != nil {
-						m.Echo("%s %v->%v\n", c.Name, tcp.c.LocalAddr(), tcp.c.RemoteAddr())
+				m.Travel(m.Target, func(m *ctx.Message) bool {
+					if tcp, ok := m.Target.Server.(*TCP); ok && tcp.c != nil {
+						m.Echo("%s %v->%v\n", m.Target.Name, tcp.c.LocalAddr(), tcp.c.RemoteAddr())
 					}
 					return true
 				})
@@ -154,6 +154,13 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			return ""
 			// }}}
 		}},
+	},
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{
+			Commands: map[string]*ctx.Command{
+				"listen": &ctx.Command{},
+			},
+		},
 	},
 }
 
