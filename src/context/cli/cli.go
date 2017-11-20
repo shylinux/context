@@ -390,6 +390,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 						args := m.Meta["spawn"]
 						msg := m.Spawn(v)
 						v.Spawn(msg, args[0]).Begin(msg)
+						cli.target = msg.Target
 					case m.Has("switch"):
 						cli.target = v
 					case m.Has("show"):
