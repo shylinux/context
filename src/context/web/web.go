@@ -27,6 +27,31 @@ type MUX interface {
 	HandleFunc(string, func(http.ResponseWriter, *http.Request))
 }
 
+func (web *WEB) Trans(m *ctx.Message, key string, arg ...string) { // {{{
+	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
+		m.Set("detail", key)
+		for k, v := range r.Form {
+			m.Add("option", k)
+			m.Meta[k] = v
+		}
+		for _, v := range r.Cookies() {
+			m.Add("option", v.Name, v.Value)
+		}
+
+		m.Cmd(arg...)
+
+		header := w.Header()
+		for _, k := range m.Meta["append"] {
+			ce := &http.Cookie{Name: k, Value: m.Get(k)}
+			header.Add("Set-Cookie", ce.String())
+		}
+		for _, v := range m.Meta["result"] {
+			w.Write([]byte(v))
+		}
+	})
+}
+
+// }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	if web.Master {
 		log.Println()
@@ -39,8 +64,10 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 			}
 			log.Println()
 		}
+	}
 
-		r.ParseForm()
+	r.ParseForm()
+	if web.Master {
 		if len(r.PostForm) > 0 {
 			for k, v := range r.PostForm {
 				log.Printf("%s: %s", k, v[0])
@@ -70,6 +97,12 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	web.Configs["route"] = &ctx.Config{Name: "route", Value: "/" + web.Name + "/", Help: "请求路径"}
 
 	web.ServeMux = http.NewServeMux()
+	for k, _ := range web.Commands {
+		if k[0] == '/' {
+			web.Trans(m.Spawn(web.Context), k)
+		}
+	}
+
 	return web
 }
 
@@ -173,6 +206,16 @@ var Index = &ctx.Context{Name: "web", Help: "网页服务",
 			})
 			return ""
 			// }}}
+		}},
+		"/hi": &ctx.Command{Name: "/hi", Help: "添加响应", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+			m.Echo("hello")
+			m.Echo("hello")
+			m.Echo("hello")
+			m.Echo("hello")
+			m.Add("append", "hi", "hello")
+			m.Add("append", "hi", "hello")
+			log.Println(m.Meta)
+			return "hello"
 		}},
 	},
 }
