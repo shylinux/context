@@ -10,7 +10,6 @@ import ( // {{{
 	"time"
 
 	"fmt"
-	"log"
 )
 
 // }}}
@@ -40,7 +39,7 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 // }}}
 func (aaa *AAA) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
-		"username": &ctx.Cache{Name: "用户名", Value: arg[0], Help: "显示已经启动运行模块的数量"},
+		"username": &ctx.Cache{Name: "用户名", Value: arg[0], Help: "用户名"},
 		"password": &ctx.Cache{Name: "密码", Value: "", Help: "用户密码，加密存储", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				if arg[0] == "" {
@@ -53,7 +52,7 @@ func (aaa *AAA) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 				} else {
 					bs := md5.Sum([]byte(fmt.Sprintln("用户密码:%s", arg[0])))
 					if x.Value != hex.EncodeToString(bs[:]) {
-						log.Println(m.Target.Name, "login in:", arg[0], "密码错误")
+						m.Log("info", "%s: login error", m.Target.Name)
 						panic("密码错误")
 					}
 				}
@@ -92,7 +91,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"login": &ctx.Command{Name: "login [sessid]|[username password [group]]]", Help: "", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-			aaa := c.Server.(*AAA) // {{{
+			m.Target = m.Master
+			aaa := m.Target.Server.(*AAA) // {{{
 			switch len(arg) {
 			case 0:
 				m.Travel(m.Target, func(m *ctx.Message) bool {
@@ -107,44 +107,33 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				if s, ok := aaa.sessions[arg[0]]; ok {
 					m.Target = s
 					m.Source.Owner = s
-					log.Println(aaa.Name, "login on:", aaa.sessions)
+					m.Log("info", "%s: logon %s", aaa.Name, m.Cap("username"))
 					return m.Cap("username")
 				}
 				m.Target = target
 			case 2:
-				s := m.Target.Find(arg[0])
-				if s != nil {
-					old := m.Source
-					defer func() { m.Source = old }()
-					m.Source = s
-
-					m.Target = s
-
+				m.Master = aaa.Context
+				if m.Find(arg[0]) != nil {
 					m.Cap("password", arg[1])
-					log.Println(aaa.Name, "login in:", arg[0])
-					old.Owner = s
-
+					m.Log("info", "%s: login", aaa.Name)
 				} else {
 					m.Start(arg[0], arg...)
-					s = m.Target
-
-					aaa.sessions[m.Cap("sessid")] = s
-					log.Println(aaa.Name, "login up:", arg[0])
+					aaa.sessions[m.Cap("sessid")] = m.Target
+					m.Log("info", "%s: logup %s", aaa.Name, m.Target.Name)
 				}
 
-				m.Target.Owner = s
-
-				m.Source.Owner = ctx.Index.Owner
+				target := m.Target
 				if arg[0] == m.Conf("rootname") {
-					ctx.Index.Owner = s
 					m.Travel(m.Target.Root, func(m *ctx.Message) bool {
 						if m.Target.Owner == nil {
-							m.Target.Owner = s
+							m.Target.Owner = target
 						}
 						return true
 					})
 				}
-				m.Source.Owner = s
+
+				m.Target.Owner = target
+				m.Source.Owner = target
 				m.Source.Group = m.Cap("group")
 
 				return m.Cap("sessid")

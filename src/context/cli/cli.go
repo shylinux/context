@@ -5,7 +5,6 @@ import ( // {{{
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -48,7 +47,7 @@ func (cli *CLI) push(f io.ReadCloser) { // {{{
 // }}}
 func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 	if len(cli.ins) == 1 && cli.Owner == nil {
-		if aaa := cli.Root.Find("aaa"); aaa != nil {
+		if msg := m.Spawn(cli.Root).Find("aaa"); msg != nil {
 
 			username := ""
 			fmt.Fprintf(cli.out, "username>")
@@ -57,8 +56,6 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 			password := ""
 			fmt.Fprintf(cli.out, "password>")
 			fmt.Fscanln(cli.in, &password)
-
-			msg := m.Spawn(aaa, "username")
 
 			if msg.Cmd("login", username, password) == "" {
 				fmt.Fprintln(cli.out, "登录失败")
@@ -233,20 +230,21 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		cli.push(io)
 
 		if m.Has("master") {
-			log.Println(cli.Name, "master terminal:")
+			m.Log("info", "%s: master terminal", cli.Name)
 			if cli.bufs == nil {
 				cli.bufs = make([][]byte, 0, 10)
 			}
 			for {
 				b := make([]byte, 128)
 				n, e := cli.bio.Read(b)
-				log.Println(cli.Name, "read:", n)
+				m.Log("info", "%s: read %d", cli.Name, n)
 				m.Assert(e)
 				cli.bufs = append(cli.bufs, b)
 			}
 			return true
 		} else {
-			log.Println(cli.Name, "slaver terminal:")
+			m.Log("info", "%s: slaver terminal", cli.Name)
+			m.Log("info", "%s: open %s", cli.Name, m.Conf("init.sh"))
 
 			if f, e := os.Open(m.Conf("init.sh")); e == nil {
 				cli.push(f)
@@ -305,7 +303,7 @@ func (cli *CLI) Exit(m *ctx.Message, arg ...string) bool { // {{{
 		return false
 
 	case m.Target:
-		log.Println(cli.Name, "release:")
+		m.Log("exit", "%s: release", cli.Name)
 	}
 
 	return true
@@ -319,8 +317,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 	},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"context": &ctx.Command{Name: "context [root|back|home] [[find|search] name] [show|spawn|start|switch][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Formats: map[string]int{"root": 0, "back": 0, "home": 0, "find": 1, "search": 1, "show": 0, "switch": 0, "start": -1, "spawn": -1},
+		"context": &ctx.Command{Name: "context [root|back|home] [[find|search] name] [list|show|spawn|start|switch][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
+			Formats: map[string]int{"root": 0, "back": 0, "home": 0, "find": 1, "search": 1, "list": 0, "show": 0, "switch": 0, "start": 0, "spawn": 0},
 			Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
 				cli, ok := m.Source.Server.(*CLI) // {{{
 				if !ok {
@@ -330,25 +328,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					}
 				}
 
-				switch len(arg) {
-				case 0:
-					m.Travel(m.Target.Root, func(m *ctx.Message) bool {
-						if m.Target.Context != nil {
-							target := m.Target
-							m.Target = m.Target.Owner
-							if m.Target != nil && m.Check(m.Target, "caches", "username") && m.Check(m.Target, "caches", "group") {
-								m.Echo("%s: %s(%s) %s %s\n", target.Context.Name, target.Name, target.Help, m.Cap("username"), m.Cap("group"))
-							} else {
-								m.Echo("%s: %s(%s)\n", target.Context.Name, target.Name, target.Help)
-							}
-							m.Target = target
-						}
-						return true
-					})
-					return ""
-				}
-
-				target := m.Target.Root
+				target := m.Target
 				if m.Has("home") {
 					target = m.Target
 				}
@@ -359,55 +339,72 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					target = m.Target.Context
 				}
 
-				cs := []*ctx.Context{}
+				ms := []*ctx.Message{}
 				switch {
 				case m.Has("search"):
 					if s := m.Search(target, m.Get("search")); len(s) > 0 {
-						cs = append(cs, s...)
+						ms = append(ms, s...)
 					}
 				case m.Has("find"):
-					if s := target.Find(m.Get("find")); s != nil {
-						cs = append(cs, s)
+					if msg := m.Spawn(target).Find(m.Get("find")); msg != nil {
+						ms = append(ms, msg)
 					}
 				case m.Has("args"):
 					if s := m.Search(target, m.Get("args")); len(s) > 0 {
-						cs = append(cs, s...)
+						ms = append(ms, s...)
+						arg = arg[1:]
 					}
 				default:
-					cs = append(cs, target)
+					ms = append(ms, m.Spawn(target))
 				}
 
-				for _, v := range cs {
-					// if !m.Source.Check(v) {
-					// 	continue
-					// }
-					//
+				for _, v := range ms {
 					switch {
 					case m.Has("start"):
 						args := m.Meta["start"]
-						m.Message.Spawn(v, args[0]).Start(arg[0], args[1:]...)
+						v.Start(arg[0], args[1:]...)
 					case m.Has("spawn"):
 						args := m.Meta["spawn"]
-						msg := m.Spawn(v)
-						v.Spawn(msg, args[0]).Begin(msg)
-						cli.target = msg.Target
+						v.Target.Spawn(v, args[0]).Begin(v)
+						cli.target = v.Target
 					case m.Has("switch"):
-						cli.target = v
+						cli.target = v.Target
 					case m.Has("show"):
-						m.Echo("%s: %s\n", v.Name, v.Help)
-						m.Echo("模块资源：\n")
-						for i, v := range v.Requests {
-							m.Echo("\t%d(%d): <- %s %s\n", i, v.Code, v.Source.Name, v.Source.Help)
+						m.Echo("%s(%s): %s\n", v.Target.Name, v.Target.Owner.Name, v.Target.Help)
+						if len(v.Target.Requests) > 0 {
+							m.Echo("模块资源：\n")
+							for i, v := range v.Target.Requests {
+								m.Echo("  %d(%d): <- %s %s\n", i, v.Code, v.Source.Name, v.Meta["detail"])
+								for i, v := range v.Messages {
+									m.Echo("    %d(%d): -> %s %s\n", i, v.Code, v.Source.Name, v.Meta["detail"])
+								}
+							}
 						}
-						m.Echo("模块引用：\n")
-						for k, v := range v.Sessions {
-							m.Echo("\t%s(%d): -> %s %s\n", k, v.Code, v.Target.Name, v.Target.Help)
+						if len(v.Target.Sessions) > 0 {
+							m.Echo("模块引用：\n")
+							for k, v := range v.Target.Sessions {
+								m.Echo("  %s(%d): -> %s %v\n", k, v.Code, v.Target.Name, v.Meta["detail"])
+							}
 						}
+					case m.Has("list") || cli.target == v.Target:
+						m.Travel(v.Target, func(m *ctx.Message) bool {
+							if m.Target.Context != nil && m.Target != v.Target {
+								target := m.Target
+								m.Target = m.Target.Owner
+								if m.Target != nil && m.Check(m.Target, "caches", "username") && m.Check(m.Target, "caches", "group") {
+									m.Echo("%s: %s(%s) %s %s\n", target.Context.Name, target.Name, target.Help, m.Cap("username"), m.Cap("group"))
+								} else {
+									m.Echo("%s: %s(%s)\n", target.Context.Name, target.Name, target.Help)
+								}
+								m.Target = target
+							}
+							return true
+						})
 					default:
-						cli.target = v
+						cli.target = v.Target
+						return ""
 					}
 				}
-
 				return ""
 				// }}}
 			}},
@@ -484,13 +481,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					return ""
 				}
 
-				s := c.Root.Find(m.Get("args"))
 				action := "dial"
 				if m.Has("listen") {
 					action = "listen"
 				}
+				msg := m.Spawn(c.Root).Find(m.Get("args"))
 
-				msg := m.Spawn(s)
 				if m.Has("master") {
 					msg.Template = msg.Spawn(msg.Source).Add("option", "master")
 				}

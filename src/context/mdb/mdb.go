@@ -8,7 +8,6 @@ import ( // {{{
 
 	"errors"
 	"fmt"
-	"log"
 )
 
 // }}}
@@ -19,25 +18,11 @@ type MDB struct {
 }
 
 func (mdb *MDB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	mdb.Configs["source"] = &ctx.Config{Name: "source", Value: "", Help: "数据库参数"}
-	mdb.Configs["driver"] = &ctx.Config{Name: "driver", Value: "", Help: "数据库驱动"}
-
 	return mdb
 }
 
 // }}}
 func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
-	m.Capi("nsource", 1)
-	defer m.Capi("nsource", -1)
-
-	if len(arg) > 0 {
-		m.Conf("source", arg[0])
-
-		if len(arg) > 1 {
-			m.Conf("driver", arg[1])
-		}
-	}
-
 	if m.Conf("source") == "" || m.Conf("driver") == "" {
 		return true
 	}
@@ -45,15 +30,9 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	db, e := sql.Open(m.Conf("driver"), m.Conf("source"))
 	m.Assert(e)
 	mdb.db = db
-	defer mdb.db.Close()
 
-	log.Println(mdb.Name, "open:", m.Conf("driver"), m.Conf("source"))
-	defer log.Println(mdb.Name, "close:", m.Conf("driver"), m.Conf("source"))
-
-	for _, p := range m.Meta["prepare"] {
-		_, e := db.Exec(p)
-		m.Assert(e)
-	}
+	m.Log("info", "%s: open %s %s", mdb.Name, m.Conf("driver"), m.Conf("source"))
+	m.Capi("nsource", 1)
 
 	return true
 }
@@ -61,7 +40,17 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 // }}}
 func (mdb *MDB) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{}
+	c.Configs = map[string]*ctx.Config{
+		"source": &ctx.Config{Name: "source", Value: "", Help: "数据库参数"},
+		"driver": &ctx.Config{Name: "driver", Value: "", Help: "数据库驱动"},
+	}
+
+	if len(arg) > 0 {
+		m.Conf("source", arg[0])
+		if len(arg) > 1 {
+			m.Conf("driver", arg[1])
+		}
+	}
 
 	s := new(MDB)
 	s.Context = c
@@ -70,6 +59,13 @@ func (mdb *MDB) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 
 // }}}
 func (mdb *MDB) Exit(m *ctx.Message, arg ...string) bool { // {{{
+	if mdb.db != nil && m.Target == mdb.Context {
+		m.Log("info", "%s: close %s %s", mdb.Name, m.Conf("driver"), m.Conf("source"))
+		m.Capi("nsource", -1)
+		mdb.db.Close()
+		mdb.db = nil
+	}
+
 	return true
 }
 
@@ -81,15 +77,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 	},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{Name: "open [source [driver]]", Help: "打开数据库",
-			Options: map[string]string{
-				"prepare": "打开数据库时自动执行的语句",
-			},
-			Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-				m.Start("db"+m.Cap("nsource"), arg...) // {{{
-				return ""
-				// }}}
-			}},
+		"open": &ctx.Command{Name: "open name [source [driver]]", Help: "打开数据库", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+			m.Start(arg[0], arg[1:]...) // {{{
+			return ""
+			// }}}
+		}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "执行SQL语句",
 			Appends: map[string]string{
 				"LastInsertId": "最后插入元组的标识",
