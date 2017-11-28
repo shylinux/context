@@ -9,6 +9,7 @@ import ( // {{{
 	"os/exec"
 	"path"
 	"regexp"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -689,10 +690,14 @@ func (m *Message) Search(c *Context, name string) []*Message { // {{{
 }
 
 // }}}
-func (m *Message) Find(name string) *Message { // {{{
+func (m *Message) Find(name string, begin ...*Context) *Message { // {{{
 	ns := strings.Split(name, ".")
-	cs := m.Target.contexts
-	old := m.Target.Name
+	target := m.Target
+	if len(begin) > 0 {
+		target = begin[0]
+	}
+	cs := target.contexts
+	old := target.Name
 
 	for _, v := range ns {
 		if x, ok := cs[v]; ok {
@@ -788,8 +793,8 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 	}
 
 	m.AssertOne(m, true, func(m *Message) {
-		m.Log("system", ":%v", arg)
-		cmd := exec.Command(key, arg[1:]...)
+		m.Log("system", ": %s %v", key, arg)
+		cmd := exec.Command(key, arg...)
 		v, e := cmd.CombinedOutput()
 		if e != nil {
 			m.Echo("%s\n", e)
@@ -1137,6 +1142,7 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 				switch arg[0] {
 				case "start":
 					go m.Set("detail", arg[1:]...).Target.Start(m)
+					runtime.Gosched()
 				case "stop":
 					m.Set("detail", arg[1:]...).Target.Exit(m)
 				case "switch":
@@ -1305,11 +1311,15 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 			m.Target.BackTrace(func(s *Context) bool {
 				switch len(arg) {
 				case 0:
+					target := m.Target
+					m.Target = s
 					for k, v := range s.Caches {
 						if m.Check(m.Target, "caches", k) {
-							m.Echo("%s(%s): %s\n", k, v.Value, v.Name)
+							m.Echo("%s(%s): %s\n", k, m.Cap(k), v.Name)
 						}
 					}
+					m.Target = target
+
 				case 1:
 					if v, ok := s.Caches[arg[0]]; ok {
 						if m.Check(m.Target, "caches", arg[0]) {

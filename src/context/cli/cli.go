@@ -27,6 +27,7 @@ type CLI struct {
 	next    string
 	exit    bool
 	login   *ctx.Context
+	lex     *ctx.Message
 
 	target *ctx.Context
 	*ctx.Context
@@ -113,11 +114,24 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 	}
 
 back:
+
 	line = strings.TrimSpace(line)
 	if line[0] == '#' {
 		return true
 	}
 	ls := strings.Split(line, " ")
+	if cli.lex != nil {
+		cli.lex.Cmd("split", line)
+		ls = cli.lex.Meta["result"]
+		for i := 0; i < len(ls); i++ {
+			if ls[i][0] == '"' {
+				ls[i] = ls[i][1 : len(ls[i])-1]
+			}
+		}
+		if len(ls) == 0 {
+			return true
+		}
+	}
 
 	msg := m.Spawn(cli.target)
 	msg.Wait = make(chan bool)
@@ -139,7 +153,9 @@ back:
 	}
 
 	for i := 0; i < len(ls); i++ {
-		ls[i] = strings.TrimSpace(ls[i])
+		if cli.lex == nil {
+			ls[i] = strings.TrimSpace(ls[i])
+		}
 
 		if ls[i][0] == '#' {
 			break
@@ -181,6 +197,32 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		return x.Value
 	}}
 
+	cli.Configs["lex"] = &ctx.Config{Name: "屏蔽脚本输出(yes/no)", Value: "", Help: "屏蔽脚本输出的信息，yes:屏蔽，no:不屏蔽", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+		if len(arg) > 0 {
+			cli, ok := m.Target.Server.(*CLI)
+			if !ok {
+				return ""
+			}
+			cli.lex = m.Find(arg[0], m.Target.Root)
+			if cli.lex == nil {
+				return ""
+			}
+
+			cli.lex.Target.Start(cli.lex)
+			cli.lex.Cmd("train", "[ \n\t]+", "1")
+
+			cli.lex.Cmd("train", "[a-zA-Z][a-zA-Z0-9]*", "2", "2")
+
+			cli.lex.Cmd("train", "0x[0-9]+", "3", "2")
+			cli.lex.Cmd("train", "[0-9]+", "3", "2")
+
+			cli.lex.Cmd("train", "\"[^\"]*\"", "4", "2")
+			cli.lex.Cmd("train", "'[^']*'", "4", "2")
+
+			cli.lex.Cmd("train", "[~!@#$&*:]", "4", "2")
+		}
+		return ""
+	}}
 	cli.Configs["slient"] = &ctx.Config{Name: "屏蔽脚本输出(yes/no)", Value: "yes", Help: "屏蔽脚本输出的信息，yes:屏蔽，no:不屏蔽"}
 	cli.Configs["default"] = &ctx.Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"}
 	cli.Configs["PS1"] = &ctx.Config{Name: "命令行提示符(target/detail)", Value: "target", Help: "命令行提示符，target:显示当前模块，detail:显示详细信息", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
@@ -353,7 +395,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 					if s := m.Search(target, m.Get("args")); len(s) > 0 {
 						ms = append(ms, s...)
 						arg = arg[1:]
+						break
 					}
+					fallthrough
 				default:
 					ms = append(ms, m.Spawn(target))
 				}
@@ -361,11 +405,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				for _, v := range ms {
 					switch {
 					case m.Has("start"):
-						args := m.Meta["start"]
-						v.Start(arg[0], args[1:]...)
+						v.Start(arg[0], arg[1:]...)
 					case m.Has("spawn"):
-						args := m.Meta["spawn"]
-						v.Target.Spawn(v, args[0]).Begin(v)
+						v.Target.Spawn(v, arg[0]).Begin(v)
 						cli.target = v.Target
 					case m.Has("switch"):
 						cli.target = v.Target
