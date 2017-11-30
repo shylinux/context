@@ -27,7 +27,7 @@ func (ssh *SSH) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 	return s
 }
 
-func (ssh *SSH) Exit(m *ctx.Message, arg ...string) bool {
+func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
 	return true
 }
 
