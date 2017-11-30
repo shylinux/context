@@ -27,7 +27,7 @@ type LEX struct {
 	seed []*Seed
 
 	mat []map[byte]*State
-	M   *ctx.Message
+	*ctx.Message
 	*ctx.Context
 }
 
@@ -88,8 +88,8 @@ func (lex *LEX) train(page int, hash int, seed []byte) { // {{{
 			c = append(c, seed[p])
 		}
 
-		lex.M.Log("debug", "page: %v", s)
-		lex.M.Log("debug", "cell: %v", c)
+		lex.Log("debug", "page: %v", s)
+		lex.Log("debug", "cell: %v", c)
 
 		flag := '\000'
 		if p+1 < len(seed) {
@@ -112,7 +112,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) { // {{{
 						lex.mat[si][c[j]] = new(State)
 					}
 					state := lex.mat[si][c[j]]
-					lex.M.Log("debug", "GET(%d,%d) state:%v", si, c[j], state)
+					lex.Log("debug", "GET(%d,%d) state:%v", si, c[j], state)
 
 					if state.next == 0 {
 						sn = append(sn, false)
@@ -123,7 +123,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) { // {{{
 						state.hash = hash
 					}
 					ends = append(ends, state)
-					lex.M.Log("debug", "SET(%d,%d) state:%v", si, c[j], state)
+					lex.Log("debug", "SET(%d,%d) state:%v", si, c[j], state)
 
 					si = state.next
 					begin, end = byte(0), byte(len(c))
@@ -137,7 +137,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) { // {{{
 						lex.mat[si][c[j]] = new(State)
 					}
 					state := lex.mat[si][c[j]]
-					lex.M.Log("debug", "GET(%d,%d) state:%v", si, c[j], state)
+					lex.Log("debug", "GET(%d,%d) state:%v", si, c[j], state)
 
 					switch flag {
 					case '+', '*':
@@ -151,9 +151,9 @@ func (lex *LEX) train(page int, hash int, seed []byte) { // {{{
 
 						for _, s := range ends {
 							if s.next == si && s.hash == 0 {
-								lex.M.Log("debug", "GET() state:%v", s)
+								lex.Log("debug", "GET() state:%v", s)
 								s.hash = hash
-								lex.M.Log("debug", "END() state:%v", s)
+								lex.Log("debug", "END() state:%v", s)
 							}
 						}
 						fallthrough
@@ -175,7 +175,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) { // {{{
 						state.hash = hash
 					}
 					ends = append(ends, state)
-					lex.M.Log("debug", "SET(%d,%d) state:%v", si, c[j], state)
+					lex.Log("debug", "SET(%d,%d) state:%v", si, c[j], state)
 				}
 			}
 		}
@@ -208,11 +208,11 @@ func (lex *LEX) parse(page int, line []byte) (word []byte, hash int, rest []byte
 		}
 
 		state := lex.mat[s][c]
-		lex.M.Log("debug", "(%d,%d): %v", s, c, state)
+		lex.Log("debug", "(%d,%d): %v", s, c, state)
 		if state == nil && star != 0 {
 			s, star = star, 0
 			state = lex.mat[s][c]
-			lex.M.Log("debug", "(%d,%d): %v", s, c, state)
+			lex.Log("debug", "(%d,%d): %v", s, c, state)
 		}
 		if state == nil {
 			break
@@ -240,7 +240,7 @@ func (lex *LEX) parse(page int, line []byte) (word []byte, hash int, rest []byte
 
 	word = line[begin:end]
 	rest = line[end:]
-	lex.M.Log("debug", "%d %v %v", hash, word, rest)
+	lex.Log("debug", "%d %v %v", hash, word, rest)
 
 	return
 }
@@ -263,7 +263,7 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (lex *LEX) Start(m *ctx.Message, arg ...string) bool { // {{{
-	lex.M = m
+	lex.Message = m
 
 	lex.page = m.Confi("page")
 	lex.cell = m.Confi("cell")
@@ -275,7 +275,7 @@ func (lex *LEX) Start(m *ctx.Message, arg ...string) bool { // {{{
 	}
 	lex.seed = make([]*Seed, 0, 10)
 
-	return true
+	return false
 }
 
 // }}}
@@ -289,7 +289,7 @@ func (lex *LEX) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 }
 
 // }}}
-func (lex *LEX) Exit(m *ctx.Message, arg ...string) bool { // {{{
+func (lex *LEX) Close(m *ctx.Message, arg ...string) bool { // {{{
 	return true
 }
 
@@ -372,6 +372,13 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 			return ""
 			// }}}
 		}},
+	},
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{Name: "void",
+			Commands: map[string]*ctx.Command{
+				"split": &ctx.Command{},
+			},
+		},
 	},
 }
 
