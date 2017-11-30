@@ -11,6 +11,9 @@ import (
 	_ "context/ssh"
 
 	_ "context/web"
+
+	_ "context/lex"
+
 	"os"
 )
 
