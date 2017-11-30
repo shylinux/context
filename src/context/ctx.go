@@ -9,7 +9,6 @@ import ( // {{{
 	"os/exec"
 	"path"
 	"regexp"
-	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -18,23 +17,21 @@ import ( // {{{
 
 // }}}
 
-type Cache struct { // {{{
+type Cache struct {
 	Name  string
 	Value string
 	Help  string
 	Hand  func(m *Message, x *Cache, arg ...string) string
 }
 
-// }}}
-type Config struct { // {{{
+type Config struct {
 	Name  string
 	Value string
 	Help  string
 	Hand  func(m *Message, x *Config, arg ...string) string
 }
 
-// }}}
-type Command struct { // {{{
+type Command struct {
 	Name    string
 	Help    string
 	Formats map[string]int
@@ -43,15 +40,12 @@ type Command struct { // {{{
 	Hand    func(c *Context, m *Message, key string, arg ...string) string
 }
 
-// }}}
-type Server interface { // {{{
+type Server interface {
+	Spawn(c *Context, m *Message, arg ...string) Server
 	Begin(m *Message, arg ...string) Server
 	Start(m *Message, arg ...string) bool
-	Spawn(c *Context, m *Message, arg ...string) Server
-	Exit(m *Message, arg ...string) bool
+	Close(m *Message, arg ...string) bool
 }
-
-// }}}
 
 type Context struct {
 	Name string
@@ -81,72 +75,28 @@ type Context struct {
 }
 
 func (c *Context) Register(s *Context, x Server) *Context { // {{{
-	Index.Root = Index
-
 	if c.contexts == nil {
 		c.contexts = make(map[string]*Context)
 	}
 	if x, ok := c.contexts[s.Name]; ok {
-		panic(errors.New(c.Name + " 上下文已存在" + x.Name))
+		panic(errors.New(c.Name + "上下文中已存在模块:" + x.Name))
 	}
 
-	s.Server = x
-	s.Context = c
 	c.contexts[s.Name] = s
+	s.Context = c
+	s.Server = x
+
+	s.Root = Index
 	if c.Root != nil {
 		s.Root = c.Root
-	} else {
-		s.Root = Index
 	}
-
-	// log.Printf("%s sub(%d): %s", c.Name, Pulse.Capi("ncontext", 1), s.Name)
 	return s
 }
 
 // }}}
-func (c *Context) Begin(m *Message) *Context { // {{{
-	for k, x := range c.Configs {
-		if x.Hand != nil {
-			m.Conf(k, x.Value)
-		}
-	}
-
-	if c.Server != nil {
-		c.Server.Begin(m, m.Meta["detail"]...)
-	}
-
-	return c
-}
-
-// }}}
-func (c *Context) Start(m *Message) bool { // {{{
-
-	if _, ok := c.Caches["status"]; !ok {
-		c.Caches["status"] = &Cache{Name: "服务状态", Value: "stop", Help: "服务状态，start:正在运行，stop:未在运行"}
-	}
-
-	if m.Cap("status") != "start" && c.Server != nil {
-		m.AssertOne(m, true, func(m *Message) {
-			m.Cap("status", "start")
-			defer m.Cap("status", "stop")
-
-			m.Log("start", "%s: %d %v", c.Name, m.Root.Capi("nserver", 1), m.Meta["detail"])
-			defer m.Root.Capi("nserver", -1)
-			defer m.Log("stop", "%s: %d %v", c.Name, m.Root.Capi("nserver"), m.Meta["detail"])
-
-			c.Requests = []*Message{m}
-			c.Server.Start(m, m.Meta["detail"]...)
-		})
-	}
-	m.Root.Wait <- true
-
-	return true
-}
-
-// }}}
-func (c *Context) Spawn(m *Message, key string) *Context { // {{{
-	s := &Context{Name: key, Help: c.Help, Owner: m.Source.Owner}
-	m.Log("begin", "%s: %s", key, c.Help)
+func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
+	s := &Context{Name: name, Help: help, Context: c, Owner: m.Source.Owner}
+	m.Log("spawn", "%s: %s", name, help)
 	m.Target = s
 	if m.Template != nil {
 		m.Template.Source = s
@@ -161,17 +111,62 @@ func (c *Context) Spawn(m *Message, key string) *Context { // {{{
 }
 
 // }}}
-func (c *Context) Exit(m *Message, arg ...string) { // {{{
-	m.Log("exit", "%s: %v", c.Name, arg)
+func (c *Context) Begin(m *Message) *Context { // {{{
+	m.Log("begin", "%s: %d %v", c.Name, Pulse.Capi("ncontext", 1), m.Meta["detail"])
+	for k, x := range c.Configs {
+		if x.Hand != nil {
+			m.Conf(k, x.Value)
+		}
+	}
+
+	c.Requests = []*Message{m}
+
+	if c.Server != nil {
+		c.Server.Begin(m, m.Meta["detail"]...)
+	}
+
+	return c
+}
+
+// }}}
+func (c *Context) Start(m *Message) bool { // {{{
+	if _, ok := c.Caches["status"]; !ok {
+		c.Caches["status"] = &Cache{Name: "服务状态(start/stop)", Value: "stop", Help: "服务状态，start:正在运行，stop:未在运行"}
+	}
+
+	if m.Cap("status") != "start" && c.Server != nil {
+		running := make(chan bool)
+		go m.AssertOne(m, true, func(m *Message) {
+			m.Log(m.Cap("status", "start"), "%s: %d %v", c.Name, m.Root.Capi("nserver", 1), m.Meta["detail"])
+
+			running <- true
+			c.Requests = append(c.Requests, m)
+			if c.Server.Start(m, m.Meta["detail"]...) {
+				c.Close(m, m.Meta["detail"]...)
+			}
+		})
+		<-running
+	}
+
+	return true
+}
+
+// }}}
+func (c *Context) Close(m *Message, arg ...string) { // {{{
+	if c.Server != nil && c.Server.Close(m, arg...) {
+		m.Log("close", "%s: %d %v", c.Name, m.Root.Capi("ncontext", -1)+1, arg)
+		delete(c.Context.contexts, c.Name)
+	}
+	return
 
 	if m.Target == c {
 		for _, v := range c.Sessions {
 			if v.Target != c {
-				v.Target.Exit(v, arg...)
+				v.Target.Close(v, arg...)
 			}
 		}
 
-		if c.Server != nil && c.Server.Exit(m, arg...) {
+		if c.Server != nil && c.Server.Close(m, arg...) {
 			if len(c.Sessions) == 0 && c.Context != nil {
 				delete(c.Context.contexts, c.Name)
 			}
@@ -179,17 +174,21 @@ func (c *Context) Exit(m *Message, arg ...string) { // {{{
 
 		for _, v := range c.Requests {
 			if v.Source != c {
-				v.Source.Exit(v, arg...)
+				v.Source.Close(v, arg...)
 			}
 		}
 	} else if m.Source == c {
 		delete(c.Sessions, m.Name)
 
-		if c.Server != nil && c.Server.Exit(m, arg...) {
+		if c.Server != nil && c.Server.Close(m, arg...) {
 			if len(c.Sessions) == 0 && c.Context != nil {
 				delete(c.Context.contexts, c.Name)
 			}
 		}
+	}
+
+	if len(c.Requests) == 0 {
+		m.Log(m.Cap("status", "stop"), "%s: %d %v", c.Name, m.Root.Capi("nserver", -1), m.Meta["detail"])
 	}
 }
 
@@ -369,16 +368,6 @@ func (c *Context) Del(arg ...string) { // {{{
 
 // }}}
 
-func (c *Context) BackTrace(hand func(s *Context) bool) { // {{{
-	for cs := c; cs != nil; cs = cs.Context {
-		if !hand(cs) {
-			return
-		}
-	}
-}
-
-// }}}
-
 type Message struct {
 	Code int
 	Time time.Time
@@ -403,24 +392,20 @@ type Message struct {
 func (m *Message) Log(action, str string, arg ...interface{}) { // {{{
 	color := 0
 	switch action {
-	case "check":
+	case "error", "check":
 		color = 31
 	case "cmd":
 		color = 32
 	case "conf":
 		color = 33
-	case "find":
+	case "search", "find", "spawn":
 		color = 35
-	case "search":
-		color = 35
-	case "spawn":
-		color = 35
-	case "begin":
+	case "begin", "start", "close":
 		color = 36
-	case "start":
-		color = 36
-	case "stop":
-		color = 36
+	case "debug":
+		if m.Conf("debug") != "on" {
+			return
+		}
 	}
 
 	if m.Name != "" {
@@ -432,28 +417,31 @@ func (m *Message) Log(action, str string, arg ...interface{}) { // {{{
 
 // }}}
 func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
-
 	switch e := e.(type) {
-	case error:
-	case string:
-		if e == "error:" {
-			if len(msg) > 0 {
-				panic(errors.New(msg[0]))
-			}
-			panic(errors.New("error"))
+	case bool:
+		if e {
+			return true
 		}
-		return true
+	case string:
+		if e != "error:" {
+			return true
+		}
+	case error:
+		if e == nil {
+			return true
+		}
 	default:
 		return true
 	}
 
-	m.Log("error", "error: %v", e)
-	m.Set("result", "error:", fmt.Sprintln(e))
-
-	if m.Conf("debug") == "on" {
-		fmt.Println(m.Code, "error:", e)
+	if len(msg) > 0 {
+		e = errors.New(msg[0])
+	}
+	if _, ok := e.(error); !ok {
+		e = errors.New("error")
 	}
 
+	m.Set("result", "error:", fmt.Sprintln(e))
 	panic(e)
 }
 
@@ -461,27 +449,20 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
 	defer func() {
 		if e := recover(); e != nil {
-			if _, ok := e.(error); ok {
-				msg.Log("error", "error: %v", e)
-				if msg.Conf("debug") == "on" && e != io.EOF {
-					fmt.Println(msg.Target.Name, "error:", e)
-					debug.PrintStack()
-				}
+			msg.Log("error", "error: %v", e)
+			if msg.Conf("debug") == "on" && e != io.EOF {
+				fmt.Println(msg.Target.Name, "error:", e)
+				debug.PrintStack()
 			}
 
 			if e == io.EOF {
 				return
-			}
-
-			if len(hand) > 1 {
+			} else if len(hand) > 1 {
 				m.AssertOne(msg, safe, hand[1:]...)
-			} else {
-				if !safe {
-					panic(e)
-				}
+			} else if !safe {
+				panic(e)
 			}
 		}
-		// Pulse.Wait <- true
 	}()
 
 	if len(hand) > 0 {
@@ -493,7 +474,6 @@ func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message))
 
 // }}}
 func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
-
 	msg := &Message{
 		Code:    m.Capi("nmessage", 1),
 		Time:    time.Now(),
@@ -659,16 +639,10 @@ func (m *Message) End(s bool) { // {{{
 
 // }}}
 
-func (m *Message) Travel(c *Context, hand func(m *Message) bool) { // {{{
+func (m *Message) BackTrace(hand func(m *Message) bool) { // {{{
 	target := m.Target
-
-	cs := []*Context{c}
-	for i := 0; i < len(cs); i++ {
-		for _, v := range cs[i].contexts {
-			cs = append(cs, v)
-		}
-		m.Target = cs[i]
-		if m.Check(m.Target) && !hand(m) {
+	for cs := target; cs != nil; cs = cs.Context {
+		if m.Check(cs) && !hand(m) {
 			break
 		}
 	}
@@ -676,49 +650,74 @@ func (m *Message) Travel(c *Context, hand func(m *Message) bool) { // {{{
 }
 
 // }}}
-func (m *Message) Search(c *Context, name string) []*Message { // {{{
-	ms := make([]*Message, 0, 3)
+func (m *Message) Travel(c *Context, hand func(m *Message) bool) { // {{{
+	target := m.Target
 
-	m.Travel(c, func(m *Message) bool {
-		if strings.Contains(m.Target.Name, name) || strings.Contains(m.Target.Help, name) {
+	cs := []*Context{c}
+	for i := 0; i < len(cs); i++ {
+		if m.Target = cs[i]; m.Check(cs[i]) && !hand(m) {
+			break
+		}
+
+		for _, v := range cs[i].contexts {
+			cs = append(cs, v)
+		}
+	}
+
+	m.Target = target
+}
+
+// }}}
+func (m *Message) Search(key string, begin ...*Context) []*Message { // {{{
+	target := m.Target
+	if len(begin) > 0 {
+		target = begin[0]
+	}
+
+	reg, e := regexp.Compile(key)
+	m.Assert(e)
+
+	ms := make([]*Message, 0, 3)
+	m.Travel(target, func(m *Message) bool {
+		if reg.MatchString(m.Target.Name) || reg.FindString(m.Target.Help) != "" {
+			m.Log("search", "%s: %d match [%s]", m.Target.Name, len(ms)+1, key)
 			ms = append(ms, m.Spawn(m.Target))
-			m.Log("search", "%s: match [%s]", m.Target.Name, name)
 		}
 		return true
 	})
+
+	for _, v := range ms {
+		v.Source = m.Target
+	}
+
 	return ms
 }
 
 // }}}
 func (m *Message) Find(name string, begin ...*Context) *Message { // {{{
-	ns := strings.Split(name, ".")
 	target := m.Target
 	if len(begin) > 0 {
 		target = begin[0]
 	}
-	cs := target.contexts
-	old := target.Name
 
-	for _, v := range ns {
+	cs := target.contexts
+	for _, v := range strings.Split(name, ".") {
 		if x, ok := cs[v]; ok {
 			cs = x.contexts
-			m.Target = x
+			target = x
 		} else {
-			m.Log("find", "%s: not find %s", m.Target.Name, v)
+			m.Log("find", "%s: not find %s", target.Name, v)
 			return nil
-			panic(errors.New(m.Target.Name + " not find: " + v))
 		}
 	}
-	m.Log("find", "%s: find %s", old, name)
-	return m
+	m.Log("find", "%s: find %s", m.Target.Name, name)
+	return m.Spawn(target)
 }
 
 // }}}
 
-func (m *Message) Start(key string, arg ...string) bool { // {{{
-	m.Set("detail", arg...)
-	m.Target.Spawn(m, key).Begin(m).Start(m)
-	return true
+func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
+	return m.Set("detail", arg...).Target.Spawn(m, name, help).Begin(m).Start(m)
 }
 
 // }}}
@@ -730,7 +729,6 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 		}
 		for s := c; s != nil; s = s.Context {
 			if x, ok := s.Commands[key]; ok {
-				m.Master = s
 				if !m.Check(s, "commands", key) {
 					break
 				}
@@ -905,7 +903,16 @@ func (m *Message) Cmd(arg ...string) string { // {{{
 	m.Set("detail", arg...)
 
 	if s := m.Target.Master; s != nil && s != m.Source.Master {
-		m.Post(s)
+		if s.Messages == nil {
+			panic(s.Name + " 没有开启消息处理")
+		}
+
+		s.Messages <- m
+		if m.Wait != nil {
+			<-m.Wait
+		}
+
+		return m.Get("result")
 	}
 
 	return m.Exec(m.Meta["detail"][0], m.Meta["detail"][1:]...)
@@ -1036,8 +1043,6 @@ func (m *Message) Capi(key string, arg ...int) int { // {{{
 
 // }}}
 
-var Pulse = &Message{Code: 0, Time: time.Now(), Source: Index, Master: Index, Target: Index}
-
 var Index = &Context{Name: "ctx", Help: "根模块",
 	Caches: map[string]*Cache{
 		"nserver":  &Cache{Name: "服务数量", Value: "0", Help: "显示已经启动运行模块的数量"},
@@ -1141,10 +1146,9 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 			default:
 				switch arg[0] {
 				case "start":
-					go m.Set("detail", arg[1:]...).Target.Start(m)
-					runtime.Gosched()
+					m.Set("detail", arg[1:]...).Target.Start(m)
 				case "stop":
-					m.Set("detail", arg[1:]...).Target.Exit(m)
+					m.Set("detail", arg[1:]...).Target.Close(m)
 				case "switch":
 				}
 			}
@@ -1226,22 +1230,22 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 				all = true
 			}
 
-			m.Target.BackTrace(func(s *Context) bool {
+			m.BackTrace(func(m *Message) bool {
 				switch len(arg) {
 				case 0:
-					for k, v := range s.Commands {
+					for k, v := range m.Target.Commands {
 						if m.Check(m.Target, "commands", k) {
 							m.Echo("%s: %s\n", k, v.Name)
 						}
 					}
 				case 1:
-					if v, ok := s.Commands[arg[0]]; ok {
+					if v, ok := m.Target.Commands[arg[0]]; ok {
 						if m.Check(m.Target, "commands", arg[0]) {
 							m.Echo("%s\n%s\n", v.Name, v.Help)
 						}
 					}
 				case 3:
-					if v, ok := s.Commands[arg[0]]; ok {
+					if v, ok := m.Target.Commands[arg[0]]; ok {
 						if m.Check(m.Target, "commands", arg[0]) {
 							v.Name = arg[1]
 							v.Help = arg[2]
@@ -1262,21 +1266,31 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 
 				switch len(arg) {
 				case 0:
-					m.Target.BackTrace(func(s *Context) bool {
-						m.Echo("%s configs:\n", s.Name)
-						for k, v := range s.Configs {
+					m.BackTrace(func(m *Message) bool {
+						if all {
+							m.Echo("%s configs:\n", m.Target.Name)
+						}
+						for k, v := range m.Target.Configs {
 							if m.Check(m.Target, "configs", k) {
-								m.Echo("  %s(%s): %s\n", k, v.Value, v.Name)
+								if all {
+									m.Echo("  ")
+								}
+								m.Echo("%s(%s): %s\n", k, v.Value, v.Name)
 							}
 						}
 						return all
 					})
 				case 1:
-					m.Target.BackTrace(func(s *Context) bool {
-						m.Echo("%s config:\n", s.Name)
-						if v, ok := s.Configs[arg[0]]; ok {
+					m.BackTrace(func(m *Message) bool {
+						if all {
+							m.Echo("%s config:\n", m.Target.Name)
+						}
+						if v, ok := m.Target.Configs[arg[0]]; ok {
 							if m.Check(m.Target, "configs", arg[0]) {
-								m.Echo("  %s: %s\n", v.Name, v.Help)
+								if all {
+									m.Echo("  ")
+								}
+								m.Echo("%s: %s\n", v.Name, v.Help)
 							}
 						}
 						return all
@@ -1308,39 +1322,31 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 				all = true
 			}
 
-			m.Target.BackTrace(func(s *Context) bool {
+			m.BackTrace(func(m *Message) bool {
 				switch len(arg) {
 				case 0:
-					target := m.Target
-					m.Target = s
-					for k, v := range s.Caches {
+					for k, v := range m.Target.Caches {
 						if m.Check(m.Target, "caches", k) {
 							m.Echo("%s(%s): %s\n", k, m.Cap(k), v.Name)
 						}
 					}
-					m.Target = target
 
 				case 1:
-					if v, ok := s.Caches[arg[0]]; ok {
+					if v, ok := m.Target.Caches[arg[0]]; ok {
 						if m.Check(m.Target, "caches", arg[0]) {
 							m.Echo("%s: %s\n", v.Name, v.Help)
 						}
 					}
 				case 2:
-					if s != m.Target {
-						m.Echo("请到%s模块上下文中操作缓存%v", s.Name, arg)
-						return false
-					}
-
 					switch arg[0] {
 					case "delete":
 						if m.Check(m.Target, "caches", arg[1]) {
-							if _, ok := s.Caches[arg[1]]; ok {
-								delete(s.Caches, arg[1])
+							if _, ok := m.Target.Caches[arg[1]]; ok {
+								delete(m.Target.Caches, arg[1])
 							}
 						}
 					default:
-						if _, ok := s.Caches[arg[0]]; ok {
+						if _, ok := m.Target.Caches[arg[0]]; ok {
 							if m.Check(m.Target, "caches", arg[0]) {
 								m.Echo("%s: %s\n", arg[0], m.Cap(arg[0], arg[1]))
 							}
@@ -1376,9 +1382,12 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 	},
 }
 
+var Pulse = &Message{Code: 0, Time: time.Now(), Source: Index, Master: Index, Target: Index}
+
 func init() {
-	Pulse.Root = Pulse
 	Pulse.Wait = make(chan bool, 10)
+	Pulse.Root = Pulse
+	Index.Root = Index
 }
 
 func Start(args ...string) {
@@ -1397,23 +1406,16 @@ func Start(args ...string) {
 		Pulse.Conf("root", args[3])
 	}
 
-	Pulse.Travel(Index, func(m *Message) bool {
+	for _, m := range Pulse.Search("") {
 		m.Target.Begin(m)
-		return true
-	})
-	Pulse.Target = Index
+	}
 
-	if n := 0; Pulse.Conf("start") != "" {
-		for _, s := range Index.contexts {
-			if ok, _ := regexp.MatchString(Pulse.Conf("start"), s.Name); ok {
-				go s.Start(Pulse.Spawn(s, s.Name).Put("option", "io", os.Stdout))
-				n++
-			}
-		}
+	for _, m := range Pulse.Search(Pulse.Conf("start")) {
+		m.Put("option", "io", os.Stdout).Target.Start(m)
+	}
 
-		for n > 0 || Pulse.Capi("nserver") > 0 {
-			<-Pulse.Wait
-			n--
-		}
+	<-Pulse.Wait
+	for Pulse.Capi("nserver") > 0 {
+		<-Pulse.Wait
 	}
 }

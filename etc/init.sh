@@ -1,16 +1,27 @@
-@debug on
+# @debug on
+# ~root aaa
+# login root root
+#
+
+source etc/lex.sh
+
+~root mdb
+open chat chat "chat:chat@/chat" mysql
+
 ~root aaa
 login root root
 
-~root lex
-server start
-~root cli
-@lex lex
+# ~root
+# $nserver
 
+#
 # login root 94ca7394d007fa189cc4be0a2625d716 root
 
-# ~cli
-# remote slaver listen :9393 tcp
+# ~root tcp
+# listen ":9393"
+# listen ":9394"
+~root cli
+remote slaver listen ":9393" tcp
 
 # ~aaa
 # login shy shy
