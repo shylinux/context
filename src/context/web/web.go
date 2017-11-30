@@ -171,7 +171,7 @@ func (web *WEB) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server 
 }
 
 // }}}
-func (web *WEB) Exit(m *ctx.Message, arg ...string) bool { // {{{
+func (web *WEB) Close(m *ctx.Message, arg ...string) bool { // {{{
 	return true
 }
 
