@@ -16,7 +16,7 @@ type TCP struct {
 	*ctx.Context
 }
 
-func (tcp *TCP) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
+func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"protocol": &ctx.Cache{Name: "protocol(tcp/tcp4/tcp6)", Value: m.Conf("protocol"), Help: "监听地址"},
 		"security": &ctx.Cache{Name: "security(true/false)", Value: m.Conf("security"), Help: "加密通信"},
@@ -106,7 +106,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 		"security": &ctx.Config{Name: "security(true/false)", Value: "false", Help: "加密通信"},
 	},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{Name: "listen [address [security]]", Help: "监听连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"listen": &ctx.Command{Name: "listen [address [security]]", Help: "监听连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 				m.Travel(m.Target, func(m *ctx.Message) bool {
@@ -121,7 +121,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			return ""
 			// }}}
 		}},
-		"dial": &ctx.Command{Name: "dial [address [security]]", Help: "建立连接", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"dial": &ctx.Command{Name: "dial [address [security]]", Help: "建立连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			switch len(arg) { // {{{
 			case 0:
 				m.Travel(m.Target, func(m *ctx.Message) bool {
@@ -136,14 +136,14 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络连接",
 			return ""
 			// }}}
 		}},
-		"send": &ctx.Command{Name: "send message", Help: "发送消息", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"send": &ctx.Command{Name: "send message", Help: "发送消息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			if tcp, ok := m.Target.Server.(*TCP); ok && tcp.Conn != nil { // {{{
 				tcp.Conn.Write([]byte(arg[0]))
 			}
 			return ""
 			// }}}
 		}},
-		"recv": &ctx.Command{Name: "recv size", Help: "接收消息", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"recv": &ctx.Command{Name: "recv size", Help: "接收消息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			if tcp, ok := m.Target.Server.(*TCP); ok && tcp.Conn != nil { // {{{
 				size, e := strconv.Atoi(arg[0])
 				m.Assert(e)
