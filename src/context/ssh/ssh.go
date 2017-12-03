@@ -17,7 +17,7 @@ func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
 	return true
 }
 
-func (ssh *SSH) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server {
+func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 	c.Commands = map[string]*ctx.Command{}
