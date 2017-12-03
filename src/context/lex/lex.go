@@ -279,7 +279,7 @@ func (lex *LEX) Start(m *ctx.Message, arg ...string) bool { // {{{
 }
 
 // }}}
-func (lex *LEX) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
+func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -302,7 +302,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 		"cell": &ctx.Config{Name: "字符集合", Value: "128", Help: "字符集合"},
 	},
 	Commands: map[string]*ctx.Command{
-		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			lex, ok := m.Target.Server.(*LEX) // {{{
 			if !ok {
 				return ""
@@ -321,7 +321,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 			return ""
 			// }}}
 		}},
-		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			lex, ok := m.Target.Server.(*LEX) // {{{
 			if !ok {
 				return ""
@@ -340,7 +340,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 			return ""
 			// }}}
 		}},
-		"split": &ctx.Command{Name: "split line [page1 [page2]]", Help: "分割语句", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"split": &ctx.Command{Name: "split line [page1 [page2]]", Help: "分割语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			lex, ok := m.Target.Server.(*LEX) // {{{
 			if !ok {
 				return ""
