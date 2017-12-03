@@ -16,7 +16,7 @@ type MDB struct {
 	*ctx.Context
 }
 
-func (mdb *MDB) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
+func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"source": &ctx.Cache{Name: "数据库参数", Value: "", Help: "数据库参数"},
 		"driver": &ctx.Cache{Name: "数据库驱动", Value: "", Help: "数据库驱动"},
@@ -87,15 +87,15 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 		"driver": &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
 	},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{Name: "open name help [source [driver]]", Help: "打开数据库", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-			m.Target = m.Master // {{{
+		"open": &ctx.Command{Name: "open name help [source [driver]]", Help: "打开数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+			m.Master = m.Target // {{{
 			m.Start(arg[0], arg[1], arg[2:]...)
 			return ""
 			// }}}
 		}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "执行操作语句",
 			Appends: map[string]string{"LastInsertId": "最后插入元组的标识", "RowsAffected": "修改元组的数量"},
-			Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 				mdb, ok := m.Target.Server.(*MDB) // {{{
 				m.Assert(ok, "目标模块类型错误")
 				m.Assert(len(arg) > 0, "缺少参数")
@@ -119,7 +119,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 				return ""
 				// }}}
 			}},
-		"query": &ctx.Command{Name: "query sql [arg]", Help: "执行查询语句", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"query": &ctx.Command{Name: "query sql [arg]", Help: "执行查询语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			mdb, ok := m.Target.Server.(*MDB) // {{{
 			m.Assert(ok, "目标模块类型错误")
 			m.Assert(len(arg) > 0, "缺少参数")
@@ -162,9 +162,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 			return ""
 			// }}}
 		}},
-		"close": &ctx.Command{Name: "close name", Help: "关闭数据库", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
-			msg := m.Find(arg[0], m.Master) // {{{
-			msg.Target.Close(msg)
+		"close": &ctx.Command{Name: "close [name]", Help: "关闭数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				msg := m.Find(arg[0], m.Master)
+				msg.Target.Close(msg)
+			} else {
+				m.Target.Close(m)
+			}
 			return ""
 			// }}}
 		}},
