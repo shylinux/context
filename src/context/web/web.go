@@ -161,7 +161,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 }
 
 // }}}
-func (web *WEB) Spawn(c *ctx.Context, m *ctx.Message, arg ...string) ctx.Server { // {{{
+func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -181,7 +181,7 @@ var Index = &ctx.Context{Name: "web", Help: "网页服务",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{Name: "listen [address [protocol [directory]]]", Help: "开启网页服务", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"listen": &ctx.Command{Name: "listen [address [protocol [directory]]]", Help: "开启网页服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				m.Conf("address", arg[0])
 			}
@@ -195,7 +195,7 @@ var Index = &ctx.Context{Name: "web", Help: "网页服务",
 			return ""
 			// }}}
 		}},
-		"content": &ctx.Command{Name: "content route template", Help: "添加响应", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"content": &ctx.Command{Name: "content route template", Help: "添加响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			mux, ok := m.Target.Server.(MUX) // {{{
 			if !ok {
 				return ""
@@ -211,7 +211,7 @@ var Index = &ctx.Context{Name: "web", Help: "网页服务",
 			return ""
 			// }}}
 		}},
-		"/hi": &ctx.Command{Name: "/hi", Help: "添加响应", Hand: func(c *ctx.Context, m *ctx.Message, key string, arg ...string) string {
+		"/hi": &ctx.Command{Name: "/hi", Help: "添加响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 			m.Echo("hello\n")
 			m.Add("append", "hi", "hello")
 			m.Add("append", "hi", "hello")
