@@ -131,6 +131,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 		}
 	}
 
+	c.Owner = m.Master.Owner
 	c.Requests = []*Message{m}
 
 	if c.Server != nil {
@@ -513,7 +514,7 @@ func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message))
 			if msg.Conf("debug") == "on" && e != io.EOF {
 				fmt.Printf("\n%s error: %v", msg.Target.Name, e)
 				debug.PrintStack()
-				fmt.Printf("%s error: %v\n", msg.Target.Name, e)
+				fmt.Printf("%s error: %v\n\n", msg.Target.Name, e)
 			}
 
 			if e == io.EOF {
@@ -804,7 +805,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 					}
 
 					m.Meta["result"] = nil
-					ret := x.Hand(m, c, key, arg...)
+					ret := x.Hand(m, s, key, arg...)
 					if ret != "" {
 						m.Echo(ret)
 					}
@@ -1113,6 +1114,7 @@ var Index = &Context{Name: "ctx", Help: "根模块",
 			default:
 				switch arg[0] {
 				case "start":
+					m.Meta = nil
 					m.Set("detail", arg[1:]...).Target.Start(m)
 				case "stop":
 					m.Set("detail", arg[1:]...).Target.Close(m)
@@ -1373,6 +1375,7 @@ func Start(args ...string) {
 		Pulse.Conf("root", args[3])
 	}
 
+	Index.Owner = Index.contexts["aaa"]
 	for _, m := range Pulse.Search("") {
 		m.Target.Begin(m)
 	}
