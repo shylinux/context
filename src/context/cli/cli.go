@@ -1,8 +1,9 @@
 package cli // {{{
 // }}}
 import ( // {{{
-	"bufio"
 	"context"
+
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -29,6 +30,7 @@ type CLI struct {
 	login   *ctx.Context
 	lex     *ctx.Message
 
+	temp   *ctx.Context
 	target *ctx.Context
 	m      *ctx.Message
 	*ctx.Context
@@ -95,52 +97,56 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 	}
 
 	line = strings.TrimSpace(line)
-	if line[0] == '#' {
+	if len(line) == 0 || line[0] == '#' {
+		return true
+	}
+
+	ls := []string{}
+	if cli.lex == nil {
+		ls = strings.Split(line, " ")
+	} else {
+		lex := m.Spawn(cli.lex.Target)
+		m.Assert(lex.Cmd("split", line, "void"))
+
+		ls = lex.Meta["result"]
+	}
+
+	if len(ls) == 0 {
 		return true
 	}
 
 	msg := m.Spawn(cli.target)
-	ls := []string{}
-	if cli.lex == nil {
-		ls = strings.Split(line, " ")
+	if cli.temp != nil {
+		msg.Target, cli.temp = cli.temp, nil
+	}
 
-		r := rune(ls[0][0])
-		if !unicode.IsNumber(r) || !unicode.IsLetter(r) || r == '$' || r == '_' {
-			if _, ok := cli.alias[string(r)]; ok {
-				if msg.Add("detail", ls[0][:1]); len(ls[0]) > 1 {
-					ls[0] = ls[0][1:]
+	for i := 0; i < len(ls); i++ {
+		ls[i] = strings.TrimSpace(ls[i])
+		if ls[i] == "" {
+			continue
+		}
+		if ls[i][0] == '#' {
+			break
+		}
+
+		if cli.lex != nil && len(ls[i]) > 1 {
+			switch ls[i][0] {
+			case '"', '\'':
+				ls[i] = ls[i][1 : len(ls[i])-1]
+			}
+		}
+
+		if r := rune(ls[i][0]); r == '$' || r == '_' || (!unicode.IsNumber(r) && !unicode.IsLetter(r)) {
+			if c, ok := cli.alias[string(r)]; ok {
+				if msg.Add("detail", c); len(ls[i]) > 1 {
+					ls[i] = ls[i][1:]
 				} else {
-					ls = ls[1:]
+					continue
 				}
 			}
 		}
 
-		for i := 0; i < len(ls); i++ {
-			ls[i] = strings.TrimSpace(ls[i])
-			if ls[i][0] == '#' {
-				break
-			}
-			if ls[i] != "" {
-				msg.Add("detail", ls[i])
-			}
-		}
-	} else {
-		lex := m.Spawn(cli.lex.Target)
-		m.Assert(lex.Cmd("split", line))
-
-		ls = lex.Meta["result"]
-		for i := 0; i < len(ls); i++ {
-			if ls[i][0] == '"' && len(ls[i]) > 1 {
-				ls[i] = ls[i][1 : len(ls[i])-1]
-			}
-			if ls[i][0] == '#' {
-				break
-			}
-			msg.Add("detail", ls[i])
-		}
-	}
-	if len(ls) == 0 {
-		return true
+		msg.Add("detail", ls[i])
 	}
 
 	msg.Wait = make(chan bool)
@@ -158,6 +164,8 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
+	cli.Owner = nil
+
 	s := new(CLI)
 	s.Context = c
 	return s
@@ -169,7 +177,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	cli.Caches["nhistory"] = &ctx.Cache{Name: "历史命令数量", Value: "0", Help: "当前终端已经执行命令的数量"}
 
 	cli.Configs["slient"] = &ctx.Config{Name: "屏蔽脚本输出(yes/no)", Value: "yes", Help: "屏蔽脚本输出的信息，yes:屏蔽，no:不屏蔽"}
-	cli.Configs["default"] = &ctx.Config{Name: "默认的搜索起点(root/back/home)", Value: "home", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"}
+	cli.Configs["default"] = &ctx.Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"}
 	cli.Configs["PS1"] = &ctx.Config{Name: "命令行提示符(target/detail)", Value: "target", Help: "命令行提示符，target:显示当前模块，detail:显示详细信息", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 { // {{{
 			return arg[0]
@@ -220,8 +228,8 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 			cli.lex = m.Find(arg[0], m.Target.Root)
 			m.Assert(cli.lex != nil, "词法解析模块不存在")
 
-			cli.lex.Cmd("train", "[ \n\t]+", "1")
-			cli.lex.Cmd("train", "#[^\n]*\n", "1", "2")
+			cli.lex.Cmd("train", "[ \n\t]+", "void", "void")
+			cli.lex.Cmd("train", "#[^\n]*\n", "void", "void")
 		}
 		return x.Value
 		// }}}
@@ -232,7 +240,6 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	}
 
 	cli.m = m
-	cli.Owner = nil
 	cli.Context.Master = cli.Context
 
 	cli.target = cli.Context
@@ -274,24 +281,26 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 			return true
 		} else {
-			if msg := m.Find("aaa", m.Target.Root); false && msg != nil {
-				username := ""
-				cli.echo("username>")
-				fmt.Fscanln(cli.in, &username)
+			if cli.Owner == nil {
+				if msg := m.Find("aaa", m.Target.Root); msg != nil {
+					username := ""
+					cli.echo("username>")
+					fmt.Fscanln(cli.in, &username)
 
-				password := ""
-				cli.echo("password>")
-				fmt.Fscanln(cli.in, &password)
+					password := ""
+					cli.echo("password>")
+					fmt.Fscanln(cli.in, &password)
 
-				if msg.Cmd("login", username, password) == "" {
-					cli.echo("登录失败")
-					m.Cmd("exit")
-					cli.out.Close()
-					cli.in.Close()
-					return false
+					if msg.Cmd("login", username, password) == "" {
+						cli.echo("登录失败")
+						m.Cmd("exit")
+						cli.out.Close()
+						cli.in.Close()
+						return false
+					}
+
+					m.Cap("username", msg.Cap("username"))
 				}
-
-				m.Cap("username", msg.Cap("username"))
 			}
 
 			m.Log("info", "%s: slaver terminal", cli.Name)
@@ -307,13 +316,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		}
 	}
 
-	for m.Deal(func(msg *ctx.Message, arg ...string) bool {
-		if a, ok := cli.alias[arg[0]]; ok {
-			arg[0] = a
-		}
-		return true
-
-	}, func(msg *ctx.Message, arg ...string) bool {
+	for m.Deal(nil, func(msg *ctx.Message, arg ...string) bool {
 		cli.history = append(cli.history, map[string]string{
 			"time":  time.Now().Format("15:04:05"),
 			"index": fmt.Sprintf("%d", len(cli.history)),
@@ -416,6 +419,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 						cli.target = v.Target
 					case m.Has("start"):
 						v.Set("detail", arg...).Target.Start(v)
+						cli.target = v.Target
 					case m.Has("switch"):
 						cli.target = v.Target
 					case m.Has("close"):
@@ -437,7 +441,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 								m.Echo("  %s(%d): -> %s %v\n", k, v.Code, v.Target.Name, v.Meta["detail"])
 							}
 						}
-					case m.Has("list") || cli.target == v.Target:
+					case m.Has("list") || len(m.Meta["detail"]) == 1 || (len(arg) == 0 && cli.target == v.Target):
+						if len(m.Meta["detail"]) == 1 {
+							v.Target = cli.target
+						}
 						m.Travel(v.Target, func(msg *ctx.Message) bool {
 							if msg.Target.Context != nil {
 								target := msg.Target
@@ -453,6 +460,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 							}
 							return true
 						})
+					case len(arg) > 0:
+						cli.next = strings.Join(arg, " ")
+						cli.temp = v.Target
 					default:
 						cli.target = v.Target
 						return ""
@@ -470,6 +480,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				cli.push(f)
 			}
 
+			return ""
+			// }}}
+		}},
+		"return": &ctx.Command{Name: "return", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+			cli := c.Server.(*CLI) // {{{
+			cli.bio.Discard(cli.bio.Buffered())
 			return ""
 			// }}}
 		}},
@@ -555,7 +571,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 				return ""
 				// }}}
 			}},
-		"void": &ctx.Command{Name: "", Help: "", Hand: nil},
 	},
 	Messages: make(chan *ctx.Message, 10),
 	Index: map[string]*ctx.Context{
