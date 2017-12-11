@@ -40,7 +40,7 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	aaa.Caches["group"] = &ctx.Cache{Name: "用户组", Value: "", Help: "用户组"}
 	aaa.Caches["username"] = &ctx.Cache{Name: "用户名", Value: "", Help: "用户名"}
-	aaa.Caches["password"] = &ctx.Cache{Name: "密码", Value: "", Help: "用户密码，加密存储", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
+	aaa.Caches["password"] = &ctx.Cache{Name: "用户密码", Value: "", Help: "用户密码，加密存储", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
 		if len(arg) > 0 { // {{{
 			bs := md5.Sum([]byte(fmt.Sprintln("用户密码:%s", arg[0])))
 			m.Assert(x.Value == "" || x.Value == hex.EncodeToString(bs[:]), "密码错误")
@@ -51,11 +51,11 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		// }}}
 	}}
 
-	aaa.Caches["expire"] = &ctx.Cache{Name: "会话超时", Value: "", Help: "用户的会话标识"}
 	aaa.Caches["sessid"] = &ctx.Cache{Name: "会话标识", Value: "", Help: "用户的会话标识"}
+	aaa.Caches["expire"] = &ctx.Cache{Name: "会话超时", Value: "", Help: "用户的会话标识"}
 	aaa.Caches["time"] = &ctx.Cache{Name: "登录时间", Value: fmt.Sprintf("%d", time.Now().Unix()), Help: "用户登录时间", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
 		if len(arg) > 0 { // {{{
-			return x.Value
+			return arg[0]
 		}
 
 		n, e := strconv.Atoi(x.Value)
@@ -64,7 +64,6 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		// }}}
 	}}
 
-	m.Log("info", "context %s", aaa.Context.Name)
 	aaa.Owner = aaa.Context
 	return aaa
 }
@@ -76,7 +75,8 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 			m.Cap("sessid", aaa.session(arg[1]))
 			m.Capi("nuser", 1)
 		}
-		m.Log("info", "%s(%s): login %s", m.Source.Name, m.Cap("group", arg[0]), m.Cap("username", arg[1]))
+		m.Log("info", m.Source, "login %s %s", m.Cap("group", arg[0]), m.Cap("username", arg[1]))
+		m.Cap("stream", m.Cap("username"))
 	}
 
 	return false
@@ -86,7 +86,7 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
 	if m.Target == aaa.Context && aaa.Owner == aaa.Context {
 		if m.Cap("username") != m.Conf("rootname") {
-			m.Log("info", "%s(%s): logout %s", aaa.Name, m.Cap("group"), m.Cap("username"))
+			m.Log("info", nil, "logout %s", m.Cap("group"), m.Cap("username"))
 			m.Capi("nuser", -1)
 			return true
 		}
@@ -124,7 +124,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 
 					m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
-					m.Log("info", "%s(%s): logon %s", m.Source.Name, m.Cap("group"), m.Cap("username"))
+					m.Log("info", m.Source, "logon %s", m.Cap("group"), m.Cap("username"))
 					return m.Cap("username")
 				}
 			case 2, 3:

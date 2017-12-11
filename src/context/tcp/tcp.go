@@ -47,7 +47,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Assert(e)
 		tcp.Conn = c
 
-		m.Log("info", "%s: dial(%d) %v->%v", tcp.Name, m.Capi("nclient"), c.LocalAddr(), c.RemoteAddr())
+		m.Log("info", nil, "dial(%d) %v->%v", m.Capi("nclient"), c.LocalAddr(), c.RemoteAddr())
 		// m.Reply(c.LocalAddr().String()).Put("option", "io", c).Cmd("open")
 		return false
 	case "accept":
@@ -58,15 +58,24 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 	m.Assert(e)
 	tcp.Listener = l
 
-	m.Log("info", "%s: listen(%d) %v", tcp.Name, m.Capi("nlisten"), l.Addr())
+	m.Log("info", nil, "listen(%d) %v", m.Capi("nlisten"), l.Addr())
 
 	for {
 		c, e := l.Accept()
 		m.Assert(e)
 
-		msg := m.Spawn(tcp.Context.Context)
+		s, i := m.Target, 0
+		m.BackTrace(func(m *ctx.Message) bool {
+			s = m.Target
+			if i++; i == 2 {
+				return false
+			}
+			return true
+		})
+
+		msg := m.Spawn(s)
 		msg.Start(fmt.Sprintf("com%d", m.Capi("nclient", 1)), c.RemoteAddr().String(), "accept", c.RemoteAddr().String())
-		msg.Log("info", "%s: accept(%d) %v<-%v", tcp.Name, m.Capi("nclient"), c.LocalAddr(), c.RemoteAddr())
+		msg.Log("info", nil, "accept(%d) %v<-%v", m.Capi("nclient"), c.LocalAddr(), c.RemoteAddr())
 
 		if tcp, ok := msg.Target.Server.(*TCP); ok {
 			tcp.Conn = c
@@ -82,7 +91,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 // }}}
 func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool { // {{{
 	if tcp.Listener != nil {
-		m.Log("info", "%s: close(%d) %v", tcp.Name, m.Capi("nlisten", -1)+1, tcp.Listener.Addr())
+		m.Log("info", nil, "close(%d) %v", m.Capi("nlisten", -1)+1, tcp.Listener.Addr())
 		tcp.Listener.Close()
 		return true
 	}

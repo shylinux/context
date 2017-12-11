@@ -23,15 +23,6 @@ func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	}
 	c.Configs = map[string]*ctx.Config{}
 
-	if len(arg) > 0 {
-		m.Cap("source", arg[0])
-	}
-	if len(arg) > 1 {
-		m.Cap("driver", arg[1])
-	} else {
-		m.Cap("driver", m.Conf("driver"))
-	}
-
 	s := new(MDB)
 	s.Context = c
 	return s
@@ -57,18 +48,19 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return false
 	}
 
+	m.Cap("stream", m.Cap("source"))
 	db, e := sql.Open(m.Cap("driver"), m.Cap("source"))
 	m.Assert(e)
 	mdb.DB = db
 
-	m.Log("info", "%s: %d open %s %s", mdb.Name, m.Capi("nsource", 1), m.Cap("driver"), m.Cap("source"))
+	m.Log("info", nil, "%d open %s %s", m.Capi("nsource", 1), m.Cap("driver"), m.Cap("source"))
 	return false
 }
 
 // }}}
 func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
 	if mdb.DB != nil && m.Target == mdb.Context {
-		m.Log("info", "%s: %d close %s %s", mdb.Name, m.Capi("nsource", -1)+1, m.Cap("driver"), m.Cap("source"))
+		m.Log("info", nil, "%d close %s %s", m.Capi("nsource", -1)+1, m.Cap("driver"), m.Cap("source"))
 		mdb.DB.Close()
 		mdb.DB = nil
 		return true
@@ -87,13 +79,15 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 		"driver": &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
 	},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{Name: "open name help [source [driver]]", Help: "打开数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-			m.Master = m.Target // {{{
+		"open": &ctx.Command{Name: "open name help source [driver]", Help: "打开数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+			m.Assert(len(arg) > 2, "缺少参数") // {{{
+			m.Master, m.Target = c, c
+			m.Cap("stream", m.Cap("nsource"))
 			m.Start(arg[0], arg[1], arg[2:]...)
 			return ""
 			// }}}
 		}},
-		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "执行操作语句",
+		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库",
 			Appends: map[string]string{"LastInsertId": "最后插入元组的标识", "RowsAffected": "修改元组的数量"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
 				mdb, ok := m.Target.Server.(*MDB) // {{{
@@ -113,9 +107,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 				n, e := ret.RowsAffected()
 				m.Assert(e)
 
+				m.Echo("%d", id).Echo("%d", n)
 				m.Add("append", "LastInsertId", fmt.Sprintf("%d", id))
 				m.Add("append", "RowsAffected", fmt.Sprintf("%d", n))
-				m.Log("info", "%s: last(%d) rows(%d)", m.Target.Name, id, n)
+				m.Log("info", nil, "last(%d) rows(%d)", id, n)
 				return ""
 				// }}}
 			}},
@@ -158,17 +153,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 				}
 			}
 
-			m.Log("info", "%s: cols(%d) rows(%d)", m.Target.Name, len(m.Meta["append"]), len(m.Meta[m.Meta["append"][0]]))
-			return ""
-			// }}}
-		}},
-		"close": &ctx.Command{Name: "close [name]", Help: "关闭数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-			if len(arg) > 0 { // {{{
-				msg := m.Find(arg[0], m.Master)
-				msg.Target.Close(msg)
-			} else {
-				m.Target.Close(m)
-			}
+			m.Log("info", nil, "rows(%d) cols(%d)", len(m.Meta[m.Meta["append"][0]]), len(m.Meta["append"]))
 			return ""
 			// }}}
 		}},

@@ -2,19 +2,10 @@ package ssh
 
 import (
 	"context"
-	_ "context/cli"
 )
 
 type SSH struct {
 	*ctx.Context
-}
-
-func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	return ssh
-}
-
-func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
-	return true
 }
 
 func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
@@ -27,8 +18,16 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
+func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	return ssh
+}
+
+func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
+	return false
+}
+
 func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
-	return true
+	return false
 }
 
 var Index = &ctx.Context{Name: "ssh", Help: "加密终端",
