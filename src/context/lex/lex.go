@@ -51,9 +51,10 @@ func (lex *LEX) train(seed []byte, arg ...string) { // {{{
 			lex.Capi("npage", 1)
 		}
 	}
-	lex.Log("debug", "%s: %d %d %v", lex.Context.Name, page, hash, seed)
+	lex.Log("debug", nil, "%d %d %v", page, hash, seed)
 	lex.seed = append(lex.seed, &Seed{page, hash, string(seed)})
 	lex.Capi("nseed", 1)
+	lex.Cap("stream", fmt.Sprintf("%s,%s,%s", lex.Cap("nseed"), lex.Cap("npage"), lex.Cap("nhash")))
 	// }}}
 
 	s := []int{page}
@@ -112,8 +113,8 @@ func (lex *LEX) train(seed []byte, arg ...string) { // {{{
 			c = append(c, seed[p])
 		}
 
-		lex.Log("debug", "page: \033[31m%v\033[0m", s)
-		lex.Log("debug", "cell: \033[32m%v\033[0m", c)
+		lex.Log("debug", nil, "page: \033[31m%v\033[0m", s)
+		lex.Log("debug", nil, "cell: \033[32m%v\033[0m", c)
 
 		flag := '\000'
 		if p+1 < len(seed) {
@@ -131,7 +132,7 @@ func (lex *LEX) train(seed []byte, arg ...string) { // {{{
 					state = new(State)
 					lex.Capi("nnode", 1)
 				}
-				lex.Log("debug", "GET(%d,%d): %v", s[i], c[j], state)
+				lex.Log("debug", nil, "GET(%d,%d): %v", s[i], c[j], state)
 
 				switch flag {
 				case '+':
@@ -143,9 +144,9 @@ func (lex *LEX) train(seed []byte, arg ...string) { // {{{
 					if sn[s[i]] = true; p == len(seed)-1 {
 						for _, n := range ends {
 							if n.next == s[i] && n.hash == 0 {
-								lex.Log("debug", "GET() state:%v", n)
+								lex.Log("debug", nil, "GET() state:%v", n)
 								n.hash = hash
-								lex.Log("debug", "END() state:%v", n)
+								lex.Log("debug", nil, "END() state:%v", n)
 							}
 						}
 					}
@@ -173,7 +174,7 @@ func (lex *LEX) train(seed []byte, arg ...string) { // {{{
 				lex.state[*state] = state
 				lex.mat[s[i]][c[j]] = state
 
-				lex.Log("debug", "SET(%d,%d): %v", s[i], c[j], state)
+				lex.Log("debug", nil, "SET(%d,%d): %v", s[i], c[j], state)
 				ends = append(ends, state)
 			}
 		}
@@ -210,11 +211,11 @@ func (lex *LEX) parse(line []byte, arg ...string) (word []byte, hash int, rest [
 		}
 
 		state := lex.mat[s][c]
-		lex.Log("debug", "(%d,%d): %v", s, c, state)
+		lex.Log("debug", nil, "(%d,%d): %v", s, c, state)
 		if state == nil && star != 0 {
 			s, star = star, 0
 			state = lex.mat[s][c]
-			lex.Log("debug", "(%d,%d): %v", s, c, state)
+			lex.Log("debug", nil, "(%d,%d): %v", s, c, state)
 		}
 		if state == nil {
 			break
@@ -238,7 +239,7 @@ func (lex *LEX) parse(line []byte, arg ...string) (word []byte, hash int, rest [
 	}
 
 	word, rest = line[begin:end], line[end:]
-	lex.Log("debug", "\033[31m[%v]\033[0m %d [%v]", string(word), hash, string(rest))
+	lex.Log("debug", nil, "\033[31m[%v]\033[0m %d [%v]", string(word), hash, string(rest))
 	return
 }
 
@@ -256,7 +257,6 @@ func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 // }}}
 func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	lex.Message = m
-	lex.Log("fuck", "why")
 	lex.Caches["nseed"] = &ctx.Cache{Name: "种子数量", Value: "0", Help: "种子数量"}
 	lex.Caches["npage"] = &ctx.Cache{Name: "集合数量", Value: "1", Help: "集合数量"}
 	lex.Caches["nhash"] = &ctx.Cache{Name: "类型数量", Value: "1", Help: "类型数量"}
