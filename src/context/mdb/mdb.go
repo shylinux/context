@@ -59,19 +59,27 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if mdb.DB != nil && m.Target == mdb.Context {
+	if mdb.Context == Index {
+		return false
+	}
+
+	switch mdb.Context {
+	case m.Target:
+	case m.Source:
+	}
+
+	if mdb.DB != nil {
 		m.Log("info", nil, "%d close %s %s", m.Capi("nsource", -1)+1, m.Cap("driver"), m.Cap("source"))
 		mdb.DB.Close()
 		mdb.DB = nil
-		return true
 	}
 
-	return false
+	return true
 }
 
 // }}}
 
-var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
+var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 	Caches: map[string]*ctx.Cache{
 		"nsource": &ctx.Cache{Name: "数据源数量", Value: "0", Help: "已打开数据库的数量"},
 	},
@@ -83,7 +91,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "内存数据库",
 			m.Assert(len(arg) > 2, "缺少参数") // {{{
 			m.Master, m.Target = c, c
 			m.Cap("stream", m.Cap("nsource"))
-			m.Start(arg[0], arg[1], arg[2:]...)
+			m.Start(arg[0], "数据存储", arg[2:]...)
 			return ""
 			// }}}
 		}},

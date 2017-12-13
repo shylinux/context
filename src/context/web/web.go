@@ -117,7 +117,6 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
 	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已注册"}
 	web.Caches["master"] = &ctx.Cache{Name: "master(yes/no)", Value: "no", Help: "日志输出请求头"}
-	m.Cap("stream", m.Cap("route")+" -> "+m.Cap("directory"))
 
 	web.ServeMux = http.NewServeMux()
 	if mux, ok := m.Target.Server.(MUX); ok {
@@ -166,7 +165,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return true
 	})
 
-	web.Caches["address"] = &ctx.Cache{Name: "address", Value: ":9393", Help: "监听地址"}
+	web.Caches["address"] = &ctx.Cache{Name: "address", Value: ":9191", Help: "监听地址"}
 	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: "http", Help: "服务协议"}
 	if len(arg) > 1 {
 		m.Cap("address", arg[1])
