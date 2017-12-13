@@ -1,26 +1,25 @@
 # ~lex source etc/lex.sh
 ~cli @lex lex
+~root aaa login root root
+# ~tcp listen ":9393"
+# ~tcp dial ":9393"
+~cli remote slaver listen ":9393" tcp
+# @debug on
 
 ~mdb open chat chat "chat:chat@/chat" mysql
+~web listen
+return
 
-~root aaa login root root
 
 @debug
 ~web spawn hi he ./
-~web listen
 route template /tpl ./usr/msg.tpl
 route script /php ./usr/msg.php
 route script /who who
 ~hi listen ./ ":9494"
 master nice
-pwd
-
-# ~aaa login shy shy
-
 return
 
 login shy shy
 
 
-~root cli
-remote slaver listen ":9393" tcp

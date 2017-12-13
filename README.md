@@ -19,6 +19,17 @@ context: 通过提供自由的模块，简洁的接口，动态的结构，让�
 * 配置管理config
 * 缓存管理cache
 
+* Cap() Conf() Cmd()
+* Spawn() Begin() Start() Close()
+
+* Request[] History[] Session[]
+* detail[] option[] result[] append[]
+
+* Context Master Owner
+* Search() Action() Assert() Figure()
+
+
+
 ## 结构设计
 * 功能树
 * 权限树

@@ -25,6 +25,7 @@ type CLI struct {
 	out io.WriteCloser
 
 	alias map[string]string
+	back  string
 	next  string
 	exit  bool
 
@@ -83,6 +84,7 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 			if len(cli.ins) > 1 {
 				return true
 			}
+			line, cli.back = cli.back, ""
 		}
 	} else {
 		line, cli.next = cli.next, ""
@@ -144,13 +146,12 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 		msg.Add("detail", ls[i])
 	}
 
-	if msg.Wait = make(chan bool); msg.Target.Master != cli.Context {
-		msg.Post(msg.Target.Master)
-	} else {
-		msg.Post(cli.Context)
-	}
+	msg.Wait = make(chan bool)
+	msg.Post(cli.Context)
 
 	cli.echo(strings.Join(msg.Meta["result"], ""))
+	cli.target = msg.Target
+	cli.back = line
 	return true
 }
 
@@ -218,11 +219,11 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 			m.Assert(lex != nil, "词法解析模块不存在")
 			if lex.Cap("status") != "start" {
 				lex.Target.Start(lex)
-				lex.Cmd("train", "'[^']*'")
-				lex.Cmd("train", "\"[^\"]*\"")
-				lex.Cmd("train", "[^ \t\n]+")
-				lex.Cmd("train", "[ \n\t]+", "void", "void")
-				lex.Cmd("train", "#[^\n]*\n", "void", "void")
+				m.Spawn(lex.Target).Cmd("train", "'[^']*'")
+				m.Spawn(lex.Target).Cmd("train", "\"[^\"]*\"")
+				m.Spawn(lex.Target).Cmd("train", "[^ \t\n]+")
+				m.Spawn(lex.Target).Cmd("train", "[ \n\t]+", "void", "void")
+				m.Spawn(lex.Target).Cmd("train", "#[^\n]*\n", "void", "void")
 			}
 			cli.lex = lex
 		}
@@ -285,6 +286,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 					cli.echo("password>")
 					fmt.Fscanln(cli.in, &password)
 
+					msg.Wait = make(chan bool)
 					if msg.Cmd("login", username, password) == "" {
 						cli.echo("登录失败")
 						m.Cmd("exit")
@@ -292,7 +294,15 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 						cli.in.Close()
 						return false
 					}
+
+					if cli.Sessions == nil {
+						cli.Sessions = make(map[string]*ctx.Message)
+					}
+					cli.Sessions["aaa"] = msg
+					msg.Name = "aaa"
 				}
+			} else {
+				m.Cap("stream", "stdout")
 			}
 
 			m.Log("info", nil, "slaver terminal")
@@ -319,7 +329,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			msg.Set("append")
 			c := exec.Command(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)
 
-			if len(cli.ins) == 1 {
+			if len(cli.ins) == 1 && cli.Context == Index {
 				c.Stdin, c.Stdout, c.Stderr = cli.in, cli.out, cli.out
 				msg.Assert(c.Start())
 				msg.Assert(c.Wait())
@@ -342,20 +352,21 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
-	switch cli.Context {
-	case m.Source:
+	if cli.Context == Index {
 		return false
-
-	case m.Target:
-		m.Log("exit", nil, "release")
 	}
 
-	return false
+	switch cli.Context {
+	case m.Target:
+	case m.Source:
+	}
+
+	return true
 }
 
 // }}}
 
-var Index = &ctx.Context{Name: "cli", Help: "管理终端",
+var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Caches: map[string]*ctx.Cache{
 		"nterm": &ctx.Cache{Name: "终端数量", Value: "0", Help: "已经运行的终端数量"},
 	},
@@ -437,7 +448,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理终端",
 		"open": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
 			Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-				m.Start(fmt.Sprintf("PTS%d", m.Capi("nterm")), "管理终端", arg...) // {{{
+				m.Start(fmt.Sprintf("PTS%d", m.Capi("nterm")), "管理终端", "void.sh") // {{{
 				return ""
 				// }}}
 			}},
