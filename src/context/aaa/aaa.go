@@ -64,6 +64,10 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		// }}}
 	}}
 
+	if m.Target == Index {
+		Pulse = m
+	}
+
 	aaa.Owner = aaa.Context
 	return aaa
 }
@@ -84,15 +88,17 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if m.Target == aaa.Context && aaa.Owner == aaa.Context {
-		if m.Cap("username") != m.Conf("rootname") {
-			m.Log("info", nil, "logout %s", m.Cap("group"), m.Cap("username"))
-			m.Capi("nuser", -1)
-			return true
-		}
+	if aaa.Context == Index {
+		return false
 	}
 
-	return false
+	switch aaa.Context {
+	case m.Target:
+	case m.Source:
+	}
+
+	m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
+	return true
 }
 
 // }}}
@@ -136,7 +142,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				if username == m.Conf("rootname") {
 					m.Set("detail", group, username).Target.Start(m)
 				} else if msg := m.Find(username); msg == nil {
-					m.Start(username, group, group, username)
+					m.Start(username, "认证用户", group, username)
 				} else {
 					m.Target = msg.Target
 				}
@@ -156,6 +162,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		},
 	},
 }
+var Pulse *ctx.Message
 
 func init() {
 	aaa := &AAA{}
