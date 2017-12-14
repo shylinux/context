@@ -30,7 +30,7 @@ func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
 	return false
 }
 
-var Index = &ctx.Context{Name: "ssh", Help: "加密终端",
+var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Caches:   map[string]*ctx.Cache{},
 	Configs:  map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{},

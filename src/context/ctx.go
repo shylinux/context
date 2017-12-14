@@ -72,7 +72,6 @@ type Context struct {
 	Owner  *Context
 	Group  string
 
-	Pulse *Message
 	Server
 }
 
@@ -127,8 +126,9 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 		}
 	}
 
-	c.Requests = []*Message{m}
+	m.Index = 1
 	c.Historys = []*Message{m}
+	c.Requests = []*Message{m}
 
 	if c.Server != nil {
 		c.Server.Begin(m, m.Meta["detail"]...)
@@ -161,12 +161,24 @@ func (c *Context) Start(m *Message) bool { // {{{
 // }}}
 func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 	m.Log("close", c, "close %v", arg)
+
 	if m.Target == c {
-		for k, v := range c.Sessions {
-			delete(c.Sessions, k)
-			if v.Target != c && !v.Target.Close(v, arg...) {
-				return false
+		switch {
+		case m.Index == 0:
+			for i := len(c.Requests) - 1; i >= 0; i-- {
+				v := c.Requests[i]
+				v.Index = -1
+				if v.Source != c && !v.Source.Close(v, arg...) {
+					v.Index = i
+					return false
+				}
+				c.Requests = c.Requests[:i]
 			}
+		case m.Index > 0:
+			for i := m.Index - 1; i < len(c.Requests)-1; i++ {
+				c.Requests[i] = c.Requests[i+1]
+			}
+			c.Requests = c.Requests[:len(c.Requests)-1]
 		}
 	}
 
@@ -174,34 +186,26 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 		return false
 	}
 
-	if m.Source == c {
+	if m.Source == c && m.Target != c {
 		if _, ok := c.Sessions[m.Name]; ok {
 			delete(c.Sessions, m.Name)
-			m.Target.Server.Close(m, arg...)
 		}
-	} else {
-		if m.Index == -1 {
-			return true
-		}
-	}
-
-	if len(c.Sessions) > 0 {
-		return false
-	}
-
-	if m.Cap("status") == "close" {
 		return true
 	}
 
+	if len(c.Requests) > 0 {
+		return false
+	}
+
+	m.Log(m.Cap("status", "close"), c, "%d server %v", m.root.Capi("nserver", -1)+1, arg)
 	if c.context != nil && len(c.contexts) == 0 {
 		m.Log("close", c, "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
 		delete(c.context.contexts, c.Name)
 	}
 
-	for _, v := range c.Requests {
-		if v.Source != c && v.Index != -1 {
-			v.Index = -1
-			v.Source.Close(v, arg...)
+	for _, v := range c.Sessions {
+		if v.Target != c {
+			v.Target.Close(v, arg...)
 		}
 	}
 
@@ -1077,7 +1081,8 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 
 // }}}
 
-var Index = &Context{Name: "ctx", Help: "元始模块",
+var Pulse = &Message{code: 0, time: time.Now(), Wait: make(chan bool), Source: Index, Master: Index, Target: Index}
+var Index = &Context{Name: "ctx", Help: "模块中心",
 	Caches: map[string]*Cache{
 		"nserver":  &Cache{Name: "服务数量", Value: "0", Help: "显示已经启动运行模块的数量"},
 		"ncontext": &Cache{Name: "模块数量", Value: "0", Help: "显示功能树已经注册模块的数量"},
@@ -1561,8 +1566,6 @@ var Index = &Context{Name: "ctx", Help: "元始模块",
 		},
 	},
 }
-
-var Pulse = &Message{code: 0, time: time.Now(), Wait: make(chan bool), Source: Index, Master: Index, Target: Index}
 
 func init() {
 	Pulse.root = Pulse
