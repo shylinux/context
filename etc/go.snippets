@@ -39,6 +39,9 @@ snippet c
 	}
 
 	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Begin(m *ctx.Message, arg ...string) ctx.Server {
+		if `Filename()`.Context == Index {
+			Pulse = m
+		}
 		return `Filename()`
 	}
 
@@ -46,11 +49,20 @@ snippet c
 		return false
 	}
 
-	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Exit(m *ctx.Message, arg ...string) bool {
+	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Close(m *ctx.Message, arg ...string) bool {
+		switch `Filename()`.Context {
+			case m.Target:
+				if `Filename()`.Context == Index {
+					return false
+				}
+			case m.Source:
+				return true
+		}
 		return false
 	}
 
 
+	var Pulse *ctx.Message
 	var Index = &ctx.Context{Name: "`Filename()`", Help: "${1}",
 		Caches:   map[string]*ctx.Cache{},
 		Configs:  map[string]*ctx.Config{},
@@ -67,6 +79,7 @@ snippet cmd
 		${4}
 		return ""
 	}},
+
 snippet conf
 	"${1}": &ctx.Config{Name: "${2}", Value: "${3}", Help: "${4}", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 {

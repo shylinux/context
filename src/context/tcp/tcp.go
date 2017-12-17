@@ -56,6 +56,16 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Log("info", nil, "dial(%d) %v->%v", m.Capi("nclient", 1), tcp.LocalAddr(), tcp.RemoteAddr())
 		m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))
 
+		msg := m.Spawn(m.Source).Put("option", "io", c)
+		msg.Cmd("open")
+		msg.Cap("stream", tcp.RemoteAddr().String())
+
+		if tcp.Sessions == nil {
+			tcp.Sessions = make(map[string]*ctx.Message)
+		}
+		tcp.Sessions["open"] = msg
+		msg.Name = "open"
+
 		// m.Reply(c.LocalAddr().String()).Put("option", "io", c).Cmd("open")
 		return false
 	case "accept":
@@ -98,12 +108,12 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if tcp.Context == Index {
-		return false
-	}
-
 	switch tcp.Context {
 	case m.Target:
+		if tcp.Context == Index {
+			return false
+		}
+
 		if tcp.Listener != nil {
 			m.Log("info", nil, "%d close %v", Pulse.Capi("nlisten", -1)+1, tcp.Listener.Addr())
 			tcp.Listener.Close()

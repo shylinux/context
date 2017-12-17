@@ -239,6 +239,9 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	if cli.Context != Index {
 		cli.Owner = nil
 	}
+	if cli.Context == Index {
+		Pulse = m
+	}
 
 	cli.target = cli.Context
 	cli.alias = map[string]string{
@@ -286,6 +289,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 					cli.echo("password>")
 					fmt.Fscanln(cli.in, &password)
 
+					msg.Name = "aaa"
 					msg.Wait = make(chan bool)
 					if msg.Cmd("login", username, password) == "" {
 						cli.echo("登录失败")
@@ -299,7 +303,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 						cli.Sessions = make(map[string]*ctx.Message)
 					}
 					cli.Sessions["aaa"] = msg
-					msg.Name = "aaa"
 				}
 			} else {
 				m.Cap("stream", "stdout")
@@ -352,13 +355,23 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if cli.Context == Index {
-		return false
-	}
-
 	switch cli.Context {
 	case m.Target:
+		if cli.Context == Index {
+			return false
+		}
+
+		if len(cli.Context.Requests) == 0 {
+			m.Log("info", nil, "%s close %v", Pulse.Cap("nterm"), arg)
+		}
 	case m.Source:
+		if m.Name == "aaa" {
+			msg := m.Spawn(cli.Context)
+			msg.Master = cli.Context
+			if !cli.Context.Close(msg, arg...) {
+				return false
+			}
+		}
 	}
 
 	return true
@@ -366,6 +379,7 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 
+var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Caches: map[string]*ctx.Cache{
 		"nterm": &ctx.Cache{Name: "终端数量", Value: "0", Help: "已经运行的终端数量"},

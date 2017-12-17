@@ -44,7 +44,7 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		if len(arg) > 0 { // {{{
 			bs := md5.Sum([]byte(fmt.Sprintln("用户密码:%s", arg[0])))
 			m.Assert(x.Value == "" || x.Value == hex.EncodeToString(bs[:]), "密码错误")
-			m.Cap("expire", fmt.Sprintf("%d", time.Now().Unix()+int64(m.Confi("expire"))))
+			m.Cap("expire", fmt.Sprintf("%d", time.Now().Unix()+int64(Pulse.Confi("expire"))))
 			return hex.EncodeToString(bs[:])
 		}
 		return x.Value
@@ -77,32 +77,36 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if len(arg) > 1 {
 		if m.Cap("sessid") == "" {
 			m.Cap("sessid", aaa.session(arg[1]))
-			m.Capi("nuser", 1)
+			Pulse.Capi("nuser", 1)
 		}
-		m.Log("info", m.Source, "login %s %s", m.Cap("group", arg[0]), m.Cap("username", arg[1]))
+		m.Log("info", m.Source, "create %s %s", m.Cap("group", arg[0]), m.Cap("username", arg[1]))
 		m.Cap("stream", m.Cap("username"))
 	}
+	m.Log("info", m.Source, "login %s %s", m.Cap("group"), m.Cap("username"))
 
 	return false
 }
 
 // }}}
 func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if aaa.Context == Index {
-		return false
-	}
-
 	switch aaa.Context {
 	case m.Target:
+		if aaa.Context == Index {
+			return false
+		}
+
+		if len(aaa.Context.Requests) == 0 {
+			m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
+		}
 	case m.Source:
 	}
 
-	m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
 	return true
 }
 
 // }}}
 
+var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	Caches: map[string]*ctx.Cache{
 		"nuser": &ctx.Cache{Name: "用户数量", Value: "0", Help: "用户数量"},
@@ -131,6 +135,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
 					m.Log("info", m.Source, "logon %s", m.Cap("group"), m.Cap("username"))
+					if m.Name != "" {
+						c.Requests = append(c.Requests, m)
+						m.Index = len(m.Target.Requests)
+					}
 					return m.Cap("username")
 				}
 			case 2, 3:
@@ -139,12 +147,17 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					username, password = arg[1], arg[2]
 				}
 
-				if username == m.Conf("rootname") {
+				if username == Pulse.Conf("rootname") {
 					m.Set("detail", group, username).Target.Start(m)
 				} else if msg := m.Find(username); msg == nil {
 					m.Start(username, "认证用户", group, username)
 				} else {
 					m.Target = msg.Target
+					msg.Target.Start(msg)
+					if m.Name != "" {
+						m.Target.Requests = append(m.Target.Requests, m)
+						m.Index = len(m.Target.Requests)
+					}
 				}
 
 				m.Cap("password", password)
@@ -162,7 +175,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		},
 	},
 }
-var Pulse *ctx.Message
 
 func init() {
 	aaa := &AAA{}
