@@ -59,19 +59,18 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if mdb.Context == Index {
-		return false
-	}
-
 	switch mdb.Context {
 	case m.Target:
-	case m.Source:
-	}
+		if mdb.Context == Index {
+			return false
+		}
 
-	if mdb.DB != nil {
-		m.Log("info", nil, "%d close %s %s", m.Capi("nsource", -1)+1, m.Cap("driver"), m.Cap("source"))
-		mdb.DB.Close()
-		mdb.DB = nil
+		if mdb.DB != nil {
+			m.Log("info", nil, "%d close %s %s", m.Capi("nsource", -1)+1, m.Cap("driver"), m.Cap("source"))
+			mdb.DB.Close()
+			mdb.DB = nil
+		}
+	case m.Source:
 	}
 
 	return true

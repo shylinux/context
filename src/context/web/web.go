@@ -194,7 +194,12 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (web *WEB) Close(m *ctx.Message, arg ...string) bool { // {{{
-	return false
+	switch web.Context {
+	case m.Target:
+	case m.Source:
+	}
+
+	return true
 }
 
 // }}}
