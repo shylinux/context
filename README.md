@@ -26,9 +26,7 @@ context: 通过提供自由的模块，简洁的接口，动态的结构，让�
 * detail[] option[] result[] append[]
 
 * Context Master Owner
-* Search() Action() Assert() Figure()
-
-
+* Search() Choice() Assert() Figure()
 
 ## 结构设计
 * 功能树
@@ -36,11 +34,9 @@ context: 通过提供自由的模块，简洁的接口，动态的结构，让�
 * 消息树
 
 ## 分支管理
-* 0.1 ctx cli
-* 0.2 mdb tcp
-* 0.3 aaa ssh
-* 0.4 web nfs
-* 0.5 lex yac
+* 0.1 ctx cli aaa ssh
+* 0.2 nfs tcp mdb web
+* 0.3 lex yac log gdb
 
 ## 终端管理
 * 寻址 指令 事件 函数 资源
