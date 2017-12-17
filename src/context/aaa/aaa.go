@@ -89,12 +89,12 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if aaa.Context == Index {
-		return false
-	}
-
 	switch aaa.Context {
 	case m.Target:
+		if aaa.Context == Index {
+			return false
+		}
+
 		if len(aaa.Context.Requests) == 0 {
 			m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
 		}

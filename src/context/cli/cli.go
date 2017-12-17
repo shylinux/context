@@ -355,12 +355,12 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
-	if cli.Context == Index {
-		return false
-	}
-
 	switch cli.Context {
 	case m.Target:
+		if cli.Context == Index {
+			return false
+		}
+
 		if len(cli.Context.Requests) == 0 {
 			m.Log("info", nil, "%s close %v", Pulse.Cap("nterm"), arg)
 		}

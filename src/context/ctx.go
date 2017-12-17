@@ -55,17 +55,17 @@ type Context struct {
 	Configs  map[string]*Config
 	Commands map[string]*Command
 
-	contexts map[string]*Context
-	context  *Context
 	root     *Context
+	context  *Context
+	contexts map[string]*Context
 
-	Sessions map[string]*Message
-	Historys []*Message
-	Requests []*Message
-
-	messages chan *Message
-	message  *Message
 	Master   *Context
+	messages chan *Message
+
+	Pulse    *Message
+	Requests []*Message
+	Historys []*Message
+	Sessions map[string]*Message
 
 	Index  map[string]*Context
 	Groups map[string]*Context
@@ -86,24 +86,20 @@ func (c *Context) Register(s *Context, x Server) *Context { // {{{
 	c.contexts[s.Name] = s
 	s.context = c
 	s.Server = x
-
-	if c.root != nil {
-		s.root = c.root
-	}
 	return s
 }
 
 // }}}
 func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
-	s := &Context{Name: name, Help: help, context: c}
+	s := &Context{Name: name, Help: help, root: c.root, context: c}
 
-	if c.Server != nil {
+	if m.Target = s; c.Server != nil {
 		c.Register(s, c.Server.Spawn(m, s, m.Meta["detail"]...))
 	} else {
 		c.Register(s, nil)
 	}
 
-	if m.Target = s; m.Template != nil {
+	if m.Template != nil {
 		m.Template.Source = s
 	}
 
@@ -115,20 +111,21 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
 	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
 
+	m.Index = 1
+	c.Pulse = m
+	c.Requests = []*Message{m}
+	c.Historys = []*Message{m}
+
 	c.Master = m.Master.Master
 	c.Owner = m.Master.Owner
 	c.Group = m.Master.Group
 
-	m.Log("begin", nil, "%d %v", m.Capi("ncontext", 1), m.Meta["detail"])
+	m.Log("begin", nil, "%d context %v", m.Capi("ncontext", 1), m.Meta["detail"])
 	for k, x := range c.Configs {
 		if x.Hand != nil {
 			m.Conf(k, x.Value)
 		}
 	}
-
-	m.Index = 1
-	c.Historys = []*Message{m}
-	c.Requests = []*Message{m}
 
 	if c.Server != nil {
 		c.Server.Begin(m, m.Meta["detail"]...)
@@ -139,42 +136,35 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
-	if m.Cap("status") != "start" && c.Server != nil {
+	if c.Requests = append(c.Requests, m); m.Cap("status") != "start" {
 		running := make(chan bool)
 		go m.AssertOne(m, true, func(m *Message) {
-			m.Log(m.Cap("status", "start"), c, "%d %v", m.Capi("nserver", 1), m.Meta["detail"])
+			m.Log(m.Cap("status", "start"), nil, "%d server %v", m.Capi("nserver", 1), m.Meta["detail"])
 
-			if m != c.Requests[0] {
-				c.Requests = append(c.Requests, m)
-			}
-
-			if running <- true; c.Server.Start(m, m.Meta["detail"]...) {
+			if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
 				c.Close(m, m.Meta["detail"]...)
 			}
 		})
 		<-running
 	}
-
 	return true
 }
 
 // }}}
 func (c *Context) Close(m *Message, arg ...string) bool { // {{{
-	m.Log("close", c, "close %v", arg)
+	m.Log("close", c, "%v", arg)
 
 	if m.Target == c {
-		switch {
-		case m.Index == 0:
+		if m.Index == 0 {
 			for i := len(c.Requests) - 1; i >= 0; i-- {
 				v := c.Requests[i]
-				v.Index = -1
-				if v.Source != c && !v.Source.Close(v, arg...) {
+				if v.Index = -1; v.Source != c && !v.Source.Close(v, arg...) {
 					v.Index = i
 					return false
 				}
 				c.Requests = c.Requests[:i]
 			}
-		case m.Index > 0:
+		} else if m.Index > 0 {
 			for i := m.Index - 1; i < len(c.Requests)-1; i++ {
 				c.Requests[i] = c.Requests[i+1]
 			}
@@ -193,22 +183,23 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 		return true
 	}
 
-	if len(c.Requests) > 0 {
+	if len(c.Requests) > 1 {
 		return false
 	}
 
-	m.Log(m.Cap("status", "close"), c, "%d server %v", m.root.Capi("nserver", -1)+1, arg)
-	if c.context != nil && len(c.contexts) == 0 {
-		m.Log("close", c, "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
-		delete(c.context.contexts, c.Name)
-	}
-
-	for _, v := range c.Sessions {
-		if v.Target != c {
-			v.Target.Close(v, arg...)
+	if m.Cap("status") == "start" {
+		m.Log(m.Cap("status", "close"), nil, "%d server %v", m.root.Capi("nserver", -1)+1, arg)
+		for _, v := range c.Sessions {
+			if v.Target != c {
+				v.Target.Close(v, arg...)
+			}
 		}
 	}
 
+	if m.Index == 0 && c.context != nil && len(c.contexts) == 0 {
+		m.Log("close", nil, "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
+		delete(c.context.contexts, c.Name)
+	}
 	return true
 }
 
@@ -392,6 +383,7 @@ type Message struct {
 	code int
 	time time.Time
 
+	Recv chan bool
 	Wait chan bool
 	Meta map[string][]string
 	Data map[string]interface{}
@@ -538,7 +530,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 		e = errors.New("error")
 	}
 
-	m.Set("result", "error: ", fmt.Sprintln(e))
+	m.Set("result", "error: ", fmt.Sprintln(e), "\n")
 	panic(e)
 }
 
@@ -832,7 +824,7 @@ func (m *Message) End(s bool) { // {{{
 
 func (m *Message) Exec(key string, arg ...string) string { // {{{
 
-	for _, c := range []*Context{m.Target, m.Target.Master, m.Source, m.Source.Master} {
+	for _, c := range []*Context{m.Target, m.Target.Master, m.Target.Owner, m.Source, m.Source.Master, m.Source.Owner} {
 		for s := c; s != nil; s = s.context {
 
 			m.Master = m.Source
