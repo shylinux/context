@@ -290,7 +290,15 @@ func (lex *LEX) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (lex *LEX) Close(m *ctx.Message, arg ...string) bool { // {{{
-	return false
+	switch lex.Context {
+	case m.Target:
+		if lex.Context == Index {
+			return false
+		}
+	case m.Source:
+	}
+
+	return true
 }
 
 // }}}
