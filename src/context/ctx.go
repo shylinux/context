@@ -37,7 +37,7 @@ type Command struct {
 	Formats map[string]int
 	Options map[string]string
 	Appends map[string]string
-	Hand    func(m *Message, c *Context, key string, arg ...string) string
+	Hand    func(m *Message, c *Context, key string, arg ...string)
 }
 
 type Server interface {
@@ -120,7 +120,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 	c.Owner = m.Master.Owner
 	c.Group = m.Master.Group
 
-	m.Log("begin", nil, "%d context %v", m.Capi("ncontext", 1), m.Meta["detail"])
+	m.Log("begin", nil, "%d context %v", m.root.Capi("ncontext", 1), m.Meta["detail"])
 	for k, x := range c.Configs {
 		if x.Hand != nil {
 			m.Conf(k, x.Value)
@@ -139,7 +139,7 @@ func (c *Context) Start(m *Message) bool { // {{{
 	if c.Requests = append(c.Requests, m); m.Cap("status") != "start" {
 		running := make(chan bool)
 		go m.AssertOne(m, true, func(m *Message) {
-			m.Log(m.Cap("status", "start"), nil, "%d server %v", m.Capi("nserver", 1), m.Meta["detail"])
+			m.Log(m.Cap("status", "start"), nil, "%d server %v", m.root.Capi("nserver", 1), m.Meta["detail"])
 
 			if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
 				c.Close(m, m.Meta["detail"]...)
@@ -828,7 +828,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 		for s := c; s != nil; s = s.context {
 
 			m.Master = m.Source
-			if x, ok := s.Commands[key]; ok && m.Check(s, "commands", key) && x.Hand != nil {
+			if x, ok := s.Commands[key]; ok && x.Hand != nil && m.Check(c, "commands", key) {
 				m.AssertOne(m, true, func(m *Message) {
 					m.Log("cmd", s, "%s %v", key, arg)
 
@@ -863,11 +863,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 						arg = m.Meta["args"]
 					}
 
-					m.Set("result")
-					m.Set("append")
-					if ret := x.Hand(m, s, key, arg...); ret != "" {
-						m.Echo(ret)
-					}
+					x.Hand(m.Set("result").Set("append"), s, key, arg...)
 
 					if x.Appends != nil {
 						for _, v := range m.Meta["append"] {
@@ -1007,7 +1003,7 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 		return m.Conf(key, arg[1])
 	}
 
-	m.Assert(true, "配置项操作错误")
+	m.Assert(false, key+"配置项操作错误")
 	return ""
 }
 
@@ -1066,7 +1062,7 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 		return m.Cap(key, arg[1])
 	}
 
-	m.Assert(true, "缓存项操作错误")
+	m.Assert(false, key+"缓存项操作错误")
 	return ""
 
 }
@@ -1131,7 +1127,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 	Commands: map[string]*Command{
 		"userinfo": &Command{Name: "userinfo [add|del [context key name help]|[command|config|cache group name]]", Help: "查看模块的用户信息",
 			Formats: map[string]int{"add": -1, "del": -1},
-			Hand: func(m *Message, c *Context, key string, arg ...string) string {
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				switch { // {{{
 				case m.Has("add"):
 					m.Target.Add(m.Source.Group, m.Meta["add"]...)
@@ -1164,10 +1160,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 					}
 				}
-				return ""
 				// }}}
 			}},
-		"server": &Command{Name: "server [start|exit|switch][args]", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) string {
+		"server": &Command{Name: "server [start|exit|switch][args]", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			switch len(arg) { // {{{
 			case 0:
 				m.Travel(m.Target.root, func(m *Message) bool {
@@ -1187,10 +1182,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				case "switch":
 				}
 			}
-			return ""
 			// }}}
 		}},
-		"message": &Command{Name: "message code", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) string {
+		"message": &Command{Name: "message code", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			switch len(arg) { // {{{
 			case 0:
 				m.Echo("\033[31mrequests:\033[0m\n")
@@ -1254,12 +1248,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 			}
 
-			return ""
 			// }}}
 		}},
 		"context": &Command{Name: "context [root] [[find|search] name] [list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
 			Formats: map[string]int{"root": 0, "back": 0, "home": 0, "find": 1, "search": 1, "list": 0, "show": 0, "close": 0, "switch": 0, "start": 0, "spawn": 0},
-			Hand: func(m *Message, c *Context, key string, arg ...string) string {
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				root := true || m.Has("root") // {{{
 
 				ms := []*Message{}
@@ -1348,12 +1341,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						v.Set("detail", arg...).Cmd()
 					}
 				}
-				return ""
 				// }}}
 			}},
 		"command": &Command{Name: "command [all] [key [name help]]", Help: "查看或修改命令",
 			Formats: map[string]int{"all": 0, "delete": 0, "void": 0},
-			Hand: func(m *Message, c *Context, key string, arg ...string) string {
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
 
 				switch len(arg) {
@@ -1428,12 +1420,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 					}
 				}
-				return ""
 				// }}}
 			}},
 		"config": &Command{Name: "config [all] [[delete|void] key [value]|[name value help]]", Help: "删除、置空、查看、修改或添加配置",
 			Formats: map[string]int{"all": 0, "delete": 0, "void": 0},
-			Hand: func(m *Message, c *Context, key string, arg ...string) string {
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
 
 				switch len(arg) {
@@ -1484,12 +1475,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				case 4:
 					m.Conf(arg[0], arg[1:]...)
 				}
-				return ""
 				// }}}
 			}},
 		"cache": &Command{Name: "cache [all] [[delete|void] key [value]|[name value help]]", Help: "删除、置空、查看、修改或添加缓存",
 			Formats: map[string]int{"all": 0, "delete": 0, "void": 0},
-			Hand: func(m *Message, c *Context, key string, arg ...string) string {
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
 
 				switch len(arg) {
@@ -1540,7 +1530,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				case 4:
 					m.Cap(arg[0], arg[1:]...)
 				}
-				return ""
 				// }}}
 			}},
 	},
