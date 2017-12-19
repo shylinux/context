@@ -386,7 +386,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"source": &ctx.Command{Name: "source file", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+		"source": &ctx.Command{Name: "source file", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 1:
@@ -395,16 +395,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				cli.push(f)
 			}
 
-			return ""
 			// }}}
 		}},
-		"return": &ctx.Command{Name: "return", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+		"return": &ctx.Command{Name: "return", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli := c.Server.(*CLI) // {{{
 			cli.bio.Discard(cli.bio.Buffered())
-			return ""
 			// }}}
 		}},
-		"alias": &ctx.Command{Name: "alias [short [long]]", Help: "查看日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+		"alias": &ctx.Command{Name: "alias [short [long]]", Help: "查看日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 0:
@@ -423,12 +421,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				cli.alias[arg[0]] = strings.Join(arg[1:], " ")
 				m.Echo("%s: %s\n", arg[0], cli.alias[arg[0]])
 			}
-			return ""
 			// }}}
 		}},
 		"remote": &ctx.Command{Name: "remote [send args...]|[[master|slaver] listen|dial address protocol]", Help: "建立远程连接",
 			Formats: map[string]int{"send": -1, "master": 0, "slaver": 0, "listen": 1, "dial": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if m.Has("send") { // {{{
 					cli := m.Target.Server.(*CLI)
 
@@ -441,7 +438,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					cli.bufs = cli.bufs[0:0]
 					m.Echo("\n~~~remote~~~\n")
 
-					return ""
+					return
 				}
 
 				action := "dial"
@@ -456,19 +453,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				msg.Cmd(action, m.Get(action))
 
-				return ""
 			}},
 		// }}}
 		"open": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
 			Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				m.Start(fmt.Sprintf("PTS%d", m.Capi("nterm")), "管理终端", "void.sh") // {{{
-				return ""
 				// }}}
 			}},
 		"master": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
 			Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				cli, ok := c.Server.(*CLI) // {{{
 				m.Assert(ok, "模块类型错误")
 				m.Assert(m.Target != c, "模块是主控模块")
@@ -476,15 +471,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				msg := m.Spawn(c)
 				msg.Start(fmt.Sprintf("PTS%d", cli.Capi("nterm")), arg[0], arg[1:]...)
 				m.Target.Master = msg.Target
-				return ""
 				// }}}
 			}},
 	},
 	Index: map[string]*ctx.Context{
 		"void": &ctx.Context{Name: "void",
 			Commands: map[string]*ctx.Command{
-				"context": &ctx.Command{},
-				"open":    &ctx.Command{},
+				"open": &ctx.Command{},
 			},
 		},
 	},
