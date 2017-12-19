@@ -1,6 +1,6 @@
-package aaa // {{{
-// }}}
-import ( // {{{
+package aaa
+
+import (
 	"context"
 
 	"crypto/md5"
@@ -12,22 +12,18 @@ import ( // {{{
 	"time"
 )
 
-// }}}
-
 type AAA struct {
 	sessions map[string]*ctx.Context
 	*ctx.Context
 }
 
-func (aaa *AAA) session(meta string) string { // {{{
+func (aaa *AAA) session(meta string) string {
 	bs := md5.Sum([]byte(fmt.Sprintln("%d%d%s", time.Now().Unix(), rand.Int(), meta)))
 	sessid := hex.EncodeToString(bs[:])
 	return sessid
 }
 
-// }}}
-
-func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
+func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -36,32 +32,29 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-// }}}
-func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	aaa.Caches["group"] = &ctx.Cache{Name: "用户组", Value: "", Help: "用户组"}
 	aaa.Caches["username"] = &ctx.Cache{Name: "用户名", Value: "", Help: "用户名"}
 	aaa.Caches["password"] = &ctx.Cache{Name: "用户密码", Value: "", Help: "用户密码，加密存储", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-		if len(arg) > 0 { // {{{
+		if len(arg) > 0 {
 			bs := md5.Sum([]byte(fmt.Sprintln("用户密码:%s", arg[0])))
 			m.Assert(x.Value == "" || x.Value == hex.EncodeToString(bs[:]), "密码错误")
 			m.Cap("expire", fmt.Sprintf("%d", time.Now().Unix()+int64(Pulse.Confi("expire"))))
 			return hex.EncodeToString(bs[:])
 		}
 		return x.Value
-		// }}}
 	}}
 
 	aaa.Caches["sessid"] = &ctx.Cache{Name: "会话标识", Value: "", Help: "用户的会话标识"}
 	aaa.Caches["expire"] = &ctx.Cache{Name: "会话超时", Value: "", Help: "用户的会话标识"}
 	aaa.Caches["time"] = &ctx.Cache{Name: "登录时间", Value: fmt.Sprintf("%d", time.Now().Unix()), Help: "用户登录时间", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-		if len(arg) > 0 { // {{{
+		if len(arg) > 0 {
 			return arg[0]
 		}
 
 		n, e := strconv.Atoi(x.Value)
 		m.Assert(e)
 		return time.Unix(int64(n), 0).Format("15:03:04")
-		// }}}
 	}}
 
 	if m.Target == Index {
@@ -72,8 +65,7 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	return aaa
 }
 
-// }}}
-func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
+func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool {
 	if len(arg) > 1 {
 		if m.Cap("sessid") == "" {
 			m.Cap("sessid", aaa.session(arg[1]))
@@ -87,24 +79,15 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 	return false
 }
 
-// }}}
-func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
+func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool {
 	switch aaa.Context {
 	case m.Target:
-		if aaa.Context == Index {
-			return false
-		}
-
-		if len(aaa.Context.Requests) == 0 {
-			m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
-		}
+		m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
 	case m.Source:
 	}
 
 	return true
 }
-
-// }}}
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
@@ -116,8 +99,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"expire":   &ctx.Config{Name: "会话超时(s)", Value: "120", Help: "会话超时"},
 	},
 	Commands: map[string]*ctx.Command{
-		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-			m.Target, m.Master = c, c // {{{
+		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Target, m.Master = c, c
 			aaa := c.Server.(*AAA)
 
 			switch len(arg) {
@@ -130,7 +113,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				if s, ok := aaa.sessions[arg[0]]; ok {
 					if m.Target = s; int64(m.Capi("expire")) < time.Now().Unix() {
 						s.Close(m)
-						return ""
+						return
 					}
 
 					m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
@@ -139,7 +122,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						c.Requests = append(c.Requests, m)
 						m.Index = len(m.Target.Requests)
 					}
-					return m.Cap("username")
+					m.Echo(m.Cap("username"))
 				}
 			case 2, 3:
 				group, username, password := arg[0], arg[0], arg[1]
@@ -163,10 +146,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				m.Cap("password", password)
 				m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
 				aaa.sessions[m.Cap("sessid")] = m.Target
-				return m.Cap("sessid")
+				m.Echo(m.Cap("sessid"))
 			}
-			return ""
-			// }}}
 		}},
 	},
 	Index: map[string]*ctx.Context{

@@ -1,19 +1,26 @@
 ~cli
 	@lex lex
-
+# ~cli
+# 	remote slaver listen ":9393" tcp
 ~aaa
 	login root root
-
+# ~ssh
+# 	listen :9191
 ~tcp
 	listen :9393
+~web
+	listen
 
 # ~tcp dial ":9393"
-# ~cli remote slaver listen ":9393" tcp
 # @debug on
-
-# ~mdb open chat chat "chat:chat@/chat" mysql
+# ~aaa
+# 	login shy shy
+# ~mdb
+# 	open chat:chat@/chat mysql
 # ~web listen
-# ~ssh listen :9898
+# @debug on
+# ~nfs
+# 	open hi.txt
 return
 
 
