@@ -1,11 +1,9 @@
-package lex // {{{
-// }}}
-import ( // {{{
+package lex
+
+import (
 	"context"
 	"fmt"
 )
-
-// }}}
 
 type State struct {
 	star bool
@@ -31,8 +29,8 @@ type LEX struct {
 	*ctx.Context
 }
 
-func (lex *LEX) train(seed []byte, arg ...string) { // {{{
-	cell, page, hash := 128, 1, 1 // {{{
+func (lex *LEX) train(seed []byte, arg ...string) {
+	cell, page, hash := 128, 1, 1
 	if len(arg) > 0 {
 		if x, ok := lex.hash[arg[0]]; ok {
 			hash = x
@@ -55,7 +53,6 @@ func (lex *LEX) train(seed []byte, arg ...string) { // {{{
 	lex.seed = append(lex.seed, &Seed{page, hash, string(seed)})
 	lex.Capi("nseed", 1)
 	lex.Cap("stream", fmt.Sprintf("%s,%s,%s", lex.Cap("nseed"), lex.Cap("npage"), lex.Cap("nhash")))
-	// }}}
 
 	s := []int{page}
 	c := make([]byte, 0, cell)
@@ -189,9 +186,8 @@ func (lex *LEX) train(seed []byte, arg ...string) { // {{{
 	}
 }
 
-// }}}
-func (lex *LEX) parse(line []byte, arg ...string) (word []byte, hash int, rest []byte) { // {{{
-	page, begin, end := 1, 0, 0 // {{{
+func (lex *LEX) parse(line []byte, arg ...string) (word []byte, hash int, rest []byte) {
+	page, begin, end := 1, 0, 0
 	if len(arg) > 0 {
 		if x, ok := lex.page[arg[0]]; ok {
 			page = x
@@ -199,7 +195,6 @@ func (lex *LEX) parse(line []byte, arg ...string) (word []byte, hash int, rest [
 			return line, 0, nil
 		}
 	}
-	// }}}
 
 	for star, s, i := 0, page, 0; s != 0 && i < len(line); i++ {
 
@@ -224,11 +219,9 @@ func (lex *LEX) parse(line []byte, arg ...string) (word []byte, hash int, rest [
 		if state, ok := lex.mat[star][c]; star == 0 || !ok || state == nil || !state.star {
 			star = 0
 		}
-
 		if end++; state.star {
 			star = s
 		}
-
 		if s, hash = state.next, state.hash; s == 0 {
 			s, star = star, 0
 		}
@@ -243,9 +236,7 @@ func (lex *LEX) parse(line []byte, arg ...string) (word []byte, hash int, rest [
 	return
 }
 
-// }}}
-
-func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
+func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -254,8 +245,7 @@ func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-// }}}
-func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	lex.Message = m
 	lex.Caches["nseed"] = &ctx.Cache{Name: "种子数量", Value: "0", Help: "种子数量"}
 	lex.Caches["npage"] = &ctx.Cache{Name: "集合数量", Value: "1", Help: "集合数量"}
@@ -264,16 +254,13 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "1", Help: "状态数量"}
 	lex.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "节点数量"}
 	lex.Caches["npush"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "节点数量", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-		lex := m.Target.Server.(*LEX) // {{{
-		return fmt.Sprintf("%d", len(lex.state))
-		// }}}
+		return fmt.Sprintf("%d", len(m.Target.Server.(*LEX).state))
 	}}
 
 	return lex
 }
 
-// }}}
-func (lex *LEX) Start(m *ctx.Message, arg ...string) bool { // {{{
+func (lex *LEX) Start(m *ctx.Message, arg ...string) bool {
 	lex.seed = make([]*Seed, 0, 10)
 	lex.page = map[string]int{"nil": 0}
 	lex.hash = map[string]int{"nil": 0}
@@ -288,46 +275,35 @@ func (lex *LEX) Start(m *ctx.Message, arg ...string) bool { // {{{
 	return false
 }
 
-// }}}
-func (lex *LEX) Close(m *ctx.Message, arg ...string) bool { // {{{
+func (lex *LEX) Close(m *ctx.Message, arg ...string) bool {
 	switch lex.Context {
 	case m.Target:
-		if lex.Context == Index {
-			return false
-		}
 	case m.Source:
 	}
-
 	return true
 }
-
-// }}}
 
 var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-			lex, ok := m.Target.Server.(*LEX) // {{{
+		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			lex, ok := m.Target.Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) > 0, "参数错误")
 
 			lex.train([]byte(arg[0]), arg[1:]...)
-			return ""
-			// }}}
 		}},
-		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-			lex, ok := m.Target.Server.(*LEX) // {{{
+		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			lex, ok := m.Target.Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) > 0, "参数错误")
 
 			word, hash, rest := lex.parse([]byte(arg[0]), arg[1:]...)
 			m.Add("result", string(word), fmt.Sprintf("%d", hash), string(rest))
-			return ""
-			// }}}
 		}},
-		"split": &ctx.Command{Name: "split line page1 [page2]", Help: "分割语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-			lex, ok := m.Target.Server.(*LEX) // {{{
+		"split": &ctx.Command{Name: "split line page1 [page2]", Help: "分割语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			lex, ok := m.Target.Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) > 1, "参数错误")
 
@@ -342,11 +318,10 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 				}
 				m.Echo(string(word))
 			}
-			return ""
-			// }}}
+
 		}},
-		"cache": &ctx.Command{Name: "cache", Help: "显示缓存", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) string {
-			lex, ok := m.Target.Server.(*LEX) // {{{
+		"cache": &ctx.Command{Name: "cache", Help: "显示缓存", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			lex, ok := m.Target.Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			for i, v := range lex.seed {
 				m.Echo("seed: %d %v\n", i, v)
@@ -365,8 +340,6 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 					m.Echo("node: %v %v %v\n", i, k, v)
 				}
 			}
-			return ""
-			// }}}
 		}},
 	},
 	Index: map[string]*ctx.Context{
