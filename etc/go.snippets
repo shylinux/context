@@ -51,16 +51,11 @@ snippet c
 
 	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Close(m *ctx.Message, arg ...string) bool {
 		switch `Filename()`.Context {
-			case m.Target:
-				if `Filename()`.Context == Index {
-					return false
-				}
-			case m.Source:
-				return true
+		case m.Target:
+		case m.Source:
 		}
-		return false
+		return true
 	}
-
 
 	var Pulse *ctx.Message
 	var Index = &ctx.Context{Name: "`Filename()`", Help: "${1}",

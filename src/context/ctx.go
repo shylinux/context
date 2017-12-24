@@ -136,7 +136,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
-	if c.Requests = append(c.Requests, m); m.Cap("status") != "start" {
+	if c.Requests, m.Index = append(c.Requests, m), len(c.Requests)+1; m.Cap("status") != "start" {
 		running := make(chan bool)
 		go m.AssertOne(m, true, func(m *Message) {
 			m.Log(m.Cap("status", "start"), nil, "%d server %v", m.root.Capi("nserver", 1), m.Meta["detail"])
@@ -519,6 +519,8 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 		if len(msg) > 2 {
 			msg = msg[2:]
 		}
+	case *Message:
+		panic(e)
 	default:
 		return true
 	}
@@ -538,6 +540,11 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
 	defer func() {
 		if e := recover(); e != nil {
+			switch e.(type) {
+			case *Message:
+				panic(e)
+			}
+
 			msg.Log("error", nil, "error: %v", e)
 			if msg.root.Conf("debug") == "on" && e != io.EOF {
 				fmt.Printf("\n\033[31m%s error: %v\033[0m\n", msg.Target.Name, e)
@@ -682,9 +689,9 @@ func (m *Message) Search(key string, root ...bool) []*Message { // {{{
 
 // }}}
 func (m *Message) Find(name string, root ...bool) *Message { // {{{
-	target := m.Target
-	if len(root) > 0 && root[0] {
-		target = m.Target.root
+	target := m.Target.root
+	if len(root) > 0 && !root[0] {
+		target = m.Target
 	}
 
 	cs := target.contexts
@@ -746,9 +753,7 @@ func (m *Message) Set(meta string, arg ...string) *Message { // {{{
 		m.Meta[meta] = arg
 	case "option", "append":
 		if len(arg) > 0 {
-			if _, ok := m.Meta[arg[0]]; !ok {
-				m.Meta[meta] = append(m.Meta[meta], arg[0])
-			}
+			m.Meta[meta] = []string{arg[0]}
 			m.Meta[arg[0]] = arg[1:]
 		} else {
 			for _, k := range m.Meta[meta] {
@@ -809,6 +814,13 @@ func (m *Message) Get(key string) string { // {{{
 }
 
 // }}}
+func (m *Message) Geti(key string) int { // {{{
+	n, e := strconv.Atoi(m.Get(key))
+	m.Assert(e)
+	return n
+}
+
+// }}}
 func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 	return m.Add("result", fmt.Sprintf(str, arg...))
 }
@@ -830,7 +842,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 			m.Master = m.Source
 			if x, ok := s.Commands[key]; ok && x.Hand != nil && m.Check(c, "commands", key) {
 				m.AssertOne(m, true, func(m *Message) {
-					m.Log("cmd", s, "%s %v", key, arg)
+					m.Log("cmd", s, "%s %v %v", key, arg, m.Meta["option"])
 
 					if x.Options != nil {
 						for _, v := range m.Meta["option"] {
@@ -1250,10 +1262,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 			// }}}
 		}},
-		"context": &Command{Name: "context [root] [[find|search] name] [list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Formats: map[string]int{"root": 0, "back": 0, "home": 0, "find": 1, "search": 1, "list": 0, "show": 0, "close": 0, "switch": 0, "start": 0, "spawn": 0},
+		"context": &Command{Name: "context [home] [[find|search] name] [info|list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
+			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "list": 0, "show": 0, "close": 0, "switch": 0, "start": 0, "spawn": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				root := true || m.Has("root") // {{{
+				root := !m.Has("home") // {{{
 
 				ms := []*Message{}
 				switch {
@@ -1277,14 +1289,17 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				for _, v := range ms {
-					m.Target = v.Target
-
+					v.Meta = m.Meta
+					v.Data = m.Data
 					switch {
 					case m.Has("switch"):
+						m.Target = v.Target
 					case m.Has("spawn"):
 						v.Set("detail", arg[2:]...).Target.Spawn(v, arg[0], arg[1]).Begin(v)
+						m.Target = v.Target
 					case m.Has("start"):
 						v.Set("detail", arg...).Target.Start(v)
+						m.Target = v.Target
 					case m.Has("close"):
 						v.Target.Close(v)
 					case m.Has("show"):
@@ -1303,6 +1318,15 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							for k, v := range v.Target.Sessions {
 								m.Echo("  %s: -> %s %v\n", k, v.Target.Name, v.Meta["detail"])
 							}
+						}
+					case m.Has("info"):
+						switch m.Get("info") {
+						case "name":
+							m.Echo("%s", v.Target.Name)
+						case "owner":
+							m.Echo("%s", v.Target.Owner.Name)
+						default:
+							m.Echo("%s(%s): %s\n", v.Target.Name, v.Target.Owner.Name, v.Target.Help)
 						}
 					case m.Has("list") || len(m.Meta["detail"]) == 1:
 						m.Travel(v.Target, func(msg *Message) bool {
@@ -1338,7 +1362,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							return true
 						})
 					case len(arg) > 0 && v != m:
-						v.Set("detail", arg...).Cmd()
+						v.Cmd(arg...)
+						// m.Meta = v.Meta
+						// m.Target = target
+					default:
+						m.Target = v.Target
 					}
 				}
 				// }}}
@@ -1456,18 +1484,21 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 
 					m.BackTrace(func(m *Message) bool {
-						if all {
-							m.Echo("%s config:\n", m.Target.Name)
-						}
+						// if all {
+						// 	m.Echo("%s config:\n", m.Target.Name)
+						// }
 						if x, ok := m.Target.Configs[arg[0]]; ok {
 							if m.Check(m.Target, "configs", arg[0]) {
-								if all {
-									m.Echo("  ")
-								}
-								m.Echo("%s: %s\n", x.Name, x.Help)
+								// if all {
+								// 	m.Echo("  ")
+								// }
+								// m.Echo("%s: %s\n", x.Name, x.Help)
+								m.Echo("%s", x.Value)
+								return false
 							}
 						}
-						return all
+						return true
+						// return all
 					})
 
 				case 2:
@@ -1512,18 +1543,21 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 
 					m.BackTrace(func(m *Message) bool {
-						if all {
-							m.Echo("%s config:\n", m.Target.Name)
-						}
+						// if all {
+						// 	m.Echo("%s config:\n", m.Target.Name)
+						// }
 						if x, ok := m.Target.Caches[arg[0]]; ok {
 							if m.Check(m.Target, "caches", arg[0]) {
-								if all {
-									m.Echo("  ")
-								}
-								m.Echo("%s: %s\n", x.Name, x.Help)
+								// if all {
+								// 	m.Echo("  ")
+								// }
+								// m.Echo("%s: %s\n", x.Name, x.Help)
+								m.Echo("%s", x.Value)
+								return false
 							}
 						}
-						return all
+						return true
+						// return all
 					})
 				case 2:
 					m.Cap(arg[0], arg[1])
