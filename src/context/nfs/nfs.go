@@ -4,9 +4,11 @@ import (
 	"context"
 
 	"fmt"
+	"github.com/skip2/go-qrcode"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type NFS struct {
@@ -73,6 +75,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	Commands: map[string]*ctx.Command{
 		"open": &ctx.Command{Name: "open file", Help: "打开文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", arg...)
+			m.Echo(m.Target.Name)
 		}},
 		"read": &ctx.Command{Name: "read [size [pos]]", Help: "读取文件, size: 读取大小, pos: 读取位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			nfs, ok := m.Target.Server.(*NFS)
@@ -117,11 +120,49 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 			m.Echo(m.Cap("pos"))
 		}},
+		"load": &ctx.Command{Name: "load file [size]", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			f, e := os.Open(arg[0])
+			if e != nil {
+				return
+			}
+			defer f.Close()
+
+			size := 1024
+			if len(arg) > 1 {
+				if s, e := strconv.Atoi(arg[1]); e == nil {
+					size = s
+				}
+			}
+
+			buf := make([]byte, size)
+			f.Read(buf)
+			m.Echo(string(buf))
+		}},
+		"save": &ctx.Command{Name: "save file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			f, e := os.Create(arg[0])
+			m.Assert(e)
+			defer f.Close()
+			fmt.Fprint(f, strings.Join(arg[1:], ""))
+		}},
+		"genqr": &ctx.Command{Name: "genqr [size] file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			size := 256
+			if len(arg) > 2 {
+				if s, e := strconv.Atoi(arg[0]); e == nil {
+					arg = arg[1:]
+					size = s
+				}
+			}
+			m.Log("fuck", nil, "%v %v", arg[0], arg[1:])
+			qrcode.WriteFile(strings.Join(arg[1:], ""), qrcode.Medium, size, arg[0])
+		}},
 	},
 	Index: map[string]*ctx.Context{
 		"void": &ctx.Context{Name: "void",
 			Commands: map[string]*ctx.Command{
-				"open": &ctx.Command{},
+				"open":  &ctx.Command{},
+				"save":  &ctx.Command{},
+				"load":  &ctx.Command{},
+				"genqr": &ctx.Command{},
 			},
 		},
 	},

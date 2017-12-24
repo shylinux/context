@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"bufio"
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -27,27 +28,43 @@ type WEB struct {
 	*ctx.Context
 }
 
+func (web *WEB) AppendJson(msg *ctx.Message) string {
+	result := []string{"{"}
+	for i, k := range msg.Meta["append"] {
+		result = append(result, fmt.Sprintf("\"%s\": [", k))
+		for j, v := range msg.Meta[k] {
+			result = append(result, fmt.Sprintf("\"%s\"", v))
+			if j < len(msg.Meta[k])-1 {
+				result = append(result, ",")
+			}
+		}
+		result = append(result, "]")
+		if i < len(msg.Meta["append"])-1 {
+			result = append(result, ", ")
+		}
+	}
+	result = append(result, "}")
+	return strings.Join(result, "")
+}
+
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn(m.Target).Set("detail", key)
 		for k, v := range r.Form {
-			msg.Add("option", k)
-			msg.Meta[k] = v
+			msg.Add("option", k, v...)
 		}
 		for _, v := range r.Cookies() {
 			msg.Add("option", v.Name, v.Value)
 		}
 
-		msg.Log("cmd", nil, "%s %v", key, msg.Meta["option"])
-		msg.Put("option", "request", r)
-		msg.Put("option", "response", w)
-		hand(msg, msg.Target, key)
-
-		header := w.Header()
-		for _, k := range msg.Meta["append"] {
-			header.Add("Set-Cookie", (&http.Cookie{Name: k, Value: msg.Get(k)}).String())
+		msg.Log("cmd", nil, "%s [] %v", key, msg.Meta["option"])
+		msg.Put("option", "request", r).Put("option", "response", w)
+		if hand(msg, msg.Target, key); len(msg.Meta["append"]) > 0 {
+			msg.Set("result", web.AppendJson(msg))
 		}
+
 		for _, v := range msg.Meta["result"] {
+			msg.Log("info", nil, "%s", v)
 			w.Write([]byte(v))
 		}
 	})
@@ -58,16 +75,16 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Println()
 		web.Log("cmd", nil, "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
-		if web.Cap("logheaders") == "yes" {
+		if web.Conf("logheaders") == "yes" {
 			for k, v := range r.Header {
-				log.Println(k+":", v[0])
+				log.Printf("%s: %v", k, v)
 			}
 			log.Println()
 		}
 
 		if r.ParseForm(); len(r.PostForm) > 0 {
 			for k, v := range r.PostForm {
-				log.Printf("%s: %s", k, v[0])
+				log.Printf("%s: %v", k, v)
 			}
 			log.Println()
 		}
@@ -75,9 +92,9 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	web.ServeMux.ServeHTTP(w, r)
 
-	if web.Message != nil && web.Cap("logheaders") == "yes" {
+	if web.Message != nil && web.Conf("logheaders") == "yes" {
 		for k, v := range w.Header() {
-			log.Println(k+":", v[0])
+			log.Printf("%s: %v", k, v)
 		}
 		log.Println()
 	}
@@ -93,10 +110,10 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: "usr", Help: "服务目录"}
-	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
-	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已注册"}
-	web.Caches["master"] = &ctx.Cache{Name: "master(yes/no)", Value: "no", Help: "日志输出请求头"}
+	web.Caches["route"] = &ctx.Cache{Name: "请求路径", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
+	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已初始化"}
+	web.Caches["master"] = &ctx.Cache{Name: "服务入口(yes/no)", Value: "no", Help: "服务入口"}
+	web.Caches["directory"] = &ctx.Cache{Name: "服务目录", Value: "usr", Help: "服务目录"}
 	if len(arg) > 0 {
 		m.Cap("directory", arg[0])
 	}
@@ -117,9 +134,6 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	if len(arg) > 0 {
 		m.Cap("directory", arg[0])
 	}
-
-	web.Message = m
-	m.Cap("master", "yes")
 
 	m.Travel(m.Target, func(m *ctx.Message) bool {
 		if h, ok := m.Target.Server.(http.Handler); ok && m.Cap("register") == "no" {
@@ -147,8 +161,8 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		return true
 	})
 
-	web.Caches["address"] = &ctx.Cache{Name: "address", Value: ":9191", Help: "监听地址"}
-	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: "http", Help: "服务协议"}
+	web.Caches["address"] = &ctx.Cache{Name: "服务地址", Value: ":9191", Help: "服务地址"}
+	web.Caches["protocol"] = &ctx.Cache{Name: "服务协议", Value: "http", Help: "服务协议"}
 	if len(arg) > 1 {
 		m.Cap("address", arg[1])
 	}
@@ -156,16 +170,20 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		m.Cap("protocol", arg[2])
 	}
 
+	m.Cap("master", "yes")
 	m.Cap("stream", m.Cap("address"))
 	m.Log("info", nil, "address [%s]", m.Cap("address"))
 	m.Log("info", nil, "protocol [%s]", m.Cap("protocol"))
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
 
-	web.Caches["logheaders"] = &ctx.Cache{Name: "日志输出报文头(yes/no)", Value: "yes", Help: "日志输出请求头"}
+	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "yes", Help: "日志输出报文头"}
 
-	if m.Cap("protocol") == "https" {
-		m.Log("info", nil, "key [%s]", m.Cap("key"))
+	if web.Message = m; m.Cap("protocol") == "https" {
+		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
+		web.Caches["key"] = &ctx.Cache{Name: "服务密钥", Value: m.Conf("key"), Help: "服务密钥"}
 		m.Log("info", nil, "cert [%s]", m.Cap("cert"))
+		m.Log("info", nil, "key [%s]", m.Cap("key"))
+
 		web.Server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
 	} else {
 		web.Server.ListenAndServe()
@@ -186,17 +204,17 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{Name: "listen [directory [address [protocol]]]", Help: "开启网页服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Set("detail", arg...).Target.Start(m)
 		}},
-		"route": &ctx.Command{Name: "route [directory|template|script] route string", Help: "添加响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"route": &ctx.Command{Name: "route directory|template|script route content", Help: "添加应用内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			mux, ok := m.Target.Server.(MUX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) == 3, "缺少参数")
 
 			switch arg[0] {
 			case "directory":
-				mux.Handle(arg[1], http.FileServer(http.Dir(arg[2])))
+				mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
 			case "template":
 				mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
 					w := m.Data["response"].(http.ResponseWriter)
@@ -209,8 +227,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				})
 			case "script":
-				cli := m.Find("cli", true)
-				lex := m.Find("lex", true)
+				cli := m.Find("cli")
+				lex := m.Find("lex")
 				mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
 					f, e := os.Open(arg[2])
 					line, bio := "", bufio.NewReader(f)
@@ -233,9 +251,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				})
 			}
 		}},
-		"/hi": &ctx.Command{Name: "/hi", Help: "添加响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Add("append", "hi", "hello")
-			m.Echo("hello\n")
 		}},
 	},
 }
