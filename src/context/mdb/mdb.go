@@ -80,9 +80,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			m.Assert(len(arg) > 0, "缺少参数")
 			m.Start(fmt.Sprintf("db%d", Pulse.Capi("nsource", 1)), "数据存储", arg...)
 			Pulse.Cap("stream", Pulse.Cap("nsource"))
+			m.Echo(m.Target.Name)
 		}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库",
-			Appends: map[string]string{"LastInsertId": "最后插入元组的标识", "RowsAffected": "修改元组的数量"},
+			Appends: map[string]string{"last": "最后插入元组的标识", "nrow": "修改元组的数量"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				mdb, ok := m.Target.Server.(*MDB)
 				m.Assert(ok, "目标模块类型错误")
@@ -102,9 +103,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Assert(e)
 
 				m.Echo("%d", id).Echo("%d", n)
-				m.Add("append", "LastInsertId", fmt.Sprintf("%d", id))
-				m.Add("append", "RowsAffected", fmt.Sprintf("%d", n))
-				m.Log("info", nil, "last(%d) rows(%d)", id, n)
+				m.Add("append", "last", fmt.Sprintf("%d", id))
+				m.Add("append", "nrow", fmt.Sprintf("%d", n))
+				m.Log("info", nil, "last(%d) nrow(%d)", id, n)
 			}},
 		"query": &ctx.Command{Name: "query sql [arg]", Help: "执行查询语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			mdb, ok := m.Target.Server.(*MDB)
@@ -145,7 +146,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 			}
 
-			m.Log("info", nil, "rows(%d) cols(%d)", len(m.Meta[m.Meta["append"][0]]), len(m.Meta["append"]))
+			if len(m.Meta["append"]) > 0 {
+				m.Log("info", nil, "rows(%d) cols(%d)", len(m.Meta[m.Meta["append"][0]]), len(m.Meta["append"]))
+			} else {
+				m.Log("info", nil, "rows(0) cols(0)")
+			}
 		}},
 	},
 	Index: map[string]*ctx.Context{
