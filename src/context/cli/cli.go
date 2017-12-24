@@ -8,6 +8,7 @@ import ( // {{{
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -128,10 +129,15 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 
 		if r := rune(ls[i][0]); r == '$' || r == '_' || (!unicode.IsNumber(r) && !unicode.IsLetter(r)) {
 			if c, ok := cli.alias[string(r)]; ok {
-				if msg.Add("detail", c); len(ls[i]) > 1 {
+				if i == 0 {
+					if msg.Add("detail", c); len(ls[i]) == 1 {
+						continue
+					}
 					ls[i] = ls[i][1:]
-				} else {
-					continue
+				} else if len(ls[i]) > 1 {
+					mm := m.Spawn(cli.target)
+					m.Assert(mm.Exec(c, ls[i][1:]))
+					ls[i] = mm.Get("result")
 				}
 			}
 		}
@@ -149,7 +155,10 @@ func (cli *CLI) parse(m *ctx.Message) bool { // {{{
 	msg.Wait = make(chan bool)
 	msg.Post(cli.Context)
 
-	cli.echo(strings.Join(msg.Meta["result"], ""))
+	result := strings.TrimRight(strings.Join(msg.Meta["result"], ""), "\n") + "\n"
+	if len(result) > 1 {
+		cli.echo(m.Cap("result", result))
+	}
 	cli.target = msg.Target
 	cli.back = line
 	return true
@@ -168,6 +177,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+	cli.Caches["result"] = &ctx.Cache{Name: "前一条指令执行结果", Value: "", Help: "前一条指令执行结果"}
 	cli.Configs["slient"] = &ctx.Config{Name: "屏蔽脚本输出(yes/no)", Value: "yes", Help: "屏蔽脚本输出的信息，yes:屏蔽，no:不屏蔽"}
 	cli.Configs["PS1"] = &ctx.Config{Name: "命令行提示符(target/detail)", Value: "target", Help: "命令行提示符，target:显示当前模块，detail:显示详细信息", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 { // {{{
@@ -326,22 +336,24 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 	m.Deal(nil, func(msg *ctx.Message, arg ...string) bool {
 		if msg.Get("result") == "error: " {
-			msg.Log("system", nil, "%v", msg.Meta["detail"])
+			if msg.Get("detail") != "login" {
+				msg.Log("system", nil, "%v", msg.Meta["detail"])
 
-			msg.Set("result")
-			msg.Set("append")
-			c := exec.Command(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)
+				msg.Set("result")
+				msg.Set("append")
+				c := exec.Command(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)
 
-			if len(cli.ins) == 1 && cli.Context == Index {
-				c.Stdin, c.Stdout, c.Stderr = cli.in, cli.out, cli.out
-				msg.Assert(c.Start())
-				msg.Assert(c.Wait())
-			} else {
-				if out, e := c.CombinedOutput(); e == nil {
-					msg.Echo(string(out))
+				if len(cli.ins) == 1 && cli.Context == Index {
+					c.Stdin, c.Stdout, c.Stderr = cli.in, cli.out, cli.out
+					msg.Assert(c.Start())
+					msg.Assert(c.Wait())
 				} else {
-					msg.Echo("error: ")
-					msg.Echo("%s\n", e)
+					if out, e := c.CombinedOutput(); e == nil {
+						msg.Echo(string(out))
+					} else {
+						msg.Echo("error: ")
+						msg.Echo("%s\n", e)
+					}
 				}
 			}
 		}
@@ -396,6 +408,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			// }}}
+		}},
+		"sleep": &ctx.Command{Name: "sleep time", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			t, e := strconv.Atoi(arg[0])
+			m.Assert(e)
+			m.Log("info", nil, "sleep %ds", t)
+			time.Sleep(time.Second * time.Duration(t))
 		}},
 		"return": &ctx.Command{Name: "return", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli := c.Server.(*CLI) // {{{

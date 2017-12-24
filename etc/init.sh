@@ -1,15 +1,24 @@
 ~cli
 	@lex lex
+~aaa login root root
+~web serve
+~ssh dial chat.shylinux.com:9090 true
+sleep 1
+~host1
+	ifneq load load end
+	remote context mpa register terminal shhylinux term term term 1
+	$sessid $result
+	remote cache sessid $sessid
+	~nfs save usr/sess.txt "terminal: " $sessid
+	~nfs genqr usr/sess.png "terminal: " $sessid
+	end
+return
 # ~cli
 # 	remote slaver listen ":9393" tcp
-~aaa
-	login root root
 # ~ssh
 # 	listen :9191
 ~tcp
 	listen :9393
-~web
-	listen
 
 # ~tcp dial ":9393"
 # @debug on
@@ -21,7 +30,6 @@
 # @debug on
 # ~nfs
 # 	open hi.txt
-return
 
 
 @debug

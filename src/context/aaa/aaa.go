@@ -17,7 +17,7 @@ type AAA struct {
 	*ctx.Context
 }
 
-func (aaa *AAA) session(meta string) string {
+func (aaa *AAA) Session(meta string) string {
 	bs := md5.Sum([]byte(fmt.Sprintln("%d%d%s", time.Now().Unix(), rand.Int(), meta)))
 	sessid := hex.EncodeToString(bs[:])
 	return sessid
@@ -45,7 +45,7 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server {
 		return x.Value
 	}}
 
-	aaa.Caches["sessid"] = &ctx.Cache{Name: "会话标识", Value: "", Help: "用户的会话标识"}
+	aaa.Caches["sessid"] = &ctx.Cache{Name: "会话令牌", Value: "", Help: "用户的会话标识"}
 	aaa.Caches["expire"] = &ctx.Cache{Name: "会话超时", Value: "", Help: "用户的会话标识"}
 	aaa.Caches["time"] = &ctx.Cache{Name: "登录时间", Value: fmt.Sprintf("%d", time.Now().Unix()), Help: "用户登录时间", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
 		if len(arg) > 0 {
@@ -60,28 +60,29 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	if m.Target == Index {
 		Pulse = m
 	}
-
-	aaa.Owner = aaa.Context
 	return aaa
 }
 
 func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool {
-	if len(arg) > 1 {
-		if m.Cap("sessid") == "" {
-			m.Cap("sessid", aaa.session(arg[1]))
-			Pulse.Capi("nuser", 1)
-		}
-		m.Log("info", m.Source, "create %s %s", m.Cap("group", arg[0]), m.Cap("username", arg[1]))
+	if len(arg) > 1 && m.Cap("sessid") == "" {
+		m.Cap("group", arg[0])
+		m.Cap("username", arg[1])
 		m.Cap("stream", m.Cap("username"))
+		m.Cap("sessid", aaa.Session(arg[1]))
+		Pulse.Capi("nuser", 1)
+		aaa.Owner = aaa.Context
+		aaa.Group = arg[0]
 	}
-	m.Log("info", m.Source, "login %s %s", m.Cap("group"), m.Cap("username"))
 
+	m.Log("info", m.Source, "%s login %s %s", Pulse.Cap("nuser"), m.Cap("group"), m.Cap("username"))
 	return false
 }
 
 func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool {
 	switch aaa.Context {
 	case m.Target:
+		root := Pulse.Target.Server.(*AAA)
+		delete(root.sessions, m.Cap("sessid"))
 		m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
 	case m.Source:
 	}
@@ -99,7 +100,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"expire":   &ctx.Config{Name: "会话超时(s)", Value: "120", Help: "会话超时"},
 	},
 	Commands: map[string]*ctx.Command{
-		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Target, m.Master = c, c
 			aaa := c.Server.(*AAA)
 
@@ -107,23 +108,20 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			case 0:
 				m.Travel(c, func(m *ctx.Message) bool {
 					m.Echo("%s(%s): %s\n", m.Target.Name, m.Cap("group"), m.Cap("time"))
+					if int64(m.Capi("expire")) < time.Now().Unix() {
+						m.Target.Close(m)
+					}
 					return true
 				})
 			case 1:
-				if s, ok := aaa.sessions[arg[0]]; ok {
-					if m.Target = s; int64(m.Capi("expire")) < time.Now().Unix() {
-						s.Close(m)
-						return
-					}
+				s, ok := aaa.sessions[arg[0]]
+				m.Assert(ok, "会话失败")
+				m.Target = s
+				m.Assert(int64(m.Capi("expire")) > time.Now().Unix(), "会话失败")
 
-					m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
-					m.Log("info", m.Source, "logon %s", m.Cap("group"), m.Cap("username"))
-					if m.Name != "" {
-						c.Requests = append(c.Requests, m)
-						m.Index = len(m.Target.Requests)
-					}
-					m.Echo(m.Cap("username"))
-				}
+				m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
+				m.Log("info", m.Source, "logon %s %s", m.Cap("username"), m.Cap("group"))
+				m.Echo(m.Cap("username"))
 			case 2, 3:
 				group, username, password := arg[0], arg[0], arg[1]
 				if len(arg) == 3 {
@@ -132,15 +130,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 				if username == Pulse.Conf("rootname") {
 					m.Set("detail", group, username).Target.Start(m)
-				} else if msg := m.Find(username); msg == nil {
+				} else if msg := m.Find(username, false); msg == nil {
 					m.Start(username, "认证用户", group, username)
 				} else {
 					m.Target = msg.Target
-					msg.Target.Start(msg)
-					if m.Name != "" {
-						m.Target.Requests = append(m.Target.Requests, m)
-						m.Index = len(m.Target.Requests)
-					}
 				}
 
 				m.Cap("password", password)
