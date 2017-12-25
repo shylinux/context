@@ -96,7 +96,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	for {
 		c, e := tcp.Accept()
 		m.Assert(e)
-		m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source).Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", "accept", c.RemoteAddr().String())
+		m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source()).Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", "accept", c.RemoteAddr().String())
 	}
 
 	return true
@@ -104,7 +104,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 
 func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool {
 	switch tcp.Context {
-	case m.Target:
+	case m.Target():
 		if tcp.Listener != nil {
 			m.Log("info", nil, "%d close %v", Pulse.Capi("nlisten", -1)+1, m.Cap("stream"))
 			tcp.Listener.Close()
@@ -115,10 +115,10 @@ func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool {
 			tcp.Conn.Close()
 			tcp.Conn = nil
 		}
-	case m.Source:
+	case m.Source():
 		if tcp.Conn != nil {
 			msg := m.Spawn(tcp.Context)
-			if msg.Master = tcp.Context; !tcp.Context.Close(msg, arg...) {
+			if msg.Master(tcp.Context); !tcp.Context.Close(msg, arg...) {
 				return false
 			}
 		}
@@ -145,12 +145,12 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 			m.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
 		}},
 		"send": &ctx.Command{Name: "send message", Help: "发送消息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			tcp, ok := m.Target.Server.(*TCP)
+			tcp, ok := m.Target().Server.(*TCP)
 			m.Assert(ok && tcp.Conn != nil)
 			tcp.Conn.Write([]byte(arg[0]))
 		}},
 		"recv": &ctx.Command{Name: "recv size", Help: "接收消息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			tcp, ok := m.Target.Server.(*TCP)
+			tcp, ok := m.Target().Server.(*TCP)
 			m.Assert(ok && tcp.Conn != nil)
 			size, e := strconv.Atoi(arg[0])
 			m.Assert(e)

@@ -49,7 +49,7 @@ func (web *WEB) AppendJson(msg *ctx.Message) string {
 
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
-		msg := m.Spawn(m.Target).Set("detail", key)
+		msg := m.Spawn(m.Target()).Set("detail", key)
 		for k, v := range r.Form {
 			msg.Add("option", k, v...)
 		}
@@ -59,7 +59,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 
 		msg.Log("cmd", nil, "%s [] %v", key, msg.Meta["option"])
 		msg.Put("option", "request", r).Put("option", "response", w)
-		if hand(msg, msg.Target, key); len(msg.Meta["append"]) > 0 {
+		if hand(msg, msg.Target(), key); len(msg.Meta["append"]) > 0 {
 			msg.Set("result", web.AppendJson(msg))
 		}
 
@@ -119,7 +119,7 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	}
 
 	web.ServeMux = http.NewServeMux()
-	if mux, ok := m.Target.Server.(MUX); ok {
+	if mux, ok := m.Target().Server.(MUX); ok {
 		for k, x := range web.Commands {
 			if k[0] == '/' {
 				mux.Trans(m, k, x.Hand)
@@ -135,13 +135,13 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		m.Cap("directory", arg[0])
 	}
 
-	m.Travel(m.Target, func(m *ctx.Message) bool {
-		if h, ok := m.Target.Server.(http.Handler); ok && m.Cap("register") == "no" {
+	m.Travel(m.Target(), func(m *ctx.Message) bool {
+		if h, ok := m.Target().Server.(http.Handler); ok && m.Cap("register") == "no" {
 			m.Cap("register", "yes")
 
-			p, i := m.Target, 0
+			p, i := m.Target(), 0
 			m.BackTrace(func(m *ctx.Message) bool {
-				p = m.Target
+				p = m.Target()
 				if i++; i == 2 {
 					return false
 				}
@@ -149,11 +149,11 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 			})
 
 			if s, ok := p.Server.(MUX); ok {
-				m.Log("info", p, "route %s -> %s", m.Cap("route"), m.Target.Name)
+				m.Log("info", p, "route %s -> %s", m.Cap("route"), m.Target().Name)
 				s.Handle(m.Cap("route"), http.StripPrefix(path.Dir(m.Cap("route")), h))
 			}
 
-			if s, ok := m.Target.Server.(MUX); ok && m.Cap("directory") != "" {
+			if s, ok := m.Target().Server.(MUX); ok && m.Cap("directory") != "" {
 				m.Log("info", nil, "dir / -> [%s]", m.Cap("directory"))
 				s.Handle("/", http.FileServer(http.Dir(m.Cap("directory"))))
 			}
@@ -194,8 +194,8 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 
 func (web *WEB) Close(m *ctx.Message, arg ...string) bool {
 	switch web.Context {
-	case m.Target:
-	case m.Source:
+	case m.Target():
+	case m.Source():
 	}
 	return true
 }
@@ -205,10 +205,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Set("detail", arg...).Target.Start(m)
+			m.Set("detail", arg...).Target().Start(m)
 		}},
 		"route": &ctx.Command{Name: "route directory|template|script route content", Help: "添加应用内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			mux, ok := m.Target.Server.(MUX)
+			mux, ok := m.Target().Server.(MUX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) == 3, "缺少参数")
 

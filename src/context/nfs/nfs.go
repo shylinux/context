@@ -53,13 +53,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
 	switch nfs.Context {
-	case m.Target:
+	case m.Target():
 		if nfs.file != nil {
 			m.Log("info", nil, "%d close %s", Pulse.Capi("nfile", -1)+1, m.Cap("name"))
 			nfs.file.Close()
 			nfs.file = nil
 		}
-	case m.Source:
+	case m.Source():
 	}
 	return true
 }
@@ -75,10 +75,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	Commands: map[string]*ctx.Command{
 		"open": &ctx.Command{Name: "open file", Help: "打开文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", arg...)
-			m.Echo(m.Target.Name)
+			m.Echo(m.Target().Name)
 		}},
 		"read": &ctx.Command{Name: "read [size [pos]]", Help: "读取文件, size: 读取大小, pos: 读取位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			nfs, ok := m.Target.Server.(*NFS)
+			nfs, ok := m.Target().Server.(*NFS)
 			m.Assert(ok)
 
 			var e error
@@ -102,7 +102,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 		}},
 		"write": &ctx.Command{Name: "write string [pos]", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			nfs, ok := m.Target.Server.(*NFS)
+			nfs, ok := m.Target().Server.(*NFS)
 			if m.Assert(ok); len(arg) > 1 {
 				m.Cap("pos", arg[1])
 			}
