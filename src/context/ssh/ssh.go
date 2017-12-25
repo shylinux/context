@@ -49,7 +49,7 @@ func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
 	ssh.send = make(map[string]*ctx.Message)
 	m.Log("info", nil, "%s connect %v <-> %v", Pulse.Cap("nhost"), ssh.Conn.LocalAddr(), ssh.Conn.RemoteAddr())
 
-	target, msg := m.Target, m.Spawn(m.Target)
+	target, msg := m.Target(), m.Spawn(m.Target())
 
 	for {
 		line, e := ssh.Reader.ReadString('\n')
@@ -60,7 +60,7 @@ func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
 				msg.Log("info", nil, "%d exec: %v", m.Capi("nrecv", 1), msg.Meta["detail"])
 
 				msg.Cmd(msg.Meta["detail"]...)
-				target = msg.Target
+				target = msg.Target()
 				m.Cap("target", target.Name)
 
 				for _, v := range msg.Meta["result"] {
@@ -99,8 +99,8 @@ func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
 
 func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
 	switch ssh.Context {
-	case m.Target:
-	case m.Source:
+	case m.Target():
+	case m.Source():
 	}
 	return true
 }
@@ -122,7 +122,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "主机连接")
 		}},
 		"remote": &ctx.Command{Name: "remote detail...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			ssh, ok := m.Target.Server.(*SSH)
+			ssh, ok := m.Target().Server.(*SSH)
 			m.Assert(ok)
 
 			m.Capi("nsend", 1)
