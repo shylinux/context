@@ -1,8 +1,18 @@
 ~cli
 	@lex lex
-~aaa login root root
+	~aaa login root root
+	~cli var a = 10
+if $username == root
+	echo welcome root user: $username
+end
 ~web serve
-~ssh dial chat.shylinux.com:9090 true
+
+function nice
+	echo who
+end
+
+return hello hello
+
 sleep 1
 ~host1
 	remote context mpa register terminal shhylinux term term term 1
@@ -11,6 +21,7 @@ sleep 1
 	~nfs save usr/sess.txt "terminal: " $sessid
 	~nfs genqr usr/sess.png "terminal: " $sessid
 return
+# ~ssh dial chat.shylinux.com:9090 true
 # ~cli
 # 	remote slaver listen ":9393" tcp
 # ~ssh

@@ -133,7 +133,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 	c.Owner = m.master.Owner
 	c.Group = m.master.Group
 
-	m.Log("begin", nil, "%d context %v", m.root.Capi("ncontext", 1), m.Meta["detail"])
+	m.Log("begin", nil, "%d context %v %v", m.root.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
 	for k, x := range c.Configs {
 		if x.Hand != nil {
 			m.Conf(k, x.Value)
@@ -156,7 +156,7 @@ func (c *Context) Start(m *Message) bool { // {{{
 	if m.Cap("status") != "start" {
 		running := make(chan bool)
 		go m.AssertOne(m, true, func(m *Message) {
-			m.Log(m.Cap("status", "start"), nil, "%d server %v", m.root.Capi("nserver", 1), m.Meta["detail"])
+			m.Log(m.Cap("status", "start"), nil, "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
 
 			if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
 				c.Close(m, m.Meta["detail"]...)
@@ -217,6 +217,10 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 	if c.context != nil {
 		m.Log("close", nil, "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
 		delete(c.context.contexts, c.Name)
+		c.context = nil
+		if c.Exit != nil {
+			c.Exit <- true
+		}
 	}
 	return true
 }
@@ -969,12 +973,9 @@ func (m *Message) Deal(pre func(msg *Message, arg ...string) bool, post func(msg
 				return
 			}
 
-			if pre != nil && !pre(msg, msg.Meta["detail"]...) {
-				run = false
-				return
+			if pre == nil || pre(msg, msg.Meta["detail"]...) {
+				msg.Exec(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)
 			}
-
-			msg.Exec(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)
 
 			if post != nil && !post(msg, msg.Meta["result"]...) {
 				run = false
@@ -1029,33 +1030,33 @@ func (m *Message) Confi(key string, arg ...int) int { // {{{
 // }}}
 func (m *Message) Conf(key string, arg ...string) string { // {{{
 	var hand func(m *Message, x *Config, arg ...string) string
-	for s := m.target; s != nil; s = s.context {
-		if x, ok := s.Configs[key]; ok {
-			if !m.Check(s, "configs", key) {
-				continue
-			}
+	for _, c := range []*Context{m.target, m.target.master, m.target.Owner, m.source, m.source.master, m.source.Owner} {
+		for s := c; s != nil; s = s.context {
+			if x, ok := s.Configs[key]; ok {
+				if !m.Check(s, "configs", key) {
+					continue
+				}
 
-			switch len(arg) {
-			case 3:
-				if hand == nil {
-					hand = x.Hand
-				}
-			case 1:
-				m.Log("conf", s, "%s %v", key, arg)
+				switch len(arg) {
+				case 3:
+					if hand == nil {
+						hand = x.Hand
+					}
+				case 1:
+					m.Log("conf", s, "%s %v", key, arg)
 
-				if x.Hand != nil {
-					x.Value = x.Hand(m, x, arg[0])
-				} else {
-					x.Value = arg[0]
+					if x.Hand != nil {
+						x.Value = x.Hand(m, x, arg[0])
+					} else {
+						x.Value = arg[0]
+					}
+					return x.Value
+				case 0:
+					if x.Hand != nil {
+						return x.Hand(m, x)
+					}
+					return x.Value
 				}
-				return x.Value
-			case 0:
-				if x.Hand != nil {
-					return x.Hand(m, x)
-				}
-				return x.Value
-			default:
-				panic(errors.New(key + "配置项参数错误"))
 			}
 		}
 	}
@@ -1070,7 +1071,7 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 		return m.Conf(key, arg[1])
 	}
 
-	m.Assert(false, key+"配置项操作错误")
+	m.Log("error", nil, "配置项不存在")
 	return ""
 }
 
@@ -1090,31 +1091,31 @@ func (m *Message) Capi(key string, arg ...int) int { // {{{
 // }}}
 func (m *Message) Cap(key string, arg ...string) string { // {{{
 	var hand func(m *Message, x *Cache, arg ...string) string
-	for s := m.target; s != nil; s = s.context {
-		if x, ok := s.Caches[key]; ok {
-			if !m.Check(s, "caches", key) {
-				continue
-			}
+	for _, c := range []*Context{m.target, m.target.master, m.target.Owner, m.source, m.source.master, m.source.Owner} {
+		for s := c; s != nil; s = s.context {
+			if x, ok := s.Caches[key]; ok {
+				if !m.Check(s, "caches", key) {
+					continue
+				}
 
-			switch len(arg) {
-			case 3:
-				if hand == nil {
-					hand = x.Hand
+				switch len(arg) {
+				case 3:
+					if hand == nil {
+						hand = x.Hand
+					}
+				case 1:
+					if x.Hand != nil {
+						x.Value = x.Hand(m, x, arg[0])
+					} else {
+						x.Value = arg[0]
+					}
+					return x.Value
+				case 0:
+					if x.Hand != nil {
+						return x.Hand(m, x)
+					}
+					return x.Value
 				}
-			case 1:
-				if x.Hand != nil {
-					x.Value = x.Hand(m, x, arg[0])
-				} else {
-					x.Value = arg[0]
-				}
-				return x.Value
-			case 0:
-				if x.Hand != nil {
-					return x.Hand(m, x)
-				}
-				return x.Value
-			default:
-				panic(errors.New(key + "缓存项参数错误"))
 			}
 		}
 	}
@@ -1129,9 +1130,8 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 		return m.Cap(key, arg[1])
 	}
 
-	m.Assert(false, key+"缓存项操作错误")
+	m.Log("error", nil, "缓存项不存在")
 	return ""
-
 }
 
 // }}}
@@ -1558,6 +1558,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 				case 2:
 					m.Conf(arg[0], arg[1])
+				case 3:
+					m.Conf(arg[0], arg[2])
 				case 4:
 					m.Conf(arg[0], arg[1:]...)
 				}
@@ -1597,30 +1599,22 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						m.Cap(arg[0], "")
 					}
 
-					m.BackTrace(func(m *Message) bool {
-						// if all {
-						// 	m.Echo("%s config:\n", m.target.Name)
-						// }
-						if x, ok := m.target.Caches[arg[0]]; ok {
-							if m.Check(m.target, "caches", arg[0]) {
-								// if all {
-								// 	m.Echo("  ")
-								// }
-								// m.Echo("%s: %s\n", x.Name, x.Help)
-								m.Echo("%s", x.Value)
-								return false
-							}
-						}
-						return true
-						// return all
-					})
+					m.Echo("%s", m.Cap(arg[0]))
 				case 2:
 					m.Cap(arg[0], arg[1])
+				case 3:
+					m.Cap(arg[0], arg[2])
 				case 4:
 					m.Cap(arg[0], arg[1:]...)
 				}
 				// }}}
 			}},
+		"pulse": &Command{Name: "arg name", Help: "查看日志", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			p := m.Target().Pulse
+			m.Echo("%d\n", p.code)
+			m.Echo("%v\n", p.Meta["detail"])
+			m.Echo("%v\n", p.Meta["option"])
+		}},
 	},
 	Index: map[string]*Context{
 		"void": &Context{Name: "void",
