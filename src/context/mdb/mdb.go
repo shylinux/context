@@ -56,13 +56,13 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool {
 
 func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool {
 	switch mdb.Context {
-	case m.Target:
+	case m.Target():
 		if mdb.DB != nil {
 			m.Log("info", nil, "%d close %s %s", Pulse.Capi("nsource", -1)+1, m.Cap("driver"), m.Cap("source"))
 			mdb.DB.Close()
 			mdb.DB = nil
 		}
-	case m.Source:
+	case m.Source():
 	}
 	return true
 }
@@ -80,12 +80,12 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			m.Assert(len(arg) > 0, "缺少参数")
 			m.Start(fmt.Sprintf("db%d", Pulse.Capi("nsource", 1)), "数据存储", arg...)
 			Pulse.Cap("stream", Pulse.Cap("nsource"))
-			m.Echo(m.Target.Name)
+			m.Echo(m.Target().Name)
 		}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库",
 			Appends: map[string]string{"last": "最后插入元组的标识", "nrow": "修改元组的数量"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				mdb, ok := m.Target.Server.(*MDB)
+				mdb, ok := m.Target().Server.(*MDB)
 				m.Assert(ok, "目标模块类型错误")
 				m.Assert(len(arg) > 0, "缺少参数")
 				m.Assert(mdb.DB != nil, "数据库未打开")
@@ -108,7 +108,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Log("info", nil, "last(%d) nrow(%d)", id, n)
 			}},
 		"query": &ctx.Command{Name: "query sql [arg]", Help: "执行查询语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			mdb, ok := m.Target.Server.(*MDB)
+			mdb, ok := m.Target().Server.(*MDB)
 			m.Assert(ok, "目标模块类型错误")
 			m.Assert(len(arg) > 0, "缺少参数")
 			m.Assert(mdb.DB != nil, "数据库未打开")

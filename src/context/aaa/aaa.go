@@ -57,7 +57,7 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server {
 		return time.Unix(int64(n), 0).Format("15:03:04")
 	}}
 
-	if m.Target == Index {
+	if m.Target() == Index {
 		Pulse = m
 	}
 	return aaa
@@ -74,17 +74,17 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool {
 		aaa.Group = arg[0]
 	}
 
-	m.Log("info", m.Source, "%s login %s %s", Pulse.Cap("nuser"), m.Cap("group"), m.Cap("username"))
+	m.Log("info", m.Source(), "%s login %s %s", Pulse.Cap("nuser"), m.Cap("group"), m.Cap("username"))
 	return false
 }
 
 func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool {
 	switch aaa.Context {
-	case m.Target:
-		root := Pulse.Target.Server.(*AAA)
+	case m.Target():
+		root := Pulse.Target().Server.(*AAA)
 		delete(root.sessions, m.Cap("sessid"))
 		m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
-	case m.Source:
+	case m.Source():
 	}
 
 	return true
@@ -101,26 +101,26 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Target, m.Master = c, c
+			m.Target(c)
 			aaa := c.Server.(*AAA)
 
 			switch len(arg) {
 			case 0:
 				m.Travel(c, func(m *ctx.Message) bool {
-					m.Echo("%s(%s): %s\n", m.Target.Name, m.Cap("group"), m.Cap("time"))
+					m.Echo("%s(%s): %s\n", m.Target().Name, m.Cap("group"), m.Cap("time"))
 					if int64(m.Capi("expire")) < time.Now().Unix() {
-						m.Target.Close(m)
+						m.Target().Close(m)
 					}
 					return true
 				})
 			case 1:
 				s, ok := aaa.sessions[arg[0]]
 				m.Assert(ok, "会话失败")
-				m.Target = s
+				m.Target(s)
 				m.Assert(int64(m.Capi("expire")) > time.Now().Unix(), "会话失败")
 
-				m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
-				m.Log("info", m.Source, "logon %s %s", m.Cap("username"), m.Cap("group"))
+				m.Source().Group, m.Source().Owner = m.Cap("group"), m.Target()
+				m.Log("info", m.Source(), "logon %s %s", m.Cap("username"), m.Cap("group"))
 				m.Echo(m.Cap("username"))
 			case 2, 3:
 				group, username, password := arg[0], arg[0], arg[1]
@@ -129,16 +129,16 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 
 				if username == Pulse.Conf("rootname") {
-					m.Set("detail", group, username).Target.Start(m)
+					m.Set("detail", group, username).Target().Start(m)
 				} else if msg := m.Find(username, false); msg == nil {
 					m.Start(username, "认证用户", group, username)
 				} else {
-					m.Target = msg.Target
+					m.Target(msg.Target())
 				}
 
 				m.Cap("password", password)
-				m.Source.Group, m.Source.Owner = m.Cap("group"), m.Target
-				aaa.sessions[m.Cap("sessid")] = m.Target
+				m.Source().Group, m.Source().Owner = m.Cap("group"), m.Target()
+				aaa.sessions[m.Cap("sessid")] = m.Target()
 				m.Echo(m.Cap("sessid"))
 			}
 		}},
