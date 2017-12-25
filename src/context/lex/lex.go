@@ -254,7 +254,7 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "1", Help: "状态数量"}
 	lex.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "节点数量"}
 	lex.Caches["npush"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "节点数量", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-		return fmt.Sprintf("%d", len(m.Target.Server.(*LEX).state))
+		return fmt.Sprintf("%d", len(m.Target().Server.(*LEX).state))
 	}}
 
 	return lex
@@ -277,8 +277,8 @@ func (lex *LEX) Start(m *ctx.Message, arg ...string) bool {
 
 func (lex *LEX) Close(m *ctx.Message, arg ...string) bool {
 	switch lex.Context {
-	case m.Target:
-	case m.Source:
+	case m.Target():
+	case m.Source():
 	}
 	return true
 }
@@ -288,14 +288,14 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			lex, ok := m.Target.Server.(*LEX)
+			lex, ok := m.Target().Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) > 0, "参数错误")
 
 			lex.train([]byte(arg[0]), arg[1:]...)
 		}},
 		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			lex, ok := m.Target.Server.(*LEX)
+			lex, ok := m.Target().Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) > 0, "参数错误")
 
@@ -303,7 +303,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 			m.Add("result", string(word), fmt.Sprintf("%d", hash), string(rest))
 		}},
 		"split": &ctx.Command{Name: "split line page1 [page2]", Help: "分割语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			lex, ok := m.Target.Server.(*LEX)
+			lex, ok := m.Target().Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) > 1, "参数错误")
 
@@ -316,12 +316,20 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 				if hash == 0 {
 					break
 				}
+
+				if len(word) > 1 {
+					switch word[0] {
+					case '"', '\'':
+						word = word[1 : len(word)-1]
+					}
+				}
+
 				m.Echo(string(word))
 			}
 
 		}},
 		"cache": &ctx.Command{Name: "cache", Help: "显示缓存", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			lex, ok := m.Target.Server.(*LEX)
+			lex, ok := m.Target().Server.(*LEX)
 			m.Assert(ok, "模块类型错误")
 			for i, v := range lex.seed {
 				m.Echo("seed: %d %v\n", i, v)
