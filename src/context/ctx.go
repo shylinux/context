@@ -240,6 +240,17 @@ func (c *Context) Master(s ...*Context) *Context { // {{{
 }
 
 // }}}
+func (c *Context) Has(key string) bool { // {{{
+	if _, ok := c.Caches[key]; ok {
+		return true
+	}
+	if _, ok := c.Configs[key]; ok {
+		return true
+	}
+	return false
+}
+
+// }}}
 
 func (c *Context) Add(group string, arg ...string) { // {{{
 	if c.Index == nil {

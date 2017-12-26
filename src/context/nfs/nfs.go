@@ -152,7 +152,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					size = s
 				}
 			}
-			m.Log("fuck", nil, "%v %v", arg[0], arg[1:])
 			qrcode.WriteFile(strings.Join(arg[1:], ""), qrcode.Medium, size, arg[0])
 		}},
 	},
