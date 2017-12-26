@@ -1,15 +1,27 @@
+@lex lex
 ~cli
 	@lex lex
-~aaa login root root
+	~aaa login root root
 ~web serve
+return
 ~ssh dial chat.shylinux.com:9090 true
 sleep 1
 ~host1
-	remote context mpa register terminal shhylinux term term term 1
-	$sessid $result
-	remote cache sessid $sessid
-	~nfs save usr/sess.txt "terminal: " $sessid
-	~nfs genqr usr/sess.png "terminal: " $sessid
+	~nfs load usr/sess.txt
+	var a = $result
+	return
+	$a = $result
+	if $a != ""
+		remote context mpa register $a
+	end
+
+	if $a == ""
+		remote context mpa register terminal shhylinux term term term 1
+		$sessid $result
+		remote cache sessid $sessid
+		~nfs save usr/sess.txt "terminal: " $sessid
+		~nfs genqr usr/sess.png "terminal: " $sessid
+	end
 return
 # ~cli
 # 	remote slaver listen ":9393" tcp

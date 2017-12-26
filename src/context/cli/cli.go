@@ -1,6 +1,6 @@
-package cli // {{{
-// }}}
-import ( // {{{
+package cli
+
+import (
 	"context"
 
 	"bufio"
@@ -14,21 +14,22 @@ import ( // {{{
 	"unicode"
 )
 
-// }}}
-
 type CLI struct {
 	bio *bufio.Reader
 	out io.WriteCloser
 
-	alias map[string]string
-	back  string
-	exit  bool
+	which int
+	lines []string
 
-	lex    *ctx.Message
+	alias map[string]string
+	lex   *ctx.Message
+
 	target *ctx.Context
 	wait   *ctx.Context
+	exit   bool
+	test   bool
+	save   bool
 
-	*ctx.Message
 	*ctx.Context
 }
 
@@ -43,15 +44,34 @@ func (cli *CLI) echo(str string, arg ...interface{}) bool {
 func (cli *CLI) parse(m *ctx.Message) bool {
 	line := m.Cap("next")
 	if line == "" {
-		cli.echo(m.Conf("PS1"))
-		l, e := cli.bio.ReadString('\n')
-		m.Assert(e)
-		line = l
+		if m.Cap("level") == "0" {
+			cli.echo(m.Conf("PS1"))
+		}
+		if cli.bio == nil {
+			if cli.which == len(cli.lines) {
+				cli.exit = true
+				cli.which = 0
+				m.Spawn(cli.target).Set("detail", "end").Post(cli.Context)
+				return false
+			}
+			line = cli.lines[cli.which]
+			cli.which++
+		} else {
+			l, e := cli.bio.ReadString('\n')
+			if e == io.EOF {
+				cli.exit = true
+				m.Spawn(cli.target).Set("detail", "end").Post(cli.Context)
+				return false
+			}
+			m.Assert(e)
+			line = l
+		}
 	}
 	m.Cap("next", "")
 
-	if line = strings.TrimSpace(line); len(line) == 0 {
-		line, cli.back = cli.back, ""
+	if line = strings.TrimSpace(line); len(line) == 0 && m.Cap("stream") == "stdout" {
+		line = m.Cap("back")
+		m.Cap("back", "")
 	}
 	if len(line) == 0 || line[0] == '#' {
 		return true
@@ -69,11 +89,13 @@ func (cli *CLI) parse(m *ctx.Message) bool {
 	msg := m.Spawn(cli.target)
 
 	for i := 0; i < len(ls); i++ {
-		if ls[i] = strings.TrimSpace(ls[i]); ls[i] == "" {
-			continue
-		}
-		if ls[i][0] == '#' {
-			break
+		if cli.lex == nil {
+			if ls[i] = strings.TrimSpace(ls[i]); ls[i] == "" {
+				continue
+			}
+			if ls[i][0] == '#' {
+				break
+			}
 		}
 
 		if r := rune(ls[i][0]); r == '$' || r == '_' || (!unicode.IsNumber(r) && !unicode.IsLetter(r)) {
@@ -95,21 +117,20 @@ func (cli *CLI) parse(m *ctx.Message) bool {
 	}
 
 	msg.Wait = make(chan bool)
-	msg.Post(cli.Context.Master())
+	msg.Post(cli.Context)
 
-	if result := strings.TrimRight(strings.Join(msg.Meta["result"], ""), "\n"); len(result) > 0 {
-		cli.echo(m.Cap("result", result) + "\n")
+	if msg.Target().Context() != nil || msg.Target() == ctx.Index {
+		cli.target = msg.Target()
 	}
 	m.Cap("target", cli.target.Name)
-	m.Cap("back", line)
-	m.Log("fuck", nil, "over")
-	if cli.wait != nil {
-		msg.Log("fuck", nil, "wait 1")
-		<-cli.wait.Exit
-		cli.wait = nil
-		msg.Log("fuck", nil, "wait 2")
-	} else {
-		cli.target = msg.Target()
+
+	result := strings.TrimRight(strings.Join(msg.Meta["result"], ""), "\n")
+	if m.Cap("result", result); len(result) > 0 {
+		cli.echo(result + "\n")
+	}
+
+	if m.Cap("back", line); cli.bio != nil {
+		cli.lines = append(cli.lines, line)
 	}
 	return !cli.exit
 }
@@ -120,6 +141,8 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 	s := new(CLI)
 	s.Context = c
+	s.lex = cli.lex
+	s.alias = cli.alias
 	return s
 }
 
@@ -171,7 +194,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 		// }}}
 	}}
 	cli.Configs["lex"] = &ctx.Config{Name: "词法解析器", Value: "", Help: "命令行词法解析器", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
-		if len(arg) > 0 { // {{{
+		if len(arg) > 0 && len(arg[0]) > 0 { // {{{
 			cli, ok := m.Target().Server.(*CLI)
 			m.Assert(ok, "模块类型错误")
 
@@ -186,6 +209,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 				m.Spawn(lex.Target()).Cmd("train", "#[^\n]*\n", "void", "void")
 			}
 			cli.lex = lex
+			return arg[0]
 		}
 		return x.Value
 		// }}}
@@ -202,23 +226,27 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	cli.target = cli.Context
 	cli.alias = map[string]string{
 		"~": "context",
-		"!": "command",
+		"!": "message",
 		"@": "config",
 		"$": "cache",
 		"&": "server",
-		"*": "message",
+		":": "command",
 	}
 
 	return cli
 }
 
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
+	cli.Context.Exit = make(chan bool)
+	cli.bio = nil
+	cli.exit = false
+	cli.test = false
 
 	if stream, ok := m.Data["io"]; ok {
+		cli.Context.Master(cli.Context)
 		io := stream.(io.ReadWriteCloser)
 		cli.bio = bufio.NewReader(io)
 		cli.out = io
-		cli.Context.Master(cli.Context)
 
 		if msg := m.Find("aaa", true); msg != nil {
 			cli.echo("username>")
@@ -244,49 +272,45 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 			}
 			cli.Sessions["aaa"] = msg
 		}
-	} else if stream, ok := m.Data["bio"]; ok {
-		cli.Context.Exit = make(chan bool)
-		cli.bio = stream.(*bufio.Reader)
-		m.AssertOne(m, true, func(m *ctx.Message) {
-			for cli.parse(m) {
-			}
-		})
-		m.Log("fuck", nil, "done 1")
-		cli.Context.Exit <- true
-		m.Log("fuck", nil, "done 2")
-		return true
-
-	} else if stream, ok := m.Data["file"]; ok {
-		cli.Context.Exit = make(chan bool)
-		io := stream.(io.ReadWriteCloser)
-		cli.bio = bufio.NewReader(io)
-		m.AssertOne(m, true, func(m *ctx.Message) {
-			for cli.parse(m) {
-			}
-		})
-		m.Log("fuck", nil, "done 1")
-		cli.Context.Exit <- true
-		m.Log("fuck", nil, "done 2")
-		return true
 	} else if len(arg) > 0 {
+		m.Cap("stream", "stdout")
+		m.Cap("next", "source "+m.Conf("init.sh"))
 		cli.Context.Master(cli.Context)
 		cli.bio = bufio.NewReader(os.Stdin)
 		cli.out = os.Stdout
-		m.Cap("stream", "stdout")
+		cli.Caches["level"] = &ctx.Cache{Name: "操作目标", Value: "0", Help: "操作目标"}
+	} else if stream, ok := m.Data["file"]; ok {
+		if bio, ok := stream.(*bufio.Reader); ok {
+			m.Cap("stream", "file")
+			cli.bio = bio
+		} else {
+			m.Cap("stream", "file")
+			cli.bio = bufio.NewReader(stream.(io.ReadWriteCloser))
+		}
+		m.Capi("level", 1)
+		defer m.Capi("level", -1)
+
+		cli.test = m.Has("test")
+		cli.save = m.Has("save")
 	}
 
-	if cli.bio != nil {
-		go m.AssertOne(m, true, func(m *ctx.Message) {
-			m.Cap("next", "source "+m.Conf("init.sh"))
-			for cli.parse(m) {
-			}
-		})
-	}
+	go m.AssertOne(m, true, func(m *ctx.Message) {
+		for cli.parse(m) {
+		}
+	})
 
 	m.Capi("nterm", 1)
 	defer m.Capi("nterm", -1)
 
-	m.Deal(nil, func(msg *ctx.Message, arg ...string) bool {
+	m.Deal(func(msg *ctx.Message, arg ...string) bool {
+		if cli.test {
+			if _, ok := Index.Commands[msg.Get("detail")]; ok {
+				msg.Exec(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)
+			}
+			return false
+		}
+		return true
+	}, func(msg *ctx.Message, arg ...string) bool {
 		if msg.Get("result") == "error: " {
 			if msg.Get("detail") != "login" {
 				msg.Log("system", nil, "%v", msg.Meta["detail"])
@@ -310,17 +334,20 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 			}
 		}
 
-		cli.target = msg.Target()
+		if msg.Target().Context() != nil || msg.Target() == ctx.Index {
+			cli.target = msg.Target()
+		}
 		return cli.exit == false
 	})
 
-	return true
+	m.Cap("status", "close")
+	return !cli.save
 }
 
-func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
+func (cli *CLI) Close(m *ctx.Message, arg ...string) bool {
 	switch cli.Context {
 	case m.Target():
-		if cli.Context == Index {
+		if m.Target() == Index && m.Capi("nserver") > 1 {
 			return false
 		}
 	case m.Source():
@@ -336,8 +363,6 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 	return true
 }
 
-// }}}
-
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Caches: map[string]*ctx.Cache{
@@ -345,35 +370,81 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"source": &ctx.Command{Name: "source file", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			cli := m.Master().Master().Server.(*CLI)
-			f, e := os.Open(arg[0])
-			m.Assert(e)
-			m.Put("option", "file", f).Start(arg[0], "脚本文件", key)
-			m.Log("fuck", nil, "source")
-			cli.wait = m.Target()
-		}},
-		"return": &ctx.Command{Name: "return", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			cli := m.Master().Master().Server.(*CLI)
-			cli.exit = true
-		}},
 		"sleep": &ctx.Command{Name: "sleep time", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			t, e := strconv.Atoi(arg[0])
+			t, e := strconv.Atoi(arg[0]) // {{{
 			m.Assert(e)
 			m.Log("info", nil, "sleep %ds", t)
 			time.Sleep(time.Second * time.Duration(t))
 			m.Log("info", nil, "sleep %ds done", t)
+			// }}}
 		}},
-		"if": &ctx.Command{Name: "if a [ = | != ] b", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			cli := m.Master().Master().Server.(*CLI)
-			m.Put("option", "bio", cli.bio).Start(strings.Join(arg, " "), "条件语句", key)
-			cli.wait = m.Target()
+		"source": &ctx.Command{Name: "source file", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			f, e := os.Open(arg[0]) // {{{
+			m.Assert(e)
+			m.Put("option", "file", f).Start(key, "脚本文件")
+			<-m.Target().Exit
+			// }}}
 		}},
-		"end": &ctx.Command{Name: "end", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			cli := m.Master().Master().Server.(*CLI)
+		"return": &ctx.Command{Name: "return result...", Help: "结束脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cli, ok := m.Source().Server.(*CLI) // {{{
+			m.Assert(ok)
 			cli.exit = true
+			for _, v := range arg {
+				cli.Pulse.Echo(v)
+			}
+			// }}}
 		}},
-		"alias": &ctx.Command{Name: "alias [short [long]]", Help: "查看日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"if": &ctx.Command{Name: "if a [ == | != ] b", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cli, ok := m.Source().Server.(*CLI) // {{{
+			m.Assert(ok)
+
+			if arg[1] == "==" && arg[0] != arg[2] {
+				m.Add("option", "test")
+			}
+			if arg[1] == "!=" && arg[0] == arg[2] {
+				m.Add("option", "test")
+			}
+			m.Put("option", "file", cli.bio).Start(key, "条件语句")
+			<-m.Target().Exit
+			// }}}
+		}},
+		"for": &ctx.Command{Name: "for var in list", Help: "循环语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cli, ok := m.Source().Server.(*CLI) // {{{
+			m.Assert(ok)
+
+			if arg[1] == "==" && arg[0] != arg[2] {
+				m.Add("option", "test")
+			}
+			if arg[1] == "!=" && arg[0] == arg[2] {
+				m.Add("option", "test")
+			}
+			m.Put("option", "file", cli.bio).Start(key, "条件语句")
+			<-m.Target().Exit
+			// }}}
+		}},
+		"end": &ctx.Command{Name: "end", Help: "结束语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cli, ok := m.Source().Server.(*CLI) // {{{
+			m.Assert(ok)
+			cli.exit = true
+			// }}}
+		}},
+		"var": &ctx.Command{Name: "var a [= b]", Help: "定义变量", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			val := ""
+			if len(arg) > 2 {
+				val = arg[2]
+			}
+			m.Cap(arg[0], arg[0], val, "临时变量")
+		}},
+		"function": &ctx.Command{Name: "function name", Help: "定义函数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cli, ok := m.Source().Server.(*CLI) // {{{
+			m.Target(m.Source().Context())
+			m.Assert(ok)
+			m.Add("option", "test")
+			m.Add("option", "save")
+			m.Put("option", "file", cli.bio).Start(arg[0], "定义函数")
+			// }}}
+		}},
+		"alias": &ctx.Command{Name: "alias [short [long]]", Help: "定义别名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli := c.Server.(*CLI) // {{{
 			switch len(arg) {
 			case 0:
@@ -419,12 +490,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"master": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
 			Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				cli, ok := c.Server.(*CLI) // {{{
+				_, ok := c.Server.(*CLI) // {{{
 				m.Assert(ok, "模块类型错误")
 				m.Assert(m.Target() != c, "模块是主控模块")
 
 				msg := m.Spawn(c)
-				msg.Start(fmt.Sprintf("PTS%d", cli.Capi("nterm")), arg[0], arg[1:]...)
+				msg.Start(fmt.Sprintf("PTS%d", Pulse.Capi("nterm")), arg[0], arg[1:]...)
 				// }}}
 			}},
 	},
