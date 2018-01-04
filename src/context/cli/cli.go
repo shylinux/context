@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -51,7 +52,7 @@ func (cli *CLI) parse(m *ctx.Message) bool {
 			if cli.which == len(cli.lines) {
 				cli.exit = true
 				cli.which = 0
-				m.Spawn(cli.target).Set("detail", "end").Post(cli.Context)
+				m.Spawn(cli.Context).Set("detail", "end").Post(cli.Context)
 				return false
 			}
 			line = cli.lines[cli.which]
@@ -60,7 +61,7 @@ func (cli *CLI) parse(m *ctx.Message) bool {
 			l, e := cli.bio.ReadString('\n')
 			if e == io.EOF {
 				cli.exit = true
-				m.Spawn(cli.target).Set("detail", "end").Post(cli.Context)
+				m.Spawn(cli.Context).Set("detail", "end").Post(cli.Context)
 				return false
 			}
 			m.Assert(e)
@@ -98,17 +99,28 @@ func (cli *CLI) parse(m *ctx.Message) bool {
 			}
 		}
 
-		if r := rune(ls[i][0]); r == '$' || r == '_' || (!unicode.IsNumber(r) && !unicode.IsLetter(r)) {
-			if c, ok := cli.alias[string(r)]; ok {
-				if i == 0 {
-					if msg.Add("detail", c); len(ls[i]) == 1 {
-						continue
+		if len(ls[i]) > 0 && !cli.test {
+			if r := rune(ls[i][0]); r == '$' || r == '_' || (!unicode.IsNumber(r) && !unicode.IsLetter(r)) {
+				if c, ok := cli.alias[string(r)]; ok {
+					if i == 0 {
+						if msg.Add("detail", c); len(ls[i]) == 1 {
+							continue
+						}
+						ls[i] = ls[i][1:]
+					} else if len(ls[i]) > 1 && !cli.test {
+						key := ls[i][1:]
+						switch c {
+						case "config", "cache":
+							if cli.Context.Has(key, c) {
+								ls[i] = m.Cap(key)
+								break
+							}
+
+							msg := m.Spawn(cli.target)
+							m.Assert(msg.Exec(c, key))
+							ls[i] = msg.Get("result")
+						}
 					}
-					ls[i] = ls[i][1:]
-				} else if len(ls[i]) > 1 {
-					msg := m.Spawn(cli.target)
-					m.Assert(msg.Exec(c, ls[i][1:]))
-					ls[i] = msg.Get("result")
 				}
 			}
 		}
@@ -272,10 +284,9 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 			}
 			cli.Sessions["aaa"] = msg
 		}
-	} else if len(arg) > 0 {
+	} else if len(arg) > 0 && arg[0] == "stdout" {
 		m.Cap("stream", "stdout")
 		m.Cap("next", "source "+m.Conf("init.sh"))
-		cli.Context.Master(cli.Context)
 		cli.bio = bufio.NewReader(os.Stdin)
 		cli.out = os.Stdout
 		cli.Caches["level"] = &ctx.Cache{Name: "操作目标", Value: "0", Help: "操作目标"}
@@ -287,9 +298,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 			m.Cap("stream", "file")
 			cli.bio = bufio.NewReader(stream.(io.ReadWriteCloser))
 		}
-		m.Capi("level", 1)
-		defer m.Capi("level", -1)
-
 		cli.test = m.Has("test")
 		cli.save = m.Has("save")
 	}
@@ -340,7 +348,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 		return cli.exit == false
 	})
 
-	m.Cap("status", "close")
 	return !cli.save
 }
 
@@ -353,7 +360,6 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool {
 	case m.Source():
 		if m.Name == "aaa" {
 			msg := m.Spawn(cli.Context)
-			msg.Master(cli.Context)
 			if !cli.Context.Close(msg, arg...) {
 				return false
 			}
@@ -381,8 +387,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"source": &ctx.Command{Name: "source file", Help: "运行脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			f, e := os.Open(arg[0]) // {{{
 			m.Assert(e)
-			m.Put("option", "file", f).Start(key, "脚本文件")
+			m.Put("option", "file", f).Start(fmt.Sprintf("%s(%d)", key, Pulse.Capi("level", 1)), "脚本文件")
 			<-m.Target().Exit
+			Pulse.Capi("level", -1)
 			// }}}
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -394,18 +401,55 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			// }}}
 		}},
-		"if": &ctx.Command{Name: "if a [ == | != ] b", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"if": &ctx.Command{Name: "if a [ == | != ] b", Help: "条件语句",
+			Formats: map[string]int{"~": 0, "!~": 0, "==": 0, "!=": 0, "-z": 0, "-n": 0, "-e": 0, "-f": 0, "-d": 0},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				cli, ok := m.Source().Server.(*CLI) // {{{
+				m.Assert(ok)
+
+				run := false
+				switch {
+				case m.Has("-e"):
+					_, e := os.Stat(arg[0])
+					run = e == nil
+				case m.Has("-f"):
+					info, e := os.Stat(arg[0])
+					run = e == nil && !info.IsDir()
+				case m.Has("-d"):
+					info, e := os.Stat(arg[0])
+					run = e == nil && info.IsDir()
+
+				case m.Has("-z"):
+					run = len(arg) == 0 || len(arg[0]) == 0
+				case m.Has("-n"):
+					run = len(arg) > 0 && len(arg[0]) > 0
+
+				case m.Has("=="):
+					run = arg[0] == arg[1]
+				case m.Has("!="):
+					run = arg[0] != arg[1]
+
+				case m.Has("~"):
+					m, e := regexp.MatchString(arg[1], arg[0])
+					run = m && e == nil
+				case m.Has("!~"):
+					m, e := regexp.MatchString(arg[1], arg[0])
+					run = !m || e != nil
+				}
+
+				if !run {
+					m.Add("option", "test")
+				}
+
+				m.Target(m.Source())
+				m.Put("option", "file", cli.bio).Start(key, "条件语句")
+				<-m.Target().Exit
+				// }}}
+			}},
+		"else": &ctx.Command{Name: "else", Help: "条件切换", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli, ok := m.Source().Server.(*CLI) // {{{
 			m.Assert(ok)
-
-			if arg[1] == "==" && arg[0] != arg[2] {
-				m.Add("option", "test")
-			}
-			if arg[1] == "!=" && arg[0] == arg[2] {
-				m.Add("option", "test")
-			}
-			m.Put("option", "file", cli.bio).Start(key, "条件语句")
-			<-m.Target().Exit
+			cli.test = !cli.test
 			// }}}
 		}},
 		"for": &ctx.Command{Name: "for var in list", Help: "循环语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -429,11 +473,30 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			// }}}
 		}},
 		"var": &ctx.Command{Name: "var a [= b]", Help: "定义变量", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cli, ok := m.Source().Server.(*CLI)
+			if m.Assert(ok); cli.test {
+				return
+			}
+
 			val := ""
 			if len(arg) > 2 {
 				val = arg[2]
 			}
-			m.Cap(arg[0], arg[0], val, "临时变量")
+			m.Assert(!m.Source().Has(arg[0], "cache"))
+			m.Spawn(m.Source()).Cap(arg[0], arg[0], val, "临时变量")
+		}},
+		"let": &ctx.Command{Name: "let a [=] b", Help: "设置变量", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cli, ok := m.Source().Server.(*CLI)
+			if m.Assert(ok); cli.test {
+				return
+			}
+
+			val := arg[1]
+			if len(arg) > 2 {
+				val = arg[2]
+			}
+
+			m.Spawn(m.Source()).Cap(arg[0], val)
 		}},
 		"function": &ctx.Command{Name: "function name", Help: "定义函数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli, ok := m.Source().Server.(*CLI) // {{{
@@ -465,39 +528,39 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			// }}}
 		}},
-		"remote": &ctx.Command{Name: "remote [send args...]|[[master|slaver] listen|dial address protocol]", Help: "建立远程连接",
-			Formats: map[string]int{"send": -1, "master": 0, "slaver": 0, "listen": 1, "dial": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				action := "dial" // {{{
-				if m.Has("listen") {
-					action = "listen"
-				}
-
-				msg := m.Find(m.Get("args"), true)
-
-				if m.Has("master") {
-					msg.Template = msg.Spawn(msg.Source()).Add("option", "master")
-				}
-				msg.Cmd(action, m.Get(action))
-
-			}}, // }}}
-		"open": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
-			Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Start(fmt.Sprintf("PTS%d", m.Capi("nterm")), "管理终端", "void.sh") // {{{
-				// }}}
-			}},
-		"master": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
-			Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				_, ok := c.Server.(*CLI) // {{{
-				m.Assert(ok, "模块类型错误")
-				m.Assert(m.Target() != c, "模块是主控模块")
-
-				msg := m.Spawn(c)
-				msg.Start(fmt.Sprintf("PTS%d", Pulse.Capi("nterm")), arg[0], arg[1:]...)
-				// }}}
-			}},
+		// "remote": &ctx.Command{Name: "remote [send args...]|[[master|slaver] listen|dial address protocol]", Help: "建立远程连接",
+		// 	Formats: map[string]int{"send": -1, "master": 0, "slaver": 0, "listen": 1, "dial": 1},
+		// 	Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		// 		action := "dial" // {{{
+		// 		if m.Has("listen") {
+		// 			action = "listen"
+		// 		}
+		//
+		// 		msg := m.Find(m.Get("args"), true)
+		//
+		// 		if m.Has("master") {
+		// 			msg.Template = msg.Spawn(msg.Source()).Add("option", "master")
+		// 		}
+		// 		msg.Cmd(action, m.Get(action))
+		//
+		// 	}}, // }}}
+		// "open": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
+		// 	Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
+		// 	Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		// 		m.Start(fmt.Sprintf("PTS%d", m.Capi("nterm")), "管理终端", "void.sh") // {{{
+		// 		// }}}
+		// 	}},
+		// "master": &ctx.Command{Name: "open [master|slaver] [script [log]]", Help: "建立远程连接",
+		// 	Options: map[string]string{"master": "主控终端", "slaver": "被控终端", "args": "启动参数", "io": "读写流"},
+		// 	Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		// 		_, ok := c.Server.(*CLI) // {{{
+		// 		m.Assert(ok, "模块类型错误")
+		// 		m.Assert(m.Target() != c, "模块是主控模块")
+		//
+		// 		msg := m.Spawn(c)
+		// 		msg.Start(fmt.Sprintf("PTS%d", Pulse.Capi("nterm")), arg[0], arg[1:]...)
+		// 		// }}}
+		// 	}},
 	},
 	Index: map[string]*ctx.Context{
 		"void": &ctx.Context{Name: "void",

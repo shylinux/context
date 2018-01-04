@@ -149,6 +149,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
+
 	if m != c.Requests[0] {
 		c.Requests, m.Index = append(c.Requests, m), len(c.Requests)+1
 	}
@@ -169,7 +170,7 @@ func (c *Context) Start(m *Message) bool { // {{{
 
 // }}}
 func (c *Context) Close(m *Message, arg ...string) bool { // {{{
-	m.Log("close", c, "%v", arg)
+	m.Log("close", c, "%d:%d %v", len(m.source.Sessions), len(m.target.Historys), arg)
 
 	if m.target == c {
 		if m.Index == 0 {
@@ -240,12 +241,25 @@ func (c *Context) Master(s ...*Context) *Context { // {{{
 }
 
 // }}}
-func (c *Context) Has(key string) bool { // {{{
-	if _, ok := c.Caches[key]; ok {
-		return true
-	}
-	if _, ok := c.Configs[key]; ok {
-		return true
+func (c *Context) Has(key ...string) bool { // {{{
+	switch len(key) {
+	case 1:
+		if _, ok := c.Caches[key[0]]; ok {
+			return true
+		}
+		if _, ok := c.Configs[key[0]]; ok {
+			return true
+		}
+	case 2:
+		if _, ok := c.Caches[key[0]]; ok && key[1] == "cache" {
+			return true
+		}
+		if _, ok := c.Configs[key[0]]; ok && key[1] == "config" {
+			return true
+		}
+		if _, ok := c.Commands[key[0]]; ok && key[1] == "command" {
+			return true
+		}
 	}
 	return false
 }
@@ -494,8 +508,7 @@ func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{
 	}
 
 	info := fmt.Sprintf("%s", ctx.Name)
-	// name := fmt.Sprintf("%s->%s", m.source.Name, m.target.Name)
-	name := fmt.Sprintf("%s:%s->%s.%d", m.source.Name, m.Name, m.target.Name, m.Index)
+	name := fmt.Sprintf("%s->%s", m.source.Name, m.target.Name)
 	if m.Name != "" {
 		name = fmt.Sprintf("%s:%s->%s.%d", m.source.Name, m.Name, m.target.Name, m.Index)
 	}
@@ -912,7 +925,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 			m.master = m.source
 			if x, ok := s.Commands[key]; ok && x.Hand != nil && m.Check(c, "commands", key) {
 				m.AssertOne(m, true, func(m *Message) {
-					m.Log("cmd", s, "%s %v %v", key, arg, m.Meta["option"])
+					m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
 
 					if x.Options != nil {
 						for _, v := range m.Meta["option"] {
@@ -922,6 +935,9 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 						}
 					}
 
+					if m.Has("args") {
+						m.Meta["args"] = nil
+					}
 					if x.Formats != nil {
 						for i := 0; i < len(arg); i++ {
 							n, ok := x.Formats[arg[i]]
@@ -955,10 +971,10 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 						}
 					}
 
-					if c.Historys == nil {
-						c.Historys = make([]*Message, 0, 10)
+					if m.target.Historys == nil {
+						m.target.Historys = make([]*Message, 0, 10)
 					}
-					c.Historys = append(c.Historys, m)
+					m.target.Historys = append(m.target.Historys, m)
 				})
 
 				return m.Get("result")
@@ -1082,7 +1098,7 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 		return m.Conf(key, arg[1])
 	}
 
-	m.Log("error", nil, "配置项不存在")
+	m.Log("error", nil, "%s 配置项不存在", key)
 	return ""
 }
 
@@ -1120,8 +1136,10 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 					} else {
 						x.Value = arg[0]
 					}
+					m.Log("debug", s, "%s %s", x.Name, x.Value)
 					return x.Value
 				case 0:
+					m.Log("debug", s, "%s %s", x.Name, x.Value)
 					if x.Hand != nil {
 						return x.Hand(m, x)
 					}
@@ -1141,7 +1159,7 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 		return m.Cap(key, arg[1])
 	}
 
-	m.Log("error", nil, "缓存项不存在")
+	m.Log("error", nil, "%s 缓存项不存在", key)
 	return ""
 }
 
@@ -1328,10 +1346,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 			// }}}
 		}},
-		"context": &Command{Name: "context [home] [[find|search] name] [info|list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
+		"context": &Command{Name: "context back|[[home] [find|search] name] [info|list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
 			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "list": 0, "show": 0, "close": 0, "switch": 0, "start": 0, "spawn": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				root := !m.Has("home") // {{{
+				if m.Has("back") { // {{{
+					m.target = m.source
+					return
+				}
+				root := !m.Has("home")
 
 				ms := []*Message{}
 				switch {
@@ -1355,10 +1377,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				for _, v := range ms {
-					v.Meta = m.Meta
-					v.Data = m.Data
+					// v.Meta = m.Meta
+					// v.Data = m.Data
 					switch {
-					case m.Has("switch"):
+					case m.Has("switch"), m.Has("back"):
 						m.target = v.target
 					case m.Has("spawn"):
 						v.Set("detail", arg[2:]...).target.Spawn(v, arg[0], arg[1]).Begin(v)
@@ -1428,9 +1450,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							return true
 						})
 					case len(arg) > 0 && v != m:
+						v.Meta = m.Meta
 						v.Cmd(arg...)
-						// m.Meta = v.Meta
-						// m.target = target
+						m.Meta = v.Meta
 					default:
 						m.target = v.target
 					}
@@ -1610,12 +1632,24 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						m.Cap(arg[0], "")
 					}
 
+					if m.source == m.source.master {
+						m.source, m.target = m.target, m.source
+					}
 					m.Echo("%s", m.Cap(arg[0]))
 				case 2:
+					if m.source == m.source.master {
+						m.source, m.target = m.target, m.source
+					}
 					m.Cap(arg[0], arg[1])
 				case 3:
+					if m.source == m.source.master {
+						m.source, m.target = m.target, m.source
+					}
 					m.Cap(arg[0], arg[2])
 				case 4:
+					if m.source == m.source.master {
+						m.source, m.target = m.target, m.source
+					}
 					m.Cap(arg[0], arg[1:]...)
 				}
 				// }}}

@@ -128,25 +128,26 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					username, password = arg[1], arg[2]
 				}
 
+				msg := m
 				if username == Pulse.Conf("rootname") {
-					m.Set("detail", group, username).Target().Start(m)
-				} else if msg := m.Find(username, false); msg == nil {
+					msg = Pulse.Spawn(Pulse.Target())
+					msg.Set("detail", group, username).Target().Start(msg)
+				} else if msg = Pulse.Find(username, false); msg == nil {
 					m.Start(username, "认证用户", group, username)
+					msg = m
 				} else {
 					m.Target(msg.Target())
 				}
 
-				m.Cap("password", password)
-				m.Source().Group, m.Source().Owner = m.Cap("group"), m.Target()
-				aaa.sessions[m.Cap("sessid")] = m.Target()
-				m.Echo(m.Cap("sessid"))
+				msg.Cap("password", password)
+				m.Source().Group, m.Source().Owner = msg.Cap("group"), msg.Target()
+				aaa.sessions[m.Cap("sessid")] = msg.Target()
+				m.Echo(msg.Cap("sessid"))
 			}
 		}},
 	},
 	Index: map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void",
-			Commands: map[string]*ctx.Command{"login": &ctx.Command{}},
-		},
+		"void": &ctx.Context{Name: "void", Commands: map[string]*ctx.Command{"login": &ctx.Command{}}},
 	},
 }
 
