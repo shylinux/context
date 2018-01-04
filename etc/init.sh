@@ -2,26 +2,27 @@
 ~cli
 	@lex lex
 	~aaa login root root
-~web serve
-return
-~ssh dial chat.shylinux.com:9090 true
-sleep 1
+	~ssh dial chat.shylinux.com:9090 true
+	sleep 1
 ~host1
+	~aaa login root root
+	~web serve
 	~nfs load usr/sess.txt
-	var a = $result
-	return
-	$a = $result
-	if $a != ""
-		remote context mpa register $a
+	var sessid = $result
+	if -n $sessid
+		~host1 remote context mpa register $sessid
+	else
+		~host1 remote context mpa register terminal shhylinux term term term 1
+		let sessid $result
 	end
 
-	if $a == ""
-		remote context mpa register terminal shhylinux term term term 1
-		$sessid $result
-		remote cache sessid $sessid
-		~nfs save usr/sess.txt "terminal: " $sessid
-		~nfs genqr usr/sess.png "terminal: " $sessid
-	end
+	~host1 cache sessid $sessid
+	~host1 remote cache sessid $sessid
+	~nfs save usr/sess.txt $sessid
+	~nfs genqr usr/sess.png "terminal: " $sessid
+return
+
+	return
 return
 # ~ssh dial chat.shylinux.com:9090 true
 # ~cli
