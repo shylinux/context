@@ -133,6 +133,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				fmt.Fprintf(ssh.Writer, "detail: %v\n", v)
 			}
 			for _, k := range m.Meta["option"] {
+				if k == "args" {
+					continue
+				}
 				for _, v := range m.Meta[k] {
 					fmt.Fprintf(ssh.Writer, "%s: %s\n", k, v)
 				}
