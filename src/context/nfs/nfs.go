@@ -127,16 +127,17 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			defer f.Close()
 
+			m.Meta = nil
 			size := 1024
 			if len(arg) > 1 {
 				if s, e := strconv.Atoi(arg[1]); e == nil {
 					size = s
 				}
 			}
-
 			buf := make([]byte, size)
-			f.Read(buf)
-			m.Echo(string(buf))
+			l, e := f.Read(buf)
+			m.Echo(string(buf[:l]))
+			m.Log("info", nil, "read %d", l)
 		}},
 		"save": &ctx.Command{Name: "save file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			f, e := os.Create(arg[0])
