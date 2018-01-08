@@ -608,7 +608,13 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 		return true
 	}
 
-	if len(msg) > 0 {
+	if len(msg) > 1 {
+		arg := make([]interface{}, 0, len(msg)-1)
+		for _, m := range msg[1:] {
+			arg = append(arg, m)
+		}
+		e = errors.New(fmt.Sprintf(msg[0], arg...))
+	} else if len(msg) > 0 {
 		e = errors.New(msg[0])
 	}
 	if _, ok := e.(error); !ok {
@@ -635,9 +641,7 @@ func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message))
 				fmt.Printf("\033[31m%s error: %v\033[0m\n\n", msg.target.Name, e)
 			}
 
-			if e == io.EOF {
-				return
-			} else if len(hand) > 1 {
+			if len(hand) > 1 {
 				m.AssertOne(msg, safe, hand[1:]...)
 			} else if !safe {
 				msg.Assert(e)
@@ -809,14 +813,22 @@ func (m *Message) Add(meta string, key string, value ...string) *Message { // {{
 	case "detail", "result":
 		m.Meta[meta] = append(m.Meta[meta], key)
 		m.Meta[meta] = append(m.Meta[meta], value...)
+
 	case "option", "append":
 		if _, ok := m.Meta[key]; !ok {
 			m.Meta[key] = make([]string, 0, 3)
-			m.Meta[meta] = append(m.Meta[meta], key)
 		}
 		m.Meta[key] = append(m.Meta[key], value...)
+
+		for _, v := range m.Meta[meta] {
+			if v == key {
+				return m
+			}
+		}
+		m.Meta[meta] = append(m.Meta[meta], key)
+
 	default:
-		m.Assert(false, "消息参数错误")
+		m.Log("error", nil, "%s 消息参数错误", meta)
 	}
 
 	return m
@@ -824,20 +836,12 @@ func (m *Message) Add(meta string, key string, value ...string) *Message { // {{
 
 // }}}
 func (m *Message) Set(meta string, arg ...string) *Message { // {{{
-	if m.Meta == nil {
-		m.Meta = make(map[string][]string)
-	}
-	if _, ok := m.Meta[meta]; !ok {
-		m.Meta[meta] = make([]string, 0, 3)
-	}
-
 	switch meta {
 	case "detail", "result":
-		m.Meta[meta] = arg
+		delete(m.Meta, meta)
 	case "option", "append":
 		if len(arg) > 0 {
-			m.Meta[meta] = []string{arg[0]}
-			m.Meta[arg[0]] = arg[1:]
+			delete(m.Meta, arg[0])
 		} else {
 			for _, k := range m.Meta[meta] {
 				delete(m.Meta, k)
@@ -846,7 +850,11 @@ func (m *Message) Set(meta string, arg ...string) *Message { // {{{
 			delete(m.Meta, meta)
 		}
 	default:
-		m.Assert(false, "消息参数错误")
+		m.Log("error", nil, "%s 消息参数错误", meta)
+	}
+
+	if len(arg) > 0 {
+		m.Add(meta, arg[0], arg[1:]...)
 	}
 
 	return m
@@ -863,15 +871,20 @@ func (m *Message) Put(meta string, key string, value interface{}) *Message { // 
 		if m.Data == nil {
 			m.Data = make(map[string]interface{})
 		}
+		m.Data[key] = value
+
 		if _, ok := m.Meta[meta]; !ok {
 			m.Meta[meta] = make([]string, 0, 3)
 		}
-		if _, ok := m.Data[key]; !ok {
-			m.Meta[meta] = append(m.Meta[meta], key)
+		for _, v := range m.Meta[meta] {
+			if v == key {
+				return m
+			}
 		}
-		m.Data[key] = value
+		m.Meta[meta] = append(m.Meta[meta], key)
+
 	default:
-		m.Assert(false, "消息参数错误")
+		m.Log("error", nil, "%s 消息参数错误", meta)
 	}
 
 	return m
@@ -904,15 +917,14 @@ func (m *Message) Geti(key string) int { // {{{
 }
 
 // }}}
-func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
-	return m.Add("result", fmt.Sprintf(str, arg...))
+func (m *Message) Gets(key string) bool { // {{{
+	b := m.Get(key)
+	return b != "" && b != "0"
 }
 
 // }}}
-func (m *Message) End(s bool) { // {{{
-	if m.Wait != nil {
-		m.Wait <- s
-	}
+func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
+	return m.Add("result", fmt.Sprintf(str, arg...))
 }
 
 // }}}
@@ -962,6 +974,9 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 					}
 
 					x.Hand(m.Set("result").Set("append"), s, key, arg...)
+					if !m.Has("result") {
+						m.Meta["result"] = nil
+					}
 
 					if x.Appends != nil {
 						for _, v := range m.Meta["append"] {
@@ -981,8 +996,6 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 			}
 		}
 	}
-
-	m.Set("result", "error: ", "命令不存在")
 	return ""
 }
 
@@ -994,7 +1007,11 @@ func (m *Message) Deal(pre func(msg *Message, arg ...string) bool, post func(msg
 
 	for run := true; run; {
 		m.AssertOne(<-m.target.messages, true, func(msg *Message) {
-			defer msg.End(true)
+			defer func() {
+				if msg.Wait != nil {
+					msg.Wait <- true
+				}
+			}()
 
 			if len(msg.Meta["detail"]) == 0 {
 				return
@@ -1013,22 +1030,26 @@ func (m *Message) Deal(pre func(msg *Message, arg ...string) bool, post func(msg
 }
 
 // }}}
-func (m *Message) Post(s *Context) string { // {{{
+func (m *Message) Post(s *Context, async ...bool) string { // {{{
 	if s == nil {
 		s = m.target.master
 	}
 
-	m.Assert(s.messages != nil, s.Name+" 没有开启消息处理")
+	if s != nil && s.messages != nil {
+		if len(async) == 0 || async[0] == false {
+			m.Wait = make(chan bool)
+		}
 
-	if s.messages <- m; m.Wait != nil {
-		<-m.Wait
+		if s.messages <- m; m.Wait != nil {
+			<-m.Wait
+		}
+		return m.Get("result")
 	}
 
-	return m.Get("result")
+	return m.Exec(m.Meta["detail"][0], m.Meta["detail"][1:]...)
 }
 
 // }}}
-
 func (m *Message) Cmd(arg ...string) string { // {{{
 	if len(arg) > 0 {
 		m.Set("detail", arg...)
@@ -1039,6 +1060,21 @@ func (m *Message) Cmd(arg ...string) string { // {{{
 	}
 
 	return m.Exec(m.Meta["detail"][0], m.Meta["detail"][1:]...)
+}
+
+// }}}
+
+func (m *Message) Confs(key string, arg ...bool) bool { // {{{
+	if len(arg) > 0 {
+		if arg[0] {
+			m.Conf(key, "1")
+		} else {
+			m.Conf(key, "0")
+		}
+	}
+
+	b := m.Conf(key)
+	return b != "" && b != "0"
 }
 
 // }}}
@@ -1057,6 +1093,7 @@ func (m *Message) Confi(key string, arg ...int) int { // {{{
 // }}}
 func (m *Message) Conf(key string, arg ...string) string { // {{{
 	var hand func(m *Message, x *Config, arg ...string) string
+
 	for _, c := range []*Context{m.target, m.target.master, m.target.Owner, m.source, m.source.master, m.source.Owner} {
 		for s := c; s != nil; s = s.context {
 			if x, ok := s.Configs[key]; ok {
@@ -1070,13 +1107,12 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 						hand = x.Hand
 					}
 				case 1:
-					m.Log("conf", s, "%s %v", key, arg)
-
 					if x.Hand != nil {
 						x.Value = x.Hand(m, x, arg[0])
 					} else {
 						x.Value = arg[0]
 					}
+					m.Log("conf", s, "%s %v", x.Name, x.Value)
 					return x.Value
 				case 0:
 					if x.Hand != nil {
@@ -1103,12 +1139,29 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 }
 
 // }}}
+func (m *Message) Caps(key string, arg ...bool) bool { // {{{
+	if len(arg) > 0 {
+		if arg[0] {
+			m.Cap(key, "1")
+		} else {
+			m.Cap(key, "0")
+		}
+	}
+
+	b := m.Cap(key)
+	return b != "" && b != "0"
+}
+
+// }}}
 func (m *Message) Capi(key string, arg ...int) int { // {{{
 	n, e := strconv.Atoi(m.Cap(key))
 	m.Assert(e)
 
-	if len(arg) > 0 {
-		n, e = strconv.Atoi(m.Cap(key, fmt.Sprintf("%d", arg[0]+n)))
+	for _, i := range arg {
+		if i == 0 {
+			i = -n
+		}
+		n, e = strconv.Atoi(m.Cap(key, fmt.Sprintf("%d", n+i)))
 		m.Assert(e)
 	}
 
@@ -1118,6 +1171,7 @@ func (m *Message) Capi(key string, arg ...int) int { // {{{
 // }}}
 func (m *Message) Cap(key string, arg ...string) string { // {{{
 	var hand func(m *Message, x *Cache, arg ...string) string
+
 	for _, c := range []*Context{m.target, m.target.master, m.target.Owner, m.source, m.source.master, m.source.Owner} {
 		for s := c; s != nil; s = s.context {
 			if x, ok := s.Caches[key]; ok {
@@ -1175,8 +1229,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 	Configs: map[string]*Config{
 		"default": &Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
 
-		"start":   &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
-		"init.sh": &Config{Name: "启动脚本", Value: "etc/init.sh", Help: "模块启动时自动运行的脚本"},
+		"start":    &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
+		"init.shy": &Config{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"},
 		"bench.log": &Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件", Hand: func(m *Message, x *Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				if e := os.MkdirAll(path.Dir(arg[0]), os.ModePerm); e == nil {
@@ -1510,6 +1564,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 						return all
 					})
+					m.Assert(m.Has("result"), "%s 命令不存在", arg[0])
 				case 3:
 					cmd := &Command{}
 					m.BackTrace(func(m *Message) bool {
@@ -1686,7 +1741,7 @@ func Start(args ...string) {
 		Pulse.Conf("start", args[0])
 	}
 	if len(args) > 1 {
-		Pulse.Conf("init.sh", args[1])
+		Pulse.Conf("init.shy", args[1])
 	}
 	if len(args) > 2 {
 		Pulse.Conf("bench.log", args[2])
@@ -1705,13 +1760,11 @@ func Start(args ...string) {
 		m.target.root = Index
 		m.target.Begin(m)
 	}
-	Index.Requests = append(Index.Requests, Pulse)
 	log.Println()
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {
-		m.Set("detail", "stdout").target.Start(m)
+		m.Set("option", "stdio").target.Start(m)
 	}
 
-	for <-Pulse.Wait; Pulse.Capi("nserver") > 0; <-Pulse.Wait {
-	}
+	<-Index.master.Exit
 }
