@@ -324,7 +324,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法解析",
 					}
 				}
 
-				m.Echo(string(word))
+				m.Add("result", string(word))
 			}
 
 		}},
