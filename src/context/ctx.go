@@ -443,6 +443,7 @@ func (c *Context) Del(arg ...string) { // {{{
 type Message struct {
 	code int
 	time time.Time
+	Hand bool
 
 	Recv chan bool
 	Wait chan bool
@@ -973,10 +974,8 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 						arg = m.Meta["args"]
 					}
 
+					m.Hand = true
 					x.Hand(m.Set("result").Set("append"), s, key, arg...)
-					if !m.Has("result") {
-						m.Meta["result"] = nil
-					}
 
 					if x.Appends != nil {
 						for _, v := range m.Meta["append"] {
@@ -1112,7 +1111,7 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 					} else {
 						x.Value = arg[0]
 					}
-					m.Log("conf", s, "%s %v", x.Name, x.Value)
+					// m.Log("conf", s, "%s %v", x.Name, x.Value)
 					return x.Value
 				case 0:
 					if x.Hand != nil {
@@ -1190,10 +1189,10 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 					} else {
 						x.Value = arg[0]
 					}
-					m.Log("debug", s, "%s %s", x.Name, x.Value)
+					// m.Log("debug", s, "%s %s", x.Name, x.Value)
 					return x.Value
 				case 0:
-					m.Log("debug", s, "%s %s", x.Name, x.Value)
+					// m.Log("debug", s, "%s %s", x.Name, x.Value)
 					if x.Hand != nil {
 						return x.Hand(m, x)
 					}

@@ -12,6 +12,7 @@ import (
 	_ "context/web"
 
 	_ "context/lex"
+	_ "context/yac"
 
 	"os"
 )
