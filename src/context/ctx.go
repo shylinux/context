@@ -920,7 +920,7 @@ func (m *Message) Geti(key string) int { // {{{
 // }}}
 func (m *Message) Gets(key string) bool { // {{{
 	b := m.Get(key)
-	return b != "" && b != "0"
+	return b != "" && b != "0" && b != "false"
 }
 
 // }}}
@@ -938,7 +938,9 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 			m.master = m.source
 			if x, ok := s.Commands[key]; ok && x.Hand != nil && m.Check(c, "commands", key) {
 				m.AssertOne(m, true, func(m *Message) {
-					m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
+					if !m.target.Has("debug") || m.Caps("debug") {
+						m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
+					}
 
 					if x.Options != nil {
 						for _, v := range m.Meta["option"] {
@@ -1073,7 +1075,7 @@ func (m *Message) Confs(key string, arg ...bool) bool { // {{{
 	}
 
 	b := m.Conf(key)
-	return b != "" && b != "0"
+	return b != "" && b != "0" && b != "false"
 }
 
 // }}}
@@ -1148,7 +1150,7 @@ func (m *Message) Caps(key string, arg ...bool) bool { // {{{
 	}
 
 	b := m.Cap(key)
-	return b != "" && b != "0"
+	return b != "" && b != "0" && b != "false"
 }
 
 // }}}

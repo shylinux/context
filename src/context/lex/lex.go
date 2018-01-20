@@ -291,6 +291,7 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	lex.Caches["nreal"] = &ctx.Cache{Name: "实点数量", Value: "0", Help: "实点数量"}
 
 	lex.Caches["compact"] = &ctx.Cache{Name: "紧凑模式", Value: "true", Help: "实点数量"}
+	lex.Caches["debug"] = &ctx.Cache{Name: "调试模式", Value: "false", Help: "调试模式"}
 	return lex
 }
 

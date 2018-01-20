@@ -25,6 +25,7 @@ type State struct { // {{{
 type YAC struct { // {{{
 	seed []*Seed
 	page map[string]int
+	word map[int]string
 	hash map[string]int
 	hand map[int]string
 
@@ -203,7 +204,7 @@ func (yac *YAC) train(page, hash int, word []string) ([]*State, int) { // {{{
 func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, string) { // {{{
 
 	level := m.Capi("level", 1)
-	m.Log("info", nil, ">>>%s%d", m.Cap("label")[0:level], level)
+	m.Log("info", nil, "%s\\%d %s(%d):", m.Cap("label")[0:level], level, yac.word[page], page)
 
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
@@ -218,14 +219,16 @@ func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, st
 
 		c := byte(lex.Geti("result"))
 		state := yac.mat[s][c]
-		m.Log("info", nil, "get(%d,%d): %s %v", s, c, lex.Meta["result"][1], state)
 		if state == nil {
-			for i, x := range yac.mat[s] {
-				if int(i) >= m.Capi("nlang") || x == nil {
+
+			for i := 0; i < yac.Capi("ncell"); i++ {
+				x := yac.mat[s][byte(i)]
+				if i >= m.Capi("nlang") || x == nil {
 					continue
 				}
-				m.Log("info", nil, "try(%d,%d): %v", s, i, x)
-				if w, l := yac.parse(m, int(i), void, line); l != line {
+				m.Log("info", nil, "%s|%d try(%d,%d): %v", m.Cap("label")[0:level], level, s, i, x)
+				if w, l := yac.parse(m, i, void, line); l != line {
+					m.Log("info", nil, "%s|%d end(%d,%d): %v", m.Cap("label")[0:level], level, s, i, x)
 					word = append(word, w...)
 					state = x
 					line = l
@@ -233,6 +236,7 @@ func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, st
 				}
 			}
 		} else {
+			m.Log("info", nil, "%s|%d get(%d,%d): %v \033[31m(%s)\033[0m", m.Cap("label")[0:level], level, s, c, state, lex.Meta["result"][1])
 			word = append(word, lex.Meta["result"][1])
 		}
 
@@ -250,15 +254,14 @@ func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, st
 	if hash == 0 {
 		word = word[:0]
 	} else {
-		m.Log("info", nil, "%s(%d,%d): %d %v %v", yac.hand[page], page, hash, len(word), word, line)
-		msg := m.Spawn(m.Source()).Add("detail", yac.hand[page], word...)
+		msg := m.Spawn(m.Source()).Add("detail", yac.hand[hash], word...)
 		if msg.Cmd(); msg.Hand {
+			m.Log("info", nil, "%s>%d set(%d): \033[31m%v\033[0m->\033[32m%v\033[0m", m.Cap("label")[0:level], level, hash, word, msg.Meta["result"])
 			word = msg.Meta["result"]
 		}
-		m.Log("info", nil, "end(%d,%d): %d %v %v", page, hash, len(word), word, line)
 	}
 
-	m.Log("info", nil, "<<<%s%d", m.Cap("label")[0:level], level)
+	m.Log("info", nil, "%s/%d %s(%d):", m.Cap("label")[0:level], level, yac.hand[hash], hash)
 	level = m.Capi("level", -1)
 	return word, line
 }
@@ -296,6 +299,7 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	yac.Caches["label"] = &ctx.Cache{Name: "嵌套标记", Value: "####################", Help: "嵌套层级"}
 
 	yac.page = map[string]int{"nil": 0}
+	yac.word = map[int]string{0: "nil"}
 	yac.hash = map[string]int{"nil": 0}
 	yac.hand = map[int]string{0: "nil"}
 
@@ -332,13 +336,14 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				if !ok {
 					page = m.Capi("npage", 1)
 					yac.page[arg[0]] = page
+					yac.word[page] = arg[0]
 				}
 
 				hash, ok := yac.hash[arg[1]]
 				if !ok {
 					hash = m.Capi("nhash", 1)
-					yac.hash[arg[0]] = hash
-					yac.hand[hash] = arg[0]
+					yac.hash[arg[1]] = hash
+					yac.hand[hash] = arg[1]
 				}
 
 				if yac.lex == nil {
