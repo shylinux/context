@@ -19,6 +19,10 @@ import ( // {{{
 
 // }}}
 
+func right(str string) bool {
+	return str != "" && str != "0" && str != "false"
+}
+
 type Cache struct {
 	Name  string
 	Value string
@@ -499,7 +503,7 @@ func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{
 	case "begin", "start", "close":
 		color = 36
 	case "debug":
-		if m.root.Conf("debug") != "on" {
+		if !m.Confs("debug") {
 			return
 		}
 	}
@@ -919,13 +923,102 @@ func (m *Message) Geti(key string) int { // {{{
 
 // }}}
 func (m *Message) Gets(key string) bool { // {{{
-	b := m.Get(key)
-	return b != "" && b != "0" && b != "false"
+	return right(m.Get(key))
 }
 
 // }}}
 func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 	return m.Add("result", fmt.Sprintf(str, arg...))
+}
+
+// }}}
+
+func (m *Message) Option(key string, arg ...string) string { // {{{
+	if len(arg) > 0 {
+		m.Log("fuck", nil, "option set %s %v", key, arg)
+		m.Set("option", append([]string{key}, arg...)...)
+	}
+
+	for msg := m; msg != nil; msg = msg.message {
+		msg.Log("fuck", nil, "option")
+		if m.Has(key) {
+			return m.Get(key)
+		}
+	}
+	return ""
+}
+
+// }}}
+func (m *Message) Optioni(key string, arg ...int) int { // {{{
+	if len(arg) > 0 {
+		meta := []string{}
+		for _, v := range arg {
+			meta = append(meta, fmt.Sprintf("%d", v))
+		}
+		m.Option(key, meta...)
+	}
+
+	i, e := strconv.Atoi(m.Option(key))
+	m.Assert(e)
+	return i
+}
+
+// }}}
+func (m *Message) Options(key string, arg ...bool) bool { // {{{
+	if len(arg) > 0 {
+		meta := []string{}
+		for _, v := range arg {
+			meta = append(meta, fmt.Sprintf("%t", v))
+		}
+		m.Option(key, meta...)
+	}
+
+	return right(m.Option(key))
+}
+
+// }}}
+
+func (m *Message) Append(key string, arg ...string) string { // {{{
+	if len(arg) > 0 {
+		m.Log("fuck", nil, "append set %s %v", key, arg)
+		m.Set("append", append([]string{key}, arg...)...)
+	}
+
+	for msg := m; msg != nil; msg = msg.message {
+		msg.Log("fuck", nil, "append")
+		if m.Has(key) {
+			return m.Get(key)
+		}
+	}
+	return ""
+}
+
+// }}}
+func (m *Message) Appendi(key string, arg ...int) int { // {{{
+	if len(arg) > 0 {
+		meta := []string{}
+		for _, v := range arg {
+			meta = append(meta, fmt.Sprintf("%d", v))
+		}
+		m.Append(key, meta...)
+	}
+
+	i, e := strconv.Atoi(m.Append(key))
+	m.Assert(e)
+	return i
+}
+
+// }}}
+func (m *Message) Appends(key string, arg ...bool) bool { // {{{
+	if len(arg) > 0 {
+		meta := []string{}
+		for _, v := range arg {
+			meta = append(meta, fmt.Sprintf("%t", v))
+		}
+		m.Append(key, meta...)
+	}
+
+	return right(m.Append(key))
 }
 
 // }}}
@@ -1271,7 +1364,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"ContextSessionSize": &Config{Name: "会话队列长度", Value: "10", Help: "每个模块可以启动其它模块的数量"},
 		"MessageQueueSize":   &Config{Name: "消息队列长度", Value: "10", Help: "每个模块接收消息的队列长度"},
 
-		"debug": &Config{Name: "调试模式(off/on)", Value: "off", Help: "是否打印错误信息，off:不打印，on:打印)"},
+		"debug": &Config{Name: "调试模式(true/false)", Value: "false", Help: "是否打印错误信息，off:不打印，on:打印)"},
 		"cert":  &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
 		"key":   &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
@@ -1400,6 +1493,30 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 			// }}}
+		}},
+		"option": &Command{Name: "option key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			if len(arg) > 0 { // {{{
+				m.Option(arg[0], arg[1:]...)
+			} else {
+				for msg := m; msg != nil; msg = msg.message {
+					m.Echo("%d %s:%s->%s %v\n", msg.code, msg.time.Format("15:03:04"), msg.source.Name, msg.target.Name, msg.Meta["detail"])
+					for _, k := range msg.Meta["option"] {
+						m.Echo("%s: %v\n", k, msg.Meta[k])
+					}
+				}
+			} // }}}
+		}},
+		"append": &Command{Name: "append key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			if len(arg) > 0 { // {{{
+				m.Append(arg[0], arg[1:]...)
+			} else {
+				for msg := m; msg != nil; msg = msg.message {
+					m.Echo("%d %s:%s->%s %v\n", msg.code, msg.time.Format("15:03:04"), msg.source.Name, msg.target.Name, msg.Meta["result"])
+					for _, k := range msg.Meta["append"] {
+						m.Echo("%s: %v\n", k, msg.Meta[k])
+					}
+				}
+			} // }}}
 		}},
 		"context": &Command{Name: "context back|[[home] [find|search] name] [info|list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
 			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "list": 0, "show": 0, "close": 0, "switch": 0, "start": 0, "spawn": 0},

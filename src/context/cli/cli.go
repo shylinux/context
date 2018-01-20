@@ -34,16 +34,7 @@ type CLI struct { // {{{
 
 // }}}
 
-func (cli *CLI) print(str string, arg ...interface{}) bool { // {{{
-	if cli.out != nil {
-		fmt.Fprintf(cli.out, str, arg...)
-		return true
-	}
-	return false
-}
-
-// }}}
-func (cli *CLI) check(arg []string) bool {
+func (cli *CLI) check(arg []string) bool { // {{{
 	if len(arg) < 0 {
 		return false
 	}
@@ -56,6 +47,7 @@ func (cli *CLI) check(arg []string) bool {
 	return true
 }
 
+// }}}
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
@@ -74,7 +66,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 
 // }}}
-func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
+func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	cli.Caches["target"] = &ctx.Cache{Name: "操作目标", Value: cli.Name, Help: "命令操作的目标"}
 	cli.Caches["result"] = &ctx.Cache{Name: "执行结果", Value: "", Help: "前一条命令的执行结果"}
 	cli.Caches["back"] = &ctx.Cache{Name: "前一条指令", Value: "", Help: "前一条指令"}
@@ -108,7 +100,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 		// }}}
 	}}
 	cli.Configs["yac"] = &ctx.Config{Name: "词法解析器", Value: "", Help: "命令行词法解析器", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
-		if len(arg) > 0 && len(arg[0]) > 0 {
+		if len(arg) > 0 && len(arg[0]) > 0 { // {{{
 			cli, ok := m.Target().Server.(*CLI)
 			m.Assert(ok, "模块类型错误")
 
@@ -125,10 +117,10 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 				m.Spawn(yac.Target()).Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9]+", "}")
 				m.Spawn(yac.Target()).Cmd("train", "word", "word", "mul{", "~", "!", "tran", "\"[^\"]*\"", "'[^']*'", "[a-zA-Z0-9_/.]+", "}")
 
-				m.Spawn(yac.Target()).Cmd("train", "op1", "op1", "opt{", "mul{", "-z", "-n", "}", "}", "word")
-				m.Spawn(yac.Target()).Cmd("train", "op2", "op2", "op1", "rep{", "mul{", "+", "-", "*", "/", "}", "op1", "}")
-				m.Spawn(yac.Target()).Cmd("train", "op1", "op1", "(", "op2", ")")
-
+				// m.Spawn(yac.Target()).Cmd("train", "op1", "op1", "opt{", "mul{", "-z", "-n", "}", "}", "word")
+				// m.Spawn(yac.Target()).Cmd("train", "op2", "op2", "op1", "rep{", "mul{", "+", "-", "*", "/", "}", "op1", "}")
+				// m.Spawn(yac.Target()).Cmd("train", "op1", "op1", "(", "op2", ")")
+				//
 				m.Spawn(yac.Target()).Cmd("train", "stm", "var", "var", "key", "opt{", "=", "op2", "}")
 
 				m.Spawn(yac.Target()).Cmd("train", "cmd", "cmd", "rep{", "word", "}")
@@ -140,7 +132,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 			return arg[0]
 		}
 		return x.Value
-
+		// }}}
 	}}
 	cli.Configs["PS1"] = &ctx.Config{Name: "命令行提示符(target/detail)", Value: "target", Help: "命令行提示符，target:显示当前模块，detail:显示详细信息", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 { // {{{
@@ -199,6 +191,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return cli
 }
 
+// }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	cli.Caches["#"] = &ctx.Cache{Name: "参数个数", Value: fmt.Sprintf("%d", len(arg)), Help: "参数个数"}
 	for i, v := range arg {
@@ -212,61 +205,71 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Caps("else", true)
 	}
 	m.Caps("exit", false)
-
-	if m.Has("stdio") {
-		cli.Caches["init.shy"] = &ctx.Cache{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"}
-		cli.Caches["level"] = &ctx.Cache{Name: "模块嵌套层数", Value: "0", Help: "模块嵌套层数"}
-		if len(arg) > 0 {
-			m.Cap("init.shy", arg[0])
+	if true {
+		if m.Has("stdio") {
+			cli.Caches["init.shy"] = &ctx.Cache{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"}
+			if len(arg) > 0 {
+				m.Cap("init.shy", arg[0])
+			}
+			go func() {
+				m.Find("nfs").Cmd("scan", m.Cap("init.shy"))
+				m.Find("nfs").Cmd("scan", "stdio")
+			}()
 		}
-		m.Find("nfs").Cmd("scan", m.Cap("init.shy"))
-
-		m.Cap("next", fmt.Sprintf("source %s\n", m.Cap("init.shy")))
-		cli.bio = bufio.NewReader(os.Stdin)
-		cli.out = os.Stdout
-		m.Conf("yac", "yac")
-		m.Cap("stream", "stdout")
-	} else if stream, ok := m.Data["file"]; ok {
-		if bio, ok := stream.(*bufio.Reader); ok {
-			cli.bio = bio
-			m.Cap("stream", "bufio")
-		} else {
-			cli.bio = bufio.NewReader(stream.(io.ReadWriteCloser))
-			m.Cap("stream", "file")
+	} else {
+		if m.Has("stdio") {
+			cli.Caches["init.shy"] = &ctx.Cache{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"}
+			cli.Caches["level"] = &ctx.Cache{Name: "模块嵌套层数", Value: "0", Help: "模块嵌套层数"}
+			if len(arg) > 0 {
+				m.Cap("init.shy", arg[0])
+			}
+			m.Cap("next", fmt.Sprintf("source %s\n", m.Cap("init.shy")))
+			cli.bio = bufio.NewReader(os.Stdin)
+			cli.out = os.Stdout
+			m.Conf("yac", "yac")
+			m.Cap("stream", "stdout")
+		} else if stream, ok := m.Data["file"]; ok {
+			if bio, ok := stream.(*bufio.Reader); ok {
+				cli.bio = bio
+				m.Cap("stream", "bufio")
+			} else {
+				cli.bio = bufio.NewReader(stream.(io.ReadWriteCloser))
+				m.Cap("stream", "file")
+			}
 		}
-	}
 
-	m.Capi("nline", 0, len(cli.lines))
-	m.Caps("pos", m.Has("for"))
+		m.Capi("nline", 0, len(cli.lines))
+		m.Caps("pos", m.Has("for"))
 
-	m.Log("info", nil, "%p %s pos:%s nline:%s %d", cli.bio, m.Cap("stream"), m.Cap("pos"), m.Cap("nline"), len(cli.lines))
+		m.Log("info", nil, "%p %s pos:%s nline:%s %d", cli.bio, m.Cap("stream"), m.Cap("pos"), m.Cap("nline"), len(cli.lines))
 
-	go m.AssertOne(m, true, func(m *ctx.Message) {
-		for !m.Caps("exit") {
-			line := m.Cap("next")
-			if m.Cap("next", ""); line == "" {
-				if cli.bio == nil {
-					line = cli.lines[m.Capi("pos", 1)-1]
-				} else {
-					cli.print(m.Conf("PS1"))
-					if l, e := cli.bio.ReadString('\n'); m.Assert(e) {
-						line = l
+		go m.AssertOne(m, true, func(m *ctx.Message) {
+			for !m.Caps("exit") {
+				line := m.Cap("next")
+				if m.Cap("next", ""); line == "" {
+					if cli.bio == nil {
+						line = cli.lines[m.Capi("pos", 1)-1]
+					} else {
+						// cli.print(m.Conf("PS1"))
+						if l, e := cli.bio.ReadString('\n'); m.Assert(e) {
+							line = l
+						}
 					}
 				}
-			}
 
-			if line == "\n" && cli.out != nil {
-				line = m.Cap("back") + "\n"
-				m.Cap("back", "")
-			}
+				if line == "\n" && cli.out != nil {
+					line = m.Cap("back") + "\n"
+					m.Cap("back", "")
+				}
 
-			yac := m.Spawn(cli.yac.Target())
-			yac.Cmd("parse", "line", "void", line)
-		}
-	}, func(m *ctx.Message) {
-		m.Caps("exit", true)
-		m.Spawn(cli.Context).Set("detail", "end").Post(cli.Context)
-	})
+				yac := m.Spawn(cli.yac.Target())
+				yac.Cmd("parse", "line", "void", line)
+			}
+		}, func(m *ctx.Message) {
+			m.Caps("exit", true)
+			m.Spawn(cli.Context).Set("detail", "end").Post(cli.Context)
+		})
+	}
 
 	m.Deal(func(msg *ctx.Message, arg ...string) bool {
 		return !cli.Has("skip") || !m.Caps("skip") || Index.Has(msg.Get("detail"), "command")
@@ -359,7 +362,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"express": &ctx.Command{Name: "express exp", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			result := "false"
+			result := "false" // {{{
 			switch len(arg) {
 			case 0:
 				result = ""
@@ -469,9 +472,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			}
 			m.Echo(result)
+			// }}}
 		}},
 		"op1": &ctx.Command{Name: "op1 word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) {
+			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 				if len(arg) == 1 {
 					m.Echo(arg[0])
 					return
@@ -492,9 +496,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}
 				}
 			}
+			// }}}
 		}},
 		"op2": &ctx.Command{Name: "op2 word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
+			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 				pre := map[string]int{"+": 1, "-": 1, "*": 2, "/": 2}
 				num := []string{arg[0]}
 				op := []string{}
@@ -516,6 +521,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				m.Echo("%s", num[0])
 			}
+			// }}}
 		}},
 		"tran": &ctx.Command{Name: "tran word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
@@ -555,13 +561,33 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			} // }}}
 		}},
-		"line": &ctx.Command{Name: "line word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"parse": &ctx.Command{Name: "parse word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
+
+				msg := m.Spawn(cli.target)
+				if a, ok := cli.alias[arg[0]]; ok {
+					msg.Set("detail", a...)
+					msg.Meta["detail"] = append(msg.Meta["detail"], arg[1:]...)
+				} else {
+					msg.Set("detail", arg...)
+				}
+
+				msg.Post(cli.Context)
+				if m.Hand = false; msg.Hand {
+					m.Hand = true
+					m.Meta["result"] = msg.Meta["result"]
+				}
+			} // }}}
+		}},
+		"lines": &ctx.Command{Name: "line word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 				arg = arg[:len(arg)-1]
 
+				m.Hand = false
 				result := strings.TrimRight(strings.Join(arg, ""), "\n")
 				if m.Cap("result", result); len(result) > 0 {
-					cli.print(result + "\n")
+					m.Echo(result + "\n")
+					// cli.print(result + "\n")
 				}
 
 				if m.Cap("back", ""); cli.bio != nil {

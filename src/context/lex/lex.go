@@ -339,7 +339,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 				}
 
 				lex.seed = append(lex.seed, &Seed{page, hash, string(arg[0])})
-				lex.Log("info", nil, "%d %d %d %v", page, hash, lex.Capi("nseed", 1), arg[0])
+				lex.Log("debug", nil, "%d %d %d %v", page, hash, lex.Capi("nseed", 1), arg[0])
 				lex.Cap("stream", fmt.Sprintf("%s,%s,%s", lex.Cap("nseed"), lex.Cap("npage"), lex.Cap("nhash")))
 
 				m.Echo("%d", lex.train(page, hash, []byte(arg[0])))

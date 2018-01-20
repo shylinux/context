@@ -89,7 +89,7 @@ func (yac *YAC) train(page, hash int, word []string) ([]*State, int) { // {{{
 					x.star = s
 					sn[x.next] = true
 					point = append(point, x)
-					yac.Pulse.Log("info", nil, "END: %v", x)
+					yac.Pulse.Log("debug", nil, "END: %v", x)
 				}
 			case "mul{":
 				mul, n = true, 1
@@ -117,7 +117,7 @@ func (yac *YAC) train(page, hash int, word []string) ([]*State, int) { // {{{
 				}
 
 				state := yac.mat[s][c]
-				yac.Pulse.Log("info", nil, "GET(%d, %d): %v", s, c, state)
+				yac.Pulse.Log("debug", nil, "GET(%d, %d): %v", s, c, state)
 				if state == nil {
 					state = &State{}
 					yac.Pulse.Capi("nnode", 1)
@@ -141,7 +141,7 @@ func (yac *YAC) train(page, hash int, word []string) ([]*State, int) { // {{{
 				}
 				yac.mat[s][c] = state
 
-				yac.Pulse.Log("info", nil, "SET(%d, %d): %v", s, c, state)
+				yac.Pulse.Log("debug", nil, "SET(%d, %d): %v", s, c, state)
 				ends = append(ends, state)
 				point = append(point, state)
 				if s > begin {
@@ -175,7 +175,7 @@ func (yac *YAC) train(page, hash int, word []string) ([]*State, int) { // {{{
 			}
 		}
 		if void {
-			yac.Pulse.Log("info", nil, "DEL: %d %d", yac.Pulse.Capi("nline"), n)
+			yac.Pulse.Log("debug", nil, "DEL: %d %d", yac.Pulse.Capi("nline"), n)
 			yac.Pulse.Capi("nline", 0, n)
 			yac.mat = yac.mat[:n]
 		}
@@ -184,14 +184,14 @@ func (yac *YAC) train(page, hash int, word []string) ([]*State, int) { // {{{
 	for _, n := range ss {
 		for _, s := range point {
 			if s.next == n {
-				yac.Pulse.Log("info", nil, "GET: %v", s)
+				yac.Pulse.Log("debug", nil, "GET: %v", s)
 				if s.next >= len(yac.mat) {
 					s.next = 0
 				}
 				if hash > 0 {
 					s.hash = hash
 				}
-				yac.Pulse.Log("info", nil, "SET: %v", s)
+				yac.Pulse.Log("debug", nil, "SET: %v", s)
 			}
 		}
 
@@ -204,7 +204,7 @@ func (yac *YAC) train(page, hash int, word []string) ([]*State, int) { // {{{
 func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, string) { // {{{
 
 	level := m.Capi("level", 1)
-	m.Log("info", nil, "%s\\%d %s(%d):", m.Cap("label")[0:level], level, yac.word[page], page)
+	m.Log("debug", nil, "%s\\%d %s(%d):", m.Cap("label")[0:level], level, yac.word[page], page)
 
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
@@ -215,7 +215,6 @@ func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, st
 
 		lex = yac.lex.Spawn(yac.lex.Target())
 		lex.Cmd("parse", line, fmt.Sprintf("yac%d", s))
-		line = lex.Meta["result"][2]
 
 		c := byte(lex.Geti("result"))
 		state := yac.mat[s][c]
@@ -226,9 +225,9 @@ func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, st
 				if i >= m.Capi("nlang") || x == nil {
 					continue
 				}
-				m.Log("info", nil, "%s|%d try(%d,%d): %v", m.Cap("label")[0:level], level, s, i, x)
+				m.Log("debug", nil, "%s|%d try(%d,%d): %v", m.Cap("label")[0:level], level, s, i, x)
 				if w, l := yac.parse(m, i, void, line); l != line {
-					m.Log("info", nil, "%s|%d end(%d,%d): %v", m.Cap("label")[0:level], level, s, i, x)
+					m.Log("debug", nil, "%s|%d end(%d,%d): %v", m.Cap("label")[0:level], level, s, i, x)
 					word = append(word, w...)
 					state = x
 					line = l
@@ -236,8 +235,9 @@ func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, st
 				}
 			}
 		} else {
-			m.Log("info", nil, "%s|%d get(%d,%d): %v \033[31m(%s)\033[0m", m.Cap("label")[0:level], level, s, c, state, lex.Meta["result"][1])
+			m.Log("debug", nil, "%s|%d get(%d,%d): %v \033[31m(%s)\033[0m", m.Cap("label")[0:level], level, s, c, state, lex.Meta["result"][1])
 			word = append(word, lex.Meta["result"][1])
+			line = lex.Meta["result"][2]
 		}
 
 		if state == nil {
@@ -254,14 +254,14 @@ func (yac *YAC) parse(m *ctx.Message, page, void int, line string) ([]string, st
 	if hash == 0 {
 		word = word[:0]
 	} else {
-		msg := m.Spawn(m.Source()).Add("detail", yac.hand[hash], word...)
+		msg := m.Spawn(yac.Message.Source()).Add("detail", yac.hand[hash], word...)
 		if msg.Cmd(); msg.Hand {
-			m.Log("info", nil, "%s>%d set(%d): \033[31m%v\033[0m->\033[32m%v\033[0m", m.Cap("label")[0:level], level, hash, word, msg.Meta["result"])
+			m.Log("debug", nil, "%s>%d set(%d): \033[31m%v\033[0m->\033[32m%v\033[0m", m.Cap("label")[0:level], level, hash, word, msg.Meta["result"])
 			word = msg.Meta["result"]
 		}
 	}
 
-	m.Log("info", nil, "%s/%d %s(%d):", m.Cap("label")[0:level], level, yac.hand[hash], hash)
+	m.Log("debug", nil, "%s/%d %s(%d):", m.Cap("label")[0:level], level, yac.hand[hash], hash)
 	level = m.Capi("level", -1)
 	return word, line
 }

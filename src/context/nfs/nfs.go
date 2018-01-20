@@ -3,6 +3,7 @@ package nfs
 import (
 	"context"
 
+	"bufio"
 	"fmt"
 	"github.com/skip2/go-qrcode"
 	"io"
@@ -12,28 +13,35 @@ import (
 )
 
 type NFS struct {
-	file *os.File
+	in  *os.File
+	out *os.File
 	*ctx.Context
 }
 
-func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	file, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE, os.ModePerm)
-	m.Assert(e)
-	info, e := os.Stat(arg[0])
-	m.Assert(e)
+func (nfs *NFS) print(str string, arg ...interface{}) bool {
+	if nfs.out == nil {
+		return false
+	}
 
+	fmt.Fprintf(nfs.out, str, arg...)
+	return true
+}
+
+func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{
-		"name": &ctx.Cache{Name: "name", Value: info.Name(), Help: "文件名"},
-		"mode": &ctx.Cache{Name: "mode", Value: info.Mode().String(), Help: "文件权限"},
-		"time": &ctx.Cache{Name: "time", Value: info.ModTime().Format("15:03:04"), Help: "创建时间"},
-		"size": &ctx.Cache{Name: "size", Value: fmt.Sprintf("%d", info.Size()), Help: "文件大小"},
-		"pos":  &ctx.Cache{Name: "pos", Value: "0", Help: "读写位置"},
+		"pos": &ctx.Cache{Name: "读写位置", Value: "0", Help: "读写位置"},
 	}
 	c.Configs = map[string]*ctx.Config{}
 
+	if info, e := os.Stat(arg[1]); e == nil {
+		c.Caches["name"] = &ctx.Cache{Name: "name", Value: info.Name(), Help: "文件名"}
+		c.Caches["mode"] = &ctx.Cache{Name: "mode", Value: info.Mode().String(), Help: "文件权限"}
+		c.Caches["size"] = &ctx.Cache{Name: "size", Value: fmt.Sprintf("%d", info.Size()), Help: "文件大小"}
+		c.Caches["time"] = &ctx.Cache{Name: "time", Value: info.ModTime().Format("15:03:04"), Help: "创建时间"}
+	}
+
 	s := new(NFS)
 	s.Context = c
-	s.file = file
 	return s
 
 }
@@ -46,18 +54,49 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server {
 }
 
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
-	m.Log("info", nil, "%d open %s", Pulse.Capi("nfile"), m.Cap("name"))
-	m.Cap("stream", m.Cap("name"))
-	return false
+	if out, ok := m.Data["out"]; ok {
+		nfs.out = out.(*os.File)
+	}
+	if in, ok := m.Data["in"]; ok {
+		nfs.in = in.(*os.File)
+	}
+
+	m.Log("info", nil, "%d %v", Pulse.Capi("nfile"), arg)
+	if m.Cap("stream", arg[1]); arg[0] == "open" {
+		return false
+	}
+
+	cli := m.Reply()
+	cli.Conf("yac", "yac")
+	yac := m.Find(cli.Conf("yac"))
+	bio := bufio.NewScanner(nfs.in)
+	nfs.print("%s", cli.Conf("PS1"))
+
+	for bio.Scan() {
+		line := m
+		if yac != nil {
+			// line = cli.Spawn(yac.Target())
+			line = m.Spawn(yac.Target())
+		} else {
+			line = m.Reply()
+		}
+		line.Cmd(append([]string{"parse", "line", "void"}, strings.Split(bio.Text()+" \n", " ")...)...)
+
+		if result := strings.TrimRight(strings.Join(line.Meta["result"], ""), "\n"); len(result) > 0 {
+			nfs.print("%s", result+"\n")
+		}
+		nfs.print("%s", cli.Conf("PS1"))
+	}
+	return true
 }
 
 func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
 	switch nfs.Context {
 	case m.Target():
-		if nfs.file != nil {
+		if nfs.in != nil {
 			m.Log("info", nil, "%d close %s", Pulse.Capi("nfile", -1)+1, m.Cap("name"))
-			nfs.file.Close()
-			nfs.file = nil
+			nfs.in.Close()
+			nfs.in = nil
 		}
 	case m.Source():
 	}
@@ -73,8 +112,21 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"size": &ctx.Config{Name: "size", Value: "1024", Help: "读取文件的默认大小值"},
 	},
 	Commands: map[string]*ctx.Command{
+		"scan": &ctx.Command{Name: "scan file", Help: "扫描文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if arg[0] == "stdio" {
+				m.Put("option", "in", os.Stdin).Put("option", "out", os.Stdout)
+				m.Start("stdio", "扫描文件", m.Meta["detail"]...)
+			} else if f, e := os.Open(arg[0]); m.Assert(e) {
+				m.Put("option", "in", f)
+				m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "扫描文件", m.Meta["detail"]...)
+			}
+			m.Echo(m.Target().Name)
+		}},
 		"open": &ctx.Command{Name: "open file", Help: "打开文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", arg...)
+			if f, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE, os.ModePerm); m.Assert(e) {
+				m.Put("option", "in", f).Put("option", "out", f)
+				m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", m.Meta["detail"]...)
+			}
 			m.Echo(m.Target().Name)
 		}},
 		"read": &ctx.Command{Name: "read [size [pos]]", Help: "读取文件, size: 读取大小, pos: 读取位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -92,7 +144,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 
 			buf := make([]byte, n)
-			if n, e = nfs.file.ReadAt(buf, int64(m.Capi("pos"))); e != io.EOF {
+			if n, e = nfs.in.ReadAt(buf, int64(m.Capi("pos"))); e != io.EOF {
 				m.Assert(e)
 			}
 			m.Echo(string(buf))
@@ -108,11 +160,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 
 			if len(arg[0]) == 0 {
-				m.Assert(nfs.file.Truncate(int64(m.Capi("pos"))))
+				m.Assert(nfs.in.Truncate(int64(m.Capi("pos"))))
 				m.Cap("size", m.Cap("pos"))
 				m.Cap("pos", "0")
 			} else {
-				n, e := nfs.file.WriteAt([]byte(arg[0]), int64(m.Capi("pos")))
+				n, e := nfs.in.WriteAt([]byte(arg[0]), int64(m.Capi("pos")))
 				if m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
 					m.Cap("size", m.Cap("pos"))
 				}

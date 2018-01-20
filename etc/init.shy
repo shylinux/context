@@ -1,3 +1,2 @@
 ~cli
 	~aaa login root root
-	var a = 4 + 3 * 5 - 2
