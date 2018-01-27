@@ -42,17 +42,19 @@ snippet c
 		if `Filename()`.Context == Index {
 			Pulse = m
 		}
+		`Filename()`.Message = m
 		return `Filename()`
 	}
 
 	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Start(m *ctx.Message, arg ...string) bool {
+		`Filename()`.Message = m
 		return false
 	}
 
 	func (`Filename()` *`toupper(substitute(expand("%:t"), ".go", "", ""))`) Close(m *ctx.Message, arg ...string) bool {
 		switch `Filename()`.Context {
-		case m.Target:
-		case m.Source:
+		case m.Target():
+		case m.Source():
 		}
 		return true
 	}

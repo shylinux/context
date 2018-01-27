@@ -33,6 +33,7 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 
 func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	aaa.Context.Master(nil)
 	aaa.Caches["group"] = &ctx.Cache{Name: "用户组", Value: "", Help: "用户组"}
 	aaa.Caches["username"] = &ctx.Cache{Name: "用户名", Value: "", Help: "用户名"}
 	aaa.Caches["password"] = &ctx.Cache{Name: "用户密码", Value: "", Help: "用户密码，加密存储", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {

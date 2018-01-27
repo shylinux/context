@@ -240,7 +240,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						if line = strings.TrimSpace(line); line != "" {
 							lex.Cmd("split", line, "void")
 							cli.Wait = make(chan bool)
-							cli.Cmd(lex.Meta["result"]...)
+							cli.Cmd(lex.Meta["result"])
 							m.Meta["result"] = cli.Meta["result"]
 						}
 

@@ -59,7 +59,7 @@ func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
 			if msg.Log("info", nil, "remote: %v", msg.Meta["option"]); msg.Has("detail") {
 				msg.Log("info", nil, "%d exec: %v", m.Capi("nrecv", 1), msg.Meta["detail"])
 
-				msg.Cmd(msg.Meta["detail"]...)
+				msg.Cmd(msg.Meta["detail"])
 				target = msg.Target()
 				m.Cap("target", target.Name)
 
@@ -113,10 +113,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address protocol", Help: "监听连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Find("tcp").Cmd(m.Meta["detail"]...)
+			m.Find("tcp").Cmd(m.Meta["detail"])
 		}},
 		"dial": &ctx.Command{Name: "dial address protocol", Help: "建立连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Find("tcp").Cmd(m.Meta["detail"]...)
+			m.Find("tcp").Cmd(m.Meta["detail"])
 		}},
 		"open": &ctx.Command{Name: "open", Help: "打开连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "主机连接")

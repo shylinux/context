@@ -127,6 +127,8 @@ func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
 func (c *Context) Begin(m *Message) *Context { // {{{
 	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
 	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
+	c.Caches["debug"] = &Cache{Name: "命令日志", Value: "true", Help: "嵌套层级"}
+	c.Configs["debug"] = &Config{Name: "过程日志", Value: "true", Help: "嵌套层级"}
 
 	m.Index = 1
 	c.Pulse = m
@@ -153,6 +155,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 
 // }}}
 func (c *Context) Start(m *Message) bool { // {{{
+	m.Hand = true
 
 	if m != c.Requests[0] {
 		c.Requests, m.Index = append(c.Requests, m), len(c.Requests)+1
@@ -238,8 +241,11 @@ func (c *Context) Context() *Context { // {{{
 
 // }}}
 func (c *Context) Master(s ...*Context) *Context { // {{{
-	if len(s) > 0 && s[0] == c {
-		c.master = c
+	if len(s) > 0 {
+		switch s[0] {
+		case nil, c:
+			c.master = s[0]
+		}
 	}
 	return c.master
 }
@@ -445,8 +451,8 @@ func (c *Context) Del(arg ...string) { // {{{
 // }}}
 
 type Message struct {
-	code int
 	time time.Time
+	code int
 	Hand bool
 
 	Recv chan bool
@@ -467,7 +473,15 @@ type Message struct {
 	Template *Message
 }
 
-func (m *Message) Source() *Context { // {{{
+func (m *Message) Code() int { // {{{
+	return m.code
+}
+
+// }}}
+func (m *Message) Source(s ...*Context) *Context { // {{{
+	if len(s) > 0 {
+		m.source = s[0]
+	}
 	return m.source
 }
 
@@ -932,17 +946,122 @@ func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 }
 
 // }}}
+func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {{{
+	switch meta {
+	case "detail", "result":
+		m.Meta[meta] = append(m.Meta[meta][:0], msg.Meta[meta]...)
+	case "option", "append":
+		if len(arg) == 0 {
+			arg = msg.Meta[meta]
+		}
+
+		for _, k := range arg {
+			if v, ok := msg.Meta[k]; ok {
+				m.Set(meta, k).Add(meta, k, v...)
+			}
+			if v, ok := msg.Data[k]; ok {
+				m.Put(meta, k, v)
+			}
+		}
+	}
+
+	return m
+}
+
+// }}}
+
+func (m *Message) Insert(meta string, index int, arg ...interface{}) string { // {{{
+	if m.Meta == nil {
+		m.Meta = make(map[string][]string)
+	}
+
+	str := []string{}
+	for _, v := range arg {
+		switch s := v.(type) {
+		case string:
+			str = append(str, s)
+		case []string:
+			str = append(str, s...)
+		case []int:
+			for _, v := range s {
+				str = append(str, fmt.Sprintf("%d", v))
+			}
+		case []bool:
+			for _, v := range s {
+				str = append(str, fmt.Sprintf("%t", v))
+			}
+		default:
+			str = append(str, fmt.Sprintf("%v", s))
+		}
+	}
+
+	if index == -1 {
+		index, m.Meta[meta] = 0, append(str, m.Meta[meta]...)
+	} else if index == -2 {
+		index, m.Meta[meta] = len(m.Meta[meta]), append(m.Meta[meta], str...)
+	} else {
+		if index < -2 {
+			index += len(m.Meta[meta]) + 2
+		}
+		if index < 0 {
+			index = 0
+		}
+
+		for i := len(m.Meta[meta]); i < index+len(str); i++ {
+			m.Meta[meta] = append(m.Meta[meta], "")
+		}
+		for i := 0; i < len(str); i++ {
+			m.Meta[meta][index+i] = str[i]
+		}
+	}
+
+	return m.Meta[meta][index]
+}
+
+// }}}
+func (m *Message) Detail(index int, arg ...interface{}) string { // {{{
+	return m.Insert("detail", index, arg...)
+}
+
+// }}}
+func (m *Message) Detaili(index int, arg ...int) int { // {{{
+	i, e := strconv.Atoi(m.Insert("detail", index, arg))
+	m.Assert(e)
+	return i
+}
+
+// }}}
+func (m *Message) Details(index int, arg ...bool) bool { // {{{
+	return right(m.Insert("detail", index, arg))
+}
+
+// }}}
+func (m *Message) Result(index int, arg ...interface{}) string { // {{{
+	return m.Insert("result", index, arg...)
+}
+
+// }}}
+func (m *Message) Resulti(index int, arg ...int) int { // {{{
+	i, e := strconv.Atoi(m.Insert("result", index, arg))
+	m.Assert(e)
+	return i
+}
+
+// }}}
+func (m *Message) Results(index int, arg ...bool) bool { // {{{
+	return right(m.Insert("result", index, arg))
+}
+
+// }}}
 
 func (m *Message) Option(key string, arg ...string) string { // {{{
 	if len(arg) > 0 {
-		m.Log("fuck", nil, "option set %s %v", key, arg)
 		m.Set("option", append([]string{key}, arg...)...)
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
-		msg.Log("fuck", nil, "option")
-		if m.Has(key) {
-			return m.Get(key)
+		if msg.Has(key) {
+			return msg.Get(key)
 		}
 	}
 	return ""
@@ -977,15 +1096,12 @@ func (m *Message) Options(key string, arg ...bool) bool { // {{{
 }
 
 // }}}
-
 func (m *Message) Append(key string, arg ...string) string { // {{{
 	if len(arg) > 0 {
-		m.Log("fuck", nil, "append set %s %v", key, arg)
 		m.Set("append", append([]string{key}, arg...)...)
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
-		msg.Log("fuck", nil, "append")
 		if m.Has(key) {
 			return m.Get(key)
 		}
@@ -1144,16 +1260,25 @@ func (m *Message) Post(s *Context, async ...bool) string { // {{{
 }
 
 // }}}
-func (m *Message) Cmd(arg ...string) string { // {{{
+func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
+	if m.Hand {
+		msg := m.Spawn(m.target)
+		msg.source = m.source
+		m = msg
+	}
+
 	if len(arg) > 0 {
-		m.Set("detail", arg...)
+		m.Set("detail")
+		m.Detail(0, arg...)
 	}
 
 	if s := m.target.master; s != nil && s != m.source.master {
-		return m.Post(s)
+		m.Post(s)
+	} else {
+		m.Exec(m.Meta["detail"][0], m.Meta["detail"][1:]...)
 	}
 
-	return m.Exec(m.Meta["detail"][0], m.Meta["detail"][1:]...)
+	return m
 }
 
 // }}}
@@ -1316,11 +1441,14 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 var Pulse = &Message{code: 0, time: time.Now(), Wait: make(chan bool), source: Index, master: Index, target: Index}
 var Index = &Context{Name: "ctx", Help: "模块中心",
 	Caches: map[string]*Cache{
+		"debug":    &Cache{Name: "服务数量", Value: "true", Help: "显示已经启动运行模块的数量"},
 		"nserver":  &Cache{Name: "服务数量", Value: "0", Help: "显示已经启动运行模块的数量"},
 		"ncontext": &Cache{Name: "模块数量", Value: "0", Help: "显示功能树已经注册模块的数量"},
 		"nmessage": &Cache{Name: "消息数量", Value: "0", Help: "显示模块启动时所创建消息的数量"},
 	},
 	Configs: map[string]*Config{
+		"debug": &Config{Name: "调试模式(true/false)", Value: "true", Help: "是否打印错误信息，off:不打印，on:打印)"},
+
 		"default": &Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
 
 		"start":    &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
@@ -1364,9 +1492,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"ContextSessionSize": &Config{Name: "会话队列长度", Value: "10", Help: "每个模块可以启动其它模块的数量"},
 		"MessageQueueSize":   &Config{Name: "消息队列长度", Value: "10", Help: "每个模块接收消息的队列长度"},
 
-		"debug": &Config{Name: "调试模式(true/false)", Value: "false", Help: "是否打印错误信息，off:不打印，on:打印)"},
-		"cert":  &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
-		"key":   &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
+		"cert": &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
+		"key":  &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*Command{
 		"userinfo": &Command{Name: "userinfo [add|del [context key name help]|[command|config|cache group name]]", Help: "查看模块的用户信息",
@@ -1493,6 +1620,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 			// }}}
+		}},
+		"detail": &Command{Name: "detail index val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			msg := m.Spawn(m.Target())
+
+			msg.Detail(1, "nie", 1, []string{"123", "123"}, true, []bool{false, true}, []int{1, 2, 2})
+
+			m.Echo("%v", msg.Meta)
+			msg.Detail(2, "nie")
+			m.Echo("%v", msg.Meta)
+
 		}},
 		"option": &Command{Name: "option key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			if len(arg) > 0 { // {{{
@@ -1623,7 +1760,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						})
 					case len(arg) > 0 && v != m:
 						v.Meta = m.Meta
-						v.Cmd(arg...)
+						v.Cmd(arg)
 						m.Meta = v.Meta
 					default:
 						m.target = v.target
@@ -1881,7 +2018,7 @@ func Start(args ...string) {
 	log.Println()
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {
-		m.Set("option", "stdio").target.Start(m)
+		m.Set("detail", Pulse.Conf("init.shy")).Set("option", "stdio").target.Start(m)
 	}
 
 	<-Index.master.Exit

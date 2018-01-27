@@ -1,2 +1,35 @@
-~cli
-	~aaa login root root
+~aaa login root root
+
+function plus
+	var a = 1
+	for $a < 10
+		~stdio print $a
+		let a = $a + 1
+	end
+end
+~yac check
+~lex check
+~log config bench.log hi.log
+
+
+return
+	if 2 < 1
+		let a = 1 +2
+		if 3 = 3
+			let a = 2 +4
+		end
+	elif 3 > 4
+		let a = 1 +6
+	else
+		let a = 2 +2
+	end
+
+	for $a < 10
+		var b = 1
+		for $b < 4
+			let b = $b+1
+		end
+		let a = $a + 1
+	end
+return $a + "hello\n context & message word\
+ nice"
