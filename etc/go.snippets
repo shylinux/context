@@ -26,6 +26,7 @@ snippet c
 	)
 
 	type `toupper(substitute(expand("%:t"), ".go", "", ""))` struct {
+		*ctx.Message
 		*ctx.Context
 	}
 

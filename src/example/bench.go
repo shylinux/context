@@ -11,6 +11,7 @@ import (
 	_ "context/tcp"
 	_ "context/web"
 
+	_ "context/gdb"
 	_ "context/lex"
 	_ "context/log"
 	_ "context/yac"

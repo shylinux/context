@@ -234,6 +234,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 		"write": &ctx.Command{Name: "write string [pos]", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil { // {{{
+
 				if len(arg) > 1 {
 					m.Cap("pos", arg[1])
 				}
@@ -247,6 +248,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					if m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
 						m.Cap("size", m.Cap("pos"))
 					}
+					nfs.out.Sync()
 				}
 
 				m.Echo(m.Cap("pos"))

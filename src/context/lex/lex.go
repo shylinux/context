@@ -297,8 +297,6 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 
 	lex.Caches["compact"] = &ctx.Cache{Name: "紧凑模式", Value: "true", Help: "实点数量"}
 
-	lex.Caps("debug", false)
-	lex.Confs("debug", false)
 	return lex
 }
 

@@ -32,7 +32,6 @@ type YAC struct {
 	state map[State]*State
 	mat   []map[byte]*State
 
-	lex *ctx.Message
 	*ctx.Message
 	*ctx.Context
 }
@@ -45,15 +44,15 @@ func (yac *YAC) name(page int) string {
 	return name
 }
 
-func (yac *YAC) train(page, hash int, word []string) (int, []*Point, []*Point) {
+func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Point, []*Point) {
 	sn := make([]bool, yac.Capi("nline"))
 	ss := []int{page}
 
 	points := []*Point{}
 	ends := []*Point{}
 
-	for i, n, m := 0, 1, false; i < len(word); i += n {
-		if !m {
+	for i, n, mul := 0, 1, false; i < len(word); i += n {
+		if !mul {
 			if hash <= 0 && word[i] == "}" {
 				return i + 2, points, ends
 			}
@@ -64,7 +63,7 @@ func (yac *YAC) train(page, hash int, word []string) (int, []*Point, []*Point) {
 			switch word[i] {
 			case "opt{", "rep{":
 				sn[s] = true
-				num, point, end := yac.train(s, 0, word[i+1:])
+				num, point, end := yac.train(m, s, 0, word[i+1:])
 				n, points = num, append(points, point...)
 				for _, x := range end {
 					state := &State{}
@@ -82,11 +81,11 @@ func (yac *YAC) train(page, hash int, word []string) (int, []*Point, []*Point) {
 					}
 				}
 			case "mul{":
-				m, n = true, 1
+				mul, n = true, 1
 				goto next
 			case "}":
-				if m {
-					m = false
+				if mul {
+					mul = false
 					goto next
 				}
 				fallthrough
@@ -94,12 +93,12 @@ func (yac *YAC) train(page, hash int, word []string) (int, []*Point, []*Point) {
 				x, ok := yac.page[word[i]]
 
 				if !ok {
-					lex := yac.lex.Cmd("parse", word[i], yac.name(s))
+					lex := yac.Sess("lex").Cmd("parse", word[i], yac.name(s))
 					if lex.Gets("result") {
 						x = lex.Geti("result")
 					} else {
 						x = len(yac.mat[s])
-						yac.lex.Cmd("train", word[i], x, yac.name(s))
+						lex.Cmd("train", word[i], x, yac.name(s))
 					}
 				}
 
@@ -130,7 +129,7 @@ func (yac *YAC) train(page, hash int, word []string) (int, []*Point, []*Point) {
 		}
 
 	next:
-		if !m {
+		if !mul {
 			ss = ss[:0]
 			for s, b := range sn {
 				if sn[s] = false; b {
@@ -190,18 +189,18 @@ func (yac *YAC) train(page, hash int, word []string) (int, []*Point, []*Point) {
 func (yac *YAC) parse(m *ctx.Message, cli *ctx.Context, page, void int, line string) (*ctx.Context, string, []string) {
 
 	level := m.Capi("level", 1)
-	m.Log("debug", nil, "%s\\%d %s(%d):", m.Cap("label")[0:level], level, yac.word[page], page)
+	m.Sess("log").Cmd("log", "debug", fmt.Sprintf("%s\\%d %s(%d):", m.Cap("label")[0:level], level, yac.word[page], page))
 
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
 
-		line = yac.lex.Cmd("parse", line, yac.name(void)).Result(2)
-		lex := yac.lex.Cmd("parse", line, yac.name(s))
+		line = yac.Sess("lex").Cmd("parse", line, yac.name(void)).Result(2)
+		lex := yac.Sess("lex").Cmd("parse", line, yac.name(s))
 
 		c := byte(lex.Resulti(0))
 		state := yac.mat[s][c]
 		if state != nil {
-			if key := yac.lex.Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(1)) <= len(lex.Result(1)) {
+			if key := yac.Sess("lex").Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(1)) <= len(lex.Result(1)) {
 				m.Log("debug", nil, "%s|%d get(%d,%d): %v \033[31m(%s)\033[0m", m.Cap("label")[0:level], level, s, c, state, lex.Result(1))
 				line, word = lex.Result(2), append(word, lex.Result(1))
 			} else {
@@ -285,9 +284,6 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	yac.Caches["level"] = &ctx.Cache{Name: "嵌套层级", Value: "0", Help: "语法解析嵌套层级"}
 	yac.Caches["label"] = &ctx.Cache{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"}
 
-	yac.Caps("debug", true)
-	yac.Confs("debug", false)
-
 	yac.page = map[string]int{"nil": 0}
 	yac.word = map[int]string{0: "nil"}
 	yac.hash = map[string]int{"nil": 0}
@@ -339,17 +335,16 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					yac.hand[hash] = arg[1]
 				}
 
-				if yac.lex == nil {
-					lex := m.Find("lex", true)
+				if m.Sess("lex") == nil {
+					lex := m.Sess("lex", "lex")
 					if lex.Cap("status") == "start" {
 						lex.Start(yac.Context.Name+"lex", "语法词法")
 					} else {
 						lex.Target().Start(lex)
 					}
-					yac.lex = lex
 				}
 
-				yac.train(page, hash, arg[2:])
+				yac.train(m, page, hash, arg[2:])
 				yac.seed = append(yac.seed, &Seed{page, hash, arg[2:]})
 				yac.Cap("stream", fmt.Sprintf("%d,%s,%s", yac.Capi("nseed", 1), yac.Cap("npage"), yac.Cap("nhash")))
 			}

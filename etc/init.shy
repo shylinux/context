@@ -7,10 +7,8 @@ function plus
 		let a = $a + 1
 	end
 end
-~yac check
-~lex check
-~log config bench.log hi.log
 
+~log config bench.log hi.log
 
 return
 	if 2 < 1

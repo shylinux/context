@@ -1,6 +1,7 @@
 package ctx // {{{
 // }}}
 import ( // {{{
+
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -19,7 +20,7 @@ import ( // {{{
 
 // }}}
 
-func right(str string) bool {
+func Right(str string) bool {
 	return str != "" && str != "0" && str != "false"
 }
 
@@ -127,13 +128,12 @@ func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
 func (c *Context) Begin(m *Message) *Context { // {{{
 	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
 	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
-	c.Caches["debug"] = &Cache{Name: "命令日志", Value: "true", Help: "嵌套层级"}
-	c.Configs["debug"] = &Config{Name: "过程日志", Value: "true", Help: "嵌套层级"}
 
 	m.Index = 1
 	c.Pulse = m
 	c.Requests = []*Message{m}
 	c.Historys = []*Message{m}
+	c.Sessions = map[string]*Message{}
 
 	c.master = m.master.master
 	c.Owner = m.master.Owner
@@ -478,6 +478,11 @@ func (m *Message) Code() int { // {{{
 }
 
 // }}}
+func (m *Message) Message() *Message { // {{{
+	return m.message
+}
+
+// }}}
 func (m *Message) Source(s ...*Context) *Context { // {{{
 	if len(s) > 0 {
 		m.source = s[0]
@@ -502,40 +507,31 @@ func (m *Message) Target(s ...*Context) *Context { // {{{
 }
 
 // }}}
+var i = 0
 
-func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{}) { // {{{
-	color := 0
-	switch action {
-	case "error", "check":
-		color = 31
-	case "cmd":
-		color = 32
-	case "conf":
-		color = 33
-	case "search", "find", "spawn":
-		color = 35
-	case "begin", "start", "close":
-		color = 36
-	case "debug":
-		if !m.Confs("debug") {
-			return
+func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{}) {
+	if !m.Options("log") {
+		return
+	}
+
+	if l := m.Sess("log"); l != nil {
+		if i++; i > 20000 {
+			debug.PrintStack()
+			os.Exit(1)
 		}
+		// l.Wait = nil
+		l.Options("log", false)
+		l.Cmd("log", action, fmt.Sprintf(str, arg...))
+	} else {
+		log.Printf(str, arg...)
+		return
 	}
-
-	if ctx == nil {
-		ctx = m.target
-	}
-
-	info := fmt.Sprintf("%s", ctx.Name)
-	name := fmt.Sprintf("%s->%s", m.source.Name, m.target.Name)
-	if m.Name != "" {
-		name = fmt.Sprintf("%s:%s->%s.%d", m.source.Name, m.Name, m.target.Name, m.Index)
-	}
-
-	log.Printf("\033[%dm%d %s(%s) %s: %s\033[0m", color, m.code, action, name, info, fmt.Sprintf(str, arg...))
 }
 
-// }}}
+func (m *Message) Gdb(action string) {
+
+}
+
 func (m *Message) Check(s *Context, arg ...string) bool { // {{{
 	if s.Owner == nil {
 		return true
@@ -603,7 +599,7 @@ func (m *Message) Check(s *Context, arg ...string) bool { // {{{
 }
 
 // }}}
-func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
+func (m *Message) Assert(e interface{}, msg ...string) bool {
 	switch e := e.(type) {
 	case error:
 	case bool:
@@ -622,6 +618,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 			msg = msg[2:]
 		}
 	case *Message:
+		os.Exit(1)
 		panic(e)
 	default:
 		return true
@@ -641,15 +638,16 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 	}
 
 	m.Set("result", "error: ", fmt.Sprintln(e), "\n")
+	os.Exit(1)
 	panic(e)
 }
 
-// }}}
 func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
 	defer func() {
 		if e := recover(); e != nil {
 			switch e.(type) {
 			case *Message:
+				os.Exit(1)
 				panic(e)
 			}
 
@@ -693,6 +691,7 @@ func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
 	}
 	m.messages = append(m.messages, msg)
 
+	msg.Wait = make(chan bool)
 	if len(key) == 0 {
 		return msg
 	}
@@ -820,6 +819,34 @@ func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
 
 // }}}
 
+func (m *Message) Sess(key string, arg ...string) *Message {
+	if len(arg) > 0 {
+		root := true
+		if len(arg) > 2 {
+			root = Right(arg[2])
+		}
+		method := "find"
+		if len(arg) > 1 {
+			method = arg[1]
+		}
+		switch method {
+		case "find":
+			m.target.Sessions[key] = m.Find(arg[0], root)
+		case "search":
+			m.target.Sessions[key] = m.Search(arg[0], root)[0]
+		}
+		return m.target.Sessions[key]
+	}
+
+	for msg := m; msg != nil; msg = msg.message {
+		if x, ok := msg.target.Sessions[key]; ok {
+			return m.Spawn(x.target)
+		}
+	}
+
+	return nil
+}
+
 func (m *Message) Add(meta string, key string, value ...string) *Message { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
@@ -855,6 +882,9 @@ func (m *Message) Add(meta string, key string, value ...string) *Message { // {{
 
 // }}}
 func (m *Message) Set(meta string, arg ...string) *Message { // {{{
+	if m.Meta == nil {
+		m.Meta = make(map[string][]string)
+	}
 	switch meta {
 	case "detail", "result":
 		delete(m.Meta, meta)
@@ -937,7 +967,7 @@ func (m *Message) Geti(key string) int { // {{{
 
 // }}}
 func (m *Message) Gets(key string) bool { // {{{
-	return right(m.Get(key))
+	return Right(m.Get(key))
 }
 
 // }}}
@@ -1032,7 +1062,7 @@ func (m *Message) Detaili(index int, arg ...int) int { // {{{
 
 // }}}
 func (m *Message) Details(index int, arg ...bool) bool { // {{{
-	return right(m.Insert("detail", index, arg))
+	return Right(m.Insert("detail", index, arg))
 }
 
 // }}}
@@ -1049,7 +1079,7 @@ func (m *Message) Resulti(index int, arg ...int) int { // {{{
 
 // }}}
 func (m *Message) Results(index int, arg ...bool) bool { // {{{
-	return right(m.Insert("result", index, arg))
+	return Right(m.Insert("result", index, arg))
 }
 
 // }}}
@@ -1092,7 +1122,7 @@ func (m *Message) Options(key string, arg ...bool) bool { // {{{
 		m.Option(key, meta...)
 	}
 
-	return right(m.Option(key))
+	return Right(m.Option(key))
 }
 
 // }}}
@@ -1134,7 +1164,7 @@ func (m *Message) Appends(key string, arg ...bool) bool { // {{{
 		m.Append(key, meta...)
 	}
 
-	return right(m.Append(key))
+	return Right(m.Append(key))
 }
 
 // }}}
@@ -1147,9 +1177,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 			m.master = m.source
 			if x, ok := s.Commands[key]; ok && x.Hand != nil && m.Check(c, "commands", key) {
 				m.AssertOne(m, true, func(m *Message) {
-					if !m.target.Has("debug") || m.Caps("debug") {
-						m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
-					}
+					m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
 
 					if x.Options != nil {
 						for _, v := range m.Meta["option"] {
@@ -1246,10 +1274,6 @@ func (m *Message) Post(s *Context, async ...bool) string { // {{{
 	}
 
 	if s != nil && s.messages != nil {
-		if len(async) == 0 || async[0] == false {
-			m.Wait = make(chan bool)
-		}
-
 		if s.messages <- m; m.Wait != nil {
 			<-m.Wait
 		}
@@ -1260,11 +1284,15 @@ func (m *Message) Post(s *Context, async ...bool) string { // {{{
 }
 
 // }}}
-func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
+func (m *Message) Cmd(arg ...interface{}) *Message {
 	if m.Hand {
-		msg := m.Spawn(m.target)
-		msg.source = m.source
-		m = msg
+		if m.message != nil {
+			m = m.message.Spawn(m.target)
+		} else {
+			msg := m.Spawn(m.target)
+			msg.source = m.source
+			m = msg
+		}
 	}
 
 	if len(arg) > 0 {
@@ -1280,8 +1308,6 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 
 	return m
 }
-
-// }}}
 
 func (m *Message) Confs(key string, arg ...bool) bool { // {{{
 	if len(arg) > 0 {
@@ -1475,11 +1501,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 				if e := os.MkdirAll(x.Value, os.ModePerm); e != nil {
 					fmt.Println(e)
-					os.Exit(1)
 				}
 				if e := os.Chdir(x.Value); e != nil {
 					fmt.Println(e)
-					os.Exit(1)
 				}
 				return arg[0]
 			}
@@ -2007,6 +2031,8 @@ func Start(args ...string) {
 		Pulse.Conf("root", args[3])
 	}
 
+	Pulse.Options("log", true)
+
 	log.Println("\n\n")
 	Index.Group = "root"
 	Index.Owner = Index.contexts["aaa"]
@@ -2016,6 +2042,7 @@ func Start(args ...string) {
 		m.target.Begin(m)
 	}
 	log.Println()
+	Pulse.Sess("log", "log").Conf("bench.log", "hi.log")
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {
 		m.Set("detail", Pulse.Conf("init.shy")).Set("option", "stdio").target.Start(m)
