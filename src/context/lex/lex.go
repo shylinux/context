@@ -26,26 +26,24 @@ type LEX struct {
 
 	page map[string]int
 	hash map[string]int
-	char map[byte][]byte
 
-	state map[State]*State
 	mat   []map[byte]*State
+	state map[State]*State
+	char  map[byte][]byte
 
 	*ctx.Message
 	*ctx.Context
 }
 
 func (lex *LEX) index(hash string, h string) int {
-	if x, e := strconv.Atoi(h); e == nil {
-		return x
+	which := lex.page
+	if hash == "nhash" {
+		which = lex.hash
 	}
 
-	which := lex.page
-	switch hash {
-	case "npage":
-		which = lex.page
-	case "nhash":
-		which = lex.hash
+	if x, e := strconv.Atoi(h); e == nil {
+		lex.Assert(hash != "npage" || x < lex.Capi("npage"))
+		return x
 	}
 
 	if x, ok := which[h]; ok {
@@ -53,6 +51,7 @@ func (lex *LEX) index(hash string, h string) int {
 	}
 
 	which[h] = lex.Capi(hash, 1)
+	lex.Assert(hash != "npage" || lex.Capi("npage") < lex.Capi("nlang"))
 	return which[h]
 }
 
@@ -65,10 +64,10 @@ func (lex *LEX) charset(c byte) []byte {
 
 func (lex *LEX) train(page int, hash int, seed []byte) int {
 
+	ss := []int{page}
 	cn := make([]bool, lex.Capi("ncell"))
-	c := make([]byte, 0, lex.Capi("ncell"))
+	cc := make([]byte, 0, lex.Capi("ncell"))
 	sn := make([]bool, lex.Capi("nline"))
-	s := []int{page}
 
 	points := []*Point{}
 
@@ -84,8 +83,8 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 			for ; seed[p] != ']'; p++ {
 				if seed[p] == '\\' {
 					p++
-					for _, s := range lex.charset(seed[p]) {
-						cn[s] = true
+					for _, c := range lex.charset(seed[p]) {
+						cn[c] = true
 					}
 					continue
 				}
@@ -95,8 +94,8 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 					if begin > end {
 						begin, end = end, begin
 					}
-					for i := begin; i <= end; i++ {
-						cn[i] = true
+					for c := begin; c <= end; c++ {
+						cn[c] = true
 					}
 					p += 2
 					continue
@@ -105,29 +104,29 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 				cn[seed[p]] = true
 			}
 
-			for i := 0; i < len(cn); i++ {
-				if (set && cn[i]) || (!set && !cn[i]) {
-					c = append(c, byte(i))
+			for c := 0; c < len(cn); c++ {
+				if (set && cn[c]) || (!set && !cn[c]) {
+					cc = append(cc, byte(c))
 				}
-				cn[i] = false
+				cn[c] = false
 			}
 
 		case '.':
-			for i := 0; i < len(cn); i++ {
-				c = append(c, byte(i))
+			for c := 0; c < len(cn); c++ {
+				cc = append(cc, byte(c))
 			}
 
 		case '\\':
 			p++
-			for _, s := range lex.charset(seed[p]) {
-				c = append(c, s)
+			for _, c := range lex.charset(seed[p]) {
+				cc = append(cc, c)
 			}
 		default:
-			c = append(c, seed[p])
+			cc = append(cc, seed[p])
 		}
 
-		lex.Log("debug", nil, "page: \033[31m%d %v\033[0m", len(s), s)
-		lex.Log("debug", nil, "cell: \033[32m%d %v\033[0m", len(c), c)
+		lex.Log("debug", nil, "page: \033[31m%d %v\033[0m", len(ss), ss)
+		lex.Log("debug", nil, "cell: \033[32m%d %v\033[0m", len(cc), cc)
 
 		flag := '\000'
 		if p+1 < len(seed) {
@@ -138,29 +137,30 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 			}
 		}
 
-		for i := 0; i < len(s); i++ {
-			for line, j := 0, byte(0); int(j) < len(c); j++ {
+		for _, s := range ss {
+			line := 0
+			for _, c := range cc {
 
 				state := &State{}
-				if lex.mat[s[i]][c[j]] != nil {
-					*state = *lex.mat[s[i]][c[j]]
+				if lex.mat[s][c] != nil {
+					*state = *lex.mat[s][c]
 				} else {
 					lex.Capi("nnode", 1)
 				}
-				lex.Log("debug", nil, "GET(%d,%d): %v", s[i], c[j], state)
+				lex.Log("debug", nil, "GET(%d,%d): %v", s, c, state)
 
 				switch flag {
 				case '+':
 					state.star = true
 				case '*':
 					state.star = true
-					sn[s[i]] = true
+					sn[s] = true
 				case '?':
-					sn[s[i]] = true
+					sn[s] = true
 				}
 
 				if state.next == 0 {
-					if line == 0 || !lex.Caps("compact") {
+					if line == 0 || !lex.Confs("compact") {
 						lex.mat = append(lex.mat, make(map[byte]*State))
 						line = lex.Capi("nline", 1) - 1
 						sn = append(sn, false)
@@ -169,54 +169,50 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 				}
 				sn[state.next] = true
 
-				lex.mat[s[i]][c[j]] = state
-				points = append(points, &Point{s[i], c[j]})
-				lex.Log("debug", nil, "SET(%d,%d): %v(%s,%s)", s[i], c[j], state, lex.Cap("nnode"), lex.Cap("nreal"))
+				lex.mat[s][c] = state
+				points = append(points, &Point{s, c})
+				lex.Log("debug", nil, "SET(%d,%d): %v(%s,%s)", s, c, state, lex.Cap("nnode"), lex.Cap("nreal"))
 			}
 		}
 
-		c, s = c[:0], s[:0]
-		for i := 0; i < len(sn); i++ {
-			if sn[i] {
-				s = append(s, i)
+		cc, ss = cc[:0], ss[:0]
+		for s, b := range sn {
+			if sn[s] = false; b {
+				ss = append(ss, s)
 			}
-			sn[i] = false
 		}
 	}
 
-	for _, n := range s {
-		if n < lex.Capi("nlang") || n >= len(lex.mat) {
+	for _, s := range ss {
+		if s < lex.Capi("nlang") || s >= len(lex.mat) {
 			continue
 		}
 
-		if len(lex.mat[n]) == 0 {
-			lex.Log("debug", nil, "DEL: %d %d", lex.Capi("nline")-1, lex.Capi("nline", 0, n))
-			lex.mat = lex.mat[:n]
+		if len(lex.mat[s]) == 0 {
+			lex.Log("debug", nil, "DEL: %d-%d", lex.Capi("nline")-1, lex.Capi("nline", 0, s))
+			lex.mat = lex.mat[:s]
 		}
 	}
 
-	for _, n := range s {
+	for _, s := range ss {
 		for _, p := range points {
 			state := &State{}
 			*state = *lex.mat[p.s][p.c]
 
-			if state.next == n {
+			if state.next == s {
 				lex.Log("debug", nil, "GET(%d, %d): %v", p.s, p.c, state)
-				if state.next >= len(lex.mat) {
+				if state.hash = hash; state.next >= len(lex.mat) {
 					state.next = 0
 				}
-				if hash > 0 {
-					state.hash = hash
-				}
+				lex.mat[p.s][p.c] = state
 				lex.Log("debug", nil, "SET(%d, %d): %v", p.s, p.c, state)
 			}
 
-			if x, ok := lex.state[*state]; ok {
-				lex.mat[p.s][p.c] = x
-			} else {
-				lex.state[*state] = state
-				lex.mat[p.s][p.c] = state
+			if x, ok := lex.state[*state]; !ok {
+				lex.state[*state] = lex.mat[p.s][p.c]
 				lex.Capi("nreal", 1)
+			} else {
+				lex.mat[p.s][p.c] = x
 			}
 		}
 	}
@@ -224,7 +220,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 	return hash
 }
 
-func (lex *LEX) parse(page int, line []byte) (hash int, word []byte, rest []byte) {
+func (lex *LEX) parse(page int, line []byte) (hash int, rest []byte, word []byte) {
 
 	pos := 0
 	for star, s := 0, page; s != 0 && pos < len(line); pos++ {
@@ -237,23 +233,19 @@ func (lex *LEX) parse(page int, line []byte) (hash int, word []byte, rest []byte
 
 		state := lex.mat[s][c]
 		lex.Log("debug", nil, "(%d,%d): %v", s, c, state)
-		if state == nil && star != 0 {
-			s, star = star, 0
-			state = lex.mat[s][c]
-			lex.Log("debug", nil, "(%d,%d): %v", s, c, state)
-		}
 		if state == nil {
-			break
-		}
-
-		if state, ok := lex.mat[star][c]; !ok || state == nil || !state.star {
-			star = 0
-		}
-		if state.star {
-			star = s
+			s, star, pos = star, 0, pos-1
+			continue
 		}
 
 		word = append(word, c)
+
+		if state.star {
+			star = s
+		} else if _, ok := lex.mat[star][c]; !ok {
+			star = 0
+		}
+
 		if s, hash = state.next, state.hash; s == 0 {
 			s, star = star, 0
 		}
@@ -278,11 +270,10 @@ func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 
 func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	if lex.Context == Index {
+	if lex.Message = m; lex.Context == Index {
 		Pulse = m
 	}
 	lex.Context.Master(nil)
-	lex.Message = m
 
 	lex.Caches["ncell"] = &ctx.Cache{Name: "字符上限", Value: "128", Help: "字符上限"}
 	lex.Caches["nlang"] = &ctx.Cache{Name: "集合上限", Value: "32", Help: "集合上限"}
@@ -295,7 +286,7 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	lex.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "节点数量"}
 	lex.Caches["nreal"] = &ctx.Cache{Name: "实点数量", Value: "0", Help: "实点数量"}
 
-	lex.Caches["compact"] = &ctx.Cache{Name: "紧凑模式", Value: "true", Help: "实点数量"}
+	lex.Configs["compact"] = &ctx.Config{Name: "紧凑模式", Value: "true", Help: "实点数量"}
 
 	return lex
 }

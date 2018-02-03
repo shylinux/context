@@ -29,24 +29,24 @@ type YAC struct {
 	hash map[string]int
 	hand map[int]string
 
-	state map[State]*State
 	mat   []map[byte]*State
+	state map[State]*State
 
 	*ctx.Message
 	*ctx.Context
 }
 
 func (yac *YAC) name(page int) string {
-	name, ok := yac.word[page]
-	if !ok {
-		name = fmt.Sprintf("yac%d", page)
+	if name, ok := yac.word[page]; ok {
+		return name
 	}
-	return name
+	return fmt.Sprintf("yac%d", page)
 }
 
 func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Point, []*Point) {
-	sn := make([]bool, yac.Capi("nline"))
+
 	ss := []int{page}
+	sn := make([]bool, yac.Capi("nline"))
 
 	points := []*Point{}
 	ends := []*Point{}
@@ -91,18 +91,13 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 				fallthrough
 			default:
 				x, ok := yac.page[word[i]]
-
 				if !ok {
-					lex := yac.Sess("lex").Cmd("parse", word[i], yac.name(s))
-					if lex.Gets("result") {
-						x = lex.Geti("result")
-					} else {
-						x = len(yac.mat[s])
-						lex.Cmd("train", word[i], x, yac.name(s))
+					if x = yac.Sess("lex").Cmd("parse", word[i], yac.name(s)).Resulti(0); x == 0 {
+						x = yac.Sess("lex").Cmd("train", word[i], len(yac.mat[s]), yac.name(s)).Resulti(0)
 					}
 				}
-
 				c := byte(x)
+
 				state := &State{}
 				if yac.mat[s][c] != nil {
 					*state = *yac.mat[s][c]
@@ -139,30 +134,31 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 		}
 	}
 
-	for _, n := range ss {
-		if n < yac.Capi("nlang") || n >= len(yac.mat) {
+	for _, s := range ss {
+		if s < yac.Capi("nlang") || s >= len(yac.mat) {
 			continue
 		}
 
 		void := true
-		for _, x := range yac.mat[n] {
+		for _, x := range yac.mat[s] {
 			if x != nil {
 				void = false
 				break
 			}
 		}
+
 		if void {
-			yac.Log("debug", nil, "DEL: %d %d", yac.Capi("nline")-1, yac.Capi("nline", 0, n))
-			yac.mat = yac.mat[:n]
+			yac.Log("debug", nil, "DEL: %d-%d", yac.Capi("nline")-1, yac.Capi("nline", 0, s))
+			yac.mat = yac.mat[:s]
 		}
 	}
 
-	for _, n := range ss {
+	for _, s := range ss {
 		for _, p := range points {
 			state := &State{}
 			*state = *yac.mat[p.s][p.c]
 
-			if state.next == n {
+			if state.next == s {
 				yac.Log("debug", nil, "GET(%d, %d): %v", p.s, p.c, state)
 				if state.next >= len(yac.mat) {
 					state.next = 0
@@ -170,15 +166,15 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 				if hash > 0 {
 					state.hash = hash
 				}
+				yac.mat[p.s][p.c] = state
 				yac.Log("debug", nil, "SET(%d, %d): %v", p.s, p.c, state)
 			}
 
-			if x, ok := yac.state[*state]; ok {
-				yac.mat[p.s][p.c] = x
-			} else {
-				yac.state[*state] = state
-				yac.mat[p.s][p.c] = state
+			if x, ok := yac.state[*state]; !ok {
+				yac.state[*state] = yac.mat[p.s][p.c]
 				yac.Capi("nreal", 1)
+			} else {
+				yac.mat[p.s][p.c] = x
 			}
 		}
 	}
