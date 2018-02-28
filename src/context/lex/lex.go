@@ -242,7 +242,7 @@ func (lex *LEX) parse(page int, line []byte) (hash int, rest []byte, word []byte
 
 		if state.star {
 			star = s
-		} else if _, ok := lex.mat[star][c]; !ok {
+		} else if x, ok := lex.mat[star][c]; !ok || !x.star {
 			star = 0
 		}
 
@@ -255,8 +255,6 @@ func (lex *LEX) parse(page int, line []byte) (hash int, rest []byte, word []byte
 		pos, word = 0, word[:0]
 	}
 	rest = line[pos:]
-
-	lex.Log("debug", nil, "\033[31m[%v]\033[0m %d [%v]", string(word), hash, string(rest))
 	return
 }
 
@@ -275,32 +273,46 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	}
 	lex.Context.Master(nil)
 
-	lex.Caches["ncell"] = &ctx.Cache{Name: "字符上限", Value: "128", Help: "字符上限"}
-	lex.Caches["nlang"] = &ctx.Cache{Name: "集合上限", Value: "32", Help: "集合上限"}
+	lex.Caches["ncell"] = &ctx.Cache{Name: "字符上限", Value: "128", Help: "字符集合的最大数量"}
+	lex.Caches["nlang"] = &ctx.Cache{Name: "词法上限", Value: "32", Help: "词法集合的最大数量"}
 
-	lex.Caches["nseed"] = &ctx.Cache{Name: "种子数量", Value: "0", Help: "种子数量"}
-	lex.Caches["npage"] = &ctx.Cache{Name: "集合数量", Value: "0", Help: "集合数量"}
-	lex.Caches["nhash"] = &ctx.Cache{Name: "类型数量", Value: "0", Help: "类型数量"}
+	lex.Caches["nseed"] = &ctx.Cache{Name: "种子数量", Value: "0", Help: "词法模板的数量"}
+	lex.Caches["npage"] = &ctx.Cache{Name: "集合数量", Value: "0", Help: "词法集合的数量"}
+	lex.Caches["nhash"] = &ctx.Cache{Name: "类型数量", Value: "0", Help: "单词类型的数量"}
 
-	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "32", Help: "状态数量"}
-	lex.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "节点数量"}
-	lex.Caches["nreal"] = &ctx.Cache{Name: "实点数量", Value: "0", Help: "实点数量"}
+	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "32", Help: "状态机状态的数量"}
+	lex.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "状态机连接的逻辑数量"}
+	lex.Caches["nreal"] = &ctx.Cache{Name: "实点数量", Value: "0", Help: "状态机连接的存储数量"}
 
-	lex.Configs["compact"] = &ctx.Config{Name: "紧凑模式", Value: "true", Help: "实点数量"}
+	lex.Configs["compact"] = &ctx.Config{Name: "紧凑模式", Value: "true", Help: "词法状态的共用"}
 
-	return lex
-}
+	if len(arg) > 0 {
+		if _, e := strconv.Atoi(arg[0]); lex.Assert(e) {
+			lex.Cap("nlang", arg[0])
+			lex.Cap("nline", arg[0])
+		}
+	}
 
-func (lex *LEX) Start(m *ctx.Message, arg ...string) bool {
-	lex.Context.Master(nil)
-	lex.Message = m
-
-	lex.seed = make([]*Seed, 0, 9)
 	lex.page = map[string]int{"nil": 0}
 	lex.hash = map[string]int{"nil": 0}
 
 	lex.mat = make([]map[byte]*State, lex.Capi("nlang"))
 	lex.state = make(map[State]*State)
+
+	lex.char = map[byte][]byte{
+		't': []byte{'\t'},
+		'n': []byte{'\n'},
+		'b': []byte{'\t', ' '},
+		's': []byte{'\t', ' ', '\n'},
+		'd': []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'},
+		'x': []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'},
+	}
+
+	return lex
+}
+
+func (lex *LEX) Start(m *ctx.Message, arg ...string) bool {
+	lex.Message = m
 	return false
 }
 
@@ -344,8 +356,9 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 					page = lex.index("npage", arg[1])
 				}
 
-				hash, word, rest := lex.parse(page, []byte(arg[0]))
-				m.Result(0, hash, string(word), string(rest))
+				hash, rest, word := lex.parse(page, []byte(arg[0]))
+				m.Result(0, hash, string(rest), string(word))
+				lex.Log("debug", nil, "\033[31m[%v]\033[0m %d [%v]", string(word), hash, string(rest))
 			}
 		}},
 		"split": &ctx.Command{Name: "split line page void help", Help: "分割语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -425,13 +438,4 @@ func init() {
 	lex := &LEX{}
 	lex.Context = Index
 	ctx.Index.Register(Index, lex)
-
-	lex.char = map[byte][]byte{
-		't': []byte{'\t'},
-		'n': []byte{'\n'},
-		'b': []byte{'\t', ' '},
-		's': []byte{'\t', ' ', '\n'},
-		'd': []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'},
-		'x': []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'},
-	}
 }

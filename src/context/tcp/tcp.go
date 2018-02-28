@@ -29,6 +29,7 @@ func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 
 func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	tcp.Context.Master(nil)
 	if tcp.Context == Index {
 		Pulse = m
 	}
@@ -48,7 +49,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 
 	switch arg[0] {
 	case "dial":
-		if m.Cap("security") != "false" {
+		if m.Caps("security") {
 			cert, e := tls.LoadX509KeyPair(m.Conf("cert"), m.Conf("key"))
 			m.Assert(e)
 			conf := &tls.Config{Certificates: []tls.Certificate{cert}}
@@ -62,18 +63,18 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 			tcp.Conn = c
 		}
 
-		msg := m.Reply("open").Put("option", "io", tcp.Conn)
-		msg.Cmd("open")
-		m.Log("info", nil, "%s dial %s", Pulse.Cap("nclient"), msg.Cap("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
+		msg := m.Reply("open").Put("option", "io", tcp.Conn).Cmd("open")
+		m.Log("info", nil, "%s dial %s", Pulse.Cap("nclient"),
+			msg.Cap("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
 		return false
 	case "accept":
 		c, e := m.Data["io"].(net.Conn)
 		m.Assert(e)
 		tcp.Conn = c
 
-		msg := m.Spawn(m.Data["source"].(*ctx.Context), "open").Put("option", "io", tcp.Conn)
-		msg.Cmd("open")
-		m.Log("info", nil, "%s accept %s", Pulse.Cap("nclient"), msg.Cap("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
+		msg := m.Spawn(m.Data["source"].(*ctx.Context), "open").Put("option", "io", tcp.Conn).Cmd("open")
+		m.Log("info", nil, "%s accept %s", Pulse.Cap("nclient"),
+			msg.Cap("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
 		return false
 	default:
 		if m.Cap("security") != "false" {
@@ -96,7 +97,9 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	for {
 		c, e := tcp.Accept()
 		m.Assert(e)
-		m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source()).Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", "accept", c.RemoteAddr().String())
+		msg := m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source())
+		msg.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接",
+			"accept", c.RemoteAddr().String(), m.Cap("security"), m.Cap("protocol"))
 	}
 
 	return true
@@ -138,27 +141,31 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 		"protocol": &ctx.Config{Name: "网络协议(tcp/tcp4/tcp6)", Value: "tcp4", Help: "网络协议"},
 	},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Start(fmt.Sprintf("pub%d", Pulse.Capi("nlisten", 1)), "网络监听", m.Meta["detail"]...)
-		}},
-		"dial": &ctx.Command{Name: "dial address [security [protocol]]", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
-		}},
-		"send": &ctx.Command{Name: "send message", Help: "发送消息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			tcp, ok := m.Target().Server.(*TCP)
-			m.Assert(ok && tcp.Conn != nil)
-			tcp.Conn.Write([]byte(arg[0]))
-		}},
-		"recv": &ctx.Command{Name: "recv size", Help: "接收消息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			tcp, ok := m.Target().Server.(*TCP)
-			m.Assert(ok && tcp.Conn != nil)
-			size, e := strconv.Atoi(arg[0])
-			m.Assert(e)
+		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Start(fmt.Sprintf("pub%d", Pulse.Capi("nlisten", 1)), "网络监听", m.Meta["detail"]...)
+			}},
+		"dial": &ctx.Command{Name: "dial address [security [protocol]]", Help: "网络连接",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
+			}},
+		"send": &ctx.Command{Name: "send message", Help: "发送消息",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				tcp, ok := m.Target().Server.(*TCP)
+				m.Assert(ok && tcp.Conn != nil)
+				tcp.Conn.Write([]byte(arg[0]))
+			}},
+		"recv": &ctx.Command{Name: "recv size", Help: "接收消息",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				tcp, ok := m.Target().Server.(*TCP)
+				m.Assert(ok && tcp.Conn != nil)
+				size, e := strconv.Atoi(arg[0])
+				m.Assert(e)
 
-			buf := make([]byte, size)
-			tcp.Conn.Read(buf)
-			m.Echo(string(buf))
-		}},
+				buf := make([]byte, size)
+				tcp.Conn.Read(buf)
+				m.Echo(string(buf))
+			}},
 	},
 	Index: map[string]*ctx.Context{
 		"void": &ctx.Context{

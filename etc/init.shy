@@ -7,8 +7,9 @@ function plus
 		let a = $a + 1
 	end
 end
-
-~log config bench.log hi.log
+~yac check
+~lex check
+~nfs listen ":9494"
 
 return
 	if 2 < 1

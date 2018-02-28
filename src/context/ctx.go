@@ -74,6 +74,7 @@ type Context struct {
 	Requests []*Message
 	Historys []*Message
 	Sessions map[string]*Message
+	Exit     chan bool
 
 	Index    map[string]*Context
 	Groups   map[string]*Context
@@ -82,7 +83,6 @@ type Context struct {
 	password string
 
 	Server
-	Exit chan bool
 }
 
 func (c *Context) Password(meta string) string { // {{{
@@ -509,7 +509,7 @@ func (m *Message) Target(s ...*Context) *Context { // {{{
 // }}}
 var i = 0
 
-func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{}) {
+func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{}) { // {{{
 	if !m.Options("log") {
 		return
 	}
@@ -528,10 +528,12 @@ func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{
 	}
 }
 
-func (m *Message) Gdb(action string) {
+// }}}
+func (m *Message) Gdb(action string) { // {{{
 
 }
 
+// }}}
 func (m *Message) Check(s *Context, arg ...string) bool { // {{{
 	if s.Owner == nil {
 		return true
@@ -599,7 +601,7 @@ func (m *Message) Check(s *Context, arg ...string) bool { // {{{
 }
 
 // }}}
-func (m *Message) Assert(e interface{}, msg ...string) bool {
+func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 	switch e := e.(type) {
 	case error:
 	case bool:
@@ -642,6 +644,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool {
 	panic(e)
 }
 
+// }}}
 func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
 	defer func() {
 		if e := recover(); e != nil {
@@ -819,7 +822,7 @@ func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
 
 // }}}
 
-func (m *Message) Sess(key string, arg ...string) *Message {
+func (m *Message) Sess(key string, arg ...string) *Message { // {{{
 	if len(arg) > 0 {
 		root := true
 		if len(arg) > 2 {
@@ -846,6 +849,8 @@ func (m *Message) Sess(key string, arg ...string) *Message {
 
 	return nil
 }
+
+// }}}
 
 func (m *Message) Add(meta string, key string, value ...string) *Message { // {{{
 	if m.Meta == nil {
@@ -885,6 +890,7 @@ func (m *Message) Set(meta string, arg ...string) *Message { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
+
 	switch meta {
 	case "detail", "result":
 		delete(m.Meta, meta)
@@ -1045,7 +1051,10 @@ func (m *Message) Insert(meta string, index int, arg ...interface{}) string { //
 		}
 	}
 
-	return m.Meta[meta][index]
+	if -1 < index && index < len(m.Meta[meta]) {
+		return m.Meta[meta][index]
+	}
+	return ""
 }
 
 // }}}
@@ -1084,9 +1093,10 @@ func (m *Message) Results(index int, arg ...bool) bool { // {{{
 
 // }}}
 
-func (m *Message) Option(key string, arg ...string) string { // {{{
-	if len(arg) > 0 {
-		m.Set("option", append([]string{key}, arg...)...)
+func (m *Message) Option(key string, arg ...interface{}) string { // {{{
+	m.Insert(key, 0, arg...)
+	if _, ok := m.Meta[key]; ok {
+		m.Add("option", key)
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
@@ -1099,36 +1109,21 @@ func (m *Message) Option(key string, arg ...string) string { // {{{
 
 // }}}
 func (m *Message) Optioni(key string, arg ...int) int { // {{{
-	if len(arg) > 0 {
-		meta := []string{}
-		for _, v := range arg {
-			meta = append(meta, fmt.Sprintf("%d", v))
-		}
-		m.Option(key, meta...)
-	}
-
-	i, e := strconv.Atoi(m.Option(key))
+	i, e := strconv.Atoi(m.Option(key, arg))
 	m.Assert(e)
 	return i
 }
 
 // }}}
 func (m *Message) Options(key string, arg ...bool) bool { // {{{
-	if len(arg) > 0 {
-		meta := []string{}
-		for _, v := range arg {
-			meta = append(meta, fmt.Sprintf("%t", v))
-		}
-		m.Option(key, meta...)
-	}
-
-	return Right(m.Option(key))
+	return Right(m.Option(key, arg))
 }
 
 // }}}
-func (m *Message) Append(key string, arg ...string) string { // {{{
-	if len(arg) > 0 {
-		m.Set("append", append([]string{key}, arg...)...)
+func (m *Message) Append(key string, arg ...interface{}) string { // {{{
+	m.Insert(key, 0, arg...)
+	if _, ok := m.Meta[key]; ok {
+		m.Add("append", key)
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
@@ -1141,30 +1136,14 @@ func (m *Message) Append(key string, arg ...string) string { // {{{
 
 // }}}
 func (m *Message) Appendi(key string, arg ...int) int { // {{{
-	if len(arg) > 0 {
-		meta := []string{}
-		for _, v := range arg {
-			meta = append(meta, fmt.Sprintf("%d", v))
-		}
-		m.Append(key, meta...)
-	}
-
-	i, e := strconv.Atoi(m.Append(key))
+	i, e := strconv.Atoi(m.Append(key, arg))
 	m.Assert(e)
 	return i
 }
 
 // }}}
 func (m *Message) Appends(key string, arg ...bool) bool { // {{{
-	if len(arg) > 0 {
-		meta := []string{}
-		for _, v := range arg {
-			meta = append(meta, fmt.Sprintf("%t", v))
-		}
-		m.Append(key, meta...)
-	}
-
-	return Right(m.Append(key))
+	return Right(m.Append(key, arg))
 }
 
 // }}}
@@ -1284,7 +1263,7 @@ func (m *Message) Post(s *Context, async ...bool) string { // {{{
 }
 
 // }}}
-func (m *Message) Cmd(arg ...interface{}) *Message {
+func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 	if m.Hand {
 		if m.message != nil {
 			m = m.message.Spawn(m.target)
@@ -1308,6 +1287,8 @@ func (m *Message) Cmd(arg ...interface{}) *Message {
 
 	return m
 }
+
+// }}}
 
 func (m *Message) Confs(key string, arg ...bool) bool { // {{{
 	if len(arg) > 0 {
@@ -1657,7 +1638,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		}},
 		"option": &Command{Name: "option key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			if len(arg) > 0 { // {{{
-				m.Option(arg[0], arg[1:]...)
+				m.Option(arg[0], arg[1:])
 			} else {
 				for msg := m; msg != nil; msg = msg.message {
 					m.Echo("%d %s:%s->%s %v\n", msg.code, msg.time.Format("15:03:04"), msg.source.Name, msg.target.Name, msg.Meta["detail"])
@@ -1669,7 +1650,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		}},
 		"append": &Command{Name: "append key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			if len(arg) > 0 { // {{{
-				m.Append(arg[0], arg[1:]...)
+				m.Append(arg[0], arg[1:])
 			} else {
 				for msg := m; msg != nil; msg = msg.message {
 					m.Echo("%d %s:%s->%s %v\n", msg.code, msg.time.Format("15:03:04"), msg.source.Name, msg.target.Name, msg.Meta["result"])
@@ -2042,7 +2023,7 @@ func Start(args ...string) {
 		m.target.Begin(m)
 	}
 	log.Println()
-	Pulse.Sess("log", "log").Conf("bench.log", "hi.log")
+	Pulse.Sess("log", "log").Conf("bench.log", "var/bench.log")
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {
 		m.Set("detail", Pulse.Conf("init.shy")).Set("option", "stdio").target.Start(m)
