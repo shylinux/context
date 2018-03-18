@@ -86,7 +86,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 		// }}}
 	}}
 	cli.Configs["yac"] = &ctx.Config{Name: "词法解析器", Value: "", Help: "命令行词法解析器", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
-		if len(arg) > 0 && len(arg[0]) > 0 {
+		if len(arg) > 0 && len(arg[0]) > 0 { // {{{
 			cli, ok := m.Target().Server.(*CLI)
 			m.Assert(ok, "模块类型错误")
 
@@ -132,7 +132,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 			return arg[0]
 		}
 		return x.Value
-
+		// }}}
 	}}
 	cli.Configs["PS1"] = &ctx.Config{Name: "命令行提示符(target/detail)", Value: "target", Help: "命令行提示符，target:显示当前模块，detail:显示详细信息", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 { // {{{
@@ -226,7 +226,9 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 			if cli.nfs = m.Find("nfs"); m.Has("stdio") {
 				cli.nfs.Cmd("scan", m.Cap("stream", "stdio"), m.Cmd("source", m.Cap("init.shy")).Get("result"))
 			} else {
-				cli.nfs.Cmd("scan", m.Cap("stream", m.Cap("init.shy")))
+				if _, e := os.Stat(m.Cap("init.shy")); e == nil {
+					cli.nfs.Cmd("scan", m.Cap("stream", m.Cap("init.shy")))
+				}
 			}
 		}()
 	}
@@ -509,7 +511,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			} // }}}
 		}},
 		"cmd": &ctx.Command{Name: "cmd word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") {
+			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
 				msg := m.Spawn(cli.target)
 				if a, ok := cli.alias[arg[0]]; ok {
 					msg.Set("detail", a...)
@@ -555,6 +557,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			} else {
 				m.Set("result", arg...)
 			}
+			// }}}
 		}},
 		"var": &ctx.Command{Name: "var a [= exp]", Help: "定义变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{

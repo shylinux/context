@@ -411,7 +411,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Put("option", "io", m.Data["io"])
 				m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", m.Meta["detail"]...)
 				m.Echo(m.Target().Name)
-			} else if f, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE, os.ModePerm); m.Assert(e) {
+			} else if f, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE, os.ModePerm); e == nil {
 				m.Put("option", "in", f).Put("option", "out", f)
 				m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", m.Meta["detail"]...)
 				m.Echo(m.Target().Name)

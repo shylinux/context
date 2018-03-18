@@ -510,6 +510,10 @@ func (m *Message) Target(s ...*Context) *Context { // {{{
 var i = 0
 
 func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{}) { // {{{
+	if !m.Confs("bench.log") {
+		return
+	}
+
 	if !m.Options("log") {
 		return
 	}
@@ -1462,12 +1466,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"init.shy": &Config{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"},
 		"bench.log": &Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件", Hand: func(m *Message, x *Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
-				if e := os.MkdirAll(path.Dir(arg[0]), os.ModePerm); e == nil {
-					if l, e := os.Create(x.Value); e == nil {
-						log.SetOutput(l)
-					}
+				// if e := os.MkdirAll(path.Dir(arg[0]), os.ModePerm); e == nil {
+				if l, e := os.Create(x.Value); e == nil {
+					log.SetOutput(l)
+					return arg[0]
 				}
-				return arg[0]
+				return ""
+				// }
 			}
 			return x.Value
 			// }}}
@@ -2014,7 +2019,7 @@ func Start(args ...string) {
 
 	Pulse.Options("log", true)
 
-	log.Println("\n\n")
+	// log.Println("\n\n")
 	Index.Group = "root"
 	Index.Owner = Index.contexts["aaa"]
 	Index.master = Index.contexts["cli"]
@@ -2022,7 +2027,7 @@ func Start(args ...string) {
 		m.target.root = Index
 		m.target.Begin(m)
 	}
-	log.Println()
+	// log.Println()
 	Pulse.Sess("log", "log").Conf("bench.log", "var/bench.log")
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {
