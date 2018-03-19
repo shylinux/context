@@ -1,14 +1,14 @@
-## 0. context简介
+## 0 context简介
 context: 终端工具链，各种实用的功能模块，通过简洁的接口，自由的组合在一起。
 
 作为一个工具箱，内置各种实用工具，通过灵活的配置，打造个性化的工具链。
 
 作为一个框架，通过模块式开发，可以快速开发各种应用软件。
 
-## 1.context安装
+## 1 context安装
 * 下载：git clone https://github.com/shylinux/context
 * 编译：cd context && go install src/example/bench.go
-## 2. context使用
+## 2 context使用
 ### 2.0 应用示例--启动WEB服务器
 
 ```sh
@@ -121,16 +121,144 @@ route directory|template|script route content
 ```
 参数route代表http请求的uri地址，参数content代表响应回复的内容，不同类型的服务有不同的意义。
 * directory静态服务
+```sh
+web> route directory /p pkg
+```
+命令"route diretory /p pkg"，当web模块接收到请求uri为"/p/"时把目录"pkg"中的内容作为响应回复。
 
 content代表路径，即web服务请求此route路径时，回复的内容为content指定的目录或文件。
 * template模板服务
+```sh
+web> route template /t LICENSE
+```
+命令"route template /t LICENSE"，当web模块接收到请求uri为"/t"时把文件"LICENSE"中的内容作为响应回复。
 
-content代表模板，即web服务请求此route路径时，回复的内容为content指定的模板被数据填充后的内容。
 * script脚本服务
 
 content代表脚本的文件名，即web服务请求此route路径时，回复的内容为content指定的脚本运行后输出的内容。
 
-## 3. context开发
+## 3 context开发
+### 3.0 context模块开发入门
+在context目录下，创建目录src/example/demo，然后打开src/example/demo/demo.go文件，并输入以下代码。
+```go
+package demo
+
+import (
+	"context"
+)
+
+var Index = &ctx.Context{Name: "demo", Help: "example demo",
+	Caches: map[string]*ctx.Cache{
+		"format": &ctx.Cache{Name: "format", Value: "hello %s world", Help: "output string"},
+	},
+	Configs: map[string]*ctx.Config{
+		"default": &ctx.Config{Name: "default", Value: "go", Help: "output string"},
+	},
+	Commands: map[string]*ctx.Command{
+		"echo": &ctx.Command{Name: "echo word", Help: "echo something", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Echo(m.Cap("format"), m.Conf("default"))
+		}},
+	},
+}
+
+func init() {
+	ctx.Index.Register(Index, nil)
+}
+```
+在context目录下，打开src/example/bench.go文件，添加一行 _ "example/demo"，引入新添加的模块 。
+```go
+package main
+
+import (
+	"context"
+	_ "context/aaa"
+	_ "context/cli"
+	_ "context/ssh"
+
+	_ "context/mdb"
+	_ "context/nfs"
+	_ "context/tcp"
+	_ "context/web"
+
+	_ "context/lex"
+	_ "context/log"
+	_ "context/yac"
+
+	_ "example/demo"
+
+	"os"
+)
+
+func main() {
+	ctx.Start(os.Args[1:]...)
+}
+```
+在context目录下，编译安装bench.go，启动bench进入新模块，执行新添加的命令。
+```sh
+$ go install src/example/bench.go
+$ bench
+> ~demo
+> echo
+hello go world
+```
+
+```go
+func init() {
+	ctx.Index.Register(Index, nil)
+}
+```
+在模块初始化时，向ctx模块注册当前模块，即当前模块为ctx的子模块。
+```go
+var Index = &ctx.Context{Name: "demo", Help :example demo",
+	Caches: map[string]*ctx.Cache{},
+	Configs: map[string]*ctx.Config{},
+	Commands: map[string]*ctx.Commands{},
+}
+```
+Index即为模块的数据结构，Name为模块的名字，Help为模块的简介，Caches为模块的缓存项，
+Configs为模块的配置项，Commands为命令项。
+```go
+type Cache struct {
+	Name  string
+	Value string
+	Help  string
+	Hand  func(m *Message, x *Cache, arg ...string) string
+}
+
+type Config struct {
+	Name  string
+	Value string
+	Help  string
+	Hand  func(m *Message, x *Config, arg ...string) string
+}
+
+type Command struct {
+	Name string
+	Help string
+
+	Formats map[string]int
+	Options map[string]string
+	Appends map[string]string
+	Hand    func(m *Message, c *Context, key string, arg ...string)
+}
+```
+Cache为缓存项的定义，Name为缓存项的名字，Value为缓存项的值，Help为缓存项的帮助信息，Hand为缓存项读写函数，可选。
+Config为配置项的定义，Name为配置项的名字，Value为配置项的值，Help为配置项的帮助信息，Hand为配置项读写函数，可选。
+Command为命令项的定义，Name为命令项的名字，Help为命令项的帮助信息，Hand为命令项执行函数。
+```go
+Commands: map[string]*ctx.Command{
+	"echo": &ctx.Command{Name: "echo word", Help: "echo something", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		m.Echo(m.Cap("format"), m.Conf("default"))
+	}},
+},
+```
+命令Hand函数，是消息驱动的。
+m.Cap()读写当前模块的某个缓存项。
+m.Conf()读写当前模块的某个配置项。
+m.Echo()输出命令执行结果。
+
+### 3.1 context模块开发进阶
+### 3.2 context核心模块开发
 
 ## 数据结构
 * ARM: 寻址与指令
