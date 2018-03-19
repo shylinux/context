@@ -201,7 +201,7 @@ $ bench
 > echo
 hello go world
 ```
-
+#### 3.0.0 代码解析
 ```go
 func init() {
 	ctx.Index.Register(Index, nil)
@@ -256,6 +256,29 @@ Commands: map[string]*ctx.Command{
 m.Cap()读写当前模块的某个缓存项。
 m.Conf()读写当前模块的某个配置项。
 m.Echo()输出命令执行结果。
+#### 3.0.1 缓存接口
+```go
+func (m *Message) Caps(key string, arg ...bool) bool
+func (m *Message) Capi(key string, arg ...int) int
+func (m *Message) Cap(key string, arg ...string) string
+```
+只有一个参数时，代表读取缓存项的值。有两个参数是会向缓存项中写入新值。
+
+Cap()把缓存项，当成字符串来进行直接读写。
+Capi()只有一个参数时，读取缓存项并转换成整型数值返回。有两个参数时，会把第二个整型参数转换成字符串写缓存项中。
+Caps()只有一个参数时，读取缓存项并转换成布尔值返回。有两个参数时，会把第二个布尔参数转换成字符串写缓存项中。
+#### 3.0.2 配置接口
+```go
+func (m *Message) Confs(key string, arg ...bool) bool
+func (m *Message) Confi(key string, arg ...int) int
+func (m *Message) Conf(key string, arg ...string) string
+```
+只有一个参数时，代表读取配置项的值。有两个参数是会向配置项中写入新值。
+
+Cap()把缓存项，当成字符串来进行直接读写。
+Capi()只有一个参数时，读取配置项并转换成整型数值返回。有两个参数时，会把第二个整型参数转换成字符串写配置项中。
+Caps()只有一个参数时，读取配置项并转换成布尔值返回。有两个参数时，会把第二个布尔参数转换成字符串写配置项中。
+#### 3.0.1 日志接口
 
 ### 3.1 context模块开发进阶
 ### 3.2 context核心模块开发
