@@ -6,6 +6,26 @@ context: 终端工具链，各种实用的功能模块，通过简洁的接口�
 作为一个框架，通过模块式开发，可以快速开发各种应用软件。
 
 ## 1 context安装
+### 1.0 context下载
+选择自己操作系统与处理器的类型对应的版本下载，直接运行即可。
+
+https://github.com/shylinux/context-bin/raw/master/bench-linux-arm
+
+https://github.com/shylinux/context-bin/raw/master/bench-linux-386
+
+https://github.com/shylinux/context-bin/raw/master/bench-linux-amd64
+
+https://github.com/shylinux/context-bin/raw/master/bench-windows-386
+
+https://github.com/shylinux/context-bin/raw/master/bench-windows-amd64
+
+https://github.com/shylinux/context-bin/raw/master/bench-darwin-amd64
+
+### 1.1 context源码安装
+#### 1.1.0 golang开发环境安装
+* 下载：git clone https://github.com/shylinux/context-dev
+* 安装：cd context-dev && ./install.sh
+#### 1.1.1 context源码安装
 * 下载：git clone https://github.com/shylinux/context
 * 编译：cd context && go install src/example/bench.go
 ## 2 context使用
