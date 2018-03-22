@@ -15,9 +15,9 @@ https://github.com/shylinux/context-bin/raw/master/bench-linux-386
 
 https://github.com/shylinux/context-bin/raw/master/bench-linux-amd64
 
-https://github.com/shylinux/context-bin/raw/master/bench-windows-386
+https://github.com/shylinux/context-bin/raw/master/bench-windows-386.exe
 
-https://github.com/shylinux/context-bin/raw/master/bench-windows-amd64
+https://github.com/shylinux/context-bin/raw/master/bench-windows-amd64.exe
 
 https://github.com/shylinux/context-bin/raw/master/bench-darwin-amd64
 
@@ -28,9 +28,9 @@ https://github.com/shylinux/context-bin/raw/master/bench-darwin-amd64
 #### 1.1.1 context源码安装
 * 下载：git clone https://github.com/shylinux/context
 * 编译：cd context && go install src/example/bench.go
+
 ## 2 context使用
 ### 2.0 应用示例--启动WEB服务器
-
 ```sh
   $ bench
   > ~web
@@ -41,6 +41,7 @@ https://github.com/shylinux/context-bin/raw/master/bench-darwin-amd64
 执行"~web"，切换到web模块，执行"serve ./ ':9090'"，在当前目录启动一个WEB服务器，监听地址为"0.0.0.0:9090"。
 
 打开浏览器输入"http://localhost:9090" ，即可看一个静态WEB服务器已经启动。
+
 ### 2.1 常用命令
 #### 2.1.1 cache: 缓存管理
 ```sh
@@ -49,19 +50,23 @@ address(:9090): 服务地址
 directory(./): 服务目录
 protocol(http): 服务协议
 ```
-输入"cache"命令，即可查看当前模块的缓存数据，通过这些缓存数据，就可以了解模块的当前各种运行状态。如"address"，代表web模块监听的网络地址为"0.0.0.0:9090"。
+输入"cache"命令，即可查看当前模块的缓存数据，通过这些缓存数据，就可以了解模块的当前各种运行状态。
+如"address"，代表web模块监听的网络地址为"0.0.0.0:9090"。
+
 #### 2.1.2 config: 配置管理
 ```sh
 web> config
 logheaders(yes): 日志输出报文头(yes/no)
 ```
-输入"config"命令，即可查看当前模块的配置信息。通过修改这些配置信息，就可以控制模块的运行的环境，改变模块运行的状态。如"logheaders"，代表web模块处理网络请求时，是否在日志中输出报文头，此时值为yes即打印报文头。
+输入"config"命令，即可查看当前模块的配置信息。通过修改这些配置信息，就可以控制模块的运行的环境，改变模块运行的状态。
+如"logheaders"，代表web模块处理网络请求时，是否在日志中输出报文头，此时值为yes即打印报文头。
 ```sh
 web> config logheaders no
 web> config
 logheaders(no): 日志输出报文头(yes/no)
 ```
 输入"config logheaders no"命令，修改logheaders的值为no，即不在日志中输出报文头。
+
 #### 2.1.3 command: 命令管理
 ```sh
 web> command
@@ -69,7 +74,12 @@ serve: serve [directory [address [protocol]]]
 route: route directory|template|script route content
 /demo: /demo
 ```
-输入"command"命令，即可查看当前模块的命令集合。通过调用这些命令使用模块提供的各种功能。如"serve"，启动一个web服务器，参数都是可选的，参数"directory"代表web服务器的响应路径，存放网页的各种文件。参数"address"，代表服务器监听的网络地址。参数"protocol"，代表服务器使用的网络协议。
+输入"command"命令，即可查看当前模块的命令集合。通过调用这些命令使用模块提供的各种功能。
+如"serve"，启动一个web服务器，参数都是可选的。
+参数"directory"代表web服务器的响应路径，存放网页的各种文件。
+参数"address"，代表服务器监听的网络地址。
+参数"protocol"，代表服务器使用的网络协议。
+
 #### 2.1.4 context: 模块管理
 ```sh
 web> context
@@ -94,7 +104,9 @@ file1(nfs::aaa:root:root): start(var/bench.log) 打开文件
 stdio(nfs::aaa:root:root): start(stdio) 扫描文件
 file2(nfs::aaa:root:root): start(etc/init.shy) 扫描文件
 ```
-输入"context ctx"命令，切换ctx模块为当前模块。输入"context"命令，即可查看当前模块及子模块的基本信息。ctx为根模块，所以可以查看到所有模块的基本信息。
+输入"context ctx"命令，切换ctx模块为当前模块。输入"context"命令，即可查看当前模块及子模块的基本信息。
+ctx为根模块，所以可以查看到所有模块的基本信息。
+
 #### 2.1.5 message: 消息管理
 ```sh
 tcp> message
@@ -108,13 +120,17 @@ historys:
   1 4361(tcp->log): 23:30:22 [log search 1 match [tcp]]
   2 4363(cli->tcp): 23:30:22 []
 ```
-输入"message"命令，查看当前模块收发的所有消息。其中"requests"是收到的长消息，如有一条ctx模块发送给tcp模块的编号为9消息。其中"sessions"，是发送出的长消息，这里为空，所以tcp模块没有发送长消息。其中"historys"是模块收到的所以消息，包括长消息和短消息。显示中除了显示当前消息，还会显示消息的子消息。
+输入"message"命令，查看当前模块收发的所有消息。
+其中"requests"是收到的长消息，如有一条ctx模块发送给tcp模块的编号为9消息。
+其中"sessions"，是发送出的长消息，这里为空，所以tcp模块没有发送长消息。
+其中"historys"是模块收到的所有消息，包括长消息和短消息。显示中除了显示当前消息，还会显示消息的子消息。
 ```sh
 tcp> message 9
 message: 0
 9(ctx->tcp): 23:36:48 []
 ```
 输入"message 9"命令，查看编号为9的消息的具体信息。
+
 ### 2.2 web模块的命令
 web模块，提供web服务。目前有两条命令serve主机管理，route路由管理。
 ```sh
@@ -123,6 +139,7 @@ serve: serve [directory [address [protocol]]]
 route: route directory|template|script route content
 /demo: /demo
 ```
+
 #### 2.2.1 serve主机管理
 ```sh
 web> command serve
@@ -175,9 +192,13 @@ var Index = &ctx.Context{Name: "demo", Help: "example demo",
 		"default": &ctx.Config{Name: "default", Value: "go", Help: "output string"},
 	},
 	Commands: map[string]*ctx.Command{
-		"echo": &ctx.Command{Name: "echo word", Help: "echo something", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Echo(m.Cap("format"), m.Conf("default"))
-		}},
+		"echo": &ctx.Command{
+			Name: "echo word",
+			Help: "echo something",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Echo(m.Cap("format"), m.Conf("default"))
+			},
+		},
 	},
 }
 
@@ -221,6 +242,7 @@ $ bench
 > echo
 hello go world
 ```
+
 #### 3.0.0 代码解析
 ```go
 func init() {
@@ -276,6 +298,7 @@ Commands: map[string]*ctx.Command{
 m.Cap()读写当前模块的某个缓存项。
 m.Conf()读写当前模块的某个配置项。
 m.Echo()输出命令执行结果。
+
 #### 3.0.1 缓存接口
 ```go
 func (m *Message) Caps(key string, arg ...bool) bool
@@ -287,6 +310,7 @@ func (m *Message) Cap(key string, arg ...string) string
 Cap()把缓存项，当成字符串来进行直接读写。
 Capi()只有一个参数时，读取缓存项并转换成整型数值返回。有两个参数时，会把第二个整型参数转换成字符串写缓存项中。
 Caps()只有一个参数时，读取缓存项并转换成布尔值返回。有两个参数时，会把第二个布尔参数转换成字符串写缓存项中。
+
 #### 3.0.2 配置接口
 ```go
 func (m *Message) Confs(key string, arg ...bool) bool
@@ -298,10 +322,160 @@ func (m *Message) Conf(key string, arg ...string) string
 Cap()把缓存项，当成字符串来进行直接读写。
 Capi()只有一个参数时，读取配置项并转换成整型数值返回。有两个参数时，会把第二个整型参数转换成字符串写配置项中。
 Caps()只有一个参数时，读取配置项并转换成布尔值返回。有两个参数时，会把第二个布尔参数转换成字符串写配置项中。
-#### 3.0.1 日志接口
+
+#### 3.0.3 日志接口
+```go
+func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{})
+```
+参数action为日志类型，可取error, info, debug...类型及相关处理由log模块自定义。
+参数ctx指定模块, 可取nil。
+参数str与arg与Printf参数相同。
 
 ### 3.1 context模块开发进阶
+#### 3.1.0 context模块的生命周期与继承多态
+context结构体封封装了三种标准接口，cache、config、command。
+但这些接口只能保存与处理简单的数据。如果需要处理复杂的数据，可以自己定义类型。
+自定义的类型必须实现Server接口。
+```go
+type Server interface {
+	Spawn(m *Message, c *Context, arg ...string) Server
+	Begin(m *Message, arg ...string) Server
+	Start(m *Message, arg ...string) bool
+	Close(m *Message, arg ...string) bool
+}
+```
+模块有自己的完整的生命周期函数，像对象，像进程。
+
+Spawn()创建新模块，类似于面向对象的new。参数m为创建模块时的消息，c为新模块，arg为创建时的参数。返回值为自定义的结构体。
+
+Begin()初始化新模块，类似于面向对象的构造函数。
+
+Start()启动模块服务，类似于进程启动。
+
+Close()关闭模块服务，类似于进程结束，类似于面向对象的析构函数。
+```go
+package demo
+
+import (
+	"context"
+)
+
+type Demo struct {
+	*ctx.Context
+}
+
+func (demo *Demo) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+	c.Caches = map[string]*ctx.Cache{
+		"format": &ctx.Cache{Name: "format", Value: c.Name + ": hello %s world", Help: "output string"},
+	}
+	c.Configs = map[string]*ctx.Config{}
+
+	d := new(Demo)
+	d.Context = c
+	return d
+}
+func (demo *Demo) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	return demo
+}
+
+func (demo *Demo) Start(m *ctx.Message, arg ...string) bool {
+	return false
+}
+
+func (demo *Demo) Close(m *ctx.Message, arg ...string) bool {
+	return true
+}
+
+var Index = &ctx.Context{Name: "demo", Help: "example demo",
+	Caches: map[string]*ctx.Cache{
+		"format": &ctx.Cache{Name: "format", Value: "hello %s world", Help: "output string"},
+	},
+	Configs: map[string]*ctx.Config{
+		"default": &ctx.Config{Name: "default", Value: "go", Help: "output string"},
+	},
+	Commands: map[string]*ctx.Command{
+		"echo": &ctx.Command{
+			Name: "echo word",
+			Help: "echo something",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Echo(m.Cap("format"), m.Conf("default"))
+			},
+		},
+		"new": &ctx.Command{
+			Name: "new name",
+			Help: "create new module",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				sub := c.Spawn(m, arg[0], "new module")
+				sub.Begin(m)
+				sub.Start(m)
+			},
+		},
+		"del": &ctx.Command{
+			Name: "del",
+			Help: "delete module",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				c.Close(m)
+			},
+		},
+	},
+}
+
+func init() {
+	demo := &Demo{}
+	demo.Context = Index
+	ctx.Index.Register(Index, demo)
+}
+```
+新定义了一个结构体Demo，可以向其添加各种自定义的数据。ctx.Context指向绑定的模块。
+并实现了四个生命周期函数。Spawn()在创建新模块时会添加一个新缓存项。创建新的自定义结构体，并与新模块绑定。
+init()创建新的自定义结构体，并与静态模块绑定。
+```sh
+$ go install src/example/bench.go
+$ bench
+cli> ~demo
+demo> new one
+one> context demo
+demo> context
+demo(ctx:cli:aaa:root:root): begin() example demo
+one(demo:cli:aaa:root:root): start() new module
+demo> new two
+two> context demo
+demo> context
+demo(ctx:cli:aaa:root:root): begin() example demo
+one(demo:cli:aaa:root:root): start() new module
+two(demo:cli:aaa:root:root): start() new module
+one> context one
+one> echo
+one: hello go world
+```
+重新编译并运行bench，进入demo模块，创新名为one的新模块，自动进入新模块。调用context demo切回原模块，调用context查看新建的模块。
+调用context one切换到新建的模块调用echo。
+新模块中没有echo命令，则会直接调用父模块的echo。
+新模块中有format缓存项，则不会调用父模块的format。
+新模块中没有default配置项，则会调用父模块的配置项。
+从而实现了模块间的继承与多态。
+```go
+one> del
+one> context demo
+demo> context
+demo(ctx:cli:aaa:root:root): begin() example demo
+two(demo:cli:aaa:root:root): start() new module
+```
+在one模块下调用del，则会删除当前模块。调用context demo切换到父模块，则看到one模块已经被删除。
+
+#### 3.1.0 message消息驱动的开发模型
+
 ### 3.2 context核心模块开发
+### 3.2.0 ctx模块中心
+### 3.2.1 cli命令中心
+### 3.2.2 lex词法中心
+### 3.2.3 yac语法中心
+### 3.2.4 tcp网络中心
+### 3.2.5 nfs存储中心
+### 3.2.6 aaa认证中心
+### 3.2.7 web应用中心
+
+### 4 设计理念
 
 ## 数据结构
 * ARM: 寻址与指令
