@@ -25,6 +25,7 @@ https://github.com/shylinux/context-bin/raw/master/bench-darwin-amd64
 #### 1.1.0 golang开发环境安装
 * 下载：git clone https://github.com/shylinux/context-dev
 * 安装：cd context-dev && ./install.sh
+
 #### 1.1.1 context源码安装
 * 下载：git clone https://github.com/shylinux/context
 * 编译：cd context && go install src/example/bench.go
@@ -454,7 +455,7 @@ one: hello go world
 新模块中有format缓存项，则不会调用父模块的format。
 新模块中没有default配置项，则会调用父模块的配置项。
 从而实现了模块间的继承与多态。
-```go
+```sh
 one> del
 one> context demo
 demo> context
@@ -463,19 +464,147 @@ two(demo:cli:aaa:root:root): start() new module
 ```
 在one模块下调用del，则会删除当前模块。调用context demo切换到父模块，则看到one模块已经被删除。
 
-#### 3.1.0 message消息驱动的开发模型
+#### 3.1.1 message消息驱动的开发模型
+为了降低模块间的信赖关系，除了定义三种标准接口外，还有模块间的通信使用消息机制。
+所以大多函数中都会有参数m代表当前的消息，arg消息的请求行参数。
+```go
+Commands: map[string]*ctx.Command{
+	"send": &ctx.Command{
+		Name: "send module",
+		Help: "send something",
+		Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			msg := m.Find(arg[0], false)
+			msg.Cmd("echo")
+			m.Echo(msg.Result(0))
+		},
+	},
+	...
+```
+如上，再给demo模块添加一条send命令。
+m.Find()会查找当前模块的子模块，并创建一个由当前模块发送给子模块的消息。
+msg.Cmd()设置请求行，并执行命令。
+msg.Result()取出响应行的数据。
+m.Echo()设置当前命令的执行结果，即当前命令的响应行。
+```sh
+$ go install src/example/bench.go
+$ bench
+demo> new one
+one> context demo
+demo> send one
+one: hello go world
+```
+重新编译并运行bench，在demo模块下，创建一个新的模块one，并切换回demo模块向one模块发送一条消息。
 
-### 3.2 context核心模块开发
-### 3.2.0 ctx模块中心
-### 3.2.1 cli命令中心
-### 3.2.2 lex词法中心
-### 3.2.3 yac语法中心
-### 3.2.4 tcp网络中心
-### 3.2.5 nfs存储中心
-### 3.2.6 aaa认证中心
-### 3.2.7 web应用中心
+* 消息创建
+```go
+func (m *Message) Search(key string, root ...bool) []*Message
+func (m *Message) Find(name string, root ...bool) *Message
+func (m *Message) Sess(key string, arg ...string) *Message
+```
+Search()遍历功能树，找出模块名称或模块帮助信息匹配正则表达式key的模块，并创建由当前模块发送给这些模块的消息。
 
-### 4 设计理念
+Find()遍历功能树，找出模块名匹配完整路径名的模块，并创建由当前模块发送给此模块的消息。name值为点分路径名，如"ctx.cli"代表ctx模块下的cli模块。
+
+第二个参数root代表搜索的起点，默认为从根模块开始搜索。值为false时，从当前模块开始搜索。
+
+Sess()是对Search()与Find()进行了封装，会把搜索的结果保存下来，以便之后的多次使用。
+参数key为保存名，第二个参数为模块名，第三个参数为搜索方法search或find，第四个参数为搜索起点是否为根模块。
+后面三个参数都有默认值，使用方法类似于C++的变参。如果只有一个参数则会直接取出之前的查找结果并创建一个新的消息。
+
+* 消息发送
+```go
+func (m *Message) Cmd(arg ...interface{}) *Message
+```
+消息发送给目标模块，调用对应的Command接口。参数为命令行，包括命令名，与命令参数。
+
+* 消息读写
+```go
+func (m *Message) Detail(index int, arg ...interface{}) string
+func (m *Message) Detaili(index int, arg ...int) int
+func (m *Message) Details(index int, arg ...bool) bool
+
+func (m *Message) Result(index int, arg ...interface{}) string
+func (m *Message) Resulti(index int, arg ...int) int
+func (m *Message) Results(index int, arg ...bool) bool
+
+func (m *Message) Option(key string, arg ...interface{}) string
+func (m *Message) Optioni(key string, arg ...int) int
+func (m *Message) Options(key string, arg ...bool) bool
+
+func (m *Message) Append(key string, arg ...interface{}) string
+func (m *Message) Appendi(key string, arg ...int) int
+func (m *Message) Appends(key string, arg ...bool) bool
+```
+消息所带的数据类似于http报文。Detail()读写请求行（命令行）数据，Result()读写响应行。Option()读写请求头。Append()读写响应头。
+
+请求行与响应行是由空格隔开的多个字符串，类似于字符串数组。Detail()与Result()第一个参数指定读写位置，第二个参数为要写入的数据，各种类型会转换为字符串插入到相应的位置。如果没有第二个参数，则代表读取对应位置上的数据。
+
+请求头与响应头存储结构为map[string][]string，类似于字符串的数组结构体。Option()与Append()第一个参数为键值，指定要读写的数组，剩下的参数为要写入数组的多个数据，返回值为数组的第一个参数。如果没有第二个参数，则返回数组的第一个数据。
+
+s结尾的函数代表读写的数据为bool值，函数内部会进行bool与string类型的相互转换。
+
+i结尾的函数代表读写的数据为int值，函数内部会进行int与string类型的相互转换。
+
+```go
+Commands: map[string]*ctx.Command{
+	"send": &ctx.Command{
+		Name: "send module",
+		Help: "send something",
+		Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Sess("sub", arg[0], "find", "false")
+
+			msg := m.Sess("sub")
+			msg.Detail(0, "echo")
+			msg.Option("key", "hello")
+
+			msg.Cmd()
+
+			m.Echo(msg.Result(0))
+			m.Echo(" ")
+			m.Echo(msg.Result(1))
+			m.Echo(" ")
+			m.Echo(msg.Append("hi"))
+		},
+	},
+	"echo": &ctx.Command{
+		Name: "echo",
+		Help: "echo something",
+		Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Result(0, m.Option("key"), "world")
+			m.Append("hi", "nice")
+		},
+	},
+	...
+```
+在send命令中， Sess()在一开始就搜索并保存了所需的模块，这些操作可以放在专门的初始化。不必每次都查找模块。
+之后再调用Sess()创建新的消息，并调用Detail()设置请求行（命令行），调用Option()设置请求头。
+然后调用Cmd()执行命令。命令执行完成后调用Result()取出响应行，调用Append()取出响应头。
+
+在echo命令中，调用Option取出请求头，调用Result设置响应行，调用Append设置响应头。
+```sh
+$ go install src/example/bench.go
+$ bench
+demo> new one
+one> context demo
+demo> send one
+hello world nice
+```
+
+## 4 context核心模块详解
+### 4.0 ctx模块中心
+### 4.1 cli命令中心
+### 4.2 lex词法中心
+### 4.3 yac语法中心
+### 4.4 tcp网络中心
+### 4.5 nfs存储中心
+### 4.6 aaa认证中心
+### 4.7 web应用中心
+### 4.8 log日志中心
+### 4.9 gdb调试中心
+### 4.a ssh集群中心
+### 4.b mdb数据中心
+
+## 5 设计理念
 
 ## 数据结构
 * ARM: 寻址与指令
