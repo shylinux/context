@@ -470,6 +470,9 @@ type Message struct {
 	target *Context
 	Index  int
 
+	ncallback int
+	callback  func() bool
+
 	Template *Message
 }
 
@@ -820,12 +823,6 @@ func (m *Message) Find(name string, root ...bool) *Message { // {{{
 }
 
 // }}}
-func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
-	return m.Set("detail", arg...).target.Spawn(m, name, help).Begin(m).Start(m)
-}
-
-// }}}
-
 func (m *Message) Sess(key string, arg ...string) *Message { // {{{
 	if len(arg) > 0 {
 		root := true
@@ -852,6 +849,12 @@ func (m *Message) Sess(key string, arg ...string) *Message { // {{{
 	}
 
 	return nil
+}
+
+// }}}
+
+func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
+	return m.Set("detail", arg...).target.Spawn(m, name, help).Begin(m).Start(m)
 }
 
 // }}}
@@ -1211,6 +1214,8 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 						m.target.Historys = make([]*Message, 0, 10)
 					}
 					m.target.Historys = append(m.target.Historys, m)
+
+					m.Back()
 				})
 
 				return m.Get("result")
@@ -1290,6 +1295,31 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 	}
 
 	return m
+}
+
+// }}}
+func (m *Message) Call(cb func() bool) { // {{{
+	m.callback = cb
+	m.message.ncallback++
+
+	m.Wait = nil
+	m.Cmd()
+}
+
+// }}}
+func (m *Message) Back() { // {{{
+	if m.callback == nil {
+		return
+	}
+
+	if m.callback() {
+		m.callback = nil
+		m.message.ncallback--
+	}
+
+	if m.message.ncallback == 0 {
+		m.message.Back()
+	}
 }
 
 // }}}

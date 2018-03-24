@@ -1,6 +1,6 @@
-package nfs
-
-import (
+package nfs // {{{
+// }}}
+import ( // {{{
 	"context"
 
 	"bufio"
@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+// }}}
 
 type NFS struct {
 	io io.ReadWriteCloser
@@ -26,7 +28,7 @@ type NFS struct {
 	*ctx.Context
 }
 
-func (nfs *NFS) print(str string, arg ...interface{}) bool {
+func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 	switch {
 	case nfs.io != nil:
 		fmt.Fprintf(nfs.io, str, arg...)
@@ -38,7 +40,9 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool {
 	return true
 }
 
-func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+// }}}
+
+func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"pos":    &ctx.Cache{Name: "读写位置", Value: "0", Help: "读写位置"},
 		"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
@@ -67,7 +71,8 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 }
 
-func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server {
+// }}}
+func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	nfs.Context.Master(nil)
 	if nfs.Context == Index {
 		Pulse = m
@@ -75,7 +80,8 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return nfs
 }
 
-func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
+// }}}
+func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if socket, ok := m.Data["io"]; ok {
 		nfs.io = socket.(io.ReadWriteCloser)
 		nfs.Reader = bufio.NewReader(nfs.io)
@@ -224,7 +230,8 @@ out:
 	return false
 }
 
-func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
+// }}}
+func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch nfs.Context {
 	case m.Target():
 		if nfs.in != nil {
@@ -236,6 +243,8 @@ func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
 	}
 	return true
 }
+
+// }}}
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
@@ -304,7 +313,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			// }}}
 		}},
 		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
 				if m.Has("nrecv") {
 					if len(arg) > 1 && arg[0] == "file" {
 						info, e := os.Stat(arg[1])
@@ -361,10 +370,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Recv = make(chan bool)
 					<-m.Recv
 				}
-			}
+			} // }}}
 		}},
 		"recv": &ctx.Command{Name: "recv [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
 				if m.Has("nrecv") {
 					if len(arg) > 1 && arg[0] == "file" {
 						f, e := os.Create(arg[1])
@@ -404,7 +413,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 				m.Recv = make(chan bool)
 				<-m.Recv
-			}
+			} // }}}
 		}},
 		"open": &ctx.Command{Name: "open file", Help: "打开文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if m.Has("io") { // {{{
@@ -500,9 +509,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"pwd": &ctx.Command{Name: "pwd", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			wd, e := os.Getwd()
+			wd, e := os.Getwd() // {{{
 			m.Assert(e)
-			m.Echo(wd)
+			m.Echo(wd) // }}}
 		}},
 	},
 	Index: map[string]*ctx.Context{
