@@ -89,6 +89,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		nfs.send = make(map[string]*ctx.Message)
 
 		target, msg := m.Target(), m.Spawn(m.Target())
+		nfs.Caches["target"] = &ctx.Cache{Name: "target", Value: target.Name, Help: "文件名"}
 
 		for {
 			line, e := nfs.Reader.ReadString('\n')
@@ -140,6 +141,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 					send.Recv <- true
 				}
 				msg = m.Spawn(target)
+				m.Cap("target", target.Name)
 				continue
 			}
 
@@ -295,22 +297,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			tcp := m.Sess("tcp") // {{{
-			if tcp == nil {
-				tcp = m.Sess("tcp", "tcp")
-			}
-			m.Assert(tcp != nil)
-			tcp.Cmd(m.Meta["detail"])
-			// }}}
+			m.Cap("stream", m.Sess("tcp", "tcp").Cmd(m.Meta["detail"]).Cap("address"))
 		}},
 		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			tcp := m.Sess("tcp") // {{{
-			if tcp == nil {
-				tcp = m.Sess("tcp", "tcp")
-			}
-			m.Assert(tcp != nil)
-			tcp.Cmd(m.Meta["detail"])
-			// }}}
+			m.Sess("tcp", "tcp").Cmd(m.Meta["detail"])
 		}},
 		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{

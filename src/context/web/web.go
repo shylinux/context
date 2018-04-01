@@ -1,6 +1,6 @@
-package web
-
-import (
+package web // {{{
+// }}}
+import ( // {{{
 	"context"
 
 	"html/template"
@@ -13,6 +13,8 @@ import (
 	"path"
 	"strings"
 )
+
+// }}}
 
 type MUX interface {
 	Handle(string, http.Handler)
@@ -28,7 +30,7 @@ type WEB struct {
 	*ctx.Context
 }
 
-func (web *WEB) AppendJson(msg *ctx.Message) string {
+func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
 	result := []string{"{"}
 	for i, k := range msg.Meta["append"] {
 		result = append(result, fmt.Sprintf("\"%s\": [", k))
@@ -47,17 +49,19 @@ func (web *WEB) AppendJson(msg *ctx.Message) string {
 	return strings.Join(result, "")
 }
 
-func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) {
+// }}}
+func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn(m.Target()).Set("detail", key)
+
 		for k, v := range r.Form {
 			msg.Add("option", k, v...)
 		}
 		for _, v := range r.Cookies() {
 			msg.Add("option", v.Name, v.Value)
 		}
-
 		msg.Log("cmd", nil, "%s [] %v", key, msg.Meta["option"])
+
 		msg.Put("option", "request", r).Put("option", "response", w)
 		if hand(msg, msg.Target(), key); len(msg.Meta["append"]) > 0 {
 			msg.Set("result", web.AppendJson(msg))
@@ -70,7 +74,8 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 	})
 }
 
-func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// }}}
+func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	if web.Message != nil {
 		log.Println()
 		web.Log("cmd", nil, "%v %s %s", r.RemoteAddr, r.Method, r.URL)
@@ -100,7 +105,9 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+// }}}
+
+func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -109,7 +116,9 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
+// }}}
+func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+	web.Context.Master(nil)
 	web.Caches["route"] = &ctx.Cache{Name: "请求路径", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
 	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已初始化"}
 	web.Caches["master"] = &ctx.Cache{Name: "服务入口(yes/no)", Value: "no", Help: "服务入口"}
@@ -130,7 +139,8 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return web
 }
 
-func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
+// }}}
+func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if len(arg) > 0 {
 		m.Cap("directory", arg[0])
 	}
@@ -192,13 +202,16 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	return true
 }
 
-func (web *WEB) Close(m *ctx.Message, arg ...string) bool {
+// }}}
+func (web *WEB) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch web.Context {
 	case m.Target():
 	case m.Source():
 	}
 	return true
 }
+
+// }}}
 
 var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	Caches:  map[string]*ctx.Cache{},
@@ -208,7 +221,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Set("detail", arg...).Target().Start(m)
 		}},
 		"route": &ctx.Command{Name: "route directory|template|script route content", Help: "添加应用内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			mux, ok := m.Target().Server.(MUX)
+			mux, ok := m.Target().Server.(MUX) // {{{
 			m.Assert(ok, "模块类型错误")
 			m.Assert(len(arg) == 3, "缺少参数")
 
@@ -249,7 +262,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 					}
 				})
-			}
+			} // }}}
 		}},
 		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Add("append", "hi", "hello")

@@ -522,7 +522,7 @@ func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{
 	}
 
 	if l := m.Sess("log"); l != nil {
-		if i++; i > 20000 {
+		if i++; i > 80000 {
 			debug.PrintStack()
 			os.Exit(1)
 		}
@@ -542,6 +542,8 @@ func (m *Message) Gdb(action string) { // {{{
 
 // }}}
 func (m *Message) Check(s *Context, arg ...string) bool { // {{{
+	return true
+
 	if s.Owner == nil {
 		return true
 	}
@@ -627,8 +629,10 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 			msg = msg[2:]
 		}
 	case *Message:
-		os.Exit(1)
-		panic(e)
+		if result, ok := e.Meta["result"]; ok && len(result) > 0 && result[0] == "error: " {
+			panic(e)
+		}
+		return true
 	default:
 		return true
 	}
@@ -647,7 +651,6 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 	}
 
 	m.Set("result", "error: ", fmt.Sprintln(e), "\n")
-	os.Exit(1)
 	panic(e)
 }
 
@@ -655,9 +658,9 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
 	defer func() {
 		if e := recover(); e != nil {
+
 			switch e.(type) {
 			case *Message:
-				os.Exit(1)
 				panic(e)
 			}
 
@@ -824,7 +827,8 @@ func (m *Message) Find(name string, root ...bool) *Message { // {{{
 
 // }}}
 func (m *Message) Sess(key string, arg ...string) *Message { // {{{
-	if len(arg) > 0 {
+
+	if _, ok := m.target.Sessions[key]; !ok && len(arg) > 0 {
 		root := true
 		if len(arg) > 2 {
 			root = Right(arg[2])
@@ -1595,7 +1599,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 			// }}}
 		}},
-		"message": &Command{Name: "message code", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+		"message": &Command{Name: "message code meta index", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			switch len(arg) { // {{{
 			case 0:
 				m.Echo("\033[31mrequests:\033[0m\n")
@@ -1657,19 +1661,39 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 					ms = append(ms, ms[i].messages...)
 				}
+			case 2, 3:
+				index := 0
+				if len(arg) == 3 {
+					n, e := strconv.Atoi(arg[2])
+					m.Assert(e)
+					index = n
+				}
+
+				n, e := strconv.Atoi(arg[0])
+				m.Assert(e)
+
+				ms := []*Message{m.root}
+				for i := 0; i < len(ms); i++ {
+					if ms[i].code == n {
+						if meta, ok := ms[i].Meta[arg[1]]; ok {
+							m.Echo(meta[index])
+						}
+					}
+					ms = append(ms, ms[i].messages...)
+				}
 			}
 
 			// }}}
 		}},
 		"detail": &Command{Name: "detail index val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Spawn(m.Target())
+			msg := m.Spawn(m.Target()) // {{{
 
 			msg.Detail(1, "nie", 1, []string{"123", "123"}, true, []bool{false, true}, []int{1, 2, 2})
 
 			m.Echo("%v", msg.Meta)
 			msg.Detail(2, "nie")
 			m.Echo("%v", msg.Meta)
-
+			// }}}
 		}},
 		"option": &Command{Name: "option key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			if len(arg) > 0 { // {{{
@@ -1843,7 +1867,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								x.Hand = nil
 							}
 						}
+					default:
+						msg := m.Spawn(m.Target()).Cmd(arg)
+						msg.Option("nrecv", m.Option("nrecv"))
+						m.Meta = msg.Meta
 					}
+					return
 
 					m.BackTrace(func(m *Message) bool {
 						if all {
@@ -1860,31 +1889,37 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						return all
 					})
 					m.Assert(m.Has("result"), "%s 命令不存在", arg[0])
-				case 3:
-					cmd := &Command{}
-					m.BackTrace(func(m *Message) bool {
-						if x, ok := m.target.Commands[arg[0]]; ok && x.Hand != nil {
-							*cmd = *x
-						}
-						return all
-					})
+				default:
+					msg := m.Spawn(m.Target()).Cmd(arg)
+					msg.Option("nrecv", m.Option("nrecv"))
+					m.Meta = msg.Meta
+					/*
+						case 3:
+							cmd := &Command{}
+							m.BackTrace(func(m *Message) bool {
+								if x, ok := m.target.Commands[arg[0]]; ok && x.Hand != nil {
+									*cmd = *x
+								}
+								return all
+							})
 
-					if m.Check(m.target, "commands", arg[0]) {
-						if x, ok := m.target.Commands[arg[0]]; ok {
-							if m.target.Owner == nil || m.master.Owner == m.target.Owner {
-								x.Name = arg[1]
-								x.Help = arg[2]
-								m.Echo("%s\n    %s\n", x.Name, x.Help)
+							if m.Check(m.target, "commands", arg[0]) {
+								if x, ok := m.target.Commands[arg[0]]; ok {
+									if m.target.Owner == nil || m.master.Owner == m.target.Owner {
+										x.Name = arg[1]
+										x.Help = arg[2]
+										m.Echo("%s\n    %s\n", x.Name, x.Help)
+									}
+								} else {
+									if m.target.Commands == nil {
+										m.target.Commands = map[string]*Command{}
+									}
+									cmd.Name = arg[1]
+									cmd.Help = arg[2]
+									m.target.Commands[arg[0]] = cmd
+								}
 							}
-						} else {
-							if m.target.Commands == nil {
-								m.target.Commands = map[string]*Command{}
-							}
-							cmd.Name = arg[1]
-							cmd.Help = arg[2]
-							m.target.Commands[arg[0]] = cmd
-						}
-					}
+					*/
 				}
 				// }}}
 			}},
@@ -1997,9 +2032,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 					m.Cap(arg[0], arg[2])
 				case 4:
-					if m.source == m.source.master {
-						m.source, m.target = m.target, m.source
-					}
 					m.Cap(arg[0], arg[1:]...)
 				}
 				// }}}
@@ -2013,8 +2045,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 	},
 	Index: map[string]*Context{
 		"void": &Context{Name: "void",
-			Caches:  map[string]*Cache{},
-			Configs: map[string]*Config{},
+			Caches: map[string]*Cache{},
+			Configs: map[string]*Config{
+				"bench.log": &Config{},
+			},
 			Commands: map[string]*Command{
 				"message": &Command{},
 				"context": &Command{},

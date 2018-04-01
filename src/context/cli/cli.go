@@ -62,6 +62,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 	cli.Caches["target"] = &ctx.Cache{Name: "操作目标", Value: cli.Name, Help: "命令操作的目标"}
 	cli.Caches["result"] = &ctx.Cache{Name: "执行结果", Value: "", Help: "前一条命令的执行结果"}
+	cli.Caches["last"] = &ctx.Cache{Name: "前一条消息", Value: "0", Help: "前一条命令的编号"}
 	cli.Caches["back"] = &ctx.Cache{Name: "前一条指令", Value: "", Help: "前一条指令"}
 	cli.Caches["next"] = &ctx.Cache{Name: "下一条指令", Value: "", Help: "下一条指令"}
 
@@ -106,16 +107,17 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 				yac.Cmd("train", "op1", "op1", "mul{", "$", "@", "}")
 				yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
+				yac.Cmd("train", "op1", "op1", "mul{", "-e", "-f", "-d", "}")
 				yac.Cmd("train", "op1", "op1", "mul{", "-", "+", "}")
 				yac.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "}")
 				yac.Cmd("train", "op2", "op2", "mul{", ">", ">=", "<", "<=", "=", "!=", "}")
 
-				yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "}")
+				yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "tran", "}")
 				yac.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
 				yac.Cmd("train", "val", "val", "(", "exp", ")")
 
 				yac.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
-				yac.Cmd("train", "stm", "let", "let", "key", "=", "exp")
+				yac.Cmd("train", "stm", "let", "let", "key", "mul{", "=", "<-", "}", "exp")
 				yac.Cmd("train", "stm", "if", "if", "exp")
 				yac.Cmd("train", "stm", "elif", "elif", "exp")
 				yac.Cmd("train", "stm", "for", "for", "exp")
@@ -306,6 +308,25 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			} // }}}
 		}},
+		"time": &ctx.Command{Name: "time format when", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			t := time.Now() // {{{
+			if len(arg) > 1 {
+				n, e := strconv.Atoi(arg[1])
+				m.Assert(e)
+				t = time.Unix(int64(n), 0)
+			}
+
+			f := ""
+			if len(arg) > 0 {
+				f = arg[0]
+			}
+
+			if f == "" {
+				m.Echo("%d", t.Unix())
+			} else {
+				m.Echo(t.Format(f))
+			} // }}}
+		}},
 		"express": &ctx.Command{Name: "express exp", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			result := "false" // {{{
 			switch len(arg) {
@@ -455,6 +476,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					} else {
 						m.Echo("true")
 					}
+				case "-e":
+					if _, e := os.Stat(arg[1]); e == nil {
+						m.Echo("true")
+					} else {
+						m.Echo("false")
+					}
+				case "-f":
+					if info, e := os.Stat(arg[1]); e == nil && !info.IsDir() {
+						m.Echo("true")
+					} else {
+						m.Echo("false")
+					}
+				case "-d":
+					if info, e := os.Stat(arg[1]); e == nil && info.IsDir() {
+						m.Echo("true")
+					} else {
+						m.Echo("false")
+					}
 				case "$":
 					m.Echo(m.Cap(arg[1]))
 				case "@":
@@ -483,7 +522,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				for i := len(op) - 1; i >= 0; i-- {
-					num[i] = m.Cmd("express", num[i], op[i], num[i+1]).Get("result")
+					num[i] = m.Spawn(m.Target()).Cmd("express", num[i], op[i], num[i+1]).Get("result")
 				}
 
 				m.Echo("%s", num[0])
@@ -509,6 +548,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						m.Echo(msg.Cap(arg[1]))
 					case "@":
 						m.Echo(msg.Conf(arg[1]))
+					}
+				case 4:
+					switch arg[0] {
+					case "$":
+						m.Echo(arg[2])
+					case "@":
+						m.Echo(arg[2])
+					}
+				default:
+					switch arg[0] {
+					case "$":
+						m.Result(0, "cache", arg[1:])
+					case "@":
+						m.Result(0, "config", arg[1:])
 					}
 				}
 			} else {
@@ -558,6 +611,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				m.Cap("target", cli.target.Name)
 				m.Set("result", msg.Meta["result"]...)
+				m.Capi("last", 0, msg.Code())
 
 			} else {
 				m.Set("result", arg...)
@@ -567,7 +621,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"var": &ctx.Command{Name: "var a [= exp]", Help: "定义变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
 				if m.Cap(arg[1], arg[1], "", "临时变量"); len(arg) > 3 {
-					m.Cap(arg[1], arg[3])
+					switch arg[2] {
+					case "=":
+						m.Cap(arg[1], arg[3])
+					case "<-":
+						m.Cap(arg[1], m.Cap("last"))
+					}
 				}
 			} else {
 				m.Set("result", arg...)
@@ -575,7 +634,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"let": &ctx.Command{Name: "let a = exp", Help: "设置变量, a: 变量名, exp: 表达式(a {+|-|*|/|%} b)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
-				m.Cap(arg[1], arg[3])
+				switch arg[2] {
+				case "=":
+					m.Cap(arg[1], arg[3])
+				case "<-":
+					m.Cap(arg[1], m.Cap("last"))
+				}
 			} else {
 				m.Set("result", arg...)
 			} // }}}
