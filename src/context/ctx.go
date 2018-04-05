@@ -276,180 +276,6 @@ func (c *Context) Has(key ...string) bool { // {{{
 
 // }}}
 
-func (c *Context) Add(group string, arg ...string) { // {{{
-	if c.Index == nil {
-		c.Index = make(map[string]*Context)
-	}
-	if c.Groups == nil {
-		c.Groups = make(map[string]*Context)
-	}
-	s := c
-	if group != "" && group != "root" {
-		if g, ok := c.Index[group]; ok {
-			s = g
-		} else {
-			panic(errors.New(group + "上下文不存在"))
-		}
-	}
-
-	switch arg[0] {
-	case "context":
-		if len(arg) != 4 {
-			panic(errors.New("参数错误"))
-		}
-		if v, ok := c.Index[arg[1]]; ok {
-			panic(errors.New(v.Name + "上下文已存在"))
-		}
-
-		s.Groups[arg[1]] = &Context{Name: arg[2], Help: arg[3], Index: c.Index}
-		c.Index[arg[1]] = s.Groups[arg[1]]
-
-		log.Println(c.Name, "add context:", arg[1:])
-	case "command":
-		if len(arg) != 3 {
-			panic(errors.New("参数错误"))
-		}
-
-		if v, ok := s.Groups[arg[1]]; ok {
-			if v.Commands == nil {
-				v.Commands = make(map[string]*Command)
-			}
-			if x, ok := v.Commands[arg[2]]; ok {
-				panic(errors.New(x.Name + "命令已存在"))
-			}
-			if x, ok := s.Commands[arg[2]]; ok {
-				log.Println(v.Name, "add command:", arg[2])
-				v.Commands[arg[2]] = x
-			} else {
-				panic(errors.New(arg[2] + "命令不存在"))
-			}
-		} else {
-			panic(errors.New(arg[1] + "上下文不存在"))
-		}
-	case "config":
-		if len(arg) != 3 {
-			panic(errors.New("参数错误"))
-		}
-
-		if v, ok := s.Groups[arg[1]]; ok {
-			if v.Configs == nil {
-				v.Configs = make(map[string]*Config)
-			}
-			if x, ok := v.Configs[arg[2]]; ok {
-				panic(errors.New(x.Name + "配置项已存在"))
-			}
-			if x, ok := s.Configs[arg[2]]; ok {
-				log.Println(v.Name, "add config:", arg[2])
-				v.Configs[arg[2]] = x
-			} else {
-				panic(errors.New(arg[2] + "配置项不存在"))
-			}
-		} else {
-			panic(errors.New(arg[1] + "上下文不存在"))
-		}
-	case "cache":
-		if len(arg) != 3 {
-			panic(errors.New("参数错误"))
-		}
-
-		if v, ok := s.Groups[arg[1]]; ok {
-			if v.Caches == nil {
-				v.Caches = make(map[string]*Cache)
-			}
-			if x, ok := v.Caches[arg[2]]; ok {
-				panic(errors.New(x.Name + "缓存项已存在"))
-			}
-			if x, ok := s.Caches[arg[2]]; ok {
-				log.Println(v.Name, "add cache:", arg[2])
-				v.Caches[arg[2]] = x
-			} else {
-				panic(errors.New(arg[2] + "缓存项不存在"))
-			}
-		} else {
-			panic(errors.New(arg[1] + "上下文不存在"))
-		}
-	}
-}
-
-// }}}
-func (c *Context) Del(arg ...string) { // {{{
-	cs := make([]*Context, 0, 5)
-
-	switch arg[0] {
-	case "context":
-		if len(arg) != 2 {
-			panic(errors.New("参数错误"))
-		}
-
-		if v, ok := c.Groups[arg[1]]; ok {
-			cs = append(cs, v)
-			delete(c.Index, arg[1])
-			delete(c.Groups, arg[1])
-			log.Println(c.Name, "del context:", arg[1])
-		}
-		for i := 0; i < len(cs); i++ {
-			for k, v := range cs[i].Groups {
-				cs = append(cs, v)
-				delete(c.Index, k)
-				log.Println(c.Name, "del context:", k)
-			}
-		}
-	case "command":
-		if len(arg) != 3 {
-			panic(errors.New("参数错误"))
-		}
-
-		if v, ok := c.Groups[arg[1]]; ok {
-			cs = append(cs, v)
-			delete(v.Commands, arg[2])
-			log.Println(v.Name, "del command:", arg[2])
-		}
-		for i := 0; i < len(cs); i++ {
-			for _, v := range cs[i].Groups {
-				cs = append(cs, v)
-				delete(v.Commands, arg[2])
-				log.Println(v.Name, "del command:", arg[2])
-			}
-		}
-	case "config":
-		if len(arg) != 3 {
-			panic(errors.New("参数错误"))
-		}
-
-		if v, ok := c.Groups[arg[1]]; ok {
-			cs = append(cs, v)
-			delete(v.Configs, arg[2])
-			log.Println(v.Name, "del config:", arg[2])
-		}
-		for i := 0; i < len(cs); i++ {
-			for _, v := range cs[i].Groups {
-				cs = append(cs, v)
-				delete(v.Configs, arg[2])
-				log.Println(v.Name, "del config:", arg[2])
-			}
-		}
-	case "cache":
-		if len(arg) != 3 {
-			panic(errors.New("参数错误"))
-		}
-
-		if v, ok := c.Groups[arg[1]]; ok {
-			cs = append(cs, v)
-			delete(v.Caches, arg[2])
-			log.Println(v.Name, "del cache:", arg[2])
-		}
-		for i := 0; i < len(cs); i++ {
-			for _, v := range cs[i].Groups {
-				cs = append(cs, v)
-				delete(v.Caches, arg[2])
-				log.Println(v.Name, "del cache:", arg[2])
-			}
-		}
-	}
-}
-
-// }}}
-
 type Message struct {
 	time time.Time
 	code int
@@ -1540,43 +1366,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"key":  &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*Command{
-		"userinfo": &Command{Name: "userinfo [add|del [context key name help]|[command|config|cache group name]]", Help: "查看模块的用户信息",
-			Formats: map[string]int{"add": -1, "del": -1},
-			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				switch { // {{{
-				case m.Has("add"):
-					m.target.Add(m.source.Group, m.Meta["add"]...)
-				case m.Has("del"):
-					m.target.Del(m.Meta["del"]...)
-				default:
-					target := m.target
-					m.target = target.Owner
-					if m.target != nil && m.Check(m.target) {
-						m.Echo("%s %s\n", m.Cap("username"), m.Cap("group"))
-					}
-					m.target = target
-
-					if len(m.Meta["args"]) > 0 {
-						if g, ok := m.target.Index[m.Get("args")]; ok {
-							for k, _ := range g.Commands {
-								m.Echo("cmd: %s\n", k)
-							}
-							for k, _ := range g.Configs {
-								m.Echo("cfg: %s\n", k)
-							}
-							for k, _ := range g.Caches {
-								m.Echo("cap: %s\n", k)
-							}
-						}
-					} else {
-						for k, v := range m.target.Index {
-							m.Echo("%s", k)
-							m.Echo(": %s %s\n", v.Name, v.Help)
-						}
-					}
-				}
-				// }}}
-			}},
 		"server": &Command{Name: "server [start|exit|switch][args]", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			switch len(arg) { // {{{
 			case 0:
@@ -1684,40 +1473,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 			// }}}
-		}},
-		"detail": &Command{Name: "detail index val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Spawn(m.Target()) // {{{
-
-			msg.Detail(1, "nie", 1, []string{"123", "123"}, true, []bool{false, true}, []int{1, 2, 2})
-
-			m.Echo("%v", msg.Meta)
-			msg.Detail(2, "nie")
-			m.Echo("%v", msg.Meta)
-			// }}}
-		}},
-		"option": &Command{Name: "option key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			if len(arg) > 0 { // {{{
-				m.Option(arg[0], arg[1:])
-			} else {
-				for msg := m; msg != nil; msg = msg.message {
-					m.Echo("%d %s:%s->%s %v\n", msg.code, msg.time.Format("15:03:04"), msg.source.Name, msg.target.Name, msg.Meta["detail"])
-					for _, k := range msg.Meta["option"] {
-						m.Echo("%s: %v\n", k, msg.Meta[k])
-					}
-				}
-			} // }}}
-		}},
-		"append": &Command{Name: "append key val...", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			if len(arg) > 0 { // {{{
-				m.Append(arg[0], arg[1:])
-			} else {
-				for msg := m; msg != nil; msg = msg.message {
-					m.Echo("%d %s:%s->%s %v\n", msg.code, msg.time.Format("15:03:04"), msg.source.Name, msg.target.Name, msg.Meta["result"])
-					for _, k := range msg.Meta["append"] {
-						m.Echo("%s: %v\n", k, msg.Meta[k])
-					}
-				}
-			} // }}}
 		}},
 		"context": &Command{Name: "context back|[[home] [find|search] name] [info|list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
 			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "list": 0, "show": 0, "close": 0, "switch": 0, "start": 0, "spawn": 0},
@@ -2035,6 +1790,113 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Cap(arg[0], arg[1:]...)
 				}
 				// }}}
+			}},
+		"group": &Command{
+			Name:    "group current [add|del group [cache|config|command item]]",
+			Help:    "用户组管理，查看、添加、删除用户组或是接口",
+			Formats: map[string]int{"add": 0, "del": 0, "cache": 0, "config": 0, "command": 0},
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
+				index := m.Target().Index // {{{
+
+				current := m.Target()
+				if len(arg) > 0 && arg[0] != "root" {
+					current = index[arg[0]]
+					if current == nil {
+						return
+					}
+				}
+
+				group := current
+				if len(arg) > 1 {
+					group = current.Index[arg[1]]
+				}
+
+				item := ""
+				if len(arg) > 2 {
+					item = arg[2]
+				}
+
+				switch {
+				case m.Has("add"):
+					if group == nil {
+						if _, ok := index[arg[1]]; ok {
+							break
+						}
+						group = &Context{Name: arg[1]}
+					}
+
+					switch {
+					case m.Has("cache"):
+						if x, ok := current.Caches[item]; ok {
+							if group.Caches == nil {
+								group.Caches = map[string]*Cache{}
+							}
+							group.Caches[item] = x
+						}
+					case m.Has("config"):
+						if x, ok := current.Configs[item]; ok {
+							if group.Configs == nil {
+								group.Configs = map[string]*Config{}
+							}
+							group.Configs[item] = x
+						}
+					case m.Has("command"):
+						if x, ok := current.Commands[item]; ok {
+							if group.Commands == nil {
+								group.Commands = map[string]*Command{}
+							}
+							group.Commands[item] = x
+						}
+					}
+
+					if current.Index == nil {
+						current.Index = map[string]*Context{}
+					}
+					current.Index[arg[1]] = group
+					index[arg[1]] = group
+
+				case m.Has("del"):
+					if group == nil {
+						break
+					}
+
+					gs := []*Context{group}
+					for i := 0; i < len(gs); i++ {
+						for _, g := range gs[i].Index {
+							gs = append(gs, g)
+						}
+
+						switch {
+						case m.Has("cache"):
+							delete(gs[i].Caches, item)
+						case m.Has("config"):
+							delete(gs[i].Configs, item)
+						case m.Has("command"):
+							delete(gs[i].Commands, item)
+						default:
+							delete(index, gs[i].Name)
+							delete(current.Index, gs[i].Name)
+						}
+					}
+
+				default:
+					m.Echo("%s:caches\n", current.Name)
+					for k, c := range current.Caches {
+						m.Echo("  %s: %s\n", k, c.Value)
+					}
+					m.Echo("%s:configs\n", current.Name)
+					for k, c := range current.Configs {
+						m.Echo("  %s: %s\n", k, c.Value)
+					}
+					m.Echo("%s:commands\n", current.Name)
+					for k, c := range current.Commands {
+						m.Echo("  %s: %s\n", k, c.Name)
+					}
+					m.Echo("%s:contexts\n", current.Name)
+					for k, c := range current.Index {
+						m.Echo("  %s: %s\n", k, c.Name)
+					}
+				} // }}}
 			}},
 		"pulse": &Command{Name: "arg name", Help: "查看日志", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			p := m.Target().Pulse
