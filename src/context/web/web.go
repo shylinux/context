@@ -3,8 +3,10 @@ package web // {{{
 import ( // {{{
 	"context"
 
+	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
 
 	"bufio"
 	"fmt"
@@ -31,11 +33,15 @@ type WEB struct {
 }
 
 func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
+	b, e := json.Marshal(msg.Meta)
+	msg.Assert(e)
+	return string(b)
+
 	result := []string{"{"}
 	for i, k := range msg.Meta["append"] {
 		result = append(result, fmt.Sprintf("\"%s\": [", k))
 		for j, v := range msg.Meta[k] {
-			result = append(result, fmt.Sprintf("\"%s\"", v))
+			result = append(result, fmt.Sprintf("\"%s\"", url.QueryEscape(v)))
 			if j < len(msg.Meta[k])-1 {
 				result = append(result, ",")
 			}
@@ -46,6 +52,7 @@ func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
 		}
 	}
 	result = append(result, "}")
+
 	return strings.Join(result, "")
 }
 

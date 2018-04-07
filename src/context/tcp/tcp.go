@@ -1,6 +1,6 @@
-package tcp
-
-import (
+package tcp // {{{
+// }}}
+import ( // {{{
 	"context"
 
 	"crypto/tls"
@@ -9,13 +9,15 @@ import (
 	"strconv"
 )
 
+// }}}
+
 type TCP struct {
 	net.Conn
 	net.Listener
 	*ctx.Context
 }
 
-func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"protocol": &ctx.Cache{Name: "网络协议(tcp/tcp4/tcp6)", Value: m.Conf("protocol"), Help: "网络协议"},
 		"security": &ctx.Cache{Name: "加密通信(true/false)", Value: m.Conf("security"), Help: "加密通信"},
@@ -28,7 +30,8 @@ func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
+// }}}
+func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	tcp.Context.Master(nil)
 	if tcp.Context == Index {
 		Pulse = m
@@ -36,7 +39,8 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return tcp
 }
 
-func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
+// }}}
+func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if len(arg) > 1 {
 		m.Cap("address", arg[1])
 	}
@@ -105,7 +109,8 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	return true
 }
 
-func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool {
+// }}}
+func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch tcp.Context {
 	case m.Target():
 		if tcp.Listener != nil {
@@ -129,6 +134,8 @@ func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool {
 
 	return true
 }
+
+// }}}
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
@@ -165,6 +172,18 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 				buf := make([]byte, size)
 				tcp.Conn.Read(buf)
 				m.Echo(string(buf))
+			}},
+		"ifconfig": &ctx.Command{Name: "ifconfig", Help: "接收消息",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				ifs, e := net.Interfaces()
+				m.Assert(e)
+				for _, v := range ifs {
+					ips, e := v.Addrs()
+					m.Assert(e)
+					for _, x := range ips {
+						m.Echo("%d %s %v %v\n", v.Index, v.Name, v.HardwareAddr, x.String())
+					}
+				}
 			}},
 	},
 	Index: map[string]*ctx.Context{
