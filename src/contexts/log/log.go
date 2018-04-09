@@ -1,7 +1,7 @@
 package log
 
 import (
-	"context"
+	"contexts"
 	"fmt"
 	Log "log"
 	"strconv"

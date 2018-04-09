@@ -2,7 +2,7 @@ package ssh
 
 import (
 	"bufio"
-	"context"
+	"contexts"
 	"fmt"
 	"net"
 	"net/url"

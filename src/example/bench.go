@@ -1,19 +1,19 @@
 package main
 
 import (
-	"context"
-	_ "context/aaa"
-	_ "context/cli"
-	_ "context/ssh"
+	"contexts"
+	_ "contexts/aaa"
+	_ "contexts/cli"
+	_ "contexts/ssh"
 
-	_ "context/mdb"
-	_ "context/nfs"
-	_ "context/tcp"
-	_ "context/web"
+	_ "contexts/mdb"
+	_ "contexts/nfs"
+	_ "contexts/tcp"
+	_ "contexts/web"
 
-	_ "context/lex"
-	_ "context/log"
-	_ "context/yac"
+	_ "contexts/lex"
+	_ "contexts/log"
+	_ "contexts/yac"
 
 	"os"
 )
