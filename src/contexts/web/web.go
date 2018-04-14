@@ -33,7 +33,14 @@ type WEB struct {
 }
 
 func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
-	b, e := json.Marshal(msg.Meta)
+	meta := map[string][]string{}
+	meta["result"] = msg.Meta["result"]
+	meta["append"] = msg.Meta["append"]
+	for _, v := range msg.Meta["append"] {
+		meta[v] = msg.Meta[v]
+	}
+
+	b, e := json.Marshal(meta)
 	msg.Assert(e)
 	return string(b)
 

@@ -19,7 +19,7 @@ type NFS struct {
 	io io.ReadWriteCloser
 	*bufio.Reader
 	*bufio.Writer
-	send map[string]*ctx.Message
+	send map[int]*ctx.Message
 
 	in  *os.File
 	out *os.File
@@ -86,71 +86,82 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		nfs.io = socket.(io.ReadWriteCloser)
 		nfs.Reader = bufio.NewReader(nfs.io)
 		nfs.Writer = bufio.NewWriter(nfs.io)
-		nfs.send = make(map[string]*ctx.Message)
+		nfs.send = make(map[int]*ctx.Message)
 
 		target, msg := m.Target(), m.Spawn(m.Target())
 		nfs.Caches["target"] = &ctx.Cache{Name: "target", Value: target.Name, Help: "文件名"}
 
+		nsend := 0
 		for {
 			line, e := nfs.Reader.ReadString('\n')
 			m.Assert(e)
 
-			if line = strings.TrimSpace(line); len(line) == 0 {
-				if msg.Log("info", nil, "remote: %v", msg.Meta["option"]); msg.Has("detail") {
-					msg.Log("info", nil, "%d exec: %v", m.Capi("nrecv", 1), msg.Meta["detail"])
+			if line = strings.TrimSpace(line); len(line) > 0 {
+				ls := strings.SplitN(line, ":", 2)
+				ls[0] = strings.TrimSpace(ls[0])
+				ls[1], e = url.QueryUnescape(strings.TrimSpace(ls[1]))
+				m.Assert(e)
 
-					msg.Cmd(msg.Meta["detail"])
-					target = msg.Target()
-					m.Cap("target", target.Name)
+				switch ls[0] {
+				case "nsend":
+					n, e := strconv.Atoi(ls[1])
+					m.Assert(e)
+					nsend = n
 
-					for _, v := range msg.Meta["result"] {
-						fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
-					}
-
-					fmt.Fprintf(nfs.Writer, "nsend: %s\n", msg.Get("nrecv"))
-					for _, k := range msg.Meta["append"] {
-						for _, v := range msg.Meta[k] {
-							fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
-						}
-					}
-					fmt.Fprintf(nfs.Writer, "\n")
-					nfs.Writer.Flush()
-
-					if msg.Has("io") {
-						if f, ok := msg.Data["io"].(io.ReadCloser); ok {
-							io.Copy(nfs.Writer, f)
-							nfs.Writer.Flush()
-							f.Close()
-						}
-					}
-				} else {
-					msg.Log("info", nil, "%s echo: %v", msg.Get("nsend"), msg.Meta["result"])
-
-					m.Cap("result", msg.Get("result"))
-					msg.Meta["append"] = msg.Meta["option"]
-					send := nfs.send[msg.Get("nsend")]
-					send.Meta = msg.Meta
-
-					if send.Has("io") {
-						if f, ok := send.Data["io"].(io.WriteCloser); ok {
-							io.CopyN(f, nfs.Reader, int64(send.Appendi("size")))
-							f.Close()
-						}
-					}
-
-					send.Recv <- true
+				default:
+					msg.Add("option", ls[0], ls[1])
 				}
-				msg = m.Spawn(target)
-				m.Cap("target", target.Name)
 				continue
 			}
 
-			ls := strings.SplitN(line, ":", 2)
-			ls[0] = strings.TrimSpace(ls[0])
-			ls[1], e = url.QueryUnescape(strings.TrimSpace(ls[1]))
-			m.Assert(e)
-			msg.Add("option", ls[0], ls[1])
+			if msg.Log("info", nil, "remote: %v", msg.Meta["option"]); msg.Has("detail") {
+				msg.Log("info", nil, "%d exec: %v", m.Capi("nrecv", 1), msg.Meta["detail"])
 
+				msg.Cmd(msg.Meta["detail"])
+				target = msg.Target()
+				m.Cap("target", target.Name)
+
+				for _, v := range msg.Meta["result"] {
+					fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
+				}
+
+				fmt.Fprintf(nfs.Writer, "nsend: %s\n", msg.Get("nrecv"))
+				for _, k := range msg.Meta["append"] {
+					for _, v := range msg.Meta[k] {
+						fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+					}
+				}
+				fmt.Fprintf(nfs.Writer, "\n")
+				nfs.Writer.Flush()
+
+				if msg.Has("io") {
+					if f, ok := msg.Data["io"].(io.ReadCloser); ok {
+						io.Copy(nfs.Writer, f)
+						nfs.Writer.Flush()
+						f.Close()
+					}
+				}
+			} else {
+				msg.Log("info", nil, "%d echo: %v", nsend, msg.Meta["result"])
+
+				m.Cap("result", msg.Get("result"))
+				msg.Meta["append"] = msg.Meta["option"]
+				delete(msg.Meta, "option")
+				send := nfs.send[nsend]
+				send.Meta = msg.Meta
+
+				if send.Has("io") {
+					if f, ok := send.Data["io"].(io.WriteCloser); ok {
+						io.CopyN(f, nfs.Reader, int64(send.Appendi("size")))
+						f.Close()
+					}
+				}
+
+				send.Recv <- true
+			}
+
+			msg = m.Spawn(target)
+			m.Cap("target", target.Name)
 		}
 		return true
 	}
@@ -319,7 +330,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					}
 
 				} else {
-					nfs.send[m.Option("nrecv", m.Capi("nsend", 1))] = m
+					nfs.send[m.Optioni("nrecv", m.Capi("nsend", 1))] = m
 
 					if len(arg) > 1 && arg[0] == "file" {
 						info, e := os.Stat(arg[1])
@@ -352,8 +363,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							f, e := os.Open(arg[1])
 							m.Assert(e)
 							defer f.Close()
-							n, e := io.Copy(nfs.Writer, f)
-							m.Log("fuck", nil, "write %d %v", n, e)
+							_, e = io.Copy(nfs.Writer, f)
 						}
 					}
 
@@ -375,7 +385,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					return
 				}
 
-				nfs.send[m.Option("nrecv", m.Capi("nsend", 1))] = m
+				nfs.send[m.Optioni("nrecv", m.Capi("nsend", 1))] = m
 
 				if len(arg) > 1 && arg[0] == "file" {
 					f, e := os.Create(arg[1])
