@@ -646,7 +646,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"source": &ctx.Command{Name: "source file", Help: "运行脚本, file: 脚本文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
-				m.Start(fmt.Sprintf("%s%d", key, m.Optioni("level", m.Capi("level")+1)), "脚本文件", arg[0])
+				m.Start(fmt.Sprintf("%s_%d_%s", key, m.Optioni("level", m.Capi("level")+1), arg[0]), "脚本文件", arg[0])
 			} // }}}
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, rusult: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
