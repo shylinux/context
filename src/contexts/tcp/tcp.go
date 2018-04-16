@@ -67,18 +67,18 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 			tcp.Conn = c
 		}
 
-		msg := m.Reply("open").Put("option", "io", tcp.Conn).Cmd("open")
 		m.Log("info", nil, "%s dial %s", Pulse.Cap("nclient"),
-			msg.Cap("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
+			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
+		m.Put("append", "io", tcp.Conn).Back(true)
 		return false
 	case "accept":
 		c, e := m.Data["io"].(net.Conn)
 		m.Assert(e)
 		tcp.Conn = c
 
-		msg := m.Spawn(m.Data["source"].(*ctx.Context), "open").Put("option", "io", tcp.Conn).Cmd("open")
 		m.Log("info", nil, "%s accept %s", Pulse.Cap("nclient"),
-			msg.Cap("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
+			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
+		m.Put("append", "io", tcp.Conn).Back(true)
 		return false
 	default:
 		if m.Cap("security") != "false" {
@@ -102,7 +102,13 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		c, e := tcp.Accept()
 		m.Assert(e)
 		msg := m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source())
-		msg.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接",
+		msg.Call(func(ok bool) (done bool, up bool) {
+			if ok {
+				m.Append("stream", msg.Append("stream"))
+				m.Put("append", "io", msg.Data["io"])
+			}
+			return ok, ok
+		}, false).Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接",
 			"accept", c.RemoteAddr().String(), m.Cap("security"), m.Cap("protocol"))
 	}
 

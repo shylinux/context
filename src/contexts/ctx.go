@@ -296,7 +296,7 @@ type Message struct {
 	Index  int
 
 	ncallback int
-	callback  func() bool
+	callback  func(ok bool) (done bool, up bool)
 
 	Template *Message
 }
@@ -1044,7 +1044,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 					}
 					m.target.Historys = append(m.target.Historys, m)
 
-					m.Back()
+					m.Back(false)
 				})
 
 				return m.Get("result")
@@ -1127,28 +1127,34 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 }
 
 // }}}
-func (m *Message) Call(cb func() bool) { // {{{
+func (m *Message) Call(cb func(ok bool) (done bool, up bool), cmd bool) *Message { // {{{
 	m.callback = cb
 	m.message.ncallback++
 
 	m.Wait = nil
-	m.Cmd()
+	if cmd {
+		m.Cmd()
+	}
+
+	return m
 }
 
 // }}}
-func (m *Message) Back() { // {{{
+func (m *Message) Back(ok bool) *Message { // {{{
 	if m.callback == nil {
-		return
+		return m
 	}
 
-	if m.callback() {
+	done, up := m.callback(ok)
+	if done {
 		m.callback = nil
 		m.message.ncallback--
 	}
 
-	if m.message.ncallback == 0 {
-		m.message.Back()
+	if up || m.message.ncallback == 0 {
+		m.message.Back(ok)
 	}
+	return m
 }
 
 // }}}
