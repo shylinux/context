@@ -32,7 +32,8 @@ type WEB struct {
 	*http.ServeMux
 	*http.Server
 
-	list map[string]string
+	list     map[string]string
+	list_key []string
 
 	*ctx.Message
 	*ctx.Context
@@ -391,8 +392,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			switch len(arg) {
 			case 0:
-				for k, v := range web.list {
-					m.Echo("%s: %s\n", k, v)
+				for _, k := range web.list_key {
+					if v, ok := web.list[k]; ok {
+						m.Echo("%s: %s\n", k, v)
+					}
 				}
 			case 1:
 				msg := m.Spawn(m.Target()).Cmd("get", web.list[arg[0]])
@@ -402,6 +405,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				case "add":
 					m.Capi("count", 1)
 					web.list[m.Cap("count")] = arg[1]
+					web.list_key = append(web.list_key, m.Cap("count"))
 				case "del":
 					delete(web.list, arg[1])
 				default:
