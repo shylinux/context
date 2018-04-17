@@ -1,6 +1,6 @@
-package ssh
-
-import (
+package ssh // {{{
+// }}}
+import ( // {{{
 	"bufio"
 	"contexts"
 	"fmt"
@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 )
+
+// }}}
 
 type SSH struct {
 	send map[string]*ctx.Message
@@ -18,7 +20,7 @@ type SSH struct {
 	*ctx.Context
 }
 
-func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
 		"nrecv":  &ctx.Cache{Name: "消息接收数量", Value: "0", Help: "消息接收数量"},
@@ -33,14 +35,18 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server {
+// }}}
+func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	if ssh.Context == Index {
 		Pulse = m
 	}
 	return ssh
 }
 
-func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
+// }}}
+func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool { // {{{
+	return false
+
 	ssh.Group = ""
 	ssh.Owner = nil
 	ssh.Conn = m.Data["io"].(net.Conn)
@@ -97,13 +103,16 @@ func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
 	return false
 }
 
-func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
+// }}}
+func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch ssh.Context {
 	case m.Target():
 	case m.Source():
 	}
 	return true
 }
+
+// }}}
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
@@ -113,13 +122,34 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address protocol", Help: "监听连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Find("tcp").Cmd(m.Meta["detail"])
+			msg := m.Sess("file", "nfs")
+			msg.Call(func(ok bool) (done bool, up bool) {
+				if ok {
+					sub := msg.Spawn(m.Target())
+					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "打开文件", sub.Meta["detail"]...)
+					sub.Cap("stream", msg.Target().Name)
+					sub.Target().Sessions["file"] = msg
+					sub.Echo(sub.Target().Name)
+				}
+				return false, true
+			}, false).Cmd(m.Meta["detail"])
+
 		}},
 		"dial": &ctx.Command{Name: "dial address protocol", Help: "建立连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Find("tcp").Cmd(m.Meta["detail"])
+			msg := m.Sess("file", "nfs")
+			msg.Call(func(ok bool) (done bool, up bool) {
+				if ok {
+					m.Cap("stream", msg.Target().Name)
+					return true, true
+				}
+				return false, false
+			}, false).Cmd(m.Meta["detail"])
+
 		}},
-		"open": &ctx.Command{Name: "open", Help: "打开连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "主机连接")
+		"send": &ctx.Command{Name: "send arg...", Help: "打开连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			msg := m.Sess("file")
+			msg.Copy(m, "detail").Cmd()
+			m.Copy(msg, "result")
 		}},
 		"remote": &ctx.Command{Name: "remote detail...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			ssh, ok := m.Target().Server.(*SSH)

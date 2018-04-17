@@ -821,7 +821,7 @@ func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {{{
 	switch meta {
 	case "detail", "result":
-		m.Meta[meta] = append(m.Meta[meta][:0], msg.Meta[meta]...)
+		m.Set(meta, msg.Meta[meta]...)
 	case "option", "append":
 		if len(arg) == 0 {
 			arg = msg.Meta[meta]
@@ -1145,6 +1145,7 @@ func (m *Message) Back(ok bool) *Message { // {{{
 		return m
 	}
 
+	m.Log("info", nil, "back %v %v", m.Meta["result"], m.Meta["append"])
 	done, up := m.callback(ok)
 	if done {
 		m.callback = nil

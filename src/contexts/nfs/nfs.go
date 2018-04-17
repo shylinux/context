@@ -308,29 +308,30 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Sess("tcp", "tcp") // {{{
+			msg := m.Sess("pub", "tcp") // {{{
 			msg.Call(func(ok bool) (done bool, up bool) {
 				if ok {
 					sub := msg.Spawn(m.Target())
 					sub.Put("option", "io", msg.Data["io"])
 					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", sub.Meta["detail"]...)
-					sub.Cap("stream", msg.Append("stream"))
+					sub.Cap("stream", msg.Target().Name)
 					sub.Echo(sub.Target().Name)
+					m.Target(sub.Target())
 				}
 				return false, true
-			}, false)
-			m.Cap("stream", msg.Cmd(m.Meta["detail"]).Cap("address"))
+			}, false).Cmd(m.Meta["detail"])
 			// }}}
 		}},
 		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Sess("tcp", "tcp") // {{{
+			msg := m.Sess("com", "tcp") // {{{
 			msg.Call(func(ok bool) (done bool, up bool) {
 				if ok {
 					sub := msg.Spawn(m.Target())
 					sub.Put("option", "io", msg.Data["io"])
 					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", sub.Meta["detail"]...)
-					sub.Cap("stream", msg.Append("stream"))
+					sub.Cap("stream", msg.Target().Name)
 					sub.Echo(sub.Target().Name)
+					m.Target(sub.Target())
 					return true, true
 				}
 				return false, false
