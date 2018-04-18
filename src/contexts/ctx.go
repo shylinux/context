@@ -6,7 +6,6 @@ import ( // {{{
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"path"
@@ -355,7 +354,7 @@ func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{
 		l.Options("log", false)
 		l.Cmd("log", action, fmt.Sprintf(str, arg...))
 	} else {
-		log.Printf(str, arg...)
+		// log.Printf(str, arg...)
 		return
 	}
 }
@@ -1328,21 +1327,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 		"default": &Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
 
-		"start":    &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
-		"init.shy": &Config{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"},
-		"bench.log": &Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件", Hand: func(m *Message, x *Config, arg ...string) string {
-			if len(arg) > 0 { // {{{
-				// if e := os.MkdirAll(path.Dir(arg[0]), os.ModePerm); e == nil {
-				if l, e := os.Create(x.Value); e == nil {
-					log.SetOutput(l)
-					return arg[0]
-				}
-				return ""
-				// }
-			}
-			return x.Value
-			// }}}
-		}},
+		"start":     &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
+		"init.shy":  &Config{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"},
+		"bench.log": &Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件"},
 		"root": &Config{Name: "工作目录", Value: ".", Help: "所有模块的当前目录", Hand: func(m *Message, x *Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				if !path.IsAbs(x.Value) {
@@ -1935,23 +1922,18 @@ func init() {
 
 func Start(args ...string) {
 	if len(args) > 0 {
-		Pulse.Conf("start", args[0])
+		Pulse.Conf("init.shy", args[0])
 	}
 	if len(args) > 1 {
-		Pulse.Conf("init.shy", args[1])
+		Pulse.Conf("bench.log", args[1])
 	}
 	if len(args) > 2 {
-		Pulse.Conf("bench.log", args[2])
-	} else {
-		Pulse.Conf("bench.log", Pulse.Conf("bench.log"))
+		Pulse.Conf("root", args[2])
 	}
 	if len(args) > 3 {
-		Pulse.Conf("root", args[3])
+		Pulse.Conf("start", args[3])
 	}
 
-	Pulse.Options("log", true)
-
-	// log.Println("\n\n")
 	Index.Group = "root"
 	Index.Owner = Index.contexts["aaa"]
 	Index.master = Index.contexts["cli"]
@@ -1959,8 +1941,9 @@ func Start(args ...string) {
 		m.target.root = Index
 		m.target.Begin(m)
 	}
-	// log.Println()
-	Pulse.Sess("log", "log").Conf("bench.log", "var/bench.log")
+
+	Pulse.Options("log", true)
+	Pulse.Sess("log", "log").Conf("bench.log", Pulse.Conf("bench.log"))
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {
 		m.Set("detail", Pulse.Conf("init.shy")).Set("option", "stdio").target.Start(m)

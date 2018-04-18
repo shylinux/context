@@ -228,7 +228,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 
 			if cli.nfs = m.Find("nfs"); m.Has("stdio") {
-				cli.nfs.Cmd("scan", m.Cap("stream", "stdio"), m.Cmd("source", m.Cap("init.shy")).Get("result"))
+				cli.nfs.Cmd("scan", m.Cap("stream", "stdio"), m.Spawn(m.Target()).Cmd("source", m.Cap("init.shy")).Get("result"))
 			} else {
 				if _, e := os.Stat(m.Cap("init.shy")); e == nil {
 					cli.nfs.Cmd("scan", m.Cap("stream", m.Cap("init.shy")))
@@ -261,6 +261,9 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch cli.Context {
 	case m.Target():
 		m.Echo(cli.nfs.Cap("return"))
+		if p, ok := m.Source().Server.(*CLI); ok {
+			p.target = cli.target
+		}
 	case m.Source():
 		if m.Name == "aaa" {
 			if !cli.Context.Close(m.Spawn(cli.Context), arg...) {

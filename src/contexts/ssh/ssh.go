@@ -118,8 +118,11 @@ var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Caches: map[string]*ctx.Cache{
 		"nhost": &ctx.Cache{Name: "主机数量", Value: "0", Help: "主机数量"},
+		"route": &ctx.Cache{Name: "route", Value: "", Help: "主机数量"},
 	},
-	Configs: map[string]*ctx.Config{},
+	Configs: map[string]*ctx.Config{
+		"route": &ctx.Config{Name: "route", Value: "com", Help: "主机数量"},
+	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address protocol", Help: "监听连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Sess("file", "nfs")
@@ -129,7 +132,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "打开文件", sub.Meta["detail"]...)
 					sub.Cap("stream", msg.Target().Name)
 					sub.Target().Sessions["file"] = msg
+					sub.Target(msg.Target())
 					sub.Echo(sub.Target().Name)
+					sub.Spawn(sub.Target()).Cmd("send", "context", "ssh")
+					sub.Spawn(sub.Target()).Cmd("send", "route", sub.Target().Name, msg.Cap("route")+"."+msg.Conf("route"))
 				}
 				return false, true
 			}, false).Cmd(m.Meta["detail"])
@@ -151,7 +157,18 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			msg.Copy(m, "detail").Cmd()
 			m.Copy(msg, "result")
 		}},
-		"remote": &ctx.Command{Name: "remote detail...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"route": &ctx.Command{Name: "route", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Conf("route", arg[0])
+			m.Cap("route", arg[1]+"."+arg[0])
+		}},
+		"dispatch": &ctx.Command{Name: "dispatch cmd arg...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Travel(m.Target(), func(m *ctx.Message) bool {
+				msg := m.Spawn(m.Target())
+				msg.Cmd("send", arg)
+				return true
+			})
+		}},
+		"register": &ctx.Command{Name: "remote detail...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			ssh, ok := m.Target().Server.(*SSH)
 			m.Assert(ok)
 

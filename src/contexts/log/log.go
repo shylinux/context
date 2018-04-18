@@ -1,13 +1,16 @@
-package log
-
-import (
+package log // {{{
+// }}}
+import ( // {{{
 	"contexts"
 	"fmt"
 	Log "log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// }}}
 
 type LOG struct {
 	module map[string]map[string]bool
@@ -19,7 +22,7 @@ type LOG struct {
 	*ctx.Context
 }
 
-func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -28,7 +31,8 @@ func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
+// }}}
+func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	if log.Context == Index {
 		Pulse = m
 	}
@@ -45,6 +49,7 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	log.Configs["bench.log"] = &ctx.Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 {
 			if m.Sess("nfs") == nil {
+				os.Create(arg[0])
 				m.Sess("nfs", "nfs").Cmd("open", arg[0])
 			}
 			return arg[0]
@@ -55,12 +60,14 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return log
 }
 
-func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
+// }}}
+func (log *LOG) Start(m *ctx.Message, arg ...string) bool { // {{{
 	log.Message = m
 	return false
 }
 
-func (log *LOG) Close(m *ctx.Message, arg ...string) bool {
+// }}}
+func (log *LOG) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch log.Context {
 	case m.Target():
 	case m.Source():
@@ -68,13 +75,15 @@ func (log *LOG) Close(m *ctx.Message, arg ...string) bool {
 	return true
 }
 
+// }}}
+
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "log", Help: "日志中心",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"slient": &ctx.Command{Name: "slient [[module] level state]", Help: "查看或设置日志开关, module: 模块名, level: 日志类型, state(true/false): 是否打印日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) {
+			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
 				switch len(arg) {
 				case 2:
 					if len(arg) > 1 {
@@ -95,10 +104,10 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 						m.Echo("%s(%s): %t\n", k, i, x)
 					}
 				}
-			}
+			} // }}}
 		}},
 		"color": &ctx.Command{Name: "color [level color]", Help: "查看或设置日志颜色, level: 日志类型, color: 文字颜色", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) {
+			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
 				if len(arg) > 1 {
 					c, e := strconv.Atoi(arg[1])
 					m.Assert(e)
@@ -108,10 +117,10 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 				for k, v := range log.color {
 					m.Echo("\033[%dm%s: %d\033[0m\n", v, k, v)
 				}
-			}
+			} // }}}
 		}},
 		"log": &ctx.Command{Name: "log level string...", Help: "输出日志, level: 日志类型, string: 日志内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) {
+			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
 				if s, ok := log.slient[arg[0]]; ok && s == true {
 					return
 				}
@@ -167,7 +176,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 						nfs.Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, strings.Join(arg[1:], "")))
 					}
 				}
-			}
+			} // }}}
 		}},
 	},
 }
