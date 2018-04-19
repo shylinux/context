@@ -32,6 +32,9 @@ type WEB struct {
 	*http.ServeMux
 	*http.Server
 
+	client *http.Client
+	cookie map[string]*http.Cookie
+
 	list     map[string]string
 	list_key []string
 
@@ -39,8 +42,8 @@ type WEB struct {
 	*ctx.Context
 }
 
-func (web *WEB) generate(m *ctx.Message, arg string) string { // {{{
-	add, e := url.Parse(arg)
+func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // {{{
+	add, e := url.Parse(uri)
 	m.Assert(e)
 
 	adds := []string{}
@@ -76,12 +79,31 @@ func (web *WEB) generate(m *ctx.Message, arg string) string { // {{{
 		}
 	}
 
+	args := []string{}
+	for i := 0; i < len(arg)-1; i += 2 {
+		args = append(args, arg[i]+"="+arg[i+1])
+	}
+	p := strings.Join(args, "&")
+
 	if add.RawQuery != "" {
 		adds = append(adds, "?")
 		adds = append(adds, add.RawQuery)
+		if p != "" {
+			adds = append(adds, "&")
+			adds = append(adds, p)
+		}
 	} else if m.Confs("query") {
 		adds = append(adds, "?")
 		adds = append(adds, m.Conf("query"))
+		if p != "" {
+			adds = append(adds, "&")
+			adds = append(adds, p)
+		}
+	} else {
+		if p != "" {
+			adds = append(adds, "?")
+			adds = append(adds, p)
+		}
 	}
 
 	return strings.Join(adds, "")
@@ -147,22 +169,23 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 
 // }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
+	web.Log("fuck", nil, "why")
 	if web.Message != nil {
 		log.Println()
 		web.Log("cmd", nil, "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
 		if web.Conf("logheaders") == "yes" {
 			for k, v := range r.Header {
-				log.Printf("%s: %v", k, v)
+				web.Log("info", nil, "%s: %v", k, v)
 			}
-			log.Println()
+			web.Log("info", nil, "")
 		}
 
 		if r.ParseForm(); len(r.PostForm) > 0 {
 			for k, v := range r.PostForm {
-				log.Printf("%s: %v", k, v)
+				web.Log("info", nil, "%s: %v", k, v)
 			}
-			log.Println()
+			web.Log("info", nil, "")
 		}
 	}
 
@@ -170,9 +193,9 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 
 	if web.Message != nil && web.Conf("logheaders") == "yes" {
 		for k, v := range w.Header() {
-			log.Printf("%s: %v", k, v)
+			web.Log("info", nil, "%s: %v", k, v)
 		}
-		log.Println()
+		web.Log("info", nil, "")
 	}
 }
 
@@ -348,15 +371,56 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				})
 			} // }}}
 		}},
-		"get": &ctx.Command{Name: "get url", Help: "访问URL", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"cookie": &ctx.Command{Name: "cookie add|del arg...", Help: "访问URL", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			web, ok := m.Target().Server.(*WEB) // {{{
 			m.Assert(ok)
 
-			uri := web.generate(m, arg[0])
+			switch len(arg) {
+			case 0:
+				for k, v := range web.cookie {
+					m.Echo("%s: %v\n", k, v.Value)
+				}
+			case 1:
+				if v, ok := web.cookie[arg[0]]; ok {
+					m.Echo("%s", v.Value)
+				}
+			default:
+				if web.cookie == nil {
+					web.cookie = make(map[string]*http.Cookie)
+				}
+				if v, ok := web.cookie[arg[0]]; ok {
+					v.Value = arg[1]
+				} else {
+					web.cookie[arg[0]] = &http.Cookie{Name: arg[0], Value: arg[1]}
+				}
+			}
+			// }}}
+		}},
+		"get": &ctx.Command{Name: "get url arg...", Help: "访问URL", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			web, ok := m.Target().Server.(*WEB) // {{{
+			m.Assert(ok)
+
+			uri := web.generate(m, arg[0], arg[1:]...)
 			m.Log("info", nil, "GET %s", uri)
 
-			res, e := http.Get(uri)
+			if web.client == nil {
+				web.client = &http.Client{}
+			}
+
+			req, e := http.NewRequest("GET", uri, nil)
 			m.Assert(e)
+			for _, v := range web.cookie {
+				req.AddCookie(v)
+			}
+
+			res, e := web.client.Do(req)
+			m.Assert(e)
+			if web.cookie == nil {
+				web.cookie = make(map[string]*http.Cookie)
+			}
+			for _, v := range res.Cookies() {
+				web.cookie[v.Name] = v
+			}
 
 			for k, v := range res.Header {
 				m.Log("info", nil, "%s: %v", k, v)
@@ -386,7 +450,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Echo(string(buf))
 			// }}}
 		}},
-		"list": &ctx.Command{Name: "list [index|add|del [url]]", Help: "查看、访问、添加url", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"list": &ctx.Command{Name: "list [set|add|del [url]]", Help: "查看、访问、添加url", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			web, ok := m.Target().Server.(*WEB) // {{{
 			m.Assert(ok)
 
@@ -400,7 +464,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			case 1:
 				msg := m.Spawn(m.Target()).Cmd("get", web.list[arg[0]])
 				m.Copy(msg, "result")
-			case 2:
+			default:
 				switch arg[0] {
 				case "add":
 					m.Capi("count", 1)
@@ -408,8 +472,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					web.list_key = append(web.list_key, m.Cap("count"))
 				case "del":
 					delete(web.list, arg[1])
+				case "set":
+					web.list[arg[1]] = arg[2]
 				default:
-					web.list[arg[0]] = arg[1]
+					msg := m.Spawn(m.Target()).Cmd("get", web.list[arg[0]], arg[1:])
+					m.Copy(msg, "result")
 				}
 			} // }}}
 		}},
