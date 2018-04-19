@@ -95,6 +95,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		for {
 			line, e := nfs.Reader.ReadString('\n')
 			m.Assert(e)
+			// m.Log("debug", nil, "recv(%d): %s", len(line), line)
 
 			if line = strings.TrimSpace(line); len(line) > 0 {
 				ls := strings.SplitN(line, ":", 2)
@@ -117,30 +118,36 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			if msg.Log("info", nil, "remote: %v", msg.Meta["option"]); msg.Has("detail") {
 				msg.Log("info", nil, "%d exec: %v", m.Capi("nrecv", 1), msg.Meta["detail"])
 
-				msg.Cmd(msg.Meta["detail"])
-				target = msg.Target()
-				m.Cap("target", target.Name)
+				func() {
+					fuck := msg
+					fuck.Call(func(ok bool) (done bool, up bool) {
+						target = fuck.Target()
+						m.Cap("target", target.Name)
 
-				for _, v := range msg.Meta["result"] {
-					fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
-				}
+						for _, v := range fuck.Meta["result"] {
+							fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
+						}
 
-				fmt.Fprintf(nfs.Writer, "nsend: %s\n", msg.Get("nrecv"))
-				for _, k := range msg.Meta["append"] {
-					for _, v := range msg.Meta[k] {
-						fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
-					}
-				}
-				fmt.Fprintf(nfs.Writer, "\n")
-				nfs.Writer.Flush()
-
-				if msg.Has("io") {
-					if f, ok := msg.Data["io"].(io.ReadCloser); ok {
-						io.Copy(nfs.Writer, f)
+						fmt.Fprintf(nfs.Writer, "nsend: %s\n", fuck.Get("nrecv"))
+						for _, k := range fuck.Meta["append"] {
+							for _, v := range fuck.Meta[k] {
+								fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+							}
+						}
+						fmt.Fprintf(nfs.Writer, "\n")
 						nfs.Writer.Flush()
-						f.Close()
-					}
-				}
+
+						if fuck.Has("io") {
+							if f, ok := fuck.Data["io"].(io.ReadCloser); ok {
+								io.Copy(nfs.Writer, f)
+								nfs.Writer.Flush()
+								f.Close()
+							}
+						}
+						return ok, ok
+					}, false).Cmd(fuck.Meta["detail"])
+				}()
+
 			} else {
 				msg.Log("info", nil, "%d echo: %v", nsend, msg.Meta["result"])
 

@@ -1423,6 +1423,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							m.Echo("  %s: %v\n", k, ms[i].Meta[k])
 						}
 
+						if ms[i].callback != nil {
+							m.Echo("callback: %d\n", ms[i].ncallback)
+						}
+
 						if len(ms[i].Meta["result"]) > 0 {
 							m.Echo("result: %v\n", ms[i].Meta["result"])
 						}
