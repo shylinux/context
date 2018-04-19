@@ -35,7 +35,7 @@ type WEB struct {
 	client *http.Client
 	cookie map[string]*http.Cookie
 
-	list     map[string]string
+	list     map[string][]string
 	list_key []string
 
 	*ctx.Message
@@ -230,7 +230,7 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		}
 	}
 
-	web.list = map[string]string{}
+	web.list = map[string][]string{}
 
 	return web
 }
@@ -396,60 +396,86 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			// }}}
 		}},
-		"get": &ctx.Command{Name: "get url arg...", Help: "访问URL", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			web, ok := m.Target().Server.(*WEB) // {{{
-			m.Assert(ok)
+		"get": &ctx.Command{Name: "get [method GET|POST] [file filename] arg...", Help: "访问URL",
+			Formats: map[string]int{"method": 1, "file": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				web, ok := m.Target().Server.(*WEB) // {{{
+				m.Assert(ok)
 
-			uri := web.generate(m, arg[0], arg[1:]...)
-			m.Log("info", nil, "GET %s", uri)
+				uri := web.generate(m, arg[0], arg[1:]...)
+				m.Log("info", nil, "GET %s", uri)
 
-			if web.client == nil {
-				web.client = &http.Client{}
-			}
-
-			req, e := http.NewRequest("GET", uri, nil)
-			m.Assert(e)
-			for _, v := range web.cookie {
-				req.AddCookie(v)
-			}
-
-			res, e := web.client.Do(req)
-			m.Assert(e)
-			if web.cookie == nil {
-				web.cookie = make(map[string]*http.Cookie)
-			}
-			for _, v := range res.Cookies() {
-				web.cookie[v.Name] = v
-			}
-
-			for k, v := range res.Header {
-				m.Log("info", nil, "%s: %v", k, v)
-			}
-
-			if m.Confs("output") {
-				if _, e := os.Stat(m.Conf("output")); e == nil {
-					name := path.Join(m.Conf("output"), fmt.Sprintf("%d", time.Now().Unix()))
-					f, e := os.Create(name)
-					m.Assert(e)
-					io.Copy(f, res.Body)
-					if m.Confs("editor") {
-						cmd := exec.Command(m.Conf("editor"), name)
-						cmd.Stdin = os.Stdin
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-						cmd.Run()
-					} else {
-						m.Echo("write to %s", name)
-					}
-					return
+				if web.client == nil {
+					web.client = &http.Client{}
 				}
-			}
 
-			buf, e := ioutil.ReadAll(res.Body)
-			m.Assert(e)
-			m.Echo(string(buf))
-			// }}}
-		}},
+				method := "GET"
+				if m.Options("method") {
+					method = m.Option("method")
+				}
+
+				var body io.Reader
+				index := strings.Index(uri, "?")
+				switch method {
+				case "POST":
+					if index > 0 {
+						body = strings.NewReader(uri[index+1:])
+						uri = uri[:index]
+					}
+				}
+
+				req, e := http.NewRequest(method, uri, body)
+				m.Assert(e)
+
+				switch method {
+				case "POST":
+					if index > 0 {
+						req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+					}
+				}
+
+				for _, v := range web.cookie {
+					req.AddCookie(v)
+				}
+
+				res, e := web.client.Do(req)
+				m.Assert(e)
+
+				if web.cookie == nil {
+					web.cookie = make(map[string]*http.Cookie)
+				}
+				for _, v := range res.Cookies() {
+					web.cookie[v.Name] = v
+				}
+
+				for k, v := range res.Header {
+					m.Log("info", nil, "%s: %v", k, v)
+				}
+
+				if m.Confs("output") {
+					if _, e := os.Stat(m.Conf("output")); e == nil {
+						name := path.Join(m.Conf("output"), fmt.Sprintf("%d", time.Now().Unix()))
+						f, e := os.Create(name)
+						m.Assert(e)
+						io.Copy(f, res.Body)
+						if m.Confs("editor") {
+							cmd := exec.Command(m.Conf("editor"), name)
+							cmd.Stdin = os.Stdin
+							cmd.Stdout = os.Stdout
+							cmd.Stderr = os.Stderr
+							cmd.Run()
+						} else {
+							m.Echo("write to %s", name)
+						}
+						return
+					}
+				}
+
+				buf, e := ioutil.ReadAll(res.Body)
+				m.Assert(e)
+				m.Echo(string(buf))
+				// }}}
+			}},
 		"list": &ctx.Command{Name: "list [set|add|del [url]]", Help: "查看、访问、添加url", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			web, ok := m.Target().Server.(*WEB) // {{{
 			m.Assert(ok)
@@ -467,15 +493,29 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			default:
 				switch arg[0] {
 				case "add":
-					m.Capi("count", 1)
-					web.list[m.Cap("count")] = arg[1]
+					web.list[m.Cap("count")] = arg[1:]
 					web.list_key = append(web.list_key, m.Cap("count"))
+					m.Capi("count", 1)
 				case "del":
 					delete(web.list, arg[1])
 				case "set":
-					web.list[arg[1]] = arg[2]
+					web.list[arg[1]] = arg[2:]
 				default:
-					msg := m.Spawn(m.Target()).Cmd("get", web.list[arg[0]], arg[1:])
+					list := []string{}
+					j := 1
+					for _, v := range web.list[arg[0]] {
+						if v == "_" && j < len(arg) {
+							list = append(list, arg[j])
+							j++
+						} else {
+							list = append(list, v)
+						}
+					}
+					for ; j < len(arg); j++ {
+						list = append(list, arg[j])
+					}
+
+					msg := m.Spawn(m.Target()).Cmd("get", list)
 					m.Copy(msg, "result")
 				}
 			} // }}}

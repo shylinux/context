@@ -1,2 +1,5 @@
 ~aaa login root root
-source etc/local.shy
+
+~web serve ./ ":9090"
+# source etc/local.shy
+

@@ -2,6 +2,7 @@ package mdb // {{{
 // }}}
 import ( // {{{
 	"contexts"
+	"strconv"
 	"strings"
 
 	"database/sql"
@@ -17,6 +18,8 @@ type MDB struct {
 
 	list     map[string][]string
 	list_key []string
+
+	table []string
 	*ctx.Context
 }
 
@@ -169,9 +172,17 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			// }}}
 		}},
 		"table": &ctx.Command{Name: "table", Help: "执行查询语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Spawn(m.Target()) // {{{
+			mdb, ok := m.Target().Server.(*MDB) // {{{
+			m.Assert(ok)
+			msg := m.Spawn(m.Target())
 			if len(arg) > 0 {
-				msg.Cmd("query", fmt.Sprintf("desc %s", arg[0]))
+				table := arg[0]
+				index, e := strconv.Atoi(arg[0])
+				if e == nil && index < len(mdb.table) {
+					table = mdb.table[index]
+				}
+				msg.Cmd("query", fmt.Sprintf("desc %s", table))
+
 				if len(arg) > 1 {
 					for i, v := range msg.Meta[msg.Meta["append"][0]] {
 						if v == arg[1] {
@@ -187,8 +198,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 			} else {
 				msg.Cmd("query", "show tables")
-				for _, v := range msg.Meta[msg.Meta["append"][0]] {
-					m.Echo("%s\n", v)
+				mdb.table = []string{}
+				for i, v := range msg.Meta[msg.Meta["append"][0]] {
+					mdb.table = append(mdb.table, v)
+					m.Echo("%d: %s\n", i, v)
 				}
 			}
 			// }}}
@@ -208,9 +221,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				if mdb.list == nil {
 					mdb.list = make(map[string][]string)
 				}
-				m.Capi("count", 1)
 				mdb.list[m.Cap("count")] = arg[1:]
 				mdb.list_key = append(mdb.list_key, m.Cap("count"))
+				m.Capi("count", 1)
 			case "set":
 				mdb.list[arg[1]] = arg[2:]
 			default:
