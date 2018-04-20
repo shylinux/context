@@ -102,7 +102,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 				yac.Cmd("train", "num", "num", "mul{", "[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
 				yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
 
-				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9]+", "}")
+				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "$", "[a-zA-Z0-9]+", "}")
 				yac.Cmd("train", "word", "word", "mul{", "~", "!", "tran", "str", "[a-zA-Z0-9_/.]+", "}")
 
 				yac.Cmd("train", "op1", "op1", "mul{", "$", "@", "}")
