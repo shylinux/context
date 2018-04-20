@@ -69,7 +69,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		m.Log("info", nil, "%s dial %s", Pulse.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
-		m.Put("append", "io", tcp.Conn).Back(true)
+		m.Put("append", "io", tcp.Conn).Back(true, m)
 		return false
 	case "accept":
 		c, e := m.Data["io"].(net.Conn)
@@ -78,7 +78,8 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		m.Log("info", nil, "%s accept %s", Pulse.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
-		m.Put("append", "io", tcp.Conn).Back(true)
+		m.Put("append", "io", tcp.Conn).Back(true, m)
+		m.Log("fuck", nil, "accept")
 		return false
 	default:
 		if m.Cap("security") != "false" {
@@ -102,12 +103,14 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		c, e := tcp.Accept()
 		m.Assert(e)
 		msg := m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source())
-		msg.Call(func(ok bool) (done bool, up bool) {
+		msg.Call(func(ok bool, com *ctx.Message) (bool, *ctx.Message) {
 			if ok {
 				m.Append("stream", msg.Append("stream"))
 				m.Put("append", "io", msg.Data["io"])
+				com.Log("fuck", nil, "listen")
 			}
-			return ok, ok
+
+			return ok, com
 		}, false).Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接",
 			"accept", c.RemoteAddr().String(), m.Cap("security"), m.Cap("protocol"))
 	}

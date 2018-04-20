@@ -5,7 +5,6 @@ import ( // {{{
 	"contexts"
 	"fmt"
 	"net"
-	"net/url"
 	"strings"
 )
 
@@ -21,13 +20,7 @@ type SSH struct {
 }
 
 func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
-	c.Caches = map[string]*ctx.Cache{
-		"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
-		"nrecv":  &ctx.Cache{Name: "消息接收数量", Value: "0", Help: "消息接收数量"},
-		"target": &ctx.Cache{Name: "消息接收模块", Value: "ssh", Help: "消息接收模块"},
-		"result": &ctx.Cache{Name: "前一条指令执行结果", Value: "", Help: "前一条指令执行结果"},
-		"sessid": &ctx.Cache{Name: "会话令牌", Value: "", Help: "会话令牌"},
-	}
+	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
 	s := new(SSH)
@@ -37,6 +30,7 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+	ssh.Context.Master(nil)
 	if ssh.Context == Index {
 		Pulse = m
 	}
@@ -45,61 +39,6 @@ func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool { // {{{
-	return false
-
-	ssh.Group = ""
-	ssh.Owner = nil
-	ssh.Conn = m.Data["io"].(net.Conn)
-	ssh.Reader = bufio.NewReader(ssh.Conn)
-	ssh.Writer = bufio.NewWriter(ssh.Conn)
-	ssh.send = make(map[string]*ctx.Message)
-	m.Log("info", nil, "%s connect %v <-> %v", Pulse.Cap("nhost"), ssh.Conn.LocalAddr(), ssh.Conn.RemoteAddr())
-
-	target, msg := m.Target(), m.Spawn(m.Target())
-
-	for {
-		line, e := ssh.Reader.ReadString('\n')
-		m.Assert(e)
-
-		if line = strings.TrimSpace(line); len(line) == 0 {
-			if msg.Log("info", nil, "remote: %v", msg.Meta["option"]); msg.Has("detail") {
-				msg.Log("info", nil, "%d exec: %v", m.Capi("nrecv", 1), msg.Meta["detail"])
-
-				msg.Cmd(msg.Meta["detail"])
-				target = msg.Target()
-				m.Cap("target", target.Name)
-
-				for _, v := range msg.Meta["result"] {
-					fmt.Fprintf(ssh.Writer, "result: %s\n", url.QueryEscape(v))
-				}
-
-				fmt.Fprintf(ssh.Writer, "nsend: %s\n", msg.Get("nrecv"))
-				for _, k := range msg.Meta["append"] {
-					for _, v := range msg.Meta[k] {
-						fmt.Fprintf(ssh.Writer, "%s: %s\n", k, v)
-					}
-				}
-				fmt.Fprintf(ssh.Writer, "\n")
-				ssh.Writer.Flush()
-			} else {
-				msg.Log("info", nil, "%s echo: %v", msg.Get("nsend"), msg.Meta["result"])
-
-				m.Cap("result", msg.Get("result"))
-				msg.Meta["append"] = msg.Meta["option"]
-				send := ssh.send[msg.Get("nsend")]
-				send.Meta = msg.Meta
-				send.Recv <- true
-			}
-			msg = m.Spawn(target)
-			continue
-		}
-
-		ls := strings.SplitN(line, ":", 2)
-		ls[0] = strings.TrimSpace(ls[0])
-		ls[1], e = url.QueryUnescape(strings.TrimSpace(ls[1]))
-		m.Assert(e)
-		msg.Add("option", ls[0], ls[1])
-	}
 	return false
 }
 
@@ -125,37 +64,38 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address protocol", Help: "监听连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Sess("file", "nfs")
-			msg.Call(func(ok bool) (done bool, up bool) {
+			msg := m.Find("nfs")
+			msg.Call(func(ok bool, file *ctx.Message) (bool, *ctx.Message) {
 				if ok {
 					sub := msg.Spawn(m.Target())
-					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "打开文件", sub.Meta["detail"]...)
-					sub.Cap("stream", msg.Target().Name)
-					sub.Target().Sessions["file"] = msg
-					sub.Echo(sub.Target().Name)
-					sub.Spawn(sub.Target()).Cmd("send", "context", "ssh")
-					sub.Spawn(sub.Target()).Cmd("send", "route", sub.Target().Name, msg.Cap("route"))
+					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "远程主机")
+
+					sub.Cap("stream", file.Target().Name)
+					sub.Sess("file", "nfs."+file.Target().Name)
+					sub.Sess("file").Cmd("send", "context", "ssh")
+					sub.Sess("file").Cmd("send", "route", sub.Target().Name, msg.Cap("route"))
+					return false, sub
 				}
-				return false, true
+				return false, nil
 			}, false).Cmd(m.Meta["detail"])
 
 		}},
 		"dial": &ctx.Command{Name: "dial address protocol", Help: "建立连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Sess("file", "nfs")
-			msg.Call(func(ok bool) (done bool, up bool) {
+			msg.Call(func(ok bool, file *ctx.Message) (bool, *ctx.Message) {
 				if ok {
-					m.Sess("file").Cmd("send", "context", "ssh")
 					m.Cap("stream", msg.Target().Name)
-					return true, true
+					m.Sess("file").Cmd("send", "context", "ssh")
+					return true, m
 				}
-				return false, false
+				return false, nil
 			}, false).Cmd(m.Meta["detail"])
 
 		}},
 		"send": &ctx.Command{Name: "send arg...", Help: "打开连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Sess("file")
-			msg.Copy(m, "detail").Call(func(ok bool) (done bool, up bool) {
-				return ok, ok
+			msg.Copy(m, "detail").Call(func(ok bool, file *ctx.Message) (bool, *ctx.Message) {
+				return ok, file
 			}, false).Cmd()
 			m.Copy(msg, "result")
 		}},
@@ -179,9 +119,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Travel(m.Target(), func(m *ctx.Message) bool {
 					if m.Target().Name == target[0] {
 						msg := m.Spawn(m.Target())
-						msg.Call(func(ok bool) (done bool, up bool) {
+						msg.Call(func(ok bool, host *ctx.Message) (bool, *ctx.Message) {
 							m.Copy(msg, "result")
-							return ok, ok
+							return ok, host
 						}, false).Cmd("send", "search", strings.Join(target[1:], "."), arg[1:])
 
 						miss = false
@@ -191,9 +131,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				if miss {
 					msg := m.Spawn(c)
-					msg.Call(func(ok bool) (done bool, up bool) {
+					msg.Call(func(ok bool, host *ctx.Message) (bool, *ctx.Message) {
 						m.Copy(msg, "result")
-						return ok, ok
+						return ok, host
 					}, false).Cmd("send", "search", arg)
 				}
 			}

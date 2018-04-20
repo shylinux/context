@@ -295,7 +295,7 @@ type Message struct {
 	Index  int
 
 	ncallback int
-	callback  func(ok bool) (done bool, up bool)
+	callback  func(ok bool, sub *Message) (done bool, up *Message)
 
 	Template *Message
 }
@@ -1043,7 +1043,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 					}
 					m.target.Historys = append(m.target.Historys, m)
 
-					m.Back(false)
+					m.Back(false, nil)
 				})
 
 				return m.Get("result")
@@ -1126,7 +1126,7 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 }
 
 // }}}
-func (m *Message) Call(cb func(ok bool) (done bool, up bool), cmd bool) *Message { // {{{
+func (m *Message) Call(cb func(ok bool, msg *Message) (done bool, sub *Message), cmd bool) *Message { // {{{
 	m.callback = cb
 	m.message.ncallback++
 
@@ -1139,20 +1139,20 @@ func (m *Message) Call(cb func(ok bool) (done bool, up bool), cmd bool) *Message
 }
 
 // }}}
-func (m *Message) Back(ok bool) *Message { // {{{
+func (m *Message) Back(ok bool, msg *Message) *Message { // {{{
 	if m.callback == nil {
 		return m
 	}
 
 	m.Log("info", nil, "back %v %v", m.Meta["result"], m.Meta["append"])
-	done, up := m.callback(ok)
+	done, sub := m.callback(ok, msg)
 	if done {
 		m.callback = nil
 		m.message.ncallback--
 	}
 
-	if up || m.message.ncallback == 0 {
-		m.message.Back(ok)
+	if sub != nil || m.message.ncallback == 0 {
+		m.message.Back(ok, sub)
 	}
 	return m
 }

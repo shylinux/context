@@ -120,31 +120,34 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 				func() {
 					fuck := msg
-					fuck.Call(func(ok bool) (done bool, up bool) {
-						target = fuck.Target()
-						m.Cap("target", target.Name)
+					fuck.Call(func(ok bool, cmd *ctx.Message) (bool, *ctx.Message) {
+						if ok {
+							target = fuck.Target()
+							m.Cap("target", target.Name)
 
-						for _, v := range fuck.Meta["result"] {
-							fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
-						}
-
-						fmt.Fprintf(nfs.Writer, "nsend: %s\n", fuck.Get("nrecv"))
-						for _, k := range fuck.Meta["append"] {
-							for _, v := range fuck.Meta[k] {
-								fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+							for _, v := range fuck.Meta["result"] {
+								fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
 							}
-						}
-						fmt.Fprintf(nfs.Writer, "\n")
-						nfs.Writer.Flush()
 
-						if fuck.Has("io") {
-							if f, ok := fuck.Data["io"].(io.ReadCloser); ok {
-								io.Copy(nfs.Writer, f)
-								nfs.Writer.Flush()
-								f.Close()
+							fmt.Fprintf(nfs.Writer, "nsend: %s\n", fuck.Get("nrecv"))
+							for _, k := range fuck.Meta["append"] {
+								for _, v := range fuck.Meta[k] {
+									fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+								}
 							}
+							fmt.Fprintf(nfs.Writer, "\n")
+							nfs.Writer.Flush()
+
+							if fuck.Has("io") {
+								if f, ok := fuck.Data["io"].(io.ReadCloser); ok {
+									io.Copy(nfs.Writer, f)
+									nfs.Writer.Flush()
+									f.Close()
+								}
+							}
+							return true, fuck
 						}
-						return ok, ok
+						return false, nil
 					}, false).Cmd(fuck.Meta["detail"])
 				}()
 
@@ -316,32 +319,32 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Sess("pub", "tcp") // {{{
-			msg.Call(func(ok bool) (done bool, up bool) {
+			msg.Call(func(ok bool, com *ctx.Message) (bool, *ctx.Message) {
 				if ok {
 					sub := msg.Spawn(m.Target())
 					sub.Put("option", "io", msg.Data["io"])
-					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", sub.Meta["detail"]...)
-					sub.Cap("stream", msg.Target().Name)
-					sub.Echo(sub.Target().Name)
-					m.Target(sub.Target())
+					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件")
+
+					sub.Cap("stream", com.Target().Name)
+					return false, sub
 				}
-				return false, true
+				return false, nil
 			}, false).Cmd(m.Meta["detail"])
 			// }}}
 		}},
 		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Sess("com", "tcp") // {{{
-			msg.Call(func(ok bool) (done bool, up bool) {
+			msg.Call(func(ok bool, com *ctx.Message) (bool, *ctx.Message) {
 				if ok {
 					sub := msg.Spawn(m.Target())
 					sub.Put("option", "io", msg.Data["io"])
-					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件", sub.Meta["detail"]...)
+					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件")
+
 					sub.Cap("stream", msg.Target().Name)
-					sub.Echo(sub.Target().Name)
 					m.Target(sub.Target())
-					return true, true
+					return true, sub
 				}
-				return false, false
+				return false, nil
 			}, false).Cmd(m.Meta["detail"])
 			// }}}
 		}},
