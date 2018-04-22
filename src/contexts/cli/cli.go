@@ -261,8 +261,8 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch cli.Context {
 	case m.Target():
 		m.Echo(cli.nfs.Cap("return"))
-		if p, ok := m.Source().Server.(*CLI); ok {
-			p.target = cli.target
+		if _, ok := m.Source().Server.(*CLI); ok {
+			// p.target = cli.target
 		}
 	case m.Source():
 		if m.Name == "aaa" {

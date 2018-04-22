@@ -187,17 +187,19 @@ func init() {
 	ctx.Index.Register(Index, log)
 
 	log.color = map[string]int{
-		"error":  31,
-		"check":  31,
-		"cmd":    32,
-		"conf":   33,
-		"search": 35,
-		"find":   35,
-		"spawn":  35,
-		"begin":  36,
-		"start":  36,
-		"close":  36,
-		"debug":  0,
+		"error":    31,
+		"check":    31,
+		"cmd":      32,
+		"conf":     33,
+		"search":   35,
+		"find":     35,
+		"callback": 35,
+		"lock":     35,
+		"spawn":    35,
+		"begin":    36,
+		"start":    36,
+		"close":    36,
+		"debug":    0,
 	}
 	log.slient = map[string]bool{}
 	log.module = map[string]map[string]bool{

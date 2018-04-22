@@ -1,11 +1,13 @@
-package yac
-
-import (
+package yac // {{{
+// }}}
+import ( // {{{
 	"contexts"
 	"fmt"
 	"strconv"
 	"strings"
 )
+
+// }}}
 
 type Seed struct {
 	page int
@@ -37,14 +39,15 @@ type YAC struct {
 	*ctx.Context
 }
 
-func (yac *YAC) name(page int) string {
+func (yac *YAC) name(page int) string { // {{{
 	if name, ok := yac.word[page]; ok {
 		return name
 	}
 	return fmt.Sprintf("yac%d", page)
 }
 
-func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Point, []*Point) {
+// }}}
+func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Point, []*Point) { // {{{
 
 	ss := []int{page}
 	sn := make([]bool, yac.Capi("nline"))
@@ -183,7 +186,8 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 	return len(word), points, ends
 }
 
-func (yac *YAC) parse(m *ctx.Message, cli *ctx.Context, page, void int, line string) (*ctx.Context, string, []string) {
+// }}}
+func (yac *YAC) parse(m *ctx.Message, cli *ctx.Context, page, void int, line string) (*ctx.Context, string, []string) { // {{{
 
 	level := m.Capi("level", 1)
 	yac.Log("debug", nil, fmt.Sprintf("%s\\%d %s(%d):", m.Cap("label")[0:level], level, yac.word[page], page))
@@ -252,7 +256,9 @@ func (yac *YAC) parse(m *ctx.Message, cli *ctx.Context, page, void int, line str
 	return cli, line, word
 }
 
-func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+// }}}
+
+func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -261,7 +267,8 @@ func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server {
+// }}}
+func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	if yac.Message = m; yac.Context == Index {
 		Pulse = m
 	}
@@ -299,12 +306,14 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return yac
 }
 
-func (yac *YAC) Start(m *ctx.Message, arg ...string) bool {
+// }}}
+func (yac *YAC) Start(m *ctx.Message, arg ...string) bool { // {{{
 	yac.Message = m
 	return false
 }
 
-func (yac *YAC) Close(m *ctx.Message, arg ...string) bool {
+// }}}
+func (yac *YAC) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch yac.Context {
 	case m.Target():
 	case m.Source():
@@ -312,13 +321,15 @@ func (yac *YAC) Close(m *ctx.Message, arg ...string) bool {
 	return true
 }
 
+// }}}
+
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"train": &ctx.Command{Name: "train page hash word...", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
+			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
 				page, ok := yac.page[arg[0]]
 				if !ok {
 					page = m.Capi("npage", 1)
@@ -352,9 +363,10 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				yac.seed = append(yac.seed, &Seed{page, hash, arg[2:]})
 				yac.Cap("stream", fmt.Sprintf("%d,%s,%s", yac.Capi("nseed", 1), yac.Cap("npage"), yac.Cap("nhash")))
 			}
+			// }}}
 		}},
 		"parse": &ctx.Command{Name: "parse page void word...", Help: "解析语句, page: 语法集合, void: 空白语法集合, word: 语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
+			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
 				page, ok := yac.page[arg[0]]
 				m.Assert(ok)
 				void, ok := yac.page[arg[1]]
@@ -366,9 +378,10 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					m.Result(0, rest, word)
 				}
 			}
+			// }}}
 		}},
 		"info": &ctx.Command{Name: "info", Help: "显示缓存", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
+			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
 				for i, v := range yac.seed {
 					m.Echo("seed: %d %v\n", i, v)
 				}
@@ -389,9 +402,10 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					}
 				}
 			}
+			// }}}
 		}},
 		"check": &ctx.Command{Name: "check page void word...", Help: "解析语句, page: 语法集合, void: 空白语法集合, word: 语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
+			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
 				set := map[*State]bool{}
 				nreal := 0
 				for _, v := range yac.state {
@@ -414,6 +428,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				}
 				m.Log("fuck", nil, "node: %d real: %d", nnode, nreal)
 			}
+			// }}}
 		}},
 	},
 }

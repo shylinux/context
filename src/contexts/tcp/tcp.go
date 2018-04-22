@@ -69,7 +69,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		m.Log("info", nil, "%s dial %s", Pulse.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
-		m.Put("append", "io", tcp.Conn).Back(true, m)
+		m.Put("append", "io", tcp.Conn).Back(m)
 		return false
 	case "accept":
 		c, e := m.Data["io"].(net.Conn)
@@ -78,8 +78,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		m.Log("info", nil, "%s accept %s", Pulse.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
-		m.Put("append", "io", tcp.Conn).Back(true, m)
-		m.Log("fuck", nil, "accept")
+		m.Put("append", "io", tcp.Conn).Back(m)
 		return false
 	default:
 		if m.Cap("security") != "false" {
@@ -103,16 +102,9 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		c, e := tcp.Accept()
 		m.Assert(e)
 		msg := m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source())
-		msg.Call(func(ok bool, com *ctx.Message) (bool, *ctx.Message) {
-			if ok {
-				m.Append("stream", msg.Append("stream"))
-				m.Put("append", "io", msg.Data["io"])
-				com.Log("fuck", nil, "listen")
-			}
-
-			return ok, com
-		}, false).Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接",
-			"accept", c.RemoteAddr().String(), m.Cap("security"), m.Cap("protocol"))
+		msg.Call(func(com *ctx.Message) *ctx.Message {
+			return com
+		}, "accept", c.RemoteAddr().String(), m.Cap("security"), m.Cap("protocol"))
 	}
 
 	return true
@@ -160,6 +152,10 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				m.Start(fmt.Sprintf("pub%d", Pulse.Capi("nlisten", 1)), "网络监听", m.Meta["detail"]...)
+			}},
+		"accept": &ctx.Command{Name: "accept address [security [protocol]]", Help: "网络连接",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
 			}},
 		"dial": &ctx.Command{Name: "dial address [security [protocol]]", Help: "网络连接",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

@@ -295,7 +295,7 @@ type Message struct {
 	Index  int
 
 	ncallback int
-	callback  func(ok bool, sub *Message) (done bool, up *Message)
+	callback  func(msg *Message) (sub *Message)
 
 	Template *Message
 }
@@ -1042,8 +1042,6 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 						m.target.Historys = make([]*Message, 0, 10)
 					}
 					m.target.Historys = append(m.target.Historys, m)
-
-					m.Back(false, nil)
 				})
 
 				return m.Get("result")
@@ -1126,34 +1124,43 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 }
 
 // }}}
-func (m *Message) Call(cb func(ok bool, msg *Message) (done bool, sub *Message), cmd bool) *Message { // {{{
+func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
 	m.callback = cb
-	m.message.ncallback++
-
 	m.Wait = nil
-	if cmd {
-		m.Cmd()
+	m.Cmd(arg...)
+	return m
+}
+
+// }}}
+func (m *Message) Back(msg *Message) *Message { // {{{
+	if msg == nil || m.callback == nil {
+		return m
 	}
+
+	m.Log("callback", nil, "%v %v", msg.Meta["result"], msg.Meta["append"])
+
+	if sub := m.callback(msg); sub != nil && m.message != nil && m.message != m {
+		m.Log("fuck", nil, "31")
+		m.message.Back(sub)
+	}
+	m.Log("fuck", nil, "41")
 
 	return m
 }
 
 // }}}
-func (m *Message) Back(ok bool, msg *Message) *Message { // {{{
-	if m.callback == nil {
-		return m
-	}
-
-	m.Log("info", nil, "back %v %v", m.Meta["result"], m.Meta["append"])
-	done, sub := m.callback(ok, msg)
-	if done {
-		m.callback = nil
-		m.message.ncallback--
-	}
-
-	if sub != nil || m.message.ncallback == 0 {
-		m.message.Back(ok, sub)
-	}
+func (m *Message) CallBack(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
+	wait := make(chan bool)
+	m.Log("fuck", nil, "callback 1")
+	go m.Call(func(sub *Message) *Message {
+		m.Log("fuck", nil, "callback 4")
+		wait <- true
+		m.Log("fuck", nil, "callback 5")
+		return cb(sub)
+	}, arg...)
+	m.Log("fuck", nil, "callback 2")
+	<-wait
+	m.Log("fuck", nil, "callback 3")
 	return m
 }
 
@@ -1388,7 +1395,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				for i, v := range m.target.Requests {
 					m.Echo("%d %s\n", i, v.Format())
 					for i, v := range v.messages {
-						m.Echo("  %d %s\n", i, v.Format())
+						if v.Detail(0) != "log" {
+							m.Echo("  %d %s\n", i, v.Format())
+						}
 					}
 				}
 
@@ -1401,7 +1410,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				for i, v := range m.target.Historys {
 					m.Echo("%d %s\n", i, v.Format())
 					for i, v := range v.messages {
-						m.Echo("  %d %s\n", i, v.Format())
+						if v.Detail(0) != "log" {
+							m.Echo("  %d %s\n", i, v.Format())
+						}
 					}
 				}
 			case 1:
