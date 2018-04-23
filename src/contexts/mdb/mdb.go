@@ -206,55 +206,63 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			}
 			// }}}
 		}},
-		"list": &ctx.Command{Name: "list add table field", Help: "执行查询语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			mdb, ok := m.Target().Server.(*MDB) // {{{
-			m.Assert(ok)
-			if len(arg) == 0 {
-				for _, k := range mdb.list_key {
-					m.Echo("%s: %v\n", k, mdb.list[k])
+		"list": &ctx.Command{Name: "list add table field [where condition]", Help: "执行查询语句",
+			Formats: map[string]int{"where": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				mdb, ok := m.Target().Server.(*MDB) // {{{
+				m.Assert(ok)
+				if len(arg) == 0 {
+					for _, k := range mdb.list_key {
+						m.Echo("%s: %v\n", k, mdb.list[k])
+					}
+					return
 				}
-				return
-			}
 
-			switch arg[0] {
-			case "add":
-				if mdb.list == nil {
-					mdb.list = make(map[string][]string)
-				}
-				mdb.list[m.Cap("count")] = arg[1:]
-				mdb.list_key = append(mdb.list_key, m.Cap("count"))
-				m.Capi("count", 1)
-			case "set":
-				mdb.list[arg[1]] = arg[2:]
-			default:
-				if table, ok := mdb.list[arg[0]]; ok {
-					msg := m.Spawn(m.Target())
+				switch arg[0] {
+				case "add":
+					if mdb.list == nil {
+						mdb.list = make(map[string][]string)
+					}
+					mdb.list[m.Cap("count")] = append(mdb.list[m.Cap("count")], m.Option("where"))
+					mdb.list[m.Cap("count")] = append(mdb.list[m.Cap("count")], arg[1:]...)
+					mdb.list_key = append(mdb.list_key, m.Cap("count"))
+					m.Capi("count", 1)
+				case "set":
+					mdb.list[arg[1]] = []string{m.Option("where")}
+					mdb.list[arg[1]] = append(mdb.list[arg[1]], arg[2:]...)
+				default:
+					if table, ok := mdb.list[arg[0]]; ok {
+						msg := m.Spawn(m.Target())
 
-					fields := strings.Join(table[1:], ",")
-					condition := ""
-					if len(arg) > 1 && len(arg[1]) > 0 {
-						condition = fmt.Sprintf("where %s", arg[1])
-					}
-					other := ""
-					if len(arg) > 2 {
-						other = strings.Join(arg[2:], " ")
-					}
+						fields := strings.Join(table[2:], ",")
+						condition := ""
+						if len(arg) > 1 && len(arg[1]) > 0 {
+							condition = fmt.Sprintf("where %s", arg[1])
+						} else if len(table[0]) > 0 {
+							condition = fmt.Sprintf("where %s", table[0])
+						}
 
-					msg.Cmd("query", fmt.Sprintf("select %s from %s %s %s", fields, table[0], condition, other))
-					for _, k := range msg.Meta["append"] {
-						m.Echo("\t%s", k)
-					}
-					m.Echo("\n")
-					for i := 0; i < len(msg.Meta[msg.Meta["append"][0]]); i++ {
+						other := ""
+						if len(arg) > 2 {
+							other = strings.Join(arg[2:], " ")
+						}
+
+						msg.Cmd("query", fmt.Sprintf("select %s from %s %s %s", fields, table[1], condition, other))
+						m.Echo("%s %s\n", table[1], condition)
 						for _, k := range msg.Meta["append"] {
-							m.Echo("\t%s", msg.Meta[k][i])
+							m.Echo("%s\t", k)
 						}
 						m.Echo("\n")
+						for i := 0; i < len(msg.Meta[msg.Meta["append"][0]]); i++ {
+							for _, k := range msg.Meta["append"] {
+								m.Echo("%s\t", msg.Meta[k][i])
+							}
+							m.Echo("\n")
+						}
 					}
 				}
-			}
-			// }}}
-		}},
+				// }}}
+			}},
 	},
 	Index: map[string]*ctx.Context{
 		"void": &ctx.Context{Name: "void",

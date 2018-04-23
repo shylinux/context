@@ -414,6 +414,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					method = m.Option("method")
 				}
 
+				m.Echo("%s", uri)
 				var body io.Reader
 				index := strings.Index(uri, "?")
 				switch method {
@@ -521,6 +522,17 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			} // }}}
 		}},
 		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Add("append", "hi", "hello")
+		}},
+		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			msg := m.Spawn(m.Target())
+			question := []string{}
+			for i := 1; i < 21; i++ {
+				question = append(question, fmt.Sprintf("{\"type\":\"1001\",\"title\":{\"text\":\"第%d题\"}}", i))
+			}
+			qs := "[" + strings.Join(question, ",") + "]"
+
+			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
 		}},
 	},

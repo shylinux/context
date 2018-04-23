@@ -1,3 +1,4 @@
+config debug on
 ~aaa login root root
 
 ~web serve ./ ":9090"

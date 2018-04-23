@@ -6,6 +6,7 @@ import ( // {{{
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/nsf/termbox-go"
 	"github.com/skip2/go-qrcode"
 	"io"
 	"net/url"
@@ -23,19 +24,26 @@ type NFS struct {
 	send   map[int]*ctx.Message
 	target *ctx.Context
 
-	in  *os.File
-	out *os.File
-	buf []string
+	in   *os.File
+	out  *os.File
+	buf  []string
+	cli  *ctx.Message
+	x, y int
 
+	*ctx.Message
 	*ctx.Context
 }
 
 func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 	switch {
 	case nfs.io != nil:
-		fmt.Fprintf(nfs.io, str, arg...)
+		str := fmt.Sprintf(str, arg...)
+		nfs.y += strings.Count(str, "\n")
+		fmt.Fprintf(nfs.in, "%s", str)
 	case nfs.out != nil:
-		fmt.Fprintf(nfs.out, str, arg...)
+		str := fmt.Sprintf(str, arg...)
+		nfs.y += strings.Count(str, "\n")
+		fmt.Fprintf(nfs.out, "%s", str)
 	default:
 		return false
 	}
@@ -43,6 +51,94 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 }
 
 // }}}
+func (nfs *NFS) clear(line string) {
+	termbox.SetCursor(nfs.x, nfs.y)
+	termbox.Flush()
+	nfs.print("                              ")
+
+	termbox.SetCursor(nfs.x, nfs.y)
+	termbox.Flush()
+
+	nfs.print("%s%s", nfs.cli.Conf("PS1"), line)
+
+}
+func (nfs *NFS) Read(p []byte) (n int, err error) {
+	if nfs.Cap("stream") != "stdio" {
+		return nfs.in.Read(p)
+	}
+
+	his := len(nfs.buf)
+	buf := make([]rune, 0, 1024)
+	back := buf
+
+	for {
+		switch ev := termbox.PollEvent(); ev.Type {
+		case termbox.EventKey:
+			switch ev.Key {
+			case termbox.KeyCtrlC:
+				termbox.Close()
+				os.Exit(1)
+			case termbox.KeyCtrlJ, termbox.KeyEnter:
+				buf = append(buf, '\n')
+				nfs.print("\n")
+				nfs.y++
+
+				b := []byte(string(buf[:len(buf)]))
+				n = len(b)
+				nfs.Log("fuck", nil, "%d %v", n, b)
+				copy(p, b)
+				return
+			case termbox.KeyCtrlP:
+				his = (his + len(nfs.buf) - 1) % len(nfs.buf)
+				b := nfs.buf[his]
+				buf = buf[:len(b)]
+				n := copy(buf, []rune(b))
+				buf = buf[:n]
+
+				nfs.clear(string(buf))
+			case termbox.KeyCtrlN:
+				his = (his + len(nfs.buf) - 1) % len(nfs.buf)
+				b := nfs.buf[his]
+				buf = buf[:len(b)]
+				n := copy(buf, []rune(b))
+				buf = buf[:n]
+
+				nfs.clear(string(buf))
+			case termbox.KeyCtrlH:
+				if len(buf) > 0 {
+					buf = buf[:len(buf)-1]
+					nfs.clear(string(buf))
+					n--
+				}
+			case termbox.KeyCtrlL:
+				termbox.Sync()
+				nfs.y = 0
+				nfs.clear(string(buf))
+			case termbox.KeyCtrlU:
+				nfs.clear("")
+				if len(buf) > 0 {
+					back = buf
+				}
+				buf = make([]rune, 0, 1024)
+				n = 0
+			case termbox.KeyCtrlY:
+				buf = back
+				n = len(buf)
+				nfs.clear(string(buf))
+			case termbox.KeySpace:
+				nfs.print(" ")
+				buf = append(buf, ' ')
+				n++
+			default:
+				print(string(ev.Ch))
+				buf = append(buf, ev.Ch)
+				n++
+			}
+		}
+	}
+	return
+
+}
 
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
@@ -84,6 +180,7 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
+	nfs.Message = m
 	if socket, ok := m.Data["io"]; ok {
 		nfs.io = socket.(io.ReadWriteCloser)
 		nfs.Reader = bufio.NewReader(nfs.io)
@@ -204,8 +301,12 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	}
 
 	cli := m.Reply()
+	nfs.cli = cli
 	yac := m.Find(cli.Conf("yac"))
-	bio := bufio.NewScanner(nfs.in)
+	bio := bufio.NewScanner(nfs)
+	if m.Cap("stream") == "stdio" {
+		termbox.Init()
+	}
 	nfs.Context.Master(nil)
 	pos := 0
 
@@ -265,6 +366,9 @@ out:
 		cli.Cmd("end")
 	} else {
 		m.Cap("status", "stop")
+	}
+	if m.Cap("stream") == "stdio" {
+		termbox.Close()
 	}
 	return false
 }
