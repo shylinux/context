@@ -726,6 +726,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			fun := m.Find("nfs.file1." + arg[0]) // {{{
 			fun.Target().Start(fun)              // }}}
 		}},
+		"target": &ctx.Command{Name: "taget", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
+				m.Put("append", "target", cli.target)
+			}
+		}},
 	},
 }
 

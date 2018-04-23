@@ -70,23 +70,27 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 	his := len(nfs.buf)
 	buf := make([]rune, 0, 1024)
 	back := buf
+	tab := []string{}
+	tabi := 0
 
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
-			case termbox.KeyCtrlC:
+			case termbox.KeyCtrlC, termbox.KeyCtrlD:
 				termbox.Close()
 				os.Exit(1)
 			case termbox.KeyCtrlJ, termbox.KeyEnter:
+				tab = tab[:0]
+
 				buf = append(buf, '\n')
 				nfs.print("\n")
 				nfs.y++
 
 				b := []byte(string(buf[:len(buf)]))
 				n = len(b)
-				nfs.Log("fuck", nil, "%d %v", n, b)
 				copy(p, b)
+				nfs.Log("info", nil, "get %d %d %s", len(b), len(p), p)
 				return
 			case termbox.KeyCtrlP:
 				his = (his + len(nfs.buf) - 1) % len(nfs.buf)
@@ -115,6 +119,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				nfs.y = 0
 				nfs.clear(string(buf))
 			case termbox.KeyCtrlU:
+				tab = tab[:0]
 				nfs.clear("")
 				if len(buf) > 0 {
 					back = buf
@@ -125,12 +130,41 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				buf = back
 				n = len(buf)
 				nfs.clear(string(buf))
+			case termbox.KeyTab:
+				if len(tab) == 0 {
+					tab = tab[:0]
+					tabi = 0
+					msg := nfs.Message.Spawn(nfs.cli.Target())
+					target := msg.Cmd("target").Data["target"].(*ctx.Context)
+					msg.Spawn(target).BackTrace(func(msg *ctx.Message) bool {
+						for k, _ := range msg.Target().Commands {
+							if strings.HasPrefix(k, string(buf)) {
+								tab = append(tab, k)
+								nfs.Log("info", nil, "add %s", k)
+							}
+						}
+						return true
+					})
+				}
+
+				if tabi >= 0 && tabi < len(tab) {
+					nfs.Log("info", nil, "get %d %d %s", len(tab), tabi, tab[tabi])
+					buf = buf[:len(tab[tabi])]
+					n := copy(buf, []rune(tab[tabi]))
+					buf = buf[:n]
+					nfs.clear(string(buf))
+					tabi = (tabi + 1) % len(tab)
+				}
+
 			case termbox.KeySpace:
+				tab = tab[:0]
 				nfs.print(" ")
 				buf = append(buf, ' ')
 				n++
 			default:
-				print(string(ev.Ch))
+				tab = tab[:0]
+				nfs.Log("fuck", nil, "%v", ev.Ch)
+				nfs.print(string(ev.Ch))
 				buf = append(buf, ev.Ch)
 				n++
 			}

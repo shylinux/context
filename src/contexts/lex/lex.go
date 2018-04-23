@@ -230,6 +230,10 @@ func (lex *LEX) parse(page int, line []byte) (hash int, rest []byte, word []byte
 			pos++
 			c = lex.charset(line[pos])[0]
 		}
+		if c > 127 {
+			word = append(word, c)
+			continue
+		}
 
 		state := lex.mat[s][c]
 		lex.Log("debug", nil, "(%d,%d): %v", s, c, state)
