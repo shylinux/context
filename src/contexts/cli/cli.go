@@ -161,9 +161,10 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 			case "target":
 			}
 
-			ps = append(ps, "\033[32m")
+			// ps = append(ps, "\033[32m")
 			ps = append(ps, cli.target.Name)
-			ps = append(ps, "\033[0m> ")
+			ps = append(ps, "> ")
+			// ps = append(ps, "\033[0m> ")
 
 		} else {
 			ps = append(ps, "[")
@@ -729,6 +730,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"target": &ctx.Command{Name: "taget", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
 				m.Put("append", "target", cli.target)
+			}
+		}},
+		"seed": &ctx.Command{Name: "seed", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			for i := 0; i < 100; i++ {
+				m.Echo("%d\n", i)
 			}
 		}},
 	},

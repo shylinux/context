@@ -24,11 +24,14 @@ type NFS struct {
 	send   map[int]*ctx.Message
 	target *ctx.Context
 
-	in   *os.File
-	out  *os.File
-	buf  []string
-	cli  *ctx.Message
-	x, y int
+	in  *os.File
+	out *os.File
+
+	cli   *ctx.Message
+	buf   []string
+	pages []string
+
+	x, y, width, height int
 
 	*ctx.Message
 	*ctx.Context
@@ -36,14 +39,43 @@ type NFS struct {
 
 func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 	switch {
+	case nfs.out != nil:
+		str := fmt.Sprintf(str, arg...)
+		fmt.Fprintf(nfs.out, "%s", str)
+
+		ls := strings.Split(str, "\n")
+		for i, l := range ls {
+			rest := ""
+
+			if len(nfs.pages) > 0 && !strings.HasSuffix(nfs.pages[len(nfs.pages)-1], "\n") {
+				rest = nfs.pages[len(nfs.pages)-1]
+				nfs.pages = nfs.pages[:len(nfs.pages)-1]
+			}
+
+			if i == len(ls)-1 {
+				nfs.pages = append(nfs.pages, rest+l)
+			} else {
+				nfs.pages = append(nfs.pages, rest+l+"\n")
+			}
+
+			if len(l) > 0 && nfs.width > 0 {
+				nfs.y += len(l) / nfs.width
+				if len(l)%nfs.width == 0 && len(l) > 0 {
+					nfs.y--
+				}
+			}
+		}
+
+		if nfs.y += len(ls) - 1; strings.HasSuffix(str, "\n") {
+			nfs.x = 0
+		} else {
+			nfs.x = len(ls[len(ls)-1])
+		}
+
 	case nfs.io != nil:
 		str := fmt.Sprintf(str, arg...)
 		nfs.y += strings.Count(str, "\n")
 		fmt.Fprintf(nfs.in, "%s", str)
-	case nfs.out != nil:
-		str := fmt.Sprintf(str, arg...)
-		nfs.y += strings.Count(str, "\n")
-		fmt.Fprintf(nfs.out, "%s", str)
 	default:
 		return false
 	}
@@ -51,25 +83,120 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 }
 
 // }}}
-func (nfs *NFS) clear(line string) {
-	termbox.SetCursor(nfs.x, nfs.y)
+func (nfs *NFS) clear(arg ...string) { // {{{
+	line := ""
+	rest := ""
+	if len(arg) > 0 {
+		line = arg[0]
+	}
+	if len(arg) > 1 {
+		rest = arg[1]
+	}
+	termbox.SetCursor(0, nfs.y)
 	termbox.Flush()
-	nfs.print("                              ")
+	fmt.Fprintf(nfs.out, strings.Repeat(" ", nfs.width))
 
-	termbox.SetCursor(nfs.x, nfs.y)
+	termbox.SetCursor(0, nfs.y)
 	termbox.Flush()
 
-	nfs.print("%s%s", nfs.cli.Conf("PS1"), line)
+	ps := nfs.cli.Conf("PS1")
 
+	fmt.Fprintf(nfs.out, "%s%s%s", ps, line, rest)
+
+	termbox.SetCursor(len(ps)+len(line), nfs.y)
+	termbox.Flush()
 }
-func (nfs *NFS) Read(p []byte) (n int, err error) {
+
+// }}}
+func (nfs *NFS) insert(rest []rune, letters []rune) []rune { // {{{
+	n := len(rest)
+	l := len(letters)
+	rest = append(rest, letters...)
+	for i := n - 1; i >= 0; i-- {
+		rest[i+l] = rest[i]
+	}
+	for i := 0; i < l; i++ {
+		rest[i] = letters[i]
+	}
+	return rest
+}
+
+// }}}
+
+func (nfs *NFS) page(buf []string, pos int) { // {{{
+	termbox.SetCursor(0, 0)
+	termbox.Sync()
+	begin := pos
+
+	for i := 0; i < nfs.height-1; i++ {
+		if pos < len(buf) && pos >= 0 {
+			if len(buf[pos]) > nfs.width {
+				fmt.Fprintf(nfs.out, "%s", buf[pos][:nfs.width])
+			} else {
+				fmt.Fprintf(nfs.out, "%s", buf[pos])
+			}
+			pos++
+		} else {
+			fmt.Fprintln(nfs.out)
+		}
+	}
+	fmt.Fprintf(nfs.out, "%d %d", len(nfs.pages), begin)
+}
+
+// }}}
+func (nfs *NFS) View() { // {{{
+	pos := len(nfs.pages) - nfs.height
+	nfs.page(nfs.pages, pos)
+	for {
+		switch ev := termbox.PollEvent(); ev.Type {
+		case termbox.EventKey:
+			switch ev.Key {
+			case termbox.KeyCtrlC:
+				return
+			default:
+				switch ev.Ch {
+				case 'f':
+					if pos+nfs.height < len(nfs.pages) {
+						pos += nfs.height - 1
+					}
+				case 'b':
+					if pos-nfs.height > 0 {
+						pos -= nfs.height - 1
+					} else {
+						pos = 0
+					}
+				case 'j':
+					if pos+1 < len(nfs.pages) {
+						pos += 1
+					}
+				case 'k':
+					if pos-1 > 0 {
+						pos -= 1
+					} else {
+						pos = 0
+					}
+				}
+				nfs.page(nfs.pages, pos)
+			}
+		}
+	}
+}
+
+// }}}
+func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 	if nfs.Cap("stream") != "stdio" {
 		return nfs.in.Read(p)
 	}
 
-	his := len(nfs.buf)
+	nfs.width, nfs.height = termbox.Size()
+
 	buf := make([]rune, 0, 1024)
+	rest := make([]rune, 0, 1024)
+
 	back := buf
+
+	his := len(nfs.buf) - 1
+
 	tab := []string{}
 	tabi := 0
 
@@ -77,70 +204,119 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
-			case termbox.KeyCtrlC, termbox.KeyCtrlD:
+			case termbox.KeyCtrlC:
 				termbox.Close()
 				os.Exit(1)
-			case termbox.KeyCtrlJ, termbox.KeyEnter:
+
+			case termbox.KeyCtrlV:
+				nfs.View()
+
+			case termbox.KeyCtrlL:
+				termbox.Sync()
+				nfs.y = 0
+
+			case termbox.KeyCtrlJ, termbox.KeyCtrlM:
 				tab = tab[:0]
 
+				buf = append(buf, rest...)
 				buf = append(buf, '\n')
 				nfs.print("\n")
-				nfs.y++
 
 				b := []byte(string(buf[:len(buf)]))
 				n = len(b)
 				copy(p, b)
-				nfs.Log("info", nil, "get %d %d %s", len(b), len(p), p)
 				return
+
 			case termbox.KeyCtrlP:
-				his = (his + len(nfs.buf) - 1) % len(nfs.buf)
-				b := nfs.buf[his]
-				buf = buf[:len(b)]
-				n := copy(buf, []rune(b))
-				buf = buf[:n]
+				for i := 0; i < len(nfs.buf); i++ {
+					his = (his + len(nfs.buf) - 1) % len(nfs.buf)
+					if strings.HasPrefix(nfs.buf[his], string(buf)) {
+						rest = rest[:0]
+						rest = append(rest, []rune(nfs.buf[his][len(buf):])...)
+						break
+					}
+				}
 
-				nfs.clear(string(buf))
 			case termbox.KeyCtrlN:
-				his = (his + len(nfs.buf) - 1) % len(nfs.buf)
-				b := nfs.buf[his]
-				buf = buf[:len(b)]
-				n := copy(buf, []rune(b))
-				buf = buf[:n]
+				for i := 0; i < len(nfs.buf); i++ {
+					his = (his + len(nfs.buf) + 1) % len(nfs.buf)
+					if strings.HasPrefix(nfs.buf[his], string(buf)) {
+						rest = rest[:0]
+						rest = append(rest, []rune(nfs.buf[his][len(buf):])...)
+						break
+					}
+				}
 
-				nfs.clear(string(buf))
+			case termbox.KeyCtrlA:
+				if len(buf) == 0 {
+					continue
+				}
+				rest = nfs.insert(rest, buf)
+				buf = buf[:0]
+
+			case termbox.KeyCtrlE:
+				if len(rest) == 0 {
+					continue
+				}
+				buf = append(buf, rest...)
+				rest = rest[:0]
+
+			case termbox.KeyCtrlB:
+				if len(buf) == 0 {
+					continue
+				}
+				rest = nfs.insert(rest, []rune{buf[len(buf)-1]})
+				buf = buf[:len(buf)-1]
+
+			case termbox.KeyCtrlF:
+				if len(rest) == 0 {
+					continue
+				}
+				buf = append(buf, rest[0])
+				rest = rest[1:]
+
 			case termbox.KeyCtrlH:
-				if len(buf) > 0 {
-					buf = buf[:len(buf)-1]
-					nfs.clear(string(buf))
-					n--
+				if len(buf) == 0 {
+					continue
 				}
-			case termbox.KeyCtrlL:
-				termbox.Sync()
-				nfs.y = 0
-				nfs.clear(string(buf))
+				buf = buf[:len(buf)-1]
+
+			case termbox.KeyCtrlD:
+				if len(rest) == 0 {
+					continue
+				}
+				rest = rest[1:]
+
 			case termbox.KeyCtrlU:
-				tab = tab[:0]
-				nfs.clear("")
 				if len(buf) > 0 {
-					back = buf
+					back = back[:0]
+					back = append(back, buf...)
 				}
-				buf = make([]rune, 0, 1024)
-				n = 0
+
+				tab = tab[:0]
+
+				buf = buf[:0]
+
+			case termbox.KeyCtrlK:
+				if len(rest) > 0 {
+					back = back[:0]
+					back = append(back, rest...)
+				}
+				rest = rest[:0]
+
 			case termbox.KeyCtrlY:
-				buf = back
-				n = len(buf)
-				nfs.clear(string(buf))
-			case termbox.KeyTab:
+				buf = append(buf, back...)
+
+			case termbox.KeyCtrlI:
 				if len(tab) == 0 {
-					tab = tab[:0]
 					tabi = 0
+					prefix := string(buf)
 					msg := nfs.Message.Spawn(nfs.cli.Target())
 					target := msg.Cmd("target").Data["target"].(*ctx.Context)
 					msg.Spawn(target).BackTrace(func(msg *ctx.Message) bool {
 						for k, _ := range msg.Target().Commands {
-							if strings.HasPrefix(k, string(buf)) {
-								tab = append(tab, k)
-								nfs.Log("info", nil, "add %s", k)
+							if strings.HasPrefix(k, prefix) {
+								tab = append(tab, k[len(prefix):])
 							}
 						}
 						return true
@@ -148,31 +324,35 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				}
 
 				if tabi >= 0 && tabi < len(tab) {
-					nfs.Log("info", nil, "get %d %d %s", len(tab), tabi, tab[tabi])
-					buf = buf[:len(tab[tabi])]
-					n := copy(buf, []rune(tab[tabi]))
-					buf = buf[:n]
-					nfs.clear(string(buf))
+					rest = rest[:0]
+					rest = append(rest, []rune(tab[tabi])...)
 					tabi = (tabi + 1) % len(tab)
 				}
 
 			case termbox.KeySpace:
 				tab = tab[:0]
-				nfs.print(" ")
 				buf = append(buf, ' ')
-				n++
+
+				if len(rest) == 0 {
+					nfs.print(" ")
+					continue
+				}
+
 			default:
 				tab = tab[:0]
-				nfs.Log("fuck", nil, "%v", ev.Ch)
-				nfs.print(string(ev.Ch))
 				buf = append(buf, ev.Ch)
-				n++
+				if len(rest) == 0 {
+					nfs.print(string(ev.Ch))
+				}
 			}
+			nfs.clear(string(buf), string(rest))
 		}
 	}
 	return
 
 }
+
+// }}}
 
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
