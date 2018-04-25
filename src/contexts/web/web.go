@@ -10,6 +10,10 @@ import ( // {{{
 	"net/url"
 	"path"
 
+	"bytes"
+	"mime/multipart"
+	"path/filepath"
+
 	"bufio"
 	"fmt"
 	"io"
@@ -320,8 +324,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"dir":      &ctx.Config{Name: "dir", Value: "/", Help: "主机路由"},
 		"file":     &ctx.Config{Name: "file", Value: "", Help: "主机文件"},
 		"query":    &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
-		"output":   &ctx.Config{Name: "output", Value: "", Help: "响应输出"},
-		"editor":   &ctx.Config{Name: "editor", Value: "", Help: "响应编辑器"},
+		"output":   &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
+		"editor":   &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
 	},
 	Commands: map[string]*ctx.Command{
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -397,13 +401,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"get": &ctx.Command{Name: "get [method GET|POST] [file filename] arg...", Help: "访问URL",
-			Formats: map[string]int{"method": 1, "file": 1},
+			Formats: map[string]int{"method": 1, "file": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				web, ok := m.Target().Server.(*WEB) // {{{
 				m.Assert(ok)
-
-				uri := web.generate(m, arg[0], arg[1:]...)
-				m.Log("info", nil, "GET %s", uri)
 
 				if web.client == nil {
 					web.client = &http.Client{}
@@ -414,12 +415,37 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					method = m.Option("method")
 				}
 
-				m.Echo("%s", uri)
+				uri := web.generate(m, arg[0], arg[1:]...)
+				m.Log("info", nil, "GET %s", uri)
+				m.Echo("%s\n", uri)
+
 				var body io.Reader
 				index := strings.Index(uri, "?")
+				contenttype := ""
+
 				switch method {
 				case "POST":
-					if index > 0 {
+					if m.Options("file") {
+						file, e := os.Open(m.Meta["file"][1])
+						m.Assert(e)
+						defer file.Close()
+
+						buf := &bytes.Buffer{}
+						writer := multipart.NewWriter(buf)
+
+						part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+						m.Assert(e)
+
+						io.Copy(part, file)
+						for i := 0; i < len(arg)-1; i += 2 {
+							writer.WriteField(arg[0], arg[1])
+						}
+
+						contenttype = writer.FormDataContentType()
+						body = buf
+						writer.Close()
+					} else if index > 0 {
+						contenttype = "application/x-www-form-urlencoded"
 						body = strings.NewReader(uri[index+1:])
 						uri = uri[:index]
 					}
@@ -428,11 +454,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				req, e := http.NewRequest(method, uri, body)
 				m.Assert(e)
 
-				switch method {
-				case "POST":
-					if index > 0 {
-						req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-					}
+				if len(contenttype) > 0 {
+					req.Header.Set("Content-Type", contenttype)
 				}
 
 				for _, v := range web.cookie {
@@ -466,7 +489,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							cmd.Stderr = os.Stderr
 							cmd.Run()
 						} else {
-							m.Echo("write to %s", name)
+							m.Echo("write to %s\n", name)
 						}
 						return
 					}
@@ -522,6 +545,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			} // }}}
 		}},
 		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Data["request"].(*http.Request)
+			file, _, e := r.FormFile("file")
+			m.Assert(e)
+			buf, e := ioutil.ReadAll(file)
+			m.Assert(e)
+			m.Echo(string(buf))
 			m.Add("append", "hi", "hello")
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
