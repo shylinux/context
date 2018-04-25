@@ -31,7 +31,7 @@ type NFS struct {
 	buf   []string
 	pages []string
 
-	x, y, width, height int
+	width, height int
 
 	*ctx.Message
 	*ctx.Context
@@ -52,51 +52,38 @@ func (nfs *NFS) insert(rest []rune, letters []rune) []rune { // {{{
 
 // }}}
 
-func (nfs *NFS) color(str string, attr ...termbox.Attribute) { // {{{
-	fg := termbox.Attribute(nfs.Confi("color"))
+func (nfs *NFS) escape(key ...string) *NFS { // {{{
+	for _, k := range key {
+		fmt.Fprintf(nfs.out, "\033[%s", k)
+	}
+	return nfs
+}
+
+// }}}
+func (nfs *NFS) color(str string, attr ...int) *NFS { // {{{
+	fg := nfs.Confi("color")
 	if len(attr) > 0 {
 		fg = attr[0]
 	}
 
-	bg := termbox.Attribute(nfs.Confi("backcolor"))
+	bg := nfs.Confi("backcolor")
 	if len(attr) > 1 {
 		bg = attr[1]
 	}
 
-	for _, v := range []rune(str) {
-		if v == '\n' {
-			nfs.x = 0
-			nfs.y++
-			continue
-		}
-		if nfs.Confs("screen") {
-			termbox.SetCell(nfs.x, nfs.y, v, fg, bg)
-		}
-		if nfs.x++; nfs.x >= nfs.width {
-			nfs.x = 0
-			nfs.y++
-		}
-		if nfs.Confs("screen") {
-			if nfs.y >= nfs.height {
-				termbox.Clear(termbox.ColorWhite, termbox.ColorBlack)
-				nfs.y = 0
-			}
-		}
+	for i := 2; i < len(attr); i++ {
+		fmt.Fprintf(nfs.out, "\033[%dm", attr[i])
 	}
-	if !nfs.Confs("screen") {
-		if fg == termbox.ColorWhite {
-			fg = fg + 8
-		}
-		fmt.Fprintf(nfs.out, "\033[4%dm\033[3%dm%s\033[0m", bg-1, fg-1, str)
-	}
-	termbox.SetCursor(nfs.x, nfs.y)
-	termbox.Flush()
+
+	fmt.Fprintf(nfs.out, "\033[4%dm\033[3%dm%s\033[0m", bg, fg, str)
+	return nfs
 }
 
 // }}}
-func (nfs *NFS) clear(arg ...string) { // {{{
-	line := ""
-	rest := ""
+func (nfs *NFS) prompt(arg ...string) { // {{{
+	nfs.escape("2K", "G", "?25h")
+
+	line, rest := "", ""
 	if len(arg) > 0 {
 		line = arg[0]
 	}
@@ -104,13 +91,9 @@ func (nfs *NFS) clear(arg ...string) { // {{{
 		rest = arg[1]
 	}
 
-	nfs.y--
-	nfs.x = 0
-	nfs.color(strings.Repeat(" ", nfs.width))
-
-	nfs.x = 0
-	ps := nfs.cli.Conf("PS1")
-	nfs.color(fmt.Sprintf("%s%s%s", ps, line, rest))
+	if nfs.color(nfs.cli.Conf("PS1"), nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
+		fmt.Fprintf(nfs.out, "\033[%dD", len(rest))
+	}
 }
 
 // }}}
@@ -138,7 +121,6 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 
 	case nfs.io != nil:
 		str := fmt.Sprintf(str, arg...)
-		nfs.y += strings.Count(str, "\n")
 		fmt.Fprintf(nfs.in, "%s", str)
 	default:
 		return false
@@ -147,16 +129,11 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 }
 
 // }}}
-func (nfs *NFS) page(buf []string, pos int) { // {{{
-	termbox.Clear(termbox.ColorWhite, termbox.ColorBlack)
-	termbox.SetCursor(0, 0)
-	termbox.Sync()
-	nfs.y = 0
-	nfs.x = 0
-
+func (nfs *NFS) page(buf []string, pos int) int { // {{{
+	nfs.escape("2J", "H")
 	begin := pos
 
-	for i := 0; i < nfs.height-1; i++ {
+	for i := 0; i < nfs.height; i++ {
 		if pos < len(buf) && pos >= 0 {
 			if len(buf[pos]) > nfs.width {
 				nfs.color(fmt.Sprintf("%s", buf[pos][:nfs.width]))
@@ -168,14 +145,14 @@ func (nfs *NFS) page(buf []string, pos int) { // {{{
 			nfs.color("\n")
 		}
 	}
-	nfs.y = nfs.height - 1
-	nfs.x = 0
-	nfs.color(fmt.Sprintf("%d/%d", begin, len(nfs.pages)), termbox.ColorRed, termbox.ColorGreen)
+
+	nfs.escape("E").color(fmt.Sprintf("%d/%d", begin, len(nfs.pages)), nfs.Confi("statuscolor"), nfs.Confi("statusbackcolor"))
+	return pos
 }
 
 // }}}
-func (nfs *NFS) View(y int) { // {{{
-	pos := len(nfs.pages) - y
+func (nfs *NFS) View() { // {{{
+	pos := len(nfs.pages) - nfs.height
 	if pos < 0 {
 		pos = 0
 	}
@@ -241,20 +218,11 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				os.Exit(1)
 
 			case termbox.KeyCtrlV:
-				y := nfs.y + 1
-				nfs.View(y)
-				nfs.page(nfs.pages, len(nfs.pages)-y)
-				nfs.y = y - 1
-				nfs.x = 0
-				// termbox.SetCell(nfs.x, nfs.y, ' ', termbox.ColorWhite, termbox.ColorBlack)
-				// termbox.Clear(termbox.ColorWhite, termbox.ColorBlack)
+				nfs.View()
+				nfs.page(nfs.pages, len(nfs.pages)-nfs.height)
 
 			case termbox.KeyCtrlL:
-				termbox.Clear(termbox.ColorWhite, termbox.ColorBlack)
-				termbox.SetCursor(0, 0)
-				termbox.Sync()
-				nfs.y = 0
-				nfs.x = 0
+				nfs.escape("2J", "H")
 
 			case termbox.KeyCtrlJ, termbox.KeyCtrlM:
 				tab = tab[:0]
@@ -386,11 +354,10 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 					nfs.print(string(ev.Ch))
 				}
 			}
-			nfs.clear(string(buf), string(rest))
+			nfs.prompt(string(buf), string(rest))
 		}
 	}
 	return
-
 }
 
 // }}}
@@ -559,10 +526,12 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	nfs.cli = cli
 	yac := m.Find(cli.Conf("yac"))
 	bio := bufio.NewScanner(nfs)
+
 	if m.Cap("stream") == "stdio" {
 		termbox.Init()
-		nfs.width, nfs.height = termbox.Size()
+		defer termbox.Close()
 	}
+
 	nfs.Context.Master(nil)
 	pos := 0
 
@@ -572,10 +541,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		goto out
 	}
 
-	if len(arg) > 2 {
-		nfs.print("%v\n", arg[2])
-	}
-	nfs.print("%s", cli.Conf("PS1"))
+	nfs.pages = append(nfs.pages, nfs.cli.Conf("PS1"))
+	nfs.prompt()
 
 	for rest, text := "", ""; pos < m.Capi("nline") || bio.Scan(); {
 		if pos == m.Capi("nline") {
@@ -614,7 +581,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 		}
 
-		nfs.print("%s", cli.Conf("PS1"))
+		nfs.pages = append(nfs.pages, fmt.Sprintf("\033[32m%s\033[m", nfs.cli.Conf("PS1")))
+		nfs.prompt()
 	}
 
 out:
@@ -622,9 +590,6 @@ out:
 		cli.Cmd("end")
 	} else {
 		m.Cap("status", "stop")
-	}
-	if m.Cap("stream") == "stdio" {
-		termbox.Close()
 	}
 	return false
 }
@@ -651,10 +616,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"nfile": &ctx.Cache{Name: "nfile", Value: "0", Help: "已经打开的文件数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"size":      &ctx.Config{Name: "size", Value: "1024", Help: "读取文件的默认大小值"},
-		"screen":    &ctx.Config{Name: "screen", Value: "false", Help: "读取文件的默认大小值"},
-		"color":     &ctx.Config{Name: "color", Value: "8", Help: "读取文件的默认大小值"},
-		"backcolor": &ctx.Config{Name: "color", Value: "1", Help: "读取文件的默认大小值"},
+		"size":            &ctx.Config{Name: "size", Value: "1024", Help: "读取文件的默认大小值"},
+		"color":           &ctx.Config{Name: "color", Value: "9", Help: "读取文件的默认大小值"},
+		"backcolor":       &ctx.Config{Name: "backcolor", Value: "9", Help: "读取文件的默认大小值"},
+		"pscolor":         &ctx.Config{Name: "pscolor", Value: "2", Help: "读取文件的默认大小值"},
+		"statuscolor":     &ctx.Config{Name: "statuspscolor", Value: "1", Help: "读取文件的默认大小值"},
+		"statusbackcolor": &ctx.Config{Name: "statusbackcolor", Value: "2", Help: "读取文件的默认大小值"},
 	},
 	Commands: map[string]*ctx.Command{
 		"buffer": &ctx.Command{Name: "buffer [index string]", Help: "扫描文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
