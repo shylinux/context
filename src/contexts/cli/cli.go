@@ -280,8 +280,13 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "cli", Help: "管理中心",
-	Caches:  map[string]*ctx.Cache{},
-	Configs: map[string]*ctx.Config{},
+	Caches: map[string]*ctx.Cache{},
+	Configs: map[string]*ctx.Config{
+		"time": &ctx.Config{Name: "time", Value: "0", Help: "所有模块的当前目录", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+			t := time.Now().Unix()
+			return fmt.Sprintf("%d", t)
+		}},
+	},
 	Commands: map[string]*ctx.Command{
 		"alias": &ctx.Command{Name: "alias [short [long]]|[delete short]", Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{

@@ -318,14 +318,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"count": &ctx.Cache{Name: "count", Value: "0", Help: "主机协议"},
 	},
 	Configs: map[string]*ctx.Config{
-		"protocol": &ctx.Config{Name: "protocol", Value: "", Help: "主机协议"},
-		"hostname": &ctx.Config{Name: "hostname", Value: "", Help: "主机地址"},
-		"port":     &ctx.Config{Name: "port", Value: "", Help: "主机端口"},
-		"dir":      &ctx.Config{Name: "dir", Value: "/", Help: "主机路由"},
-		"file":     &ctx.Config{Name: "file", Value: "", Help: "主机文件"},
-		"query":    &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
-		"output":   &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
-		"editor":   &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
+		"protocol":   &ctx.Config{Name: "protocol", Value: "", Help: "主机协议"},
+		"hostname":   &ctx.Config{Name: "hostname", Value: "", Help: "主机地址"},
+		"port":       &ctx.Config{Name: "port", Value: "", Help: "主机端口"},
+		"dir":        &ctx.Config{Name: "dir", Value: "/", Help: "主机路由"},
+		"file":       &ctx.Config{Name: "file", Value: "", Help: "主机文件"},
+		"query":      &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
+		"output":     &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
+		"editor":     &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
+		"upload_dir": &ctx.Config{Name: "upload_dir", Value: "tmp", Help: "上传文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -400,7 +401,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			// }}}
 		}},
-		"get": &ctx.Command{Name: "get [method GET|POST] [file filename] arg...", Help: "访问URL",
+		"get": &ctx.Command{Name: "get [method GET|POST] [file filename] url arg...", Help: "访问URL",
 			Formats: map[string]int{"method": 1, "file": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				web, ok := m.Target().Server.(*WEB) // {{{
@@ -544,14 +545,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			} // }}}
 		}},
-		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Data["request"].(*http.Request)
-			file, _, e := r.FormFile("file")
+		"upload": &ctx.Command{Name: "upload file", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			msg := m.Spawn(m.Target()) // {{{
+			msg.Cmd("get", "/upload", "method", "POST", "file", "file", arg[0])
+			m.Copy(msg, "result")
+			// }}}
+		}},
+		"/upload": &ctx.Command{Name: "/upload", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Data["request"].(*http.Request) // {{{
+
+			file, header, e := r.FormFile("file")
 			m.Assert(e)
-			buf, e := ioutil.ReadAll(file)
+
+			f, e := os.Create(path.Join(m.Conf("upload_dir"), header.Filename))
 			m.Assert(e)
-			m.Echo(string(buf))
-			m.Add("append", "hi", "hello")
+
+			n, e := io.Copy(f, file)
+			m.Assert(e)
+
+			m.Echo("%d", n)
+			// }}}
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target())

@@ -3,7 +3,19 @@ package aaa // {{{
 import ( // {{{
 	"contexts"
 
+	"io"
+	"io/ioutil"
+	"os"
+
+	"crypto"
 	"crypto/md5"
+
+	crand "crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+
 	"encoding/hex"
 	"math/rand"
 
@@ -155,6 +167,148 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				m.Echo(msg.Cap("sessid"))
 			} // }}}
 		}},
+		"md5": &ctx.Command{Name: "md5 [content][file filename]", Help: "散列",
+			Formats: map[string]int{"file": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if m.Options("file") { // {{{
+					f, e := os.Open(m.Option("file"))
+					m.Assert(e)
+
+					h := md5.New()
+					io.Copy(h, f)
+
+					m.Echo(hex.EncodeToString(h.Sum([]byte{})[:]))
+				} else if len(arg) > 0 {
+					h := md5.Sum([]byte(arg[0]))
+					m.Echo(hex.EncodeToString(h[:]))
+				}
+				// }}}
+			}},
+		"rsa": &ctx.Command{Name: "rsa gen|encrypt|decrypt|sign|verify [key str][keyfile filename][signs str][signfile filename][file filename][mm str][mmfile filename] content",
+			Help: ` 密钥: rsa gen keyfile key.pem
+					加密: rsa encrypt keyfile pubkey.pem mmfile mm.txt hello
+					解密: rsa decrypt keyfile key.pem mmfile mm.txt
+					签名: rsa sign keyfile key.pem signfile sign.txt hello
+					验签: rsa verify keyfile pubkey.pem signfile sign.txt hello`,
+			Formats: map[string]int{"key": 1, "keyfile": 1, "signs": 1, "signfile": 1, "file": 1, "mm": 1, "mmfile": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if arg[0] == "gen" { // {{{
+					keys, e := rsa.GenerateKey(crand.Reader, 1024)
+					m.Assert(e)
+
+					private := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(keys)}))
+					m.Append("private", private)
+					m.Echo(private)
+
+					pub, e := x509.MarshalPKIXPublicKey(&keys.PublicKey)
+					m.Assert(e)
+
+					public := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: pub}))
+					m.Append("public", public)
+					m.Echo(public)
+
+					if m.Options("keyfile") {
+						ioutil.WriteFile(m.Option("keyfile"), []byte(private), 0666)
+						ioutil.WriteFile("pub"+m.Option("keyfile"), []byte(public), 0666)
+					}
+					return
+				}
+
+				keys := []byte(m.Option("key"))
+				if m.Options("keyfile") {
+					b, e := ioutil.ReadFile(m.Option("keyfile"))
+					m.Assert(e)
+					keys = b
+				}
+
+				block, e := pem.Decode(keys)
+				m.Assert(e)
+
+				if arg[0] == "decrypt" {
+					private, e := x509.ParsePKCS1PrivateKey(block.Bytes)
+					m.Assert(e)
+
+					mm := []byte(m.Option("mm"))
+					if m.Options("mmfile") {
+						b, e := ioutil.ReadFile(m.Option("mmfile"))
+						m.Assert(e)
+						mm = b
+					}
+
+					buf := make([]byte, 1024)
+					n, e := base64.StdEncoding.Decode(buf, mm)
+					m.Assert(e)
+					buf = buf[:n]
+
+					b, e := rsa.DecryptPKCS1v15(crand.Reader, private, buf)
+					m.Assert(e)
+
+					m.Echo(string(b))
+					if m.Options("file") {
+						ioutil.WriteFile(m.Option("file"), b, 0666)
+					}
+					return
+				}
+
+				var content []byte
+				if m.Options("file") {
+					b, e := ioutil.ReadFile(m.Option("file"))
+					m.Assert(e)
+					content = b
+				} else if len(arg) > 1 {
+					content = []byte(arg[1])
+				}
+
+				switch arg[0] {
+				case "encrypt":
+					public, e := x509.ParsePKIXPublicKey(block.Bytes)
+					m.Assert(e)
+
+					b, e := rsa.EncryptPKCS1v15(crand.Reader, public.(*rsa.PublicKey), content)
+					m.Assert(e)
+
+					res := base64.StdEncoding.EncodeToString(b)
+					m.Echo(res)
+					if m.Options("mmfile") {
+						ioutil.WriteFile(m.Option("mmfile"), []byte(res), 0666)
+					}
+
+				case "sign":
+					private, e := x509.ParsePKCS1PrivateKey(block.Bytes)
+					m.Assert(e)
+
+					h := md5.Sum(content)
+					b, e := rsa.SignPKCS1v15(crand.Reader, private, crypto.MD5, h[:])
+					m.Assert(e)
+
+					res := base64.StdEncoding.EncodeToString(b)
+					m.Echo(res)
+
+					if m.Options("signfile") {
+						ioutil.WriteFile(m.Option("signfile"), []byte(res), 0666)
+					}
+
+				case "verify":
+					public, e := x509.ParsePKIXPublicKey(block.Bytes)
+					m.Assert(e)
+
+					sign := []byte(m.Option("sign"))
+					if m.Options("signfile") {
+						b, e := ioutil.ReadFile(m.Option("signfile"))
+						m.Assert(e)
+						sign = b
+					}
+
+					buf := make([]byte, 1024)
+					n, e := base64.StdEncoding.Decode(buf, sign)
+					m.Assert(e)
+					buf = buf[:n]
+
+					h := md5.Sum(content)
+					m.Echo("%t", rsa.VerifyPKCS1v15(public.(*rsa.PublicKey), crypto.MD5, h[:], buf) == nil)
+				}
+				// }}}
+			}},
 	},
 	Index: map[string]*ctx.Context{
 		"void": &ctx.Context{Name: "void", Commands: map[string]*ctx.Command{"login": &ctx.Command{}}},

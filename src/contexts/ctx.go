@@ -1330,10 +1330,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"nmessage": &Cache{Name: "消息数量", Value: "0", Help: "显示模块启动时所创建消息的数量"},
 	},
 	Configs: map[string]*Config{
-		"debug": &Config{Name: "调试模式(true/false)", Value: "true", Help: "是否打印错误信息，off:不打印，on:打印)"},
-
-		"default": &Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
-
+		"debug":     &Config{Name: "调试模式(true/false)", Value: "true", Help: "是否打印错误信息，off:不打印，on:打印)"},
+		"default":   &Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
 		"start":     &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
 		"init.shy":  &Config{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"},
 		"bench.log": &Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件"},
@@ -1366,6 +1364,23 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"key":  &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*Command{
+		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			if len(arg) == 0 {
+				m.Echo("^_^  Welcome to context world  ^_^\n")
+				m.Echo("Context is to be a distributed operating system, try to simple everything in work and life. ")
+				m.Echo("In context you will find all kinds of tools, and you can also make new tool in a quick and easy way.\n")
+				m.Echo("Here is just a simple introduce, you can look github.com/shylinux/context/README.md for more information.\n")
+				m.Echo("0. example\n")
+				m.Echo("1. context\n")
+				m.Echo("2. message\n")
+				return
+			}
+			switch arg[0] {
+			case "example":
+			case "context":
+			case "message":
+			}
+		}},
 		"server": &Command{Name: "server [start|exit|switch][args]", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			switch len(arg) { // {{{
 			case 0:
