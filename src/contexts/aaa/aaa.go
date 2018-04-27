@@ -167,7 +167,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				m.Echo(msg.Cap("sessid"))
 			} // }}}
 		}},
-		"md5": &ctx.Command{Name: "md5 [content][file filename]", Help: "散列",
+		"md5": &ctx.Command{Name: "md5 [file filename][content]", Help: "散列",
 			Formats: map[string]int{"file": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if m.Options("file") { // {{{
@@ -184,13 +184,16 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 				// }}}
 			}},
-		"rsa": &ctx.Command{Name: "rsa gen|encrypt|decrypt|sign|verify [key str][keyfile filename][signs str][signfile filename][file filename][mm str][mmfile filename] content",
-			Help: ` 密钥: rsa gen keyfile key.pem
+		"rsa": &ctx.Command{Name: "rsa gen|encrypt|decrypt|sign|verify [keyfile filename][key str][mmfile filename][mm str][signfile filename][signs str][file filename] content",
+			Help: ` gen生成密钥, encrypt公钥加密, decrypt私钥解密, sgin私钥签名, verify公钥验签,
+					keyfile密钥文件, key密钥字符串，mm加密文件, mm加密字符串, signfile签名文件，signs签名字符串,
+					file数据文件，content数据内容.
+					密钥: rsa gen keyfile key.pem
 					加密: rsa encrypt keyfile pubkey.pem mmfile mm.txt hello
 					解密: rsa decrypt keyfile key.pem mmfile mm.txt
 					签名: rsa sign keyfile key.pem signfile sign.txt hello
 					验签: rsa verify keyfile pubkey.pem signfile sign.txt hello`,
-			Formats: map[string]int{"key": 1, "keyfile": 1, "signs": 1, "signfile": 1, "file": 1, "mm": 1, "mmfile": 1},
+			Formats: map[string]int{"keyfile": 1, "key": 1, "mmfile": 1, "mm": 1, "signfile": 1, "signs": 1, "file": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if arg[0] == "gen" { // {{{
 					keys, e := rsa.GenerateKey(crand.Reader, 1024)
@@ -306,6 +309,23 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					h := md5.Sum(content)
 					m.Echo("%t", rsa.VerifyPKCS1v15(public.(*rsa.PublicKey), crypto.MD5, h[:], buf) == nil)
+				}
+				// }}}
+			}},
+		"deal": &ctx.Command{Name: "deal init|sell|buy|done [keyfile name][key str]", Help: "散列",
+			Formats: map[string]int{"file": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if m.Options("file") { // {{{
+					f, e := os.Open(m.Option("file"))
+					m.Assert(e)
+
+					h := md5.New()
+					io.Copy(h, f)
+
+					m.Echo(hex.EncodeToString(h.Sum([]byte{})[:]))
+				} else if len(arg) > 0 {
+					h := md5.Sum([]byte(arg[0]))
+					m.Echo(hex.EncodeToString(h[:]))
 				}
 				// }}}
 			}},

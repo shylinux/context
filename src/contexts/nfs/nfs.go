@@ -13,6 +13,7 @@ import ( // {{{
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // }}}
@@ -129,11 +130,11 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 }
 
 // }}}
-func (nfs *NFS) page(buf []string, pos int) int { // {{{
+func (nfs *NFS) page(buf []string, pos int, top int, height int) int { // {{{
 	nfs.escape("2J", "H")
 	begin := pos
 
-	for i := 0; i < nfs.height; i++ {
+	for i := 0; i < height; i++ {
 		if pos < len(buf) && pos >= 0 {
 			if len(buf[pos]) > nfs.width {
 				nfs.color(fmt.Sprintf("%s", buf[pos][:nfs.width]))
@@ -151,13 +152,13 @@ func (nfs *NFS) page(buf []string, pos int) int { // {{{
 }
 
 // }}}
-func (nfs *NFS) View() { // {{{
-	pos := len(nfs.pages) - nfs.height
+func (nfs *NFS) View(buf []string, top int, height int) { // {{{
+	pos := len(buf) - height
 	if pos < 0 {
 		pos = 0
 	}
 
-	nfs.page(nfs.pages, pos)
+	nfs.page(buf, pos, top, height)
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
@@ -167,15 +168,15 @@ func (nfs *NFS) View() { // {{{
 			default:
 				switch ev.Ch {
 				case 'f':
-					if pos+nfs.height < len(nfs.pages) {
-						pos += nfs.height - 1
+					if pos+height < len(buf) {
+						pos += height - 1
 					}
 				case 'b':
-					if pos -= nfs.height - 1; pos < 0 {
+					if pos -= height - 1; pos < 0 {
 						pos = 0
 					}
 				case 'j':
-					if pos+1 < len(nfs.pages) {
+					if pos+1 < len(buf) {
 						pos += 1
 					}
 				case 'k':
@@ -185,7 +186,7 @@ func (nfs *NFS) View() { // {{{
 				case 'q':
 					return
 				}
-				nfs.page(nfs.pages, pos)
+				nfs.page(buf, pos, top, height)
 			}
 		}
 	}
@@ -218,20 +219,18 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				os.Exit(1)
 
 			case termbox.KeyCtrlV:
-				nfs.View()
-				nfs.page(nfs.pages, len(nfs.pages)-nfs.height)
+				nfs.View(nfs.pages, 0, nfs.height)
+				nfs.page(nfs.pages, len(nfs.pages)-nfs.height, 0, nfs.height)
 
 			case termbox.KeyCtrlL:
 				nfs.escape("2J", "H")
 
 			case termbox.KeyCtrlJ, termbox.KeyCtrlM:
-				tab = tab[:0]
-
 				buf = append(buf, rest...)
 				buf = append(buf, '\n')
 				nfs.print("\n")
 
-				b := []byte(string(buf[:len(buf)]))
+				b := []byte(string(buf))
 				n = len(b)
 				copy(p, b)
 				return
@@ -284,6 +283,25 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				buf = append(buf, rest[0])
 				rest = rest[1:]
 
+			case termbox.KeyCtrlW:
+				if len(buf) > 0 {
+					c := buf[len(buf)-1]
+					for len(buf) > 0 && unicode.IsSpace(c) && unicode.IsSpace(buf[len(buf)-1]) {
+						buf = buf[:len(buf)-1]
+					}
+
+					for len(buf) > 0 && unicode.IsPunct(c) && unicode.IsPunct(buf[len(buf)-1]) {
+						buf = buf[:len(buf)-1]
+					}
+
+					for len(buf) > 0 && unicode.IsLetter(c) && unicode.IsLetter(buf[len(buf)-1]) {
+						buf = buf[:len(buf)-1]
+					}
+
+					for len(buf) > 0 && unicode.IsDigit(c) && unicode.IsDigit(buf[len(buf)-1]) {
+						buf = buf[:len(buf)-1]
+					}
+				}
 			case termbox.KeyCtrlH:
 				if len(buf) == 0 {
 					continue
@@ -315,6 +333,11 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 
 			case termbox.KeyCtrlY:
 				buf = append(buf, back...)
+
+			case termbox.KeyCtrlT:
+				if l := len(buf); l > 1 {
+					buf[l-1], buf[l-2] = buf[l-2], buf[l-1]
+				}
 
 			case termbox.KeyCtrlI:
 				if len(tab) == 0 {
