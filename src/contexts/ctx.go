@@ -274,6 +274,19 @@ func (c *Context) Has(key ...string) bool { // {{{
 
 // }}}
 
+type Session struct {
+}
+
+type Callback struct {
+	ncall int
+	hand  func(msg *Message) (sub *Message)
+}
+
+type Feedback struct {
+	nfeed int
+	hand  func(msg *Message) (sub *Message)
+}
+
 type Message struct {
 	time time.Time
 	code int
@@ -294,8 +307,7 @@ type Message struct {
 	target *Context
 	Index  int
 
-	ncallback int
-	callback  func(msg *Message) (sub *Message)
+	callback Callback
 
 	Template *Message
 }
@@ -817,6 +829,11 @@ func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 }
 
 // }}}
+func (m *Message) Color(color int, str string, arg ...interface{}) *Message { // {{{
+	return m.Add("result", fmt.Sprintf("\033[%dm%s\033[0m", color, fmt.Sprintf(str, arg...)))
+}
+
+// }}}
 func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {{{
 	switch meta {
 	case "detail", "result":
@@ -1125,7 +1142,7 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 
 // }}}
 func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
-	m.callback = cb
+	m.callback.hand = cb
 	m.Wait = nil
 	m.Cmd(arg...)
 	return m
@@ -1133,17 +1150,16 @@ func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{})
 
 // }}}
 func (m *Message) Back(msg *Message) *Message { // {{{
-	if msg == nil || m.callback == nil {
+	if msg == nil || m.callback.hand == nil {
 		return m
 	}
 
 	m.Log("callback", nil, "%v %v", msg.Meta["result"], msg.Meta["append"])
 
-	if sub := m.callback(msg); sub != nil && m.message != nil && m.message != m {
-		m.Log("fuck", nil, "31")
+	m.callback.ncall++
+	if sub := m.callback.hand(msg); sub != nil && m.message != nil && m.message != m {
 		m.message.Back(sub)
 	}
-	m.Log("fuck", nil, "41")
 
 	return m
 }
@@ -1365,21 +1381,35 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			if len(arg) == 0 {
+			if len(arg) == 0 { // {{{
 				m.Echo("^_^  Welcome to context world  ^_^\n")
+				m.Echo("\n")
 				m.Echo("Context is to be a distributed operating system, try to simple everything in work and life. ")
 				m.Echo("In context you will find all kinds of tools, and you can also make new tool in a quick and easy way.\n")
 				m.Echo("Here is just a simple introduce, you can look github.com/shylinux/context/README.md for more information.\n")
-				m.Echo("0. example\n")
-				m.Echo("1. context\n")
-				m.Echo("2. message\n")
+				m.Echo("\n")
+				m.Color(31, "       c\n")
+				m.Color(33, "     sh go\n")
+				m.Color(32, "   vi").Color(33, " php").Color(31, " js\n")
+				m.Echo(" ARM Linux HTTP\n")
+				m.Echo("\n")
+
+				m.Color(31, "Content ").Color(32, "Message\n")
+				m.Color(32, "ctx ").Color(33, "cli ").Color(31, "aaa ").Color(33, "web\n")
+				m.Color(32, "lex ").Color(33, "yac ").Color(31, "log ").Color(33, "gdb\n")
+				m.Color(32, "tcp ").Color(33, "nfs ").Color(31, "ssh ").Color(33, "mdb\n")
+				m.Echo("\n")
+
+				m.Color(31, " edukid ").Color(32, "etcvpn\n")
 				return
 			}
+
 			switch arg[0] {
 			case "example":
 			case "context":
 			case "message":
 			}
+			// }}}
 		}},
 		"server": &Command{Name: "server [start|exit|switch][args]", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			switch len(arg) { // {{{
@@ -1449,8 +1479,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							m.Echo("  %s: %v\n", k, ms[i].Meta[k])
 						}
 
-						if ms[i].callback != nil {
-							m.Echo("callback: %d\n", ms[i].ncallback)
+						if ms[i].callback.hand != nil {
+							m.Echo("callback: %d\n", ms[i].callback.ncall)
 						}
 
 						if len(ms[i].Meta["result"]) > 0 {
@@ -1473,28 +1503,154 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 					ms = append(ms, ms[i].messages...)
 				}
-			case 2, 3:
-				index := 0
-				if len(arg) == 3 {
-					n, e := strconv.Atoi(arg[2])
-					m.Assert(e)
-					index = n
-				}
-
+			default:
 				n, e := strconv.Atoi(arg[0])
 				m.Assert(e)
 
 				ms := []*Message{m.root}
 				for i := 0; i < len(ms); i++ {
 					if ms[i].code == n {
-						if meta, ok := ms[i].Meta[arg[1]]; ok {
-							m.Echo(meta[index])
+						switch arg[1] {
+						case "option", "session", "callback", "feedback":
+							m.Echo("get")
+							msg := ms[i].Spawn(ms[i].target)
+							msg.Cmd(arg[1:])
+							m.Copy(msg, "result")
+							return
+						default:
+							index := 0
+							if len(arg) >= 3 {
+								n, e := strconv.Atoi(arg[2])
+								m.Assert(e)
+								index = n
+							}
+
+							if meta, ok := ms[i].Meta[arg[1]]; ok {
+								m.Echo(meta[index])
+							}
 						}
+
 					}
 					ms = append(ms, ms[i].messages...)
 				}
 			}
 
+			// }}}
+		}},
+		"option": &Command{Name: "option", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			for msg := m; msg != nil; msg = msg.message { // {{{
+				if len(arg) == 0 {
+					m.Echo("msg(%s->%s): %d(%s) %v\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"), msg.Meta["detail"])
+				}
+				for _, k := range msg.Meta["option"] {
+					for _, v := range msg.Meta[k] {
+						if len(arg) == 0 {
+							m.Echo("  %s: %v\n", k, v)
+						} else if k == arg[0] {
+							if len(arg) > 1 {
+								msg.Option(k, arg[1])
+							}
+							m.Echo("msg(%s->%s): %d(%s)\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"))
+							m.Echo("  %s: %v\n", k, v)
+						}
+					}
+				}
+			}
+			// }}}
+		}},
+		"session": &Command{Name: "session", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			for msg := m; msg != nil; msg = msg.message { // {{{
+				if len(arg) == 0 {
+					m.Echo("msg(%s->%s): %d(%s) %v\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"), msg.Meta["detail"])
+				}
+				for k, v := range msg.target.Sessions {
+					if len(arg) == 0 {
+						m.Echo("  %s(%s->%s): %d(%s)\n", k, v.source.Name, v.target.Name, msg.code, msg.time.Format("15:04:05"))
+					} else if k == arg[0] {
+						switch arg[1] {
+						case "cache":
+							sub := msg.Sess(k)
+							sub.Cmd("cache", arg[2:])
+							m.Copy(sub, "result")
+							return
+						case "config":
+							sub := msg.Sess(k)
+							sub.Cmd("config", arg[2:])
+							m.Copy(sub, "result")
+							return
+						case "command":
+							sub := msg.Sess(k)
+							sub.Cmd("command", arg[2:])
+							m.Copy(sub, "result")
+							return
+						default:
+							msg.target.Sessions[arg[0]] = msg.Find(arg[1])
+						}
+						m.Echo("msg(%s->%s): %d(%s)\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"))
+						m.Echo("  %s(%s->%s): %d(%s)\n", k, v.source.Name, v.target.Name, msg.code, msg.time.Format("15:04:05"))
+					}
+				}
+			}
+			// }}}
+		}},
+		"callback": &Command{Name: "callback", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			for msg := m; msg != nil; msg = msg.message { // {{{
+				if len(arg) == 0 {
+					m.Echo("msg(%s->%s): %d(%s) %v\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"), msg.Meta["detail"])
+					m.Echo("  ncall: %d\n", msg.callback.ncall)
+					m.Echo("  hand: %v\n", msg.callback.hand)
+				} else {
+					switch arg[0] {
+					case "del":
+						msg.message.callback.hand = nil
+					case "add":
+						msg.message.callback.hand = func(msg *Message) *Message {
+							msg.Log("fuck", nil, "default")
+							return msg
+						}
+						return
+					default:
+						m.Result(0, arg)
+						msg.message.Back(m)
+						return
+					}
+				}
+			}
+			// }}}
+		}},
+		"feedback": &Command{Name: "feedback", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			for msg := m; msg != nil; msg = msg.message { // {{{
+				if len(arg) == 0 {
+					m.Echo("msg(%s->%s): %d(%s)\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"))
+				}
+				for k, v := range msg.target.Sessions {
+					if len(arg) == 0 {
+						m.Echo("  %s(%s->%s): %d(%s)\n", k, v.source.Name, v.target.Name, msg.code, msg.time.Format("15:04:05"))
+					} else if k == arg[0] {
+						switch arg[1] {
+						case "cache":
+							sub := msg.Sess(k)
+							sub.Cmd("cache", arg[2:])
+							m.Copy(sub, "result")
+							return
+						case "config":
+							sub := msg.Sess(k)
+							sub.Cmd("config", arg[2:])
+							m.Copy(sub, "result")
+							return
+						case "command":
+							sub := msg.Sess(k)
+							sub.Cmd("command", arg[2:])
+							m.Copy(sub, "result")
+							return
+						default:
+							msg.target.Sessions[arg[0]] = msg.Find(arg[1])
+						}
+						m.Echo("msg(%s->%s): %d(%s)\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"))
+						m.Echo("  %s(%s->%s): %d(%s)\n", k, v.source.Name, v.target.Name, msg.code, msg.time.Format("15:04:05"))
+					}
+				}
+			}
 			// }}}
 		}},
 		"context": &Command{Name: "context back|[[home] [find|search] name] [info|list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
@@ -1974,6 +2130,11 @@ func Start(args ...string) {
 
 	Pulse.Options("log", true)
 	Pulse.Sess("log", "log").Conf("bench.log", Pulse.Conf("bench.log"))
+	Pulse.Sess("cli", "cli")
+	Pulse.callback.hand = func(msg *Message) *Message {
+		msg.Log("fuck", nil, "%v", msg.Meta["result"])
+		return nil
+	}
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {
 		m.Set("detail", Pulse.Conf("init.shy")).Set("option", "stdio").target.Start(m)
