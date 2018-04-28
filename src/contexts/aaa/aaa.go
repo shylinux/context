@@ -161,8 +161,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Target(msg.Target())
 				}
 
+				msg.Target().Sessions["aaa"] = msg
+
 				msg.Cap("password", password)
-				m.Source().Group, m.Source().Owner = msg.Cap("group"), msg.Target()
+				m.Source().Sessions["aaa"] = msg
+				// m.Source().Group, m.Source().Owner = msg.Cap("group"), msg.Target()
 				aaa.sessions[m.Cap("sessid")] = msg.Target()
 				m.Echo(msg.Cap("sessid"))
 			} // }}}

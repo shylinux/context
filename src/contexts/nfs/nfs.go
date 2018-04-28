@@ -425,6 +425,8 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
+	m.Target().Sessions["nfs"] = m
+
 	nfs.Message = m
 	if socket, ok := m.Data["io"]; ok {
 		nfs.io = socket.(io.ReadWriteCloser)
@@ -547,7 +549,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 	cli := m.Reply()
 	nfs.cli = cli
-	yac := m.Find(cli.Conf("yac"))
+	yac := m.Sess("yac", cli.Conf("yac"))
 	bio := bufio.NewScanner(nfs)
 
 	if m.Cap("stream") == "stdio" {
@@ -585,6 +587,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		for ; pos < m.Capi("nline"); pos++ {
 
 			for text = nfs.buf[pos] + "\n"; text != ""; {
+
 				line := m.Spawn(yac.Target())
 				line.Optioni("pos", pos)
 				line.Options("stdio", true)
