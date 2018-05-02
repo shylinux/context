@@ -429,6 +429,9 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 	nfs.Message = m
 	if socket, ok := m.Data["io"]; ok {
+		m.Cap("stream", m.Source().Name)
+		// m.Sesss("aaa", "aaa").Cmd("login", "demo", "demo")
+
 		nfs.io = socket.(io.ReadWriteCloser)
 		nfs.Reader = bufio.NewReader(nfs.io)
 		nfs.Writer = bufio.NewWriter(nfs.io)
@@ -463,6 +466,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 
 			if msg.Has("detail") {
+				msg.Target(m.Sessions["ssh"].Target())
 				msg.Log("info", nil, "%d recv", m.Capi("nrecv", 1))
 				msg.Log("info", nil, "detail: %v", msg.Meta["detail"])
 				msg.Log("info", nil, "option: %v", msg.Meta["option"])
@@ -472,27 +476,24 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 					cmd := msg
 					cmd.Call(func(sub *ctx.Message) *ctx.Message {
 						for _, v := range sub.Meta["result"] {
-							n, e := fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
+							_, e := fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
 							sub.Assert(e)
-							sub.Log("fuck", nil, "write %d", n)
 						}
 
 						sub.Append("nsend", sub.Option("nsend"))
 						for _, k := range sub.Meta["append"] {
 							for _, v := range sub.Meta[k] {
-								n, e := fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+								_, e := fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
 								sub.Assert(e)
-								sub.Log("fuck", nil, "write %d", n)
 							}
 						}
 
-						sub.Log("info", nil, "%d send", sub.Optioni("nsend"))
+						sub.Log("info", nil, "%d recv", sub.Optioni("nsend"))
 						sub.Log("info", nil, "result: %v", sub.Meta["result"])
 						sub.Log("info", nil, "append: %v", sub.Meta["append"])
 
-						n, e := fmt.Fprintf(nfs.Writer, "\n")
+						_, e := fmt.Fprintf(nfs.Writer, "\n")
 						sub.Assert(e)
-						sub.Log("sub", nil, "write %d", n)
 						e = nfs.Writer.Flush()
 						sub.Assert(e)
 
@@ -549,7 +550,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 	cli := m.Reply()
 	nfs.cli = cli
-	yac := m.Sess("yac", cli.Conf("yac"))
+	yac := m.Sesss("yac", cli.Conf("yac"))
 	bio := bufio.NewScanner(nfs)
 
 	if m.Cap("stream") == "stdio" {
@@ -690,31 +691,27 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Find("tcp") // {{{
-			msg.Call(func(com *ctx.Message) *ctx.Message {
-				sub := com.Spawn(m.Target())
-				sub.Put("option", "target", m.Source())
-				sub.Put("option", "io", com.Data["io"])
-				sub.Cmd(com.Meta["detail"])
-				sub.Cap("stream", com.Target().Name)
-				return sub
-			}, m.Meta["detail"])
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
+				m.Find("tcp").Call(func(com *ctx.Message) *ctx.Message {
+					sub := com.Spawn(m.Target())
+					sub.Put("option", "target", m.Source())
+					sub.Put("option", "io", com.Data["io"])
+					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件")
+					return sub
+				}, m.Meta["detail"])
+			}
 			// }}}
 		}},
-		"accept": &ctx.Command{Name: "accept args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件")
-		}},
 		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Sess("com", "tcp") // {{{
-			msg.CallBack(func(com *ctx.Message) *ctx.Message {
-				sub := com.Spawn(m.Target())
-				sub.Put("option", "target", m.Source())
-				sub.Put("option", "io", com.Data["io"])
-				sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件")
-				sub.Cap("stream", com.Target().Name)
-				m.Target(sub.Target())
-				return sub
-			}, m.Meta["detail"])
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
+				m.Find("tcp").Call(func(com *ctx.Message) *ctx.Message {
+					sub := com.Spawn(m.Target())
+					sub.Put("option", "target", m.Source())
+					sub.Put("option", "io", com.Data["io"])
+					sub.Start(fmt.Sprintf("file%d", Pulse.Capi("nfile", 1)), "打开文件")
+					return sub
+				}, m.Meta["detail"])
+			}
 			// }}}
 		}},
 		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -933,6 +930,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				"save":  &ctx.Command{},
 				"load":  &ctx.Command{},
 				"genqr": &ctx.Command{},
+				"write": &ctx.Command{},
 			},
 		},
 	},

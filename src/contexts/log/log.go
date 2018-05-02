@@ -169,15 +169,30 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 					}
 				}
 
+				cmd := strings.Join(arg[1:], "")
+
 				if nfs := m.Sess("nfs"); nfs != nil {
 					if nfs.Options("log", false); color > 0 {
-						nfs.Cmd("write", fmt.Sprintf("%s\033[%dm%s%s %s\033[0m\n", date, color, code, action, strings.Join(arg[1:], "")))
+						nfs.Cmd("write", fmt.Sprintf("%s\033[%dm%s%s %s\033[0m\n", date, color, code, action, cmd))
 					} else {
-						nfs.Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, strings.Join(arg[1:], "")))
+						nfs.Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, cmd))
 					}
 				}
 			} // }}}
 		}},
+	},
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{Name: "void", Help: "void",
+			Configs: map[string]*ctx.Config{
+				"flag_code":   &ctx.Config{},
+				"flag_action": &ctx.Config{},
+				"flag_name":   &ctx.Config{},
+				"flag_color":  &ctx.Config{},
+				"flag_time":   &ctx.Config{},
+				"flag_date":   &ctx.Config{},
+			},
+			Commands: map[string]*ctx.Command{"log": &ctx.Command{}},
+		},
 	},
 }
 
@@ -187,21 +202,23 @@ func init() {
 	ctx.Index.Register(Index, log)
 
 	log.color = map[string]int{
-		"error":    31,
-		"check":    31,
-		"cmd":      32,
-		"conf":     33,
-		"search":   35,
-		"find":     35,
-		"callback": 35,
-		"lock":     35,
-		"spawn":    35,
-		"begin":    36,
-		"start":    36,
-		"close":    36,
-		"debug":    0,
+		"error":  31,
+		"check":  31,
+		"cmd":    32,
+		"conf":   33,
+		"search": 35,
+		"find":   35,
+		"cb":     35,
+		"lock":   35,
+		"spawn":  35,
+		"begin":  36,
+		"start":  36,
+		"close":  36,
+		"debug":  0,
 	}
-	log.slient = map[string]bool{}
+	log.slient = map[string]bool{
+		"lock": true,
+	}
 	log.module = map[string]map[string]bool{
 		"log": {"cmd": true},
 		"lex": {"cmd": true, "debug": true},

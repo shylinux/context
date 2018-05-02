@@ -373,6 +373,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				m.Assert(ok)
 
 				if cli, ok := m.Data["cli"].(*ctx.Context); m.Assert(ok) {
+					m.Sessions["cli"] = m.Spawn(cli)
 					cli, rest, word := yac.parse(m, cli, page, void, strings.Join(arg[2:], " "))
 					m.Data["cli"] = cli
 					m.Result(0, rest, word)
@@ -430,6 +431,11 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 			// }}}
 		}},
+	},
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{Name: "void", Help: "void",
+			Commands: map[string]*ctx.Command{"parse": &ctx.Command{}},
+		},
 	},
 }
 

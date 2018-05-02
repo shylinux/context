@@ -228,8 +228,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 				m.Cap("init.shy", arg[0])
 			}
 
-			// m.Sess("nfs", "nfs")
-			cli.nfs = m.Find("nfs")
+			cli.nfs = m.Sesss("nfs", "nfs")
 			// m.Target().Sessions["nfs"] = cli.nfs
 			if m.Has("stdio") {
 				cli.nfs.Cmd("scan", m.Cap("stream", "stdio"), m.Spawn(m.Target()).Cmd("source", m.Cap("init.shy")).Get("result"))
@@ -581,14 +580,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"cmd": &ctx.Command{Name: "cmd word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
-				msg := m.Spawn(cli.target)
+				detail := []string{}
+
 				if a, ok := cli.alias[arg[0]]; ok {
-					msg.Set("detail", a...)
-					msg.Meta["detail"] = append(msg.Meta["detail"], arg[1:]...)
+					detail = append(detail, a...)
+					detail = append(detail, arg[1:]...)
 				} else {
-					msg.Set("detail", arg...)
+					detail = append(detail, arg...)
 				}
-				msg.Cmd()
+
+				msg := m.Spawn(cli.target)
+				msg.Cmd(detail)
+				if msg.Target().Context() != nil || msg.Target() == ctx.Index {
+					cli.target = msg.Target()
+				}
 
 				if !msg.Hand && cli.Owner == ctx.Index.Owner {
 					msg.Hand = true
@@ -614,10 +619,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 							msg.Echo(string(out))
 						}
 					}
-				}
-
-				if msg.Target().Context() != nil || msg.Target() == ctx.Index {
-					cli.target = msg.Target()
 				}
 
 				m.Cap("target", cli.target.Name)
@@ -744,6 +745,19 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Echo("%d\n", i)
 			}
 		}},
+	},
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{Name: "void",
+			Caches: map[string]*ctx.Cache{
+				"nserver": &ctx.Cache{},
+			},
+			Configs: map[string]*ctx.Config{
+				"bench.log": &ctx.Config{},
+			},
+			Commands: map[string]*ctx.Command{
+				"cmd": &ctx.Command{},
+			},
+		},
 	},
 }
 

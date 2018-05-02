@@ -436,6 +436,11 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 			}
 		}},
 	},
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{Name: "void", Help: "void",
+			Commands: map[string]*ctx.Command{"parse": &ctx.Command{}},
+		},
+	},
 }
 
 func init() {

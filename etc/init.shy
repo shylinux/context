@@ -1,6 +1,5 @@
+login root root
 config debug on
-~aaa login root root
-
-~web serve ./ ":9090"
-# source etc/local.shy
+~ssh
+	listen ":9090"
 

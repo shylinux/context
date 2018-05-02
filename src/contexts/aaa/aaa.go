@@ -27,6 +27,7 @@ import ( // {{{
 // }}}
 
 type AAA struct {
+	share    map[string]*ctx.Context
 	sessions map[string]*ctx.Context
 	*ctx.Context
 }
@@ -42,6 +43,14 @@ func (aaa *AAA) Session(meta string) string { // {{{
 func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
+
+	c.Index = map[string]*ctx.Context{
+		"void": &ctx.Context{Name: "void", Help: "void",
+			Caches:   map[string]*ctx.Cache{"group": &ctx.Cache{}},
+			Configs:  map[string]*ctx.Config{"rootname": &ctx.Config{}},
+			Commands: map[string]*ctx.Command{"login": &ctx.Command{}},
+		},
+	}
 
 	s := new(AAA)
 	s.Context = c
@@ -90,7 +99,6 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Cap("sessid", aaa.Session(arg[1]))
 		Pulse.Capi("nuser", 1)
 		aaa.Owner = aaa.Context
-		aaa.Group = arg[0]
 	}
 
 	m.Log("info", m.Source(), "%s login %s %s", Pulse.Cap("nuser"), m.Cap("group"), m.Cap("username"))
@@ -141,7 +149,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				m.Target(s)
 				m.Assert(int64(m.Capi("expire")) > time.Now().Unix(), "会话失败")
 
-				m.Source().Group, m.Source().Owner = m.Cap("group"), m.Target()
 				m.Log("info", m.Source(), "logon %s %s", m.Cap("username"), m.Cap("group"))
 				m.Echo(m.Cap("username"))
 			case 2, 3:
@@ -153,6 +160,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				msg := m
 				if username == Pulse.Conf("rootname") {
 					msg = Pulse.Spawn(Pulse.Target())
+					ctx.Index.Sessions["aaa"] = msg
 					msg.Set("detail", group, username).Target().Start(msg)
 				} else if msg = Pulse.Find(username, false); msg == nil {
 					m.Start(username, "认证用户", group, username)
@@ -164,11 +172,31 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				msg.Target().Sessions["aaa"] = msg
 
 				msg.Cap("password", password)
-				m.Source().Sessions["aaa"] = msg
-				// m.Source().Group, m.Source().Owner = msg.Cap("group"), msg.Target()
+
+				m.Login(msg)
 				aaa.sessions[m.Cap("sessid")] = msg.Target()
 				m.Echo(msg.Cap("sessid"))
 			} // }}}
+		}},
+		"share": &ctx.Command{Name: "share user", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) == 0 { // {{{
+				aaa := m.Target().Server.(*AAA)
+				for k, v := range aaa.share {
+					m.Echo("%s: %s", k, v.Name)
+				}
+				return
+			}
+
+			group := m.Sess("aaa").Cap("group")
+			m.Travel(c, func(msg *ctx.Message) bool {
+				aaa := msg.Target().Server.(*AAA)
+				if aaa.share == nil {
+					aaa.share = make(map[string]*ctx.Context)
+				}
+				aaa.share[group] = m.Target()
+				return true
+			})
+			// }}}
 		}},
 		"md5": &ctx.Command{Name: "md5 [file filename][content]", Help: "散列",
 			Formats: map[string]int{"file": 1},
@@ -334,7 +362,14 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}},
 	},
 	Index: map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void", Commands: map[string]*ctx.Command{"login": &ctx.Command{}}},
+		"void": &ctx.Context{Name: "void", Help: "void",
+			Caches:  map[string]*ctx.Cache{"group": &ctx.Cache{}},
+			Configs: map[string]*ctx.Config{"rootname": &ctx.Config{}},
+			Commands: map[string]*ctx.Command{
+				"login": &ctx.Command{},
+				"check": &ctx.Command{},
+			},
+		},
 	},
 }
 
