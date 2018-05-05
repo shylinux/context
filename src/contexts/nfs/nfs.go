@@ -426,27 +426,36 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 // }}}
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	m.Target().Sessions["nfs"] = m
+	m.Sessions["nfs"] = m
 
 	nfs.Message = m
 	if socket, ok := m.Data["io"]; ok {
 		m.Cap("stream", m.Source().Name)
 		// m.Sesss("aaa", "aaa").Cmd("login", "demo", "demo")
+		m.Options("stdio", false)
 
 		nfs.io = socket.(io.ReadWriteCloser)
 		nfs.Reader = bufio.NewReader(nfs.io)
 		nfs.Writer = bufio.NewWriter(nfs.io)
+
 		nfs.send = make(map[int]*ctx.Message)
 		nfs.target = m.Target()
 		if target, ok := m.Data["target"]; ok {
 			nfs.target = target.(*ctx.Context)
 		}
 
-		msg := m.Spawn(nfs.target)
-		nfs.Caches["target"] = &ctx.Cache{Name: "target", Value: nfs.target.Name, Help: "文件名"}
+		var msg *ctx.Message
+
+		nfs.Caches["target"] = &ctx.Cache{Name: "target", Value: "", Help: "文件名"}
 
 		for {
 			line, e := nfs.Reader.ReadString('\n')
 			m.Assert(e)
+
+			if msg == nil {
+				msg = m.Sesss("ssh")
+				m.Cap("target", msg.Target().Name)
+			}
 
 			if line = strings.TrimSpace(line); len(line) > 0 {
 				ls := strings.SplitN(line, ":", 2)
@@ -466,7 +475,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 
 			if msg.Has("detail") {
-				msg.Target(m.Sessions["ssh"].Target())
 				msg.Log("info", nil, "%d recv", m.Capi("nrecv", 1))
 				msg.Log("info", nil, "detail: %v", msg.Meta["detail"])
 				msg.Log("info", nil, "option: %v", msg.Meta["option"])
@@ -530,8 +538,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				send.Back(send)
 			}
 
-			msg = m.Spawn(nfs.target)
-			m.Cap("target", nfs.target.Name)
+			msg = nil
 		}
 		return true
 	}

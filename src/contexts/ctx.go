@@ -199,6 +199,16 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
 	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
 
+	item := []string{}
+	m.BackTrace(func(m *Message) bool {
+		item = append(item, m.target.Name)
+		return true
+	})
+	for i := 0; i < len(item)/2; i++ {
+		item[i], item[len(item)-i-1] = item[len(item)-i-1], item[i]
+	}
+	c.Caches["route"] = &Cache{Name: "服务数据", Value: strings.Join(item, "."), Help: "服务数据"}
+
 	m.Index = 1
 	c.Pulse = m
 	c.Requests = []*Message{m}
@@ -916,13 +926,24 @@ func (m *Message) Back(msg *Message) *Message { // {{{
 }
 
 // }}}
-func (m *Message) CallBack(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
+func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
+	if !sync {
+		m.Call(cb, arg...)
+		return m
+	}
+
 	wait := make(chan bool)
+
 	go m.Call(func(sub *Message) *Message {
+		m.Log("lock", nil, "before done %v", arg)
 		wait <- true
+		m.Log("lock", nil, "after done %v", arg)
 		return cb(sub)
 	}, arg...)
+
+	m.Log("lock", nil, "before wait %v", arg)
 	<-wait
+	m.Log("lock", nil, "after wait %v", arg)
 	return m
 }
 
@@ -1790,8 +1811,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 			// }}}
 		}},
-		"context": &Command{Name: "context back|[[home] [find|search] name] [info|list|show|spawn|start|switch|close][args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "list": 0, "show": 0, "close": 0, "switch": 0, "start": 0, "spawn": 0},
+		"context": &Command{Name: "context back|[[home] [find|search] name] [info|list|show|switch|[args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
+			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "list": 0, "show": 0, "switch": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if m.Has("back") { // {{{
 					m.target = m.source
@@ -1826,14 +1847,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					switch {
 					case m.Has("switch"), m.Has("back"):
 						m.target = v.target
-					case m.Has("spawn"):
-						v.Set("detail", arg[2:]...).target.Spawn(v, arg[0], arg[1]).Begin(v)
-						m.target = v.target
-					case m.Has("start"):
-						v.Set("detail", arg...).target.Start(v)
-						m.target = v.target
-					case m.Has("close"):
-						v.target.Close(v)
 					case m.Has("show"):
 						m.Echo("%s(%s): %s\n", v.target.Name, v.target.Owner.Name, v.target.Help)
 						if len(v.target.Requests) > 0 {
@@ -1855,6 +1868,19 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						switch m.Get("info") {
 						case "name":
 							m.Echo("%s", v.target.Name)
+						case "path":
+							path := []string{}
+							m.BackTrace(func(m *Message) bool {
+								path = append(path, m.target.Name)
+								return true
+							})
+
+							list := []string{}
+							for i := len(path) - 1; i >= 0; i-- {
+								list = append(list, path[i])
+							}
+
+							m.Echo("%s", strings.Join(list, "."))
 						case "owner":
 							m.Echo("%s", v.target.Owner.Name)
 						default:
