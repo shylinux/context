@@ -482,13 +482,14 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 				func() {
 					cmd := msg
+					nsend := cmd.Option("nsend")
 					cmd.Call(func(sub *ctx.Message) *ctx.Message {
 						for _, v := range sub.Meta["result"] {
 							_, e := fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
 							sub.Assert(e)
 						}
 
-						sub.Append("nsend", sub.Option("nsend"))
+						sub.Append("nsend", nsend)
 						for _, k := range sub.Meta["append"] {
 							for _, v := range sub.Meta[k] {
 								_, e := fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)

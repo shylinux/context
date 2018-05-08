@@ -217,7 +217,7 @@ func init() {
 		"debug":  0,
 	}
 	log.slient = map[string]bool{
-		"lock": true,
+		// "lock": true,
 	}
 	log.module = map[string]map[string]bool{
 		"log": {"cmd": true},
