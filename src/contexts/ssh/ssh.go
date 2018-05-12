@@ -105,6 +105,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Sessions["ssh"] = sub
 					return sub
 				}, m.Meta["detail"])
+				m.Spawn(m.Target()).Cmd("save")
 			}
 			// }}}
 		}},
@@ -127,6 +128,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
 
+					if m.Option("domain") == m.Cap("domain") { //本地命令
+						msg := m.Spawn(m.Target())
+						msg.Cmd(arg)
+						m.Copy(msg, "result").Copy(msg, "append")
+						m.Back(m)
+						return
+					}
+
 					target := strings.Split(m.Option("domain"), ".")
 					name, rest := target[0], target[1:]
 					if name == m.Conf("domain") {
@@ -138,14 +147,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						}
 					}
 
-					if len(rest) == 0 && len(name) == 0 {
-						if m.Options("nsend") {
+					if len(rest) == 0 && len(name) == 0 { //点对点通信
+						if m.Options("nsend") { //接收命令
 							msg := m.Spawn(m.Target())
 							msg.Cmd(arg)
 							m.Back(msg)
-						} else {
+						} else { //发送命令
 							ssh.Message.Sesss("nfs").CallBack(m.Options("stdio"), func(host *ctx.Message) *ctx.Message {
-								m.Back(m.Copy(host, "result").Copy(host, "option"))
+								m.Back(m.Copy(host, "result").Copy(host, "append"))
 								return nil
 							}, "send", "send", arg)
 						}
@@ -153,7 +162,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 
 					miss := true
-					m.Travel(c, func(m *ctx.Message) bool {
+					m.Travel(c, func(m *ctx.Message) bool { //向下搜索
 						if ssh, ok := m.Target().Server.(*SSH); ok && m.Conf("domains") == name {
 							msg := m.Spawn(ssh.nfs)
 							msg.Option("domain", strings.Join(rest, "."))
@@ -166,7 +175,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						return miss
 					})
 
-					if miss {
+					if miss { //向上搜索
 						if ssh, ok := c.Server.(*SSH); m.Assert(ok) && ssh.nfs != nil {
 							msg := m.Spawn(ssh.nfs)
 							msg.Option("domain", m.Option("domain"))
@@ -194,18 +203,19 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Echo(m.Cap("domain", strings.Join(msg.Meta["result"], "")))
 						m.Back(msg)
 
-						nfs := m.Sesss("nfs")
-						nfs.Put("option", "data", map[string]string{"domain": m.Cap("domain")})
-						nfs.Cmd("json", m.Conf("domain.json"))
-
-						png := m.Sesss("nfs")
-						png.Cmd("genqr", m.Conf("domain.png"), m.Cap("domain"))
-
+						m.Spawn(m.Target()).Cmd("save")
 						return nil
 					}, "send", "pwd", arg[0])
 				}
 			}
 			// }}}
+		}},
+		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			json := m.Sesss("nfs")
+			json.Put("option", "data", map[string]string{"domain": m.Cap("domain")})
+			json.Cmd("json", m.Conf("domain.json"))
+
+			m.Sesss("nfs").Cmd("genqr", m.Conf("domain.png"), json.Result(0))
 		}},
 		"who": &ctx.Command{Name: "who", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			aaa := m.Sesss("aaa")
@@ -217,7 +227,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Append("share", m.Cap("share")) // {{{
 			m.Append("level", m.Cap("level"))
 			m.Append("type", m.Conf("type"))
-			m.Append("value", m.Cap("route"))
+			m.Append("value", m.Cap("domain"))
 			m.Append("kind", m.Conf("kind"))
 			m.Append("name", m.Conf("name"))
 			m.Append("mark", m.Conf("mark"))

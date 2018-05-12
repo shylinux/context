@@ -117,11 +117,11 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 
 func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
 	meta := map[string][]string{}
-	meta["result"] = msg.Meta["result"]
-	meta["append"] = msg.Meta["append"]
 	for _, v := range msg.Meta["append"] {
 		meta[v] = msg.Meta[v]
 	}
+	meta["result"] = msg.Meta["result"]
+	meta["append"] = msg.Meta["append"]
 
 	b, e := json.Marshal(meta)
 	msg.Assert(e)
@@ -160,8 +160,9 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 		msg.Log("cmd", nil, "%s [] %v", key, msg.Meta["option"])
 
 		msg.Put("option", "request", r).Put("option", "response", w)
-		if hand(msg, msg.Target(), key); len(msg.Meta["append"]) > 0 {
-			msg.Set("result", web.AppendJson(msg))
+		if hand(msg, msg.Target(), key); len(msg.Meta["append"]) > -1 {
+			w.Write([]byte(web.AppendJson(msg)))
+			return
 		}
 
 		for _, v := range msg.Meta["result"] {

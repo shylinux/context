@@ -935,10 +935,11 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 	wait := make(chan bool)
 
 	go m.Call(func(sub *Message) *Message {
+		msg := cb(sub)
 		m.Log("lock", nil, "before done %v", arg)
 		wait <- true
 		m.Log("lock", nil, "after done %v", arg)
-		return cb(sub)
+		return msg
 	}, arg...)
 
 	m.Log("lock", nil, "before wait %v", arg)
