@@ -366,14 +366,13 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			// }}}
 		}},
 		"parse": &ctx.Command{Name: "parse page void word...", Help: "解析语句, page: 语法集合, void: 空白语法集合, word: 语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
+			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok, "模块类型错误") { // {{{
 				page, ok := yac.page[arg[0]]
-				m.Assert(ok)
+				m.Assert(ok, "语法集合错误")
 				void, ok := yac.page[arg[1]]
-				m.Assert(ok)
+				m.Assert(ok, "词法集合错误")
 
-				if cli, ok := m.Data["cli"].(*ctx.Context); m.Assert(ok) {
-					m.Sessions["cli"] = m.Spawn(cli)
+				if cli, ok := m.Data["cli"].(*ctx.Context); m.Assert(ok, "执行模块错误") {
 					cli, rest, word := yac.parse(m, cli, page, void, strings.Join(arg[2:], " "))
 					m.Data["cli"] = cli
 					m.Result(0, rest, word)

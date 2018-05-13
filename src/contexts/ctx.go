@@ -871,22 +871,28 @@ func (m *Message) Sess(key string, arg ...string) *Message { // {{{
 }
 
 // }}}
-func (m *Message) Sesss(key string, arg ...string) *Message { // {{{
+func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
 	if _, ok := m.Sessions[key]; !ok && len(arg) > 0 {
+		switch msg := arg[0].(type) {
+		case *Message:
+			m.Sessions[key] = msg
+			return msg
+		}
+
 		root := true
 		if len(arg) > 2 {
-			root = Right(arg[2])
+			root = Right(arg[2].(string))
 		}
 		method := "find"
 		if len(arg) > 1 {
-			method = arg[1]
+			method = arg[1].(string)
 		}
 
 		switch method {
 		case "find":
-			m.Sessions[key] = m.Find(arg[0], root)
+			m.Sessions[key] = m.Find(arg[0].(string), root)
 		case "search":
-			m.Sessions[key] = m.Search(arg[0], root)[0]
+			m.Sessions[key] = m.Search(arg[0].(string), root)[0]
 		}
 		return m.Sessions[key]
 	}
@@ -1103,6 +1109,24 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {
 		}
 	}
 
+	return m
+}
+
+// }}}
+func (m *Message) Table(cb func(map[string]string) bool) *Message { // {{{
+	if len(m.Meta["append"]) > 0 {
+		for i := 0; i < len(m.Meta[m.Meta["append"][0]]); i++ {
+			row := map[string]string{}
+			for _, k := range m.Meta["append"] {
+				if i < len(m.Meta[k]) {
+					row[k] = m.Meta[k][i]
+				}
+			}
+			if !cb(row) {
+				break
+			}
+		}
+	}
 	return m
 }
 

@@ -1,5 +1,3 @@
+source etc/local.shy
 login root root
-config debug on
-~ssh
-	listen ":9090"
 

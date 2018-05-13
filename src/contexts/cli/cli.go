@@ -102,8 +102,8 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 				yac.Cmd("train", "num", "num", "mul{", "[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
 				yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
 
-				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "$", "[a-zA-Z0-9]+", "}")
-				yac.Cmd("train", "word", "word", "mul{", "~", "!", "tran", "str", "[a-zA-Z0-9_/.]+", "}")
+				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9]+", "}")
+				yac.Cmd("train", "word", "word", "mul{", "~", "!", "tran", "str", "[a-zA-Z0-9_/.:]+", "}")
 
 				yac.Cmd("train", "op1", "op1", "mul{", "$", "@", "}")
 				yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
@@ -196,6 +196,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
+	m.Sesss("cli", m)
 	cli.Caches["#"] = &ctx.Cache{Name: "参数个数", Value: fmt.Sprintf("%d", len(arg)), Help: "参数个数"}
 	for i, v := range arg {
 		cli.Caches[fmt.Sprintf("%d", i)] = &ctx.Cache{Name: "执行参数", Value: v, Help: "执行参数"}
@@ -229,7 +230,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 
 			cli.nfs = m.Sesss("nfs", "nfs")
-			// m.Target().Sessions["nfs"] = cli.nfs
 			if m.Has("stdio") {
 				cli.nfs.Cmd("scan", m.Cap("stream", "stdio"), m.Spawn(m.Target()).Cmd("source", m.Cap("init.shy")).Get("result"))
 			} else {

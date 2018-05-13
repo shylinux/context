@@ -2,6 +2,7 @@ package mdb // {{{
 // }}}
 import ( // {{{
 	"contexts"
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -28,7 +29,12 @@ func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"source": &ctx.Cache{Name: "数据库参数", Value: "", Help: "数据库参数"},
 		"driver": &ctx.Cache{Name: "数据库驱动", Value: "", Help: "数据库驱动"},
 	}
-	c.Configs = map[string]*ctx.Config{}
+	c.Configs = map[string]*ctx.Config{
+		"table": &ctx.Config{Name: "关系表", Value: "", Help: "关系表"},
+		"field": &ctx.Config{Name: "字段名", Value: "", Help: "字段名"},
+		"where": &ctx.Config{Name: "条件", Value: "", Help: "条件"},
+		"parse": &ctx.Config{Name: "解析", Value: "", Help: "解析"},
+	}
 
 	s := new(MDB)
 	s.Context = c
@@ -206,6 +212,50 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			}
 			// }}}
 		}},
+		"get": &ctx.Command{Name: "get [where str] [parse str] [table [field]]", Help: "执行查询语句",
+			Formats: map[string]int{"where": 1, "parse": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+
+				where := m.Conf("where")
+				if m.Options("where") {
+					where = m.Option("where")
+				}
+
+				parse := m.Conf("parse")
+				if m.Options("parse") {
+					parse = m.Option("parse")
+				}
+
+				table := m.Conf("table")
+				if len(arg) > 0 {
+					table = arg[0]
+				}
+
+				field := m.Conf("field")
+				if len(arg) > 1 {
+					field = arg[1]
+				}
+
+				rest := []string{}
+				if len(arg) > 2 {
+					rest = arg[2:]
+				}
+
+				msg := m.Spawn(m.Target())
+				msg.Cmd("query", fmt.Sprintf("select %s from %s where %s", field, table, where), rest)
+				m.Copy(msg, "result").Copy(msg, "append")
+				m.Table(func(row map[string]string) bool {
+					data := map[string]interface{}{}
+					switch parse {
+					case "json":
+						json.Unmarshal([]byte(row[field]), data)
+						m.Echo("%v", data)
+					default:
+						m.Echo("%v", row[field])
+					}
+					return false
+				})
+			}},
 		"list": &ctx.Command{Name: "list add table field [where condition]", Help: "执行查询语句",
 			Formats: map[string]int{"where": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
