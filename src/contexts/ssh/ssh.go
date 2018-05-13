@@ -5,7 +5,6 @@ import ( // {{{
 
 	"fmt"
 	"strings"
-	"time"
 )
 
 // }}}
@@ -111,12 +110,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		}},
 		"dial": &ctx.Command{Name: "dial address protocol", Help: "建立连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
-				m.Find("nfs").Call(func(file *ctx.Message) *ctx.Message {
+				m.Find("nfs").CallBack(true, func(file *ctx.Message) *ctx.Message {
 					sub := file.Spawn(m.Target())
 					sub.Target().Start(sub)
 					m.Sessions["ssh"] = sub
 
-					time.Sleep(time.Second)
 					sub.Spawn(sub.Target()).Cmd("pwd", m.Conf("domain"))
 					return sub
 				}, m.Meta["detail"])
@@ -193,7 +191,17 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Echo(m.Cap("domain"))
 			case 1:
 				if m.Options("nsend") {
-					m.Conf("domains", arg[0])
+					domain := arg[0]
+
+					m.Travel(c, func(m *ctx.Message) bool {
+						if m.Conf("domains") == domain {
+							domain = domain + m.Cap("nhost")
+							return false
+						}
+						return true
+					})
+					m.Conf("domains", domain)
+
 					m.Echo(m.Cap("domain"))
 					m.Echo(".")
 					m.Echo(m.Conf("domains"))
@@ -211,29 +219,87 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			// }}}
 		}},
 		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			json := m.Sesss("nfs")
+			json := m.Sesss("nfs") // {{{
 			json.Put("option", "data", map[string]string{"domain": m.Cap("domain")})
 			json.Cmd("json", m.Conf("domain.json"))
-
 			m.Sesss("nfs").Cmd("genqr", m.Conf("domain.png"), json.Result(0))
+			// }}}
 		}},
 		"who": &ctx.Command{Name: "who", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			aaa := m.Sesss("aaa")
+			aaa := m.Sesss("aaa") // {{{
 			if aaa != nil {
 				m.Echo(aaa.Cap("group"))
 			}
-		}},
-		"good": &ctx.Command{Name: "good", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Append("share", m.Cap("share")) // {{{
-			m.Append("level", m.Cap("level"))
-			m.Append("type", m.Conf("type"))
-			m.Append("value", m.Cap("domain"))
-			m.Append("kind", m.Conf("kind"))
-			m.Append("name", m.Conf("name"))
-			m.Append("mark", m.Conf("mark"))
-			m.Append("count", m.Cap("count"))
-			m.Back(m)
 			// }}}
+		}},
+		"good": &ctx.Command{Name: "good context|command|config|cache args", Help: "设备注册", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) {
+			if len(arg) == 0 { // {{{
+				m.Append("share", m.Cap("share"))
+				m.Append("level", m.Cap("level"))
+				m.Append("type", m.Conf("type"))
+				m.Append("value", m.Cap("domain"))
+				m.Append("kind", m.Conf("kind"))
+				m.Append("name", m.Cap("domain"))
+				m.Append("mark", m.Conf("mark"))
+				m.Append("count", m.Cap("count"))
+				m.Back(m)
+				return
+			}
+			cmds := m.Option("cmds")
+
+			if arg[0] == "context" {
+				if len(arg) > 1 {
+					cmds = arg[1]
+				}
+
+				m.Travel(ctx.Index, func(msg *ctx.Message) bool {
+					current := msg.Target()
+					if _, ok := current.Index[cmds]; ok {
+
+					} else if cmds != "" && cmds != "root" {
+						return true
+					}
+
+					m.Add("append", "name", current.Name)
+					m.Add("append", "help", current.Help)
+					return true
+				})
+				return
+			}
+
+			if len(arg) > 2 {
+				cmds = arg[2]
+			}
+			current := m.Sess(arg[1], arg[1], "search").Target()
+			if x, ok := current.Index[cmds]; ok {
+				current = x
+			} else if cmds != "" && cmds != "root" {
+				return
+			}
+
+			switch arg[0] {
+			case "command":
+
+				for k, x := range current.Commands {
+					m.Add("append", "key", k)
+					m.Add("append", "name", x.Name)
+					m.Add("append", "help", x.Help)
+				}
+			case "config":
+				for k, x := range current.Configs {
+					m.Add("append", "key", k)
+					m.Add("append", "name", x.Name)
+					m.Add("append", "value", x.Value)
+					m.Add("append", "help", x.Help)
+				}
+			case "cache":
+				for k, x := range current.Caches {
+					m.Add("append", "key", k)
+					m.Add("append", "name", x.Name)
+					m.Add("append", "value", x.Value)
+					m.Add("append", "help", x.Help)
+				}
+			} // }}}
 		}},
 	},
 }

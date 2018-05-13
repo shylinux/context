@@ -1,5 +1,6 @@
 login root root
-config debug on
+source etc/local.shy
 ~ssh
-	listen ":9090"
+	config domain ctx
+	dial "shylinux.com:9090"
 
