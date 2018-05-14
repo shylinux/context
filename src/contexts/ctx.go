@@ -1836,8 +1836,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 			// }}}
 		}},
-		"context": &Command{Name: "context back|[[home] [find|search] name] [info|list|show|switch|[args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "list": 0, "show": 0, "switch": 0},
+		"context": &Command{Name: "context back|[[home] [find|search] name] [info|lists|show|switch|[args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
+			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "lists": 0, "show": 0, "switch": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if m.Has("back") { // {{{
 					m.target = m.source
@@ -1911,7 +1911,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						default:
 							m.Echo("%s(%s): %s\n", v.target.Name, v.target.Owner.Name, v.target.Help)
 						}
-					case m.Has("list") || len(m.Meta["detail"]) == 1:
+					case m.Has("lists") || len(m.Meta["detail"]) == 1:
 						m.Travel(v.target, func(msg *Message) bool {
 							target := msg.target
 							m.Echo("%s(", target.Name)
@@ -1989,13 +1989,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 			// }}}
 		}},
-		"command": &Command{Name: "command [all] [key [name help]]", Help: "查看或修改命令",
+		"command": &Command{Name: "command [all] add [key [name help]]", Help: "查看或修改命令",
 			Formats: map[string]int{"all": 0, "delete": 0, "void": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
-
-				switch len(arg) {
-				case 0:
+				if len(arg) == 0 {
 					m.BackTrace(func(m *Message) bool {
 						if all {
 							m.Echo("%s comands:\n", m.target.Name)
@@ -2010,6 +2008,53 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 						return all
 					})
+					return
+				}
+				switch arg[0] {
+				case "add":
+					if m.target.Caches == nil {
+						m.target.Caches = map[string]*Cache{}
+					}
+
+					if m.target.Commands == nil {
+						m.target.Commands = map[string]*Command{}
+					}
+
+					if _, ok := m.target.Caches["part"]; !ok {
+						m.target.Caches["part"] = &Cache{Name: "part", Value: "0", Help: "part"}
+					}
+					m.target.Commands[m.Cap("part")] = &Command{
+						Name: strings.Join(arg[1:], " "), Help: "part", Hand: func(m *Message, c *Context, key string, args ...string) {
+							list := []string{}
+							j := 0
+							for i := 1; i < len(arg); i++ {
+								if arg[i] == "_" && j < len(args) {
+									list = append(list, args[j])
+									j++
+									continue
+								}
+								list = append(list, arg[i])
+							}
+							list = append(list, args[j:]...)
+
+							msg := m.Spawn(m.target).Cmd(list)
+							m.Copy(msg, "result").Copy(msg, "append")
+						},
+					}
+					m.Capi("part", 1)
+					return
+				case "list":
+					for i := 0; i < m.Capi("part"); i++ {
+
+						if c, ok := m.target.Commands[fmt.Sprintf("%d", i)]; ok {
+							m.Echo("%d: %s\n", i, c.Name)
+							return
+						}
+					}
+				}
+
+				switch len(arg) {
+				case 0:
 				case 1:
 					switch {
 					case m.Has("delete"):

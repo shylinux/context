@@ -98,9 +98,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"driver": &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
 	},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{Name: "open source [driver]", Help: "打开数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"open": &ctx.Command{Name: "open source [name]", Help: "打开数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Assert(len(arg) > 0, "缺少参数") // {{{
-			m.Start(fmt.Sprintf("db%d", Pulse.Capi("nsource", 1)), "数据存储", arg...)
+			name := fmt.Sprintf("db%d", Pulse.Capi("nsource", 1))
+			if len(arg) > 1 {
+				name = arg[1]
+			}
+			m.Start(name, "数据存储", arg...)
 			Pulse.Cap("stream", Pulse.Cap("nsource"))
 			m.Echo(m.Target().Name)
 			// }}}
@@ -256,6 +260,31 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					return false
 				})
 			}},
+		"show": &ctx.Command{Name: "show table field [where condition]", Help: "执行查询语句",
+			Formats: map[string]int{"where": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				msg := m.Spawn(m.Target())
+
+				fields := strings.Join(arg[1:], ",")
+				condition := ""
+				if m.Options("where") {
+					condition = fmt.Sprintf("where %s", m.Option("where"))
+				}
+
+				msg.Cmd("query", fmt.Sprintf("select %s from %s %s", fields, arg[0], condition))
+				m.Echo("%s %s\n", arg[0], condition)
+				for _, k := range msg.Meta["append"] {
+					m.Echo("%s\t", k)
+				}
+				m.Echo("\n")
+				for i := 0; i < len(msg.Meta[msg.Meta["append"][0]]); i++ {
+					for _, k := range msg.Meta["append"] {
+						m.Echo("%s\t", msg.Meta[k][i])
+					}
+					m.Echo("\n")
+				}
+			}},
+		// }}}
 		"list": &ctx.Command{Name: "list add table field [where condition]", Help: "执行查询语句",
 			Formats: map[string]int{"where": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

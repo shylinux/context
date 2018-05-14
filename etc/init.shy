@@ -1,5 +1,6 @@
 source etc/local.shy
 login root root
 ~ssh
-	dial "shylinux.com:9090"
+#dial "shylinux.com:9090"
+	command add pwd _
 
