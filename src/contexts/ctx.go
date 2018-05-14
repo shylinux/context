@@ -2045,12 +2045,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					return
 				case "list":
 					for i := 0; i < m.Capi("part"); i++ {
-
 						if c, ok := m.target.Commands[fmt.Sprintf("%d", i)]; ok {
 							m.Echo("%d: %s\n", i, c.Name)
-							return
 						}
 					}
+					return
 				}
 
 				switch len(arg) {
