@@ -391,6 +391,7 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
 		"return": &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
 
+		"nbytes": &ctx.Cache{Name: "消息发送字节", Value: "0", Help: "消息发送字节"},
 		"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
 		"nrecv":  &ctx.Cache{Name: "消息接收数量", Value: "0", Help: "消息接收数量"},
 		"target": &ctx.Cache{Name: "消息接收模块", Value: "ssh", Help: "消息接收模块"},
@@ -450,12 +451,15 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		for {
 			line, e := nfs.Reader.ReadString('\n')
-			m.Assert(e)
-
 			if msg == nil {
 				msg = m.Sesss("ssh")
 				m.Cap("target", msg.Target().Name)
 			}
+
+			if e == io.EOF {
+				msg.Cmd("close")
+			}
+			m.Assert(e)
 
 			if line = strings.TrimSpace(line); len(line) > 0 {
 				ls := strings.SplitN(line, ":", 2)
@@ -640,6 +644,7 @@ func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool { // {{{
 			nfs.in = nil
 		}
 	case m.Source():
+		m.Source().Close(m.Spawn(m.Source()))
 	}
 	return true
 }
@@ -750,10 +755,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						m.Option("time", info.ModTime())
 						m.Option("mode", info.Mode())
 
-						fmt.Fprintf(nfs.Writer, "detail: recv\n")
+						n, e := fmt.Fprintf(nfs.Writer, "detail: recv\n")
+						m.Capi("nbytes", n)
+						m.Assert(e)
 					}
 					for _, v := range arg {
-						fmt.Fprintf(nfs.Writer, "detail: %v\n", v)
+						n, e := fmt.Fprintf(nfs.Writer, "detail: %v\n", v)
+						m.Capi("nbytes", n)
+						m.Assert(e)
 					}
 
 					for _, k := range m.Meta["option"] {
@@ -761,14 +770,18 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							continue
 						}
 						for _, v := range m.Meta[k] {
-							fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+							n, e := fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+							m.Capi("nbytes", n)
+							m.Assert(e)
 						}
 					}
 					m.Log("info", nil, "%d send", m.Optioni("nsend"))
 					m.Log("info", nil, "detail: %v", m.Meta["detail"])
 					m.Log("info", nil, "option: %v", m.Meta["option"])
 
-					fmt.Fprintf(nfs.Writer, "\n")
+					n, e := fmt.Fprintf(nfs.Writer, "\n")
+					m.Capi("nbytes", n)
+					m.Assert(e)
 					nfs.Writer.Flush()
 
 					if len(arg) > 1 && arg[0] == "file" {

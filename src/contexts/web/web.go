@@ -437,7 +437,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
 						m.Assert(e)
 
-						n, e := io.Copy(part, file)
+						io.Copy(part, file)
 						for i := 0; i < len(arg)-1; i += 2 {
 							writer.WriteField(arg[0], arg[1])
 						}

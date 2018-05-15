@@ -90,6 +90,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"domain.json": &ctx.Config{Name: "domain.json", Value: "var/domain.json", Help: "主机数量"},
 		"domain.png":  &ctx.Config{Name: "domain.png", Value: "var/domain.png", Help: "主机数量"},
 
+		"mdb": &ctx.Config{Name: "mdb", Value: "mdb.chat", Help: "主机数量"},
+		"uid": &ctx.Config{Name: "uid", Value: "", Help: "主机数量"},
+
 		"type": &ctx.Config{Name: "type", Value: "terminal", Help: "主机数量"},
 		"kind": &ctx.Config{Name: "kind", Value: "terminal", Help: "主机数量"},
 		"name": &ctx.Config{Name: "name", Value: "vps", Help: "主机数量"},
@@ -202,6 +205,13 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					})
 					m.Conf("domains", domain)
 
+					mdb := m.Find(m.Conf("mdb"), true)
+					if mdb != nil {
+						domain := m.Cap("domain") + "." + m.Conf("domains")
+						mdb.Cmd("exec", "delete from goodship where value=?", domain)
+						mdb.Cmd("exec", "insert into goodship(uid, share, level, type, value, kind, name) value(?, 'root', 'root', 'terminal', ?, 'terminal', ?)", m.Conf("uid"), domain, domain)
+					}
+
 					m.Echo(m.Cap("domain"))
 					m.Echo(".")
 					m.Echo(m.Conf("domains"))
@@ -217,6 +227,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 			}
 			// }}}
+		}},
+		"close": &ctx.Command{Name: "close", Help: "连接断开", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Target().Close(m)
 		}},
 		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			json := m.Sesss("nfs") // {{{
