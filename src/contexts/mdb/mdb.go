@@ -55,11 +55,7 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if len(arg) > 0 {
 		m.Cap("source", arg[0])
 	}
-	if len(arg) > 1 {
-		m.Cap("driver", arg[1])
-	} else {
-		m.Cap("driver", Pulse.Conf("driver"))
-	}
+	m.Cap("driver", Pulse.Conf("driver"))
 	if m.Cap("source") == "" || m.Cap("driver") == "" {
 		return false
 	}
@@ -284,7 +280,6 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					m.Echo("\n")
 				}
 			}},
-		// }}}
 		"list": &ctx.Command{Name: "list add table field [where condition]", Help: "执行查询语句",
 			Formats: map[string]int{"where": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

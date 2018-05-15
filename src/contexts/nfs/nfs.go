@@ -556,7 +556,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		}
 	}
 
-	cli := m.Reply()
+	// cli := m.Reply()
+	cli := m.Sesss("cli")
 	nfs.cli = cli
 	yac := m.Sesss("yac", cli.Conf("yac"))
 	bio := bufio.NewScanner(nfs)

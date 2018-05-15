@@ -306,7 +306,9 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 		delete(c.context.contexts, c.Name)
 		c.context = nil
 		if c.Exit != nil {
+			m.Log("info", nil, "before exit<-")
 			c.Exit <- true
+			m.Log("info", nil, "after exit<-")
 		}
 	}
 	return true
@@ -1276,6 +1278,11 @@ func (m *Message) Appends(key string, arg ...bool) bool { // {{{
 // }}}
 
 func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
+	return m.Set("detail", arg...).target.Spawn(m, name, help).Begin(m).Start(m)
+}
+
+// }}}
+func (m *Message) Starts(name string, help string, arg ...string) bool { // {{{
 	return m.Set("detail", arg...).target.Spawn(m, name, help).Begin(m).Start(m)
 }
 
