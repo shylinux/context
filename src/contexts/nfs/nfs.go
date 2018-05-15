@@ -646,6 +646,9 @@ func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool { // {{{
 	case m.Source():
 		m.Source().Close(m.Spawn(m.Source()))
 	}
+	if m.Target() == Index {
+		return false
+	}
 	return true
 }
 

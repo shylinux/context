@@ -5,6 +5,7 @@ import ( // {{{
 
 	"fmt"
 	"strings"
+	"time"
 )
 
 // }}}
@@ -50,6 +51,18 @@ func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool { // {{{
 	case m.Target():
 	case m.Source():
 	}
+	if m.Target() == Index {
+		go func() {
+			m.Target().Begin(m)
+			m.Sesss("nfs", "nfs")
+			for !m.Caps("stream") {
+				time.Sleep(time.Second * time.Duration(m.Confi("interval")))
+				go ssh.Message.Spawn(m.Target()).Copy(ssh.Message, "detail").Cmd()
+				time.Sleep(time.Second * time.Duration(m.Confi("interval")))
+			}
+		}()
+		return false
+	}
 	return true
 }
 
@@ -86,6 +99,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"domain": &ctx.Cache{Name: "domain", Value: "com", Help: "主机数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"interval":    &ctx.Config{Name: "interval", Value: "3", Help: "主机数量"},
 		"domain":      &ctx.Config{Name: "domain", Value: "com", Help: "主机数量"},
 		"domain.json": &ctx.Config{Name: "domain.json", Value: "var/domain.json", Help: "主机数量"},
 		"domain.png":  &ctx.Config{Name: "domain.png", Value: "var/domain.png", Help: "主机数量"},
@@ -115,6 +129,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
 				m.Find("nfs").CallBack(true, func(file *ctx.Message) *ctx.Message {
 					sub := file.Spawn(m.Target())
+					sub.Copy(m, "detail")
 					sub.Target().Start(sub)
 					m.Sessions["ssh"] = sub
 
@@ -230,6 +245,15 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		}},
 		"close": &ctx.Command{Name: "close", Help: "连接断开", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Target().Close(m)
+		}},
+		"list": &ctx.Command{Name: "list", Help: "连接断开", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			domain := m.Cap("domain")
+			m.Travel(c, func(m *ctx.Message) bool {
+				if m.Confs("domains") {
+					m.Echo("%s: %s.%s\n", m.Target().Name, domain, m.Conf("domains"))
+				}
+				return true
+			})
 		}},
 		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			json := m.Sesss("nfs") // {{{

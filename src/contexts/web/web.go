@@ -17,7 +17,6 @@ import ( // {{{
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -175,7 +174,6 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 // }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	if web.Message != nil {
-		log.Println()
 		web.Log("cmd", nil, "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
 		if web.Conf("logheaders") == "yes" {

@@ -207,7 +207,7 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 	for i := 0; i < len(item)/2; i++ {
 		item[i], item[len(item)-i-1] = item[len(item)-i-1], item[i]
 	}
-	c.Caches["route"] = &Cache{Name: "服务数据", Value: strings.Join(item, "."), Help: "服务数据"}
+	c.Caches["module"] = &Cache{Name: "服务数据", Value: strings.Join(item, "."), Help: "服务数据"}
 
 	m.Index = 1
 	c.Pulse = m
@@ -1669,6 +1669,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"message": &Command{Name: "message code meta index", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			switch len(arg) { // {{{
 			case 0:
+				pulse := m.target.Pulse
+				if pulse != nil {
+					m.Echo("\033[31mPulse:\033[0m\n")
+					m.Echo("%d %s\n", pulse.code, pulse.Format())
+				}
+
 				m.Echo("\033[31mrequests:\033[0m\n")
 				for i, v := range m.target.Requests {
 					m.Echo("%d %s\n", i, v.Format())

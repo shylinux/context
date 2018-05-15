@@ -132,7 +132,9 @@ func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool { // {{{
 			}
 		}
 	}
-
+	if m.Target() == Index {
+		return false
+	}
 	return true
 }
 
