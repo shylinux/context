@@ -2,6 +2,6 @@
 	login root root
 
 ~ssh
-	config domain ctx
+	config domain tce
 	dial "shylinux.com:9090"
 
