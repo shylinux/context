@@ -1993,11 +1993,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				case "start":
 					msg := m.Spawn(m.Target())
 					msg.Detail(0, arg)
-					msg.Target().Begin(msg)
+					msg.Target().Start(msg)
 				case "close":
 					msg := m.Spawn(m.Target())
 					msg.Detail(0, arg)
-					msg.Target().Begin(msg)
+					msg.Target().Close(msg)
 				}
 			}
 			// }}}
