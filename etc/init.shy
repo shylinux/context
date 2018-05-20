@@ -4,4 +4,7 @@
 ~ssh
 	config domain tce
 	dial "shylinux.com:9090"
+~nfs
+	command add git status
+	command add git branch
 
