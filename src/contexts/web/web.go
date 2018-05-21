@@ -2,17 +2,19 @@ package web // {{{
 // }}}
 import ( // {{{
 	"contexts"
+	"toolkit"
 
 	"encoding/json"
-	"html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
+	"text/template"
 
 	"bytes"
 	"mime/multipart"
 	"path/filepath"
+	"sort"
 
 	"bufio"
 	"fmt"
@@ -24,6 +26,42 @@ import ( // {{{
 )
 
 // }}}
+
+type listtime []os.FileInfo
+
+func (l listtime) Len() int {
+	return len(l)
+}
+func (l listtime) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
+}
+func (l listtime) Less(i, j int) bool {
+	return l[i].ModTime().After(l[j].ModTime())
+}
+
+type listsize []os.FileInfo
+
+func (l listsize) Len() int {
+	return len(l)
+}
+func (l listsize) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
+}
+func (l listsize) Less(i, j int) bool {
+	return l[i].Size() > (l[j].Size())
+}
+
+type listname []os.FileInfo
+
+func (l listname) Len() int {
+	return len(l)
+}
+func (l listname) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
+}
+func (l listname) Less(i, j int) bool {
+	return l[i].Name() < (l[j].Name())
+}
 
 type MUX interface {
 	Handle(string, http.Handler)
@@ -116,6 +154,10 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 
 func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
 	meta := map[string][]string{}
+	if !msg.Has("result") && !msg.Has("append") {
+		return ""
+	}
+
 	if meta["result"] = msg.Meta["result"]; msg.Has("append") {
 		meta["append"] = msg.Meta["append"]
 		for _, v := range msg.Meta["append"] {
@@ -577,6 +619,73 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Assert(e)
 
 			m.Echo("%d", n)
+			// }}}
+		}},
+		"download": &ctx.Command{Name: "download file", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			msg := m.Spawn(m.Target()) // {{{
+			msg.Cmd("get", "/upload", "method", "POST", "file", "file", arg[0])
+			m.Copy(msg, "result")
+			// }}}
+		}},
+		"/download": &ctx.Command{Name: "/download", Help: "文件下载", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Data["request"].(*http.Request) // {{{
+			w := m.Data["response"].(http.ResponseWriter)
+
+			if !m.Options("file") {
+				m.Option("file", m.Cap("directory"))
+			}
+
+			file := m.Option("file")
+			s, e := os.Stat(file)
+			if m.Assert(e); s.IsDir() {
+				fs, e := ioutil.ReadDir(file)
+				m.Assert(e)
+
+				switch m.Option("list") {
+				case "time":
+					if m.Option("order") == "max" {
+						sort.Sort(listtime(fs))
+					} else {
+						sort.Sort(sort.Reverse(listtime(fs)))
+					}
+				case "size":
+					if m.Option("order") == "max" {
+						sort.Sort(listsize(fs))
+					} else {
+						sort.Sort(sort.Reverse(listsize(fs)))
+					}
+				case "name":
+					if m.Option("order") == "max" {
+						sort.Sort(listname(fs))
+					} else {
+						sort.Sort(sort.Reverse(listname(fs)))
+					}
+				}
+
+				for _, v := range fs {
+					m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
+
+					if v.IsDir() {
+						m.Add("append", "size", "---")
+					} else {
+						m.Add("append", "size", kit.FmtSize(v.Size()))
+					}
+
+					m.Add("append", "name", v.Name())
+				}
+				w.Header().Add("Content-Type", "text/html")
+				m.Assert(template.Must(template.ParseGlob("usr/up.tpl")).Execute(w, m.Meta))
+				delete(m.Meta, "result")
+				delete(m.Meta, "append")
+			} else {
+				m.Log("fuck", nil, "why %s", file)
+				http.ServeFile(w, r, file)
+			}
+			/*
+				{{range $key := .append}}
+					<td>{{index $meta $key $i}}</td>
+				{{end}}
+			*/
 			// }}}
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
