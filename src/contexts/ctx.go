@@ -1644,8 +1644,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Echo("Here is just a simple introduce, you can look github.com/shylinux/context/README.md for more information.\n")
 				m.Echo("\n")
 				m.Color(31, "       c\n")
-				m.Color(33, "     sh go\n")
-				m.Color(32, "   vi").Color(33, " php").Color(31, " js\n")
+				m.Color(31, "     sh").Color(33, " go\n")
+				m.Color(31, "   vi").Color(32, " php").Color(32, " js\n")
 				m.Echo(" ARM Linux HTTP\n")
 				m.Echo("\n")
 
