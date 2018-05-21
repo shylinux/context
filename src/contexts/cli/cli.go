@@ -47,8 +47,10 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	s.lex = cli.lex
 	s.yac = cli.yac
 	s.nfs = cli.nfs
-	// s.target = cli.target
-	s.target = c
+	s.target = cli.target
+	if len(arg) > 0 {
+		s.target = c
+	}
 	return s
 }
 
@@ -103,7 +105,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 				yac.Cmd("train", "num", "num", "mul{", "[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
 				yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
 
-				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9]+", "}")
+				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9_]+", "}")
 				yac.Cmd("train", "word", "word", "mul{", "~", "!", "tran", "str", "[a-zA-Z0-9_/.:]+", "}")
 
 				yac.Cmd("train", "op1", "op1", "mul{", "$", "@", "}")
@@ -319,25 +321,34 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			} // }}}
 		}},
-		"time": &ctx.Command{Name: "time format when", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			t := time.Now() // {{{
-			if len(arg) > 1 {
-				n, e := strconv.Atoi(arg[1])
-				m.Assert(e)
-				t = time.Unix(int64(n), 0)
-			}
+		"time": &ctx.Command{Name: "time [parse format when] format when",
+			Formats: map[string]int{"parse": 2},
+			Help:    "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				t := time.Now() // {{{
+				if m.Options("parse") {
+					f := "2006-01-02 15:04:05"
+					n, e := time.Parse(f, m.Option("parse"))
+					m.Assert(e)
+					t = n
+				}
 
-			f := ""
-			if len(arg) > 0 {
-				f = arg[0]
-			}
+				if len(arg) > 1 {
+					n, e := strconv.Atoi(arg[1])
+					m.Assert(e)
+					t = time.Unix(int64(n), 0)
+				}
 
-			if f == "" {
-				m.Echo("%d", t.Unix())
-			} else {
-				m.Echo(t.Format(f))
-			} // }}}
-		}},
+				f := ""
+				if len(arg) > 0 {
+					f = arg[0]
+				}
+
+				if f == "" {
+					m.Echo("%d", t.Unix())
+				} else {
+					m.Echo(t.Format(f))
+				} // }}}
+			}},
 		"express": &ctx.Command{Name: "express exp", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			result := "false" // {{{
 			switch len(arg) {

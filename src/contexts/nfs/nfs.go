@@ -948,13 +948,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			m.Echo(wd) // }}}
 		}},
 		"git": &ctx.Command{Name: "git", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			cmd := exec.Command("git", arg...)
+			cmd := exec.Command("git", arg...) // {{{
 			if out, e := cmd.CombinedOutput(); e != nil {
 				m.Echo("error: ")
 				m.Echo("%s\n", e)
 			} else {
 				m.Echo(string(out))
 			}
+			// }}}
 		}},
 	},
 	Index: map[string]*ctx.Context{
