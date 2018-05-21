@@ -116,11 +116,12 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 
 func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
 	meta := map[string][]string{}
-	for _, v := range msg.Meta["append"] {
-		meta[v] = msg.Meta[v]
+	if meta["result"] = msg.Meta["result"]; msg.Has("append") {
+		meta["append"] = msg.Meta["append"]
+		for _, v := range msg.Meta["append"] {
+			meta[v] = msg.Meta[v]
+		}
 	}
-	meta["result"] = msg.Meta["result"]
-	meta["append"] = msg.Meta["append"]
 
 	b, e := json.Marshal(meta)
 	msg.Assert(e)
@@ -151,6 +152,9 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 		msg := m.Spawn(m.Target()).Set("detail", key)
 
 		for k, v := range r.Form {
+			msg.Add("option", k, v...)
+		}
+		for k, v := range r.PostForm {
 			msg.Add("option", k, v...)
 		}
 		for _, v := range r.Cookies() {
@@ -555,7 +559,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			file, header, e := r.FormFile("file")
 			m.Assert(e)
 
-			f, e := os.Create(path.Join(m.Conf("upload_dir"), header.Filename))
+			dir := r.FormValue("path")
+			if dir == "" {
+				dir = m.Conf("upload_dir")
+			}
+			name := path.Join(dir, header.Filename)
+			m.Append("path", name)
+			if _, e := os.Stat(name); e == nil {
+				m.Echo("failure, file already exist!")
+				return
+			}
+
+			f, e := os.Create(name)
 			m.Assert(e)
 
 			n, e := io.Copy(f, file)
