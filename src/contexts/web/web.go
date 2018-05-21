@@ -2,6 +2,7 @@ package web // {{{
 // }}}
 import ( // {{{
 	"contexts"
+	"strconv"
 	"toolkit"
 
 	"encoding/json"
@@ -193,6 +194,8 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn(m.Target()).Set("detail", key)
 
+		msg.Add("option", "method", r.Method)
+
 		for k, v := range r.Form {
 			msg.Add("option", k, v...)
 		}
@@ -370,7 +373,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"query":      &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
 		"output":     &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
 		"editor":     &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
-		"upload_dir": &ctx.Config{Name: "upload_dir", Value: "tmp", Help: "上传文件路径"},
+		"upload_tpl": &ctx.Config{Name: "upload_tpl", Value: "usr/up.html", Help: "上传文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -597,95 +600,90 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"/upload": &ctx.Command{Name: "/upload", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Data["request"].(*http.Request) // {{{
-
-			file, header, e := r.FormFile("file")
-			m.Assert(e)
-
-			dir := r.FormValue("path")
-			if dir == "" {
-				dir = m.Conf("upload_dir")
-			}
-			name := path.Join(dir, header.Filename)
-			m.Append("path", name)
-			if _, e := os.Stat(name); e == nil {
-				m.Echo("failure, file already exist!")
-				return
-			}
-
-			f, e := os.Create(name)
-			m.Assert(e)
-
-			n, e := io.Copy(f, file)
-			m.Assert(e)
-
-			m.Echo("%d", n)
-			// }}}
-		}},
-		"download": &ctx.Command{Name: "download file", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Spawn(m.Target()) // {{{
-			msg.Cmd("get", "/upload", "method", "POST", "file", "file", arg[0])
-			m.Copy(msg, "result")
-			// }}}
-		}},
-		"/download": &ctx.Command{Name: "/download", Help: "文件下载", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Data["request"].(*http.Request) // {{{
 			w := m.Data["response"].(http.ResponseWriter)
 
 			if !m.Options("file") {
 				m.Option("file", m.Cap("directory"))
 			}
+			dir := m.Option("file")
 
-			file := m.Option("file")
-			s, e := os.Stat(file)
-			if m.Assert(e); s.IsDir() {
-				fs, e := ioutil.ReadDir(file)
+			if m.Option("method") == "POST" {
+				file, header, e := r.FormFile("file")
 				m.Assert(e)
 
-				switch m.Option("list") {
-				case "time":
-					if m.Option("order") == "max" {
-						sort.Sort(listtime(fs))
-					} else {
-						sort.Sort(sort.Reverse(listtime(fs)))
-					}
-				case "size":
-					if m.Option("order") == "max" {
-						sort.Sort(listsize(fs))
-					} else {
-						sort.Sort(sort.Reverse(listsize(fs)))
-					}
-				case "name":
-					if m.Option("order") == "max" {
-						sort.Sort(listname(fs))
-					} else {
-						sort.Sort(sort.Reverse(listname(fs)))
-					}
+				name := path.Join(dir, header.Filename)
+
+				if _, e := os.Stat(name); e != nil {
+					f, e := os.Create(name)
+					m.Assert(e)
+
+					_, e = io.Copy(f, file)
+					m.Assert(e)
+					m.Option("message", "", "\n", name)
+				} else {
+					m.Option("message", "", "\n", name, "already exist!")
 				}
-
-				for _, v := range fs {
-					m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
-
-					if v.IsDir() {
-						m.Add("append", "size", "---")
-					} else {
-						m.Add("append", "size", kit.FmtSize(v.Size()))
-					}
-
-					m.Add("append", "name", v.Name())
-				}
-				w.Header().Add("Content-Type", "text/html")
-				m.Assert(template.Must(template.ParseGlob("usr/up.tpl")).Execute(w, m.Meta))
-				delete(m.Meta, "result")
-				delete(m.Meta, "append")
-			} else {
-				m.Log("fuck", nil, "why %s", file)
-				http.ServeFile(w, r, file)
 			}
-			/*
-				{{range $key := .append}}
-					<td>{{index $meta $key $i}}</td>
-				{{end}}
-			*/
+
+			file := m.Option("file")
+
+			s, e := os.Stat(file)
+			if m.Assert(e); !s.IsDir() {
+				http.ServeFile(w, r, file)
+				return
+			}
+
+			fs, e := ioutil.ReadDir(file)
+			m.Assert(e)
+
+			max := true
+			if i, e := strconv.Atoi(m.Option("order")); e == nil {
+				max = i%2 == 1
+			}
+
+			switch m.Option("list") {
+			case "time":
+				if max {
+					m.Option("message", "sort by time")
+					sort.Sort(listtime(fs))
+				} else {
+					m.Option("message", "sort by time reverse")
+					sort.Sort(sort.Reverse(listtime(fs)))
+				}
+			case "size":
+				if max {
+					m.Option("message", "sort by size")
+					sort.Sort(listsize(fs))
+				} else {
+					m.Option("message", "sort by size reverse")
+					sort.Sort(sort.Reverse(listsize(fs)))
+				}
+			case "name":
+				if max {
+					m.Option("message", "sort by name")
+					sort.Sort(listname(fs))
+				} else {
+					m.Option("message", "sort by name reverse")
+					sort.Sort(sort.Reverse(listname(fs)))
+				}
+			}
+
+			for _, v := range fs {
+				m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
+				m.Add("append", "size", kit.FmtSize(v.Size()))
+
+				name := v.Name()
+				if v.IsDir() {
+					name += "/"
+				}
+
+				m.Add("append", "name", name)
+			}
+
+			w.Header().Add("Content-Type", "text/html")
+			m.Assert(template.Must(template.ParseGlob(m.Conf("upload_tpl"))).Execute(w, m.Meta))
+			delete(m.Meta, "result")
+			delete(m.Meta, "append")
 			// }}}
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
