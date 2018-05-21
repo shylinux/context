@@ -1,6 +1,8 @@
-bin/
+tmp/
 var/
 pkg/
+bin/
+*.swp
 # Binaries for programs and plugins
 *.exe
 *.dll
