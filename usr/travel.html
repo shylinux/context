@@ -6,14 +6,19 @@
 		cursor:pointer;
 		background-color:lightgray;
 	}
-	.time {
-		padding-right:20px;
-	}
-	.size {
-		text-align:right;
-		padding-right:20px;
-	}
 	.name {
+		padding-left:10px;
+		text-align:left;
+	}
+	.help {
+		padding-left:10px;
+		text-align:left;
+	}
+	.status {
+		padding-left:10px;
+		text-align:left;
+	}
+	.stream {
 		padding-left:10px;
 		text-align:left;
 	}
@@ -25,21 +30,6 @@
 
 <body>
 
-<form method="POST" action="/upload" enctype="multipart/form-data">
-	<fieldset><legend>upload</legend>
-		<input type="file" name="file"><input type="submit">
-	</fieldset>
-	<fieldset><legend>message</legend>
-		<pre>{{index . "message"}}</pre>
-	</fieldset>
-	<fieldset><legend>branch</legend>
-		<pre>{{index . "branch"}}</pre>
-	</fieldset>
-	<fieldset><legend>status</legend>
-		<pre>{{index . "status"}}</pre>
-	</fieldset>
-</form>
-
 <table>
 <colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 <tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
@@ -49,7 +39,7 @@
 	{{range $key := index $meta "append"}}
 		{{if eq $key "name"}}
 			<td class="{{$key}}">
-				<a href="/upload?file={{index $meta "file" 0}}/{{index $meta $key $i}}"><code>{{index $meta $key $i}}</code></a>
+				<code><a href="/travel?dir={{index $meta $key $i}}">{{index $meta $key $i}}</a></code>
 			</td>
 		{{else}}
 			<td class="{{$key}}">

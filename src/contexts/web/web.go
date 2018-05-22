@@ -374,6 +374,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"output":     &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
 		"editor":     &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
 		"upload_tpl": &ctx.Config{Name: "upload_tpl", Value: "usr/up.html", Help: "上传文件路径"},
+		"travel_tpl": &ctx.Config{Name: "travel_tpl", Value: "usr/travel.html", Help: "上传文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -465,7 +466,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				uri := web.generate(m, arg[0], arg[1:]...)
 				m.Log("info", nil, "GET %s", uri)
-				m.Echo("%s\n", uri)
+				m.Echo("%s: %s\n", method, uri)
 
 				var body io.Reader
 				index := strings.Index(uri, "?")
@@ -624,6 +625,122 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Option("message", "", "\n", name, "already exist!")
 				}
 			}
+
+			branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
+			m.Option("branch", branch.Result(0))
+			status := m.Find("nfs").Cmd("git", "-C", dir, "status")
+			m.Option("status", status.Result(0))
+
+			file := m.Option("file")
+
+			s, e := os.Stat(file)
+			if m.Assert(e); !s.IsDir() {
+				http.ServeFile(w, r, file)
+				return
+			}
+
+			fs, e := ioutil.ReadDir(file)
+			m.Assert(e)
+
+			max := true
+			if i, e := strconv.Atoi(m.Option("order")); e == nil {
+				max = i%2 == 1
+			}
+
+			switch m.Option("list") {
+			case "time":
+				if max {
+					m.Option("message", "sort by time")
+					sort.Sort(listtime(fs))
+				} else {
+					m.Option("message", "sort by time reverse")
+					sort.Sort(sort.Reverse(listtime(fs)))
+				}
+			case "size":
+				if max {
+					m.Option("message", "sort by size")
+					sort.Sort(listsize(fs))
+				} else {
+					m.Option("message", "sort by size reverse")
+					sort.Sort(sort.Reverse(listsize(fs)))
+				}
+			case "name":
+				if max {
+					m.Option("message", "sort by name")
+					sort.Sort(listname(fs))
+				} else {
+					m.Option("message", "sort by name reverse")
+					sort.Sort(sort.Reverse(listname(fs)))
+				}
+			}
+
+			for _, v := range fs {
+				m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
+				m.Add("append", "size", kit.FmtSize(v.Size()))
+
+				name := v.Name()
+				if v.IsDir() {
+					name += "/"
+				}
+
+				m.Add("append", "name", name)
+			}
+
+			w.Header().Add("Content-Type", "text/html")
+			m.Assert(template.Must(template.ParseGlob(m.Conf("upload_tpl"))).Execute(w, m.Meta))
+			delete(m.Meta, "result")
+			delete(m.Meta, "append")
+			// }}}
+		}},
+		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Data["request"].(*http.Request) // {{{
+			w := m.Data["response"].(http.ResponseWriter)
+
+			dir := "ctx"
+			if m.Options("dir") {
+				dir = m.Option("dir")
+			}
+
+			msg := m.Find(dir, true)
+
+			m.Travel(msg.Target(), func(m *ctx.Message) bool {
+				m.Add("append", "name", m.Target().Name)
+				m.Add("append", "help", m.Target().Help)
+				m.Add("append", "status", m.Cap("status"))
+				m.Add("append", "stream", m.Cap("stream"))
+				return true
+			})
+			w.Header().Add("Content-Type", "text/html")
+			m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).Execute(w, m.Meta))
+			delete(m.Meta, "result")
+			delete(m.Meta, "append")
+			return
+			if !m.Options("file") {
+				m.Option("file", m.Cap("directory"))
+			}
+
+			if m.Option("method") == "POST" {
+				file, header, e := r.FormFile("file")
+				m.Assert(e)
+
+				name := path.Join(dir, header.Filename)
+
+				if _, e := os.Stat(name); e != nil {
+					f, e := os.Create(name)
+					m.Assert(e)
+
+					_, e = io.Copy(f, file)
+					m.Assert(e)
+					m.Option("message", "", "\n", name)
+				} else {
+					m.Option("message", "", "\n", name, "already exist!")
+				}
+			}
+
+			branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
+			m.Option("branch", branch.Result(0))
+			status := m.Find("nfs").Cmd("git", "-C", dir, "status")
+			m.Option("status", status.Result(0))
 
 			file := m.Option("file")
 
