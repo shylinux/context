@@ -701,19 +701,66 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				dir = m.Option("dir")
 			}
 
-			msg := m.Find(dir, true)
+			if msg := m.Find(dir, true); msg != nil {
+				if m.Option("method") == "POST" {
+					switch m.Option("ccc") {
+					case "config":
+						m.Echo(msg.Conf(m.Option("name"), m.Option("value")))
+					case "command":
+						msg = msg.Spawn(msg.Target())
+						msg.Cmd(m.Option("name"))
+						m.Copy(msg, "result").Copy(msg, "append")
+					}
+					return
+				}
 
-			m.Travel(msg.Target(), func(m *ctx.Message) bool {
-				m.Add("append", "name", m.Target().Name)
-				m.Add("append", "help", m.Target().Help)
-				m.Add("append", "status", m.Cap("status"))
-				m.Add("append", "stream", m.Cap("stream"))
-				return true
-			})
-			w.Header().Add("Content-Type", "text/html")
-			m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).Execute(w, m.Meta))
-			delete(m.Meta, "result")
-			delete(m.Meta, "append")
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "head", m.Meta))
+
+				for k, v := range msg.Target().Caches {
+					msg.Add("append", "key", k)
+					msg.Add("append", "name", v.Name)
+					msg.Add("append", "help", v.Help)
+					msg.Add("append", "value", v.Value)
+				}
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "cache", msg.Meta))
+
+				msg = msg.Spawn(msg.Target())
+				for k, v := range msg.Target().Configs {
+					msg.Add("append", "key", k)
+					msg.Add("append", "name", v.Name)
+					msg.Add("append", "help", v.Help)
+					msg.Add("append", "value", v.Value)
+					msg.Add("append", "input", "")
+				}
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "config", msg.Meta))
+
+				msg = msg.Spawn(msg.Target())
+				for k, v := range msg.Target().Commands {
+					msg.Add("append", "key", k)
+					msg.Add("append", "name", v.Name)
+					msg.Add("append", "help", v.Help)
+					msg.Add("append", "input", "")
+				}
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "command", msg.Meta))
+
+				msg = msg.Spawn(msg.Target())
+				msg.Travel(msg.Target(), func(m *ctx.Message) bool {
+					m.Add("append", "name", m.Target().Name)
+					m.Add("append", "help", m.Target().Help)
+					m.Add("append", "module", m.Cap("module"))
+					m.Add("append", "status", m.Cap("status"))
+					m.Add("append", "stream", m.Cap("stream"))
+					return true
+				})
+				w.Header().Add("Content-Type", "text/html")
+				msg.Put("option", "target", msg.Target())
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "context", msg.Meta))
+
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "tail", m.Meta))
+				delete(m.Meta, "result")
+				delete(m.Meta, "append")
+			}
+
 			return
 			if !m.Options("file") {
 				m.Option("file", m.Cap("directory"))

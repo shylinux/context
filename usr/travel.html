@@ -1,7 +1,12 @@
+{{define "head"}}
 <!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <style>
+	legend {
+		font-size:16px;
+		font-weight:bold;
+	}
 	th {
 		cursor:pointer;
 		background-color:lightgray;
@@ -25,32 +30,118 @@
 	code {
 		font-size:14px;
 	}
+	.result {
+		background-color:black;
+		color:white;
+		padding:10px;
+		margin:0px;
+	}
 </style>
 </head>
 
 <body>
+{{end}}
 
-<table>
-<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
-<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
-{{$meta := .}} {{$first := index .append 0}}
-{{range $i, $k := index . $first}}
-<tr>
-	{{range $key := index $meta "append"}}
-		{{if eq $key "name"}}
-			<td class="{{$key}}">
-				<code><a href="/travel?dir={{index $meta $key $i}}">{{index $meta $key $i}}</a></code>
-			</td>
-		{{else}}
+{{define "cache"}}
+<fieldset><legend>cache</legend>
+	<table>
+	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
+	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$meta := .}} {{$first := index .append 0}}
+	{{range $i, $k := index . $first}}
+	<tr>
+		{{range $key := index $meta "append"}}
 			<td class="{{$key}}">
 				<code>{{index $meta $key $i}}</code>
 			</td>
 		{{end}}
+	</tr>
 	{{end}}
-</tr>
+	</table>
+</fieldset>
 {{end}}
-</table>
 
+{{define "config"}}
+<fieldset><legend>config</legend>
+	<table>
+	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
+	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$meta := .}} {{$first := index .append 0}}
+	{{range $i, $k := index . $first}}
+	<tr>{{$config := index $meta "key" $i}}
+		{{range $key := index $meta "append"}}
+			{{if eq $key "input"}}
+				<td class="{{$key}}">
+					<input type="text" name="{{$config}}" onkeydown="return Config(event, '{{$config}}')">
+					<code>{{index $meta $key $i}}</code>
+				</td>
+			{{else}}
+				<td class="{{$key}}">
+					<code>{{index $meta $key $i}}</code>
+				</td>
+			{{end}}
+		{{end}}
+	</tr>
+	{{end}}
+	</table>
+</fieldset>
+{{end}}
+
+{{define "command"}}
+<fieldset><legend>command</legend>
+	<table>
+	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
+	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$meta := .}} {{$first := index .append 0}}
+	{{range $i, $k := index . $first}}
+	<tr onclick="return Direct(event)">{{$command := index $meta "key" $i}}
+		{{range $key := index $meta "append"}}
+			<td class="{{$key}}">
+			{{if eq $key "input"}}
+				<input type="text" name="{{$command}}" onkeydown="return Command(event, '{{$command}}')">
+			{{else if eq $key "key"}}
+				<code><a href="" onclick="return Direct(event, '{{$command}}')">{{index $meta $key $i}}</a></code>
+			{{else}}
+				<code>{{index $meta $key $i}}</code>
+			{{end}}
+			</td>
+		{{end}}
+	</tr>
+	{{end}}
+	</table>
+</fieldset>
+<fieldset><legend>result</legend>
+<pre class="result"><code id="result">
+</code></pre>
+</fieldset>
+{{end}}
+
+{{define "context"}}
+<fieldset><legend>context</legend>
+	<table>
+	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
+	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$meta := .}} {{$first := index .append 0}}
+	{{range $i, $k := index . $first}}
+	<tr>
+		{{range $key := index $meta "append"}}
+			{{if eq $key "name"}}
+				<td class="{{$key}}">
+					<code><a href="/travel?dir={{index $meta "module" $i}}">{{index $meta $key $i}}</a></code>
+				</td>
+			{{else}}
+				<td class="{{$key}}">
+					<code>{{index $meta $key $i}}</code>
+				</td>
+			{{end}}
+		{{end}}
+	</tr>
+	{{end}}
+	</table>
+</fieldset>
+{{end}}
+
+{{define "tail"}}
 <script>
 	function Cookie(name, value) {
 		if (value == undefined) {
@@ -59,17 +150,89 @@
 			if (result && result.length > 0) {
 				return result[1];
 			}
-			return ""
+			return "";
 		}
 
 		document.cookie = name+"="+value;
 		return Cookie(name);
 	}
 
+	function Search(name) {
+		var pattern = new RegExp(name+"=([^&#]*)");
+		var result = pattern.exec(location.search);
+		if (result && result.length > 0) {
+			return result[1];
+		}
+		return "";
+	}
+
+	function POST(url, form, cb) {
+		var xhr = new XMLHttpRequest();
+		xhr.onreadystatechange = function() {
+			switch (xhr.readyState) {
+				case 4:
+					switch (xhr.status) {
+						case 200:
+							var msg = JSON.parse(xhr.responseText);
+							console.log(msg)
+							typeof cb == "function" && cb(msg)
+					}
+					break;
+			}
+		}
+
+		xhr.open("POST", url);
+		xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+		if (!("dir" in form)) {
+			form = form || {}
+			form["dir"] = Search("dir")
+		}
+
+		var args = [];
+		for (k in form) {
+			args.push(k+"="+encodeURIComponent(form[k]));
+		}
+
+		var arg = args.join("&");
+		console.log(url)
+		console.log(arg)
+		xhr.send(arg);
+	}
+
+	function Refresh() {
+		location.assign(location.href);
+	}
+
+	function Config(event, name) {
+		if (event.keyCode == 13) {
+			POST("", {ccc:"config", name:name, value:event.currentTarget.value}, function(msg) {Refresh()})
+		}
+	}
+
+	function Command(event, name) {
+		if (event.keyCode == 13) {
+			POST("", {ccc:"command", name:name, value:event.currentTarget.value}, function(msg) {alert(msg.result.join(""))})
+		}
+	}
+
+	function Direct(event, name, value) {
+		console.log(event)
+		if (name) {
+			POST("", {ccc:"command", name:name, value:value||""}, function(msg) {
+				var result = document.getElementById("result");
+				result.innerHTML = msg.result.join("")
+			})
+		}
+		return false;
+	}
+
 	function list(what) {
 		Cookie("list", what);
-		Cookie("order", Cookie("order")*1 + 1)
-		location.assign(location.href)
+		Cookie("order", Cookie("order")*1 + 1);
+		location.assign(location.href);
 	}
+
 </script>
 </body>
+{{end}}

@@ -833,6 +833,8 @@ func (m *Message) Find(name string, root ...bool) *Message { // {{{
 	for _, v := range strings.Split(name, ".") {
 		if x, ok := cs[v]; ok {
 			target, cs = x, x.contexts
+		} else if target.Name == v {
+			continue
 		} else {
 			m.Log("find", target, "not find %s", v)
 			return nil
