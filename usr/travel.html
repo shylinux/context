@@ -47,6 +47,8 @@
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$l := index .append|len}}
+	{{if gt $l 0}}
 	{{$meta := .}} {{$first := index .append 0}}
 	{{range $i, $k := index . $first}}
 	<tr>
@@ -57,6 +59,7 @@
 		{{end}}
 	</tr>
 	{{end}}
+	{{end}}
 	</table>
 </fieldset>
 {{end}}
@@ -66,6 +69,8 @@
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$l := index .append|len}}
+	{{if gt $l 0}}
 	{{$meta := .}} {{$first := index .append 0}}
 	{{range $i, $k := index . $first}}
 	<tr>{{$config := index $meta "key" $i}}
@@ -83,6 +88,7 @@
 		{{end}}
 	</tr>
 	{{end}}
+	{{end}}
 	</table>
 </fieldset>
 {{end}}
@@ -92,6 +98,8 @@
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$l := index .append|len}}
+	{{if gt $l 0}}
 	{{$meta := .}} {{$first := index .append 0}}
 	{{range $i, $k := index . $first}}
 	<tr onclick="return Direct(event)">{{$command := index $meta "key" $i}}
@@ -108,9 +116,10 @@
 		{{end}}
 	</tr>
 	{{end}}
+	{{end}}
 	</table>
 </fieldset>
-<fieldset><legend>result</legend>
+<fieldset><legend>result<input id="direct" type="text" onkeydown="return Direct(event)"></legend>
 <pre class="result"><code id="result">
 </code></pre>
 </fieldset>
@@ -121,6 +130,8 @@
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$l := index .append|len}}
+	{{if gt $l 0}}
 	{{$meta := .}} {{$first := index .append 0}}
 	{{range $i, $k := index . $first}}
 	<tr>
@@ -136,6 +147,7 @@
 			{{end}}
 		{{end}}
 	</tr>
+	{{end}}
 	{{end}}
 	</table>
 </fieldset>
@@ -212,19 +224,26 @@
 
 	function Command(event, name) {
 		if (event.keyCode == 13) {
-			POST("", {ccc:"command", name:name, value:event.currentTarget.value}, function(msg) {alert(msg.result.join(""))})
+			if (name) {
+				POST("", {ccc:"command", name:name, value:event.currentTarget.value}, function(msg) {alert(msg.result.join(""))})
+			}
 		}
 	}
 
 	function Direct(event, name, value) {
 		console.log(event)
-		if (name) {
+		if (event.keyCode == 13) {
+			if (!name) {
+				name = event.currentTarget.value;
+			}
 			POST("", {ccc:"command", name:name, value:value||""}, function(msg) {
 				var result = document.getElementById("result");
-				result.innerHTML = msg.result.join("")
+				var direct = document.getElementById("direct");
+				direct.innerHTML = name;
+				result.innerHTML = msg.result.join("");
 			})
+			return false;
 		}
-		return false;
 	}
 
 	function list(what) {

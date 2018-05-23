@@ -722,7 +722,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					msg.Add("append", "help", v.Help)
 					msg.Add("append", "value", v.Value)
 				}
-				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "cache", msg.Meta))
+				if len(msg.Meta["append"]) > 0 {
+					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "cache", msg.Meta))
+				}
 
 				msg = msg.Spawn(msg.Target())
 				for k, v := range msg.Target().Configs {
@@ -732,7 +734,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					msg.Add("append", "value", v.Value)
 					msg.Add("append", "input", "")
 				}
-				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "config", msg.Meta))
+				if len(msg.Meta["append"]) > 0 {
+					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "config", msg.Meta))
+				}
 
 				msg = msg.Spawn(msg.Target())
 				for k, v := range msg.Target().Commands {
@@ -741,7 +745,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					msg.Add("append", "help", v.Help)
 					msg.Add("append", "input", "")
 				}
-				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "command", msg.Meta))
+				if len(msg.Meta["append"]) > 0 {
+					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "command", msg.Meta))
+				}
 
 				msg = msg.Spawn(msg.Target())
 				msg.Travel(msg.Target(), func(m *ctx.Message) bool {
@@ -754,7 +760,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				})
 				w.Header().Add("Content-Type", "text/html")
 				msg.Put("option", "target", msg.Target())
-				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "context", msg.Meta))
+				if len(msg.Meta["append"]) > 0 {
+					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "context", msg.Meta))
+				}
 
 				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "tail", m.Meta))
 				delete(m.Meta, "result")
