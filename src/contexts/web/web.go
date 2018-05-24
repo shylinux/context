@@ -6,11 +6,11 @@ import ( // {{{
 	"toolkit"
 
 	"encoding/json"
+	"html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
-	"text/template"
 
 	"bytes"
 	"mime/multipart"
@@ -632,7 +632,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						_, e = io.Copy(f, file)
 						m.Assert(e)
-						m.Option("message", name)
+						m.Option("message", name, "upload success!")
 					} else {
 						m.Option("message", name, "already exist!")
 					}
@@ -703,6 +703,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
 				m.Add("append", "size", kit.FmtSize(v.Size()))
 				m.Add("append", "name", name)
+				m.Add("append", "path", path.Join(m.Option("file"), name))
 			}
 
 			w.Header().Add("Content-Type", "text/html")
@@ -733,6 +734,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					return
 				}
 
+				w.Header().Add("Content-Type", "text/html")
 				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "head", m.Meta))
 
 				for k, v := range msg.Target().Caches {
@@ -769,6 +771,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 
 				msg = msg.Spawn(msg.Target())
+				msg.Copy(m, "option")
 				msg.Travel(msg.Target(), func(m *ctx.Message) bool {
 					m.Add("append", "name", m.Target().Name)
 					m.Add("append", "help", m.Target().Help)
@@ -777,8 +780,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Add("append", "stream", m.Cap("stream"))
 					return true
 				})
-				w.Header().Add("Content-Type", "text/html")
-				msg.Put("option", "target", msg.Target())
 				if len(msg.Meta["append"]) > 0 {
 					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "context", msg.Meta))
 				}

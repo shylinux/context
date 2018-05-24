@@ -126,7 +126,7 @@
 {{end}}
 
 {{define "context"}}
-<fieldset><legend>context</legend>
+<fieldset><legend><input type="text" id="dir" value="{{index .dir 0}}" onkeydown="return Change(event)"></legend>
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
@@ -154,63 +154,9 @@
 {{end}}
 
 {{define "tail"}}
+<script src="library/context.js"></script>
 <script>
-	function Cookie(name, value) {
-		if (value == undefined) {
-			var pattern = new RegExp(name+"=([^;]*);?");
-			var result = pattern.exec(document.cookie);
-			if (result && result.length > 0) {
-				return result[1];
-			}
-			return "";
-		}
 
-		document.cookie = name+"="+value;
-		return Cookie(name);
-	}
-
-	function Search(name) {
-		var pattern = new RegExp(name+"=([^&#]*)");
-		var result = pattern.exec(location.search);
-		if (result && result.length > 0) {
-			return result[1];
-		}
-		return "";
-	}
-
-	function POST(url, form, cb) {
-		var xhr = new XMLHttpRequest();
-		xhr.onreadystatechange = function() {
-			switch (xhr.readyState) {
-				case 4:
-					switch (xhr.status) {
-						case 200:
-							var msg = JSON.parse(xhr.responseText);
-							console.log(msg)
-							typeof cb == "function" && cb(msg)
-					}
-					break;
-			}
-		}
-
-		xhr.open("POST", url);
-		xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-
-		if (!("dir" in form)) {
-			form = form || {}
-			form["dir"] = Search("dir")
-		}
-
-		var args = [];
-		for (k in form) {
-			args.push(k+"="+encodeURIComponent(form[k]));
-		}
-
-		var arg = args.join("&");
-		console.log(url)
-		console.log(arg)
-		xhr.send(arg);
-	}
 
 	function Refresh() {
 		location.assign(location.href);
@@ -218,7 +164,7 @@
 
 	function Config(event, name) {
 		if (event.keyCode == 13) {
-			POST("", {ccc:"config", name:name, value:event.currentTarget.value}, function(msg) {Refresh()})
+			ctx.POST("", {ccc:"config", name:name, value:event.currentTarget.value}, function(msg) {Refresh()})
 		}
 	}
 
@@ -232,9 +178,9 @@
 			var direct = document.getElementById("direct");
 			if (name) {
 				direct.value = name;
-				POST("", {ccc:"command", name:name, value:event.currentTarget.value}, Result)
+				ctx.POST("", {ccc:"command", name:name, value:event.currentTarget.value}, Result)
 			} else {
-				POST("", {ccc:"command", name:event.currentTarget.value}, Result)
+				ctx.POST("", {ccc:"command", name:event.currentTarget.value}, Result)
 			}
 		}
 	}
@@ -247,13 +193,19 @@
 
 		var direct = document.getElementById("direct");
 		direct.value = name;
-		POST("", {ccc:"command", name:name, value:value||""}, Result)
+		ctx.POST("", {ccc:"command", name:name, value:value||""}, Result)
 		return false;
 	}
 
+	function Change(event) {
+		if (event.keyCode == 13) {
+			ctx.Search("dir", event.target.value);
+		}
+	}
+
 	function list(what) {
-		Cookie("list", what);
-		Cookie("order", Cookie("order")*1 + 1);
+		ctx.Cookie("list", what);
+		ctx.Cookie("order", ctx.Cookie("order")*1 + 1);
 		location.assign(location.href);
 	}
 

@@ -63,7 +63,7 @@
 </fieldset>
 {{end}}
 
-<fieldset><legend>list</legend>
+<fieldset><legend><input type="text" id="dir" value="{{index .file 0}}" onkeydown="return Change(event)"></legend>
 <table>
 <colgroup>
 	{{range .append}}
@@ -83,13 +83,16 @@
 		{{end}}
 	{{end}}
 </tr>
-{{$meta := .}} {{$first := index .append 0}}
+
+{{$meta := .}}
+{{if .append}}
+{{$first := index .append 0}}
 {{range $i, $k := index . $first}}
 <tr>
 	{{range $key := index $meta "append"}}
 		{{if eq $key "name"}}
 			<td class="{{$key}}">
-				<a href="/upload?file={{index $meta "file" 0}}/{{index $meta $key $i}}"><code>{{index $meta $key $i}}</code></a>
+				<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
 			</td>
 		{{else}}
 			<td class="{{$key}}">
@@ -98,6 +101,7 @@
 		{{end}}
 	{{end}}
 </tr>
+{{end}}
 {{end}}
 </table>
 </fieldset>
@@ -111,24 +115,17 @@
 	</form>
 </fieldset>
 
+<script src="library/context.js"></script>
 <script>
-	function Cookie(name, value) {
-		if (value == undefined) {
-			var pattern = new RegExp(name+"=([^;]*);?");
-			var result = pattern.exec(document.cookie);
-			if (result && result.length > 0) {
-				return result[1];
-			}
-			return ""
+	function Change(event) {
+		if (event.keyCode == 13) {
+			ctx.Search("file", event.target.value);
 		}
-
-		document.cookie = name+"="+value;
-		return Cookie(name);
 	}
 
 	function list(what) {
-		Cookie("list", what);
-		Cookie("order", Cookie("order")*1 + 1)
+		ctx.Cookie("list", what);
+		ctx.Cookie("order", ctx.Cookie("order")*1 + 1)
 		location.assign(location.href)
 	}
 </script>
