@@ -199,9 +199,6 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 		for k, v := range r.Form {
 			msg.Add("option", k, v...)
 		}
-		for k, v := range r.PostForm {
-			msg.Add("option", k, v...)
-		}
 		for _, v := range r.Cookies() {
 			msg.Add("option", v.Name, v.Value)
 		}
@@ -373,7 +370,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"query":      &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
 		"output":     &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
 		"editor":     &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
-		"upload_tpl": &ctx.Config{Name: "upload_tpl", Value: "usr/up.html", Help: "上传文件路径"},
+		"upload_tpl": &ctx.Config{Name: "upload_tpl", Value: "usr/upload.html", Help: "上传文件路径"},
 		"travel_tpl": &ctx.Config{Name: "travel_tpl", Value: "usr/travel.html", Help: "上传文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -603,36 +600,54 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Data["request"].(*http.Request) // {{{
 			w := m.Data["response"].(http.ResponseWriter)
 
+			m.Option("message", "")
 			if !m.Options("file") {
 				m.Option("file", m.Cap("directory"))
 			}
 			dir := m.Option("file")
 
 			if m.Option("method") == "POST" {
-				file, header, e := r.FormFile("file")
-				m.Assert(e)
+				if m.Options("content") {
+					name := path.Join(dir, m.Option("filename"))
+					if _, e := os.Stat(name); e != nil {
+						f, e := os.Create(name)
+						m.Assert(e)
 
-				name := path.Join(dir, header.Filename)
-
-				if _, e := os.Stat(name); e != nil {
-					f, e := os.Create(name)
-					m.Assert(e)
-
-					_, e = io.Copy(f, file)
-					m.Assert(e)
-					m.Option("message", "", "\n", name)
+						_, e = f.WriteString(m.Option("content"))
+						defer f.Close()
+						m.Assert(e)
+						m.Option("message", name, "upload success!")
+					} else {
+						m.Option("message", name, "already exist!")
+					}
 				} else {
-					m.Option("message", "", "\n", name, "already exist!")
+					file, header, e := r.FormFile("file")
+					m.Assert(e)
+
+					name := path.Join(dir, header.Filename)
+
+					if _, e := os.Stat(name); e != nil {
+						f, e := os.Create(name)
+						m.Assert(e)
+
+						_, e = io.Copy(f, file)
+						m.Assert(e)
+						m.Option("message", name)
+					} else {
+						m.Option("message", name, "already exist!")
+					}
 				}
 			}
 
-			branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
-			m.Option("branch", branch.Result(0))
-			status := m.Find("nfs").Cmd("git", "-C", dir, "status")
-			m.Option("status", status.Result(0))
+			switch m.Option("cmd") {
+			case "git":
+				branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
+				m.Option("branch", branch.Result(0))
+				status := m.Find("nfs").Cmd("git", "-C", dir, "status")
+				m.Option("status", status.Result(0))
+			}
 
 			file := m.Option("file")
-
 			s, e := os.Stat(file)
 			if m.Assert(e); !s.IsDir() {
 				http.ServeFile(w, r, file)
@@ -647,42 +662,46 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				max = i%2 == 1
 			}
 
+			m.Option("sort", "")
+			m.Option("reverse", "")
 			switch m.Option("list") {
 			case "time":
 				if max {
-					m.Option("message", "sort by time")
+					m.Option("sort", "time")
 					sort.Sort(listtime(fs))
 				} else {
-					m.Option("message", "sort by time reverse")
+					m.Option("reverse", "time")
 					sort.Sort(sort.Reverse(listtime(fs)))
 				}
 			case "size":
 				if max {
-					m.Option("message", "sort by size")
+					m.Option("sort", "size")
 					sort.Sort(listsize(fs))
 				} else {
-					m.Option("message", "sort by size reverse")
+					m.Option("reverse", "size")
 					sort.Sort(sort.Reverse(listsize(fs)))
 				}
 			case "name":
 				if max {
-					m.Option("message", "sort by name")
+					m.Option("sort", "name")
 					sort.Sort(listname(fs))
 				} else {
-					m.Option("message", "sort by name reverse")
+					m.Option("reverse", "name")
 					sort.Sort(sort.Reverse(listname(fs)))
 				}
 			}
 
 			for _, v := range fs {
-				m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
-				m.Add("append", "size", kit.FmtSize(v.Size()))
-
 				name := v.Name()
 				if v.IsDir() {
 					name += "/"
 				}
+				if name[0] == '.' {
+					continue
+				}
 
+				m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
+				m.Add("append", "size", kit.FmtSize(v.Size()))
 				m.Add("append", "name", name)
 			}
 

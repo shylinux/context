@@ -102,7 +102,7 @@
 	{{if gt $l 0}}
 	{{$meta := .}} {{$first := index .append 0}}
 	{{range $i, $k := index . $first}}
-	<tr onclick="return Direct(event)">{{$command := index $meta "key" $i}}
+	<tr>{{$command := index $meta "key" $i}}
 		{{range $key := index $meta "append"}}
 			<td class="{{$key}}">
 			{{if eq $key "input"}}
@@ -119,7 +119,7 @@
 	{{end}}
 	</table>
 </fieldset>
-<fieldset><legend>result<input id="direct" type="text" onkeydown="return Direct(event)"></legend>
+<fieldset><legend><input id="direct" type="text" onkeydown="return Command(event)"></legend>
 <pre class="result"><code id="result">
 </code></pre>
 </fieldset>
@@ -222,28 +222,33 @@
 		}
 	}
 
+	function Result(msg) {
+		var result = document.getElementById("result");
+		result.innerHTML = msg.result.join("");
+	}
+
 	function Command(event, name) {
 		if (event.keyCode == 13) {
+			var direct = document.getElementById("direct");
 			if (name) {
-				POST("", {ccc:"command", name:name, value:event.currentTarget.value}, function(msg) {alert(msg.result.join(""))})
+				direct.value = name;
+				POST("", {ccc:"command", name:name, value:event.currentTarget.value}, Result)
+			} else {
+				POST("", {ccc:"command", name:event.currentTarget.value}, Result)
 			}
 		}
 	}
 
 	function Direct(event, name, value) {
 		console.log(event)
-		if (event.keyCode == 13) {
-			if (!name) {
-				name = event.currentTarget.value;
-			}
-			POST("", {ccc:"command", name:name, value:value||""}, function(msg) {
-				var result = document.getElementById("result");
-				var direct = document.getElementById("direct");
-				direct.innerHTML = name;
-				result.innerHTML = msg.result.join("");
-			})
-			return false;
+		if (!name) {
+			name = event.currentTarget.value;
 		}
+
+		var direct = document.getElementById("direct");
+		direct.value = name;
+		POST("", {ccc:"command", name:name, value:value||""}, Result)
+		return false;
 	}
 
 	function list(what) {

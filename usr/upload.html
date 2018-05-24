@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<style>
+	legend {
+		font-size:16px;
+		font-weight:bold;
+	}
+	th {
+		cursor:pointer;
+		background-color:lightgray;
+	}
+	.time {
+		padding-right:20px;
+	}
+	.size {
+		text-align:right;
+		padding-right:20px;
+	}
+	.name {
+		padding-left:10px;
+		text-align:left;
+	}
+	.sort {
+		color:red;
+	}
+	.reverse {
+		color:green;
+	}
+	.message {
+		color:red;
+	}
+	code {
+		font-size:14px;
+	}
+</style>
+</head>
+
+<body>
+
+{{if index . "cmd"}}
+{{$cmd := index . "cmd" 0}}
+{{if eq $cmd "git"}}
+<fieldset><legend>branch</legend>
+	<pre>{{index . "branch"}}</pre>
+</fieldset>
+
+<fieldset><legend>status</legend>
+	<pre>{{index . "status"}}</pre>
+</fieldset>
+{{end}}
+{{end}}
+
+<fieldset><legend>upload</legend>
+	<form method="POST" action="/upload" enctype="multipart/form-data">
+		<input type="file" name="file"><input type="submit">
+	</form>
+</fieldset>
+
+{{if index . "message" 0}}
+<fieldset class="message"><legend>message</legend>
+	<pre>{{index . "message"}}</pre>
+</fieldset>
+{{end}}
+
+<fieldset><legend>list</legend>
+<table>
+<colgroup>
+	{{range .append}}
+		<col class="{{.}}">
+	{{end}}
+</colgroup>
+<tr>
+	{{$sort := index . "sort" 0}}
+	{{$reverse := index . "reverse" 0}}
+	{{range .append}}
+		{{if eq $sort .}}
+			<th class="{{.}} sort" onclick="list('{{.}}')">{{.}}</th>
+		{{else if eq $reverse .}}
+			<th class="{{.}} reverse" onclick="list('{{.}}')">{{.}}</th>
+		{{else}}
+			<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>
+		{{end}}
+	{{end}}
+</tr>
+{{$meta := .}} {{$first := index .append 0}}
+{{range $i, $k := index . $first}}
+<tr>
+	{{range $key := index $meta "append"}}
+		{{if eq $key "name"}}
+			<td class="{{$key}}">
+				<a href="/upload?file={{index $meta "file" 0}}/{{index $meta $key $i}}"><code>{{index $meta $key $i}}</code></a>
+			</td>
+		{{else}}
+			<td class="{{$key}}">
+				<code>{{index $meta $key $i}}</code>
+			</td>
+		{{end}}
+	{{end}}
+</tr>
+{{end}}
+</table>
+</fieldset>
+
+<fieldset><legend>create</legend>
+	<form method="POST" action="/upload">
+		<table>
+			<tr><td>filename:</td><td><input type="text" name="filename" required><input type="submit"></td></tr>
+			<tr><td>content:</td><td><textarea rows="5" cols="80" name="content" required></textarea></td></tr>
+		</table>
+	</form>
+</fieldset>
+
+<script>
+	function Cookie(name, value) {
+		if (value == undefined) {
+			var pattern = new RegExp(name+"=([^;]*);?");
+			var result = pattern.exec(document.cookie);
+			if (result && result.length > 0) {
+				return result[1];
+			}
+			return ""
+		}
+
+		document.cookie = name+"="+value;
+		return Cookie(name);
+	}
+
+	function list(what) {
+		Cookie("list", what);
+		Cookie("order", Cookie("order")*1 + 1)
+		location.assign(location.href)
+	}
+</script>
+</body>
