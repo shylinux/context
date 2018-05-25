@@ -126,7 +126,7 @@
 {{end}}
 
 {{define "context"}}
-<fieldset><legend><input type="text" id="dir" value="{{index .dir 0}}" onkeydown="return Change(event)"></legend>
+<fieldset><legend><input type="text" id="module" value="{{index .module 0}}" onkeydown="return Change(event)"></legend>
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
@@ -138,7 +138,35 @@
 		{{range $key := index $meta "append"}}
 			{{if eq $key "name"}}
 				<td class="{{$key}}">
-					<code><a href="/travel?dir={{index $meta "module" $i}}">{{index $meta $key $i}}</a></code>
+					<code><a href="/travel?module={{index $meta "module" $i}}">{{index $meta $key $i}}</a></code>
+				</td>
+			{{else}}
+				<td class="{{$key}}">
+					<code>{{index $meta $key $i}}</code>
+				</td>
+			{{end}}
+		{{end}}
+	</tr>
+	{{end}}
+	{{end}}
+	</table>
+</fieldset>
+{{end}}
+
+{{define "domain"}}
+<fieldset><legend><input type="text" id="domain" value="{{index . "domains" 0}}" onkeydown="return Change(event)"></legend>
+	<table>
+	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
+	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
+	{{$l := index .append|len}}
+	{{if gt $l 0}}
+	{{$meta := .}} {{$first := index .append 0}}
+	{{range $i, $k := index . $first}}
+	<tr>
+		{{range $key := index $meta "append"}}
+			{{if eq $key "name"}}
+				<td class="{{$key}}">
+					<code><a href="/travel?domain={{index $meta "domain" $i}}">{{index $meta $key $i}}</a></code>
 				</td>
 			{{else}}
 				<td class="{{$key}}">
@@ -162,7 +190,7 @@
 
 	function Config(event, name) {
 		if (event.keyCode == 13) {
-			ctx.POST("", {ccc:"config", name:name, value:event.currentTarget.value}, function(msg) {Refresh()})
+			ctx.Conf(name, event.currentTarget.value, function(msg) {Refresh()});
 		}
 	}
 
@@ -176,9 +204,9 @@
 			var direct = document.getElementById("direct");
 			if (name) {
 				direct.value = name;
-				ctx.POST("", {ccc:"command", name:name, value:event.currentTarget.value}, Result)
+				ctx.Cmd(name, event.currentTarget.value, Result);
 			} else {
-				ctx.POST("", {ccc:"command", name:event.currentTarget.value}, Result)
+				ctx.Cmd(event.currentTarget.value, "", Result);
 			}
 		}
 	}
@@ -191,13 +219,13 @@
 
 		var direct = document.getElementById("direct");
 		direct.value = name;
-		ctx.POST("", {ccc:"command", name:name, value:value||""}, Result)
+		ctx.Cmd(name, value, Result);
 		return false;
 	}
 
 	function Change(event) {
 		if (event.keyCode == 13) {
-			ctx.Search("dir", event.target.value);
+			ctx.Search("module", event.target.value);
 		}
 	}
 
@@ -206,7 +234,9 @@
 		ctx.Cookie("order", ctx.Cookie("order")*1 + 1);
 		location.assign(location.href);
 	}
-
+	function show(name) {
+		ctx.Cap(name, function(msg) {console.log(msg)});
+	}
 </script>
 </body>
 {{end}}

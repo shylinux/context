@@ -713,167 +713,126 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Data["request"].(*http.Request) // {{{
-			w := m.Data["response"].(http.ResponseWriter)
+			w := m.Data["response"].(http.ResponseWriter) // {{{
 
-			dir := "ctx"
-			if m.Options("dir") {
-				dir = m.Option("dir")
+			module := "ctx"
+			if m.Options("module") {
+				module = m.Option("module")
+			}
+			if m.Options("domain") {
+				module = "ssh"
 			}
 
-			if msg := m.Find(dir, true); msg != nil {
-				if m.Option("method") == "POST" {
-					switch m.Option("ccc") {
-					case "config":
-						m.Echo(msg.Conf(m.Option("name"), m.Option("value")))
-					case "command":
-						msg = msg.Spawn(msg.Target())
-						msg.Cmd(m.Option("name"))
-						m.Copy(msg, "result").Copy(msg, "append")
-					}
-					return
-				}
-
-				w.Header().Add("Content-Type", "text/html")
-				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "head", m.Meta))
-
-				for k, v := range msg.Target().Caches {
-					msg.Add("append", "key", k)
-					msg.Add("append", "name", v.Name)
-					msg.Add("append", "help", v.Help)
-					msg.Add("append", "value", v.Value)
-				}
-				if len(msg.Meta["append"]) > 0 {
-					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "cache", msg.Meta))
-				}
-
-				msg = msg.Spawn(msg.Target())
-				for k, v := range msg.Target().Configs {
-					msg.Add("append", "key", k)
-					msg.Add("append", "name", v.Name)
-					msg.Add("append", "help", v.Help)
-					msg.Add("append", "value", v.Value)
-					msg.Add("append", "input", "")
-				}
-				if len(msg.Meta["append"]) > 0 {
-					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "config", msg.Meta))
-				}
-
-				msg = msg.Spawn(msg.Target())
-				for k, v := range msg.Target().Commands {
-					msg.Add("append", "key", k)
-					msg.Add("append", "name", v.Name)
-					msg.Add("append", "help", v.Help)
-					msg.Add("append", "input", "")
-				}
-				if len(msg.Meta["append"]) > 0 {
-					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "command", msg.Meta))
-				}
-
-				msg = msg.Spawn(msg.Target())
-				msg.Copy(m, "option")
-				msg.Travel(msg.Target(), func(m *ctx.Message) bool {
-					m.Add("append", "name", m.Target().Name)
-					m.Add("append", "help", m.Target().Help)
-					m.Add("append", "module", m.Cap("module"))
-					m.Add("append", "status", m.Cap("status"))
-					m.Add("append", "stream", m.Cap("stream"))
-					return true
-				})
-				if len(msg.Meta["append"]) > 0 {
-					m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "context", msg.Meta))
-				}
-
-				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "tail", m.Meta))
-				delete(m.Meta, "result")
-				delete(m.Meta, "append")
-			}
-
-			return
-			if !m.Options("file") {
-				m.Option("file", m.Cap("directory"))
-			}
-
-			if m.Option("method") == "POST" {
-				file, header, e := r.FormFile("file")
-				m.Assert(e)
-
-				name := path.Join(dir, header.Filename)
-
-				if _, e := os.Stat(name); e != nil {
-					f, e := os.Create(name)
-					m.Assert(e)
-
-					_, e = io.Copy(f, file)
-					m.Assert(e)
-					m.Option("message", "", "\n", name)
-				} else {
-					m.Option("message", "", "\n", name, "already exist!")
-				}
-			}
-
-			branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
-			m.Option("branch", branch.Result(0))
-			status := m.Find("nfs").Cmd("git", "-C", dir, "status")
-			m.Option("status", status.Result(0))
-
-			file := m.Option("file")
-
-			s, e := os.Stat(file)
-			if m.Assert(e); !s.IsDir() {
-				http.ServeFile(w, r, file)
+			msg := m.Find(module, true)
+			if msg == nil {
 				return
 			}
 
-			fs, e := ioutil.ReadDir(file)
-			m.Assert(e)
+			if m.Option("method") == "POST" {
+				switch m.Option("ccc") {
+				case "cache":
+					m.Echo(msg.Cap(m.Option("name")))
+				case "config":
+					if m.Options("value") {
+						m.Echo(msg.Conf(m.Option("name"), m.Option("value")))
+					} else {
+						m.Echo(msg.Conf(m.Option("name")))
+					}
+				case "command":
+					msg = msg.Spawn(msg.Target())
+					if m.Options("domain") {
+						module := "ssh"
+						if m.Options("module") {
+							module = m.Option("module")
+						}
+						if m.Options("value") {
+							msg.Detail(0, "send", "context", module, m.Option("name"), m.Option("value"))
+						} else {
+							msg.Detail(0, "send", "context", module, m.Option("name"))
+						}
+						msg.Log("fuck", nil, "why %d ", len(msg.Meta["detail"]))
 
-			max := true
-			if i, e := strconv.Atoi(m.Option("order")); e == nil {
-				max = i%2 == 1
-			}
+						msg.Option("domain", m.Option("domain"))
+						msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
+							m.Copy(sub, "result").Copy(sub, "append")
+							return nil
+						})
+					} else {
+						if m.Options("value") {
+							msg.Detail(0, m.Option("name"), m.Option("value"))
+						} else {
+							msg.Detail(0, m.Option("name"))
+						}
 
-			switch m.Option("list") {
-			case "time":
-				if max {
-					m.Option("message", "sort by time")
-					sort.Sort(listtime(fs))
-				} else {
-					m.Option("message", "sort by time reverse")
-					sort.Sort(sort.Reverse(listtime(fs)))
+						msg.Cmd()
+						m.Copy(msg, "result").Copy(msg, "append")
+					}
 				}
-			case "size":
-				if max {
-					m.Option("message", "sort by size")
-					sort.Sort(listsize(fs))
-				} else {
-					m.Option("message", "sort by size reverse")
-					sort.Sort(sort.Reverse(listsize(fs)))
-				}
-			case "name":
-				if max {
-					m.Option("message", "sort by name")
-					sort.Sort(listname(fs))
-				} else {
-					m.Option("message", "sort by name reverse")
-					sort.Sort(sort.Reverse(listname(fs)))
-				}
-			}
-
-			for _, v := range fs {
-				m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
-				m.Add("append", "size", kit.FmtSize(v.Size()))
-
-				name := v.Name()
-				if v.IsDir() {
-					name += "/"
-				}
-
-				m.Add("append", "name", name)
+				return
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			m.Assert(template.Must(template.ParseGlob(m.Conf("upload_tpl"))).Execute(w, m.Meta))
+			m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "head", m.Meta))
+
+			for k, v := range msg.Target().Caches {
+				msg.Add("append", "key", k)
+				msg.Add("append", "name", v.Name)
+				msg.Add("append", "help", v.Help)
+				msg.Add("append", "value", v.Value)
+			}
+			if len(msg.Meta["append"]) > 0 {
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "cache", msg.Meta))
+			}
+
+			msg = msg.Spawn(msg.Target())
+			for k, v := range msg.Target().Configs {
+				msg.Add("append", "key", k)
+				msg.Add("append", "name", v.Name)
+				msg.Add("append", "help", v.Help)
+				msg.Add("append", "value", v.Value)
+				msg.Add("append", "input", "")
+			}
+			if len(msg.Meta["append"]) > 0 {
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "config", msg.Meta))
+			}
+
+			msg = msg.Spawn(msg.Target())
+			for k, v := range msg.Target().Commands {
+				msg.Add("append", "key", k)
+				msg.Add("append", "name", v.Name)
+				msg.Add("append", "help", v.Help)
+				msg.Add("append", "input", "")
+			}
+			if len(msg.Meta["append"]) > 0 {
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "command", msg.Meta))
+			}
+
+			msg = msg.Spawn(msg.Target())
+			msg.Travel(msg.Target(), func(m *ctx.Message) bool {
+				m.Add("append", "name", m.Target().Name)
+				m.Add("append", "help", m.Target().Help)
+				m.Add("append", "module", m.Cap("module"))
+				m.Add("append", "status", m.Cap("status"))
+				m.Add("append", "stream", m.Cap("stream"))
+				return true
+			})
+			if len(msg.Meta["append"]) > 0 {
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "context", msg.Meta))
+			}
+
+			msg = msg.Find("ssh", true)
+			msg.Option("domains", m.Option("domain"))
+			msg.Travel(msg.Target(), func(m *ctx.Message) bool {
+				m.Add("append", "name", m.Target().Name)
+				m.Add("append", "help", m.Target().Help)
+				m.Add("append", "domain", m.Conf("domains"))
+				return true
+			})
+			if len(msg.Meta["append"]) > 0 {
+				m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "domain", msg.Meta))
+			}
+
+			m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "tail", m.Meta))
 			delete(m.Meta, "result")
 			delete(m.Meta, "append")
 			// }}}
