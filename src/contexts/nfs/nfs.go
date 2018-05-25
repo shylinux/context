@@ -450,6 +450,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		nfs.Caches["target"] = &ctx.Cache{Name: "target", Value: "", Help: "文件名"}
 
+		nsend := ""
+
 		for {
 			line, e := nfs.Reader.ReadString('\n')
 			if msg == nil {
@@ -473,6 +475,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 					msg.Add("detail", ls[1])
 				case "result":
 					msg.Add("result", ls[1])
+				case "nsend":
+					nsend = ls[1]
 				default:
 					msg.Add("option", ls[0], ls[1])
 				}
@@ -484,20 +488,21 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				msg.Log("info", nil, "detail: %v", msg.Meta["detail"])
 				msg.Log("info", nil, "option: %v", msg.Meta["option"])
 				msg.Options("stdio", false)
+				msg.Option("nsend", nsend)
 
 				func() {
 					cmd := msg
-					nsend := cmd.Option("nsend")
+					nsends := nsend
 					cmd.Call(func(sub *ctx.Message) *ctx.Message {
 						for _, v := range sub.Meta["result"] {
 							_, e := fmt.Fprintf(nfs.Writer, "result: %s\n", url.QueryEscape(v))
 							sub.Assert(e)
 						}
 
-						sub.Append("nsend", nsend)
+						sub.Append("nsend", nsends)
 						for _, k := range sub.Meta["append"] {
 							for _, v := range sub.Meta[k] {
-								_, e := fmt.Fprintf(nfs.Writer, "%s: %s\n", k, v)
+								_, e := fmt.Fprintf(nfs.Writer, "%s: %s\n", k, url.QueryEscape(v))
 								sub.Assert(e)
 							}
 						}
@@ -526,11 +531,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				msg.Meta["append"] = msg.Meta["option"]
 				delete(msg.Meta, "option")
 
-				msg.Log("info", nil, "%s send", msg.Meta["nsend"])
+				msg.Log("info", nil, "%s send", nsend)
 				msg.Log("info", nil, "result: %v", msg.Meta["result"])
 				msg.Log("info", nil, "append: %v", msg.Meta["append"])
 
-				send := nfs.send[msg.Appendi("nsend")]
+				n, e := strconv.Atoi(nsend)
+				m.Assert(e)
+				send := nfs.send[n]
 				send.Copy(msg, "result")
 				send.Copy(msg, "append")
 
@@ -544,6 +551,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				send.Back(send)
 			}
 
+			nsend = ""
 			msg = nil
 		}
 		return true

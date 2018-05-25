@@ -1852,7 +1852,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"context": &Command{Name: "context back|[[home] [find|search] name] [info|lists|show|switch|[args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Formats: map[string]int{"back": 0, "home": 0, "find": 1, "search": 1, "info": 1, "lists": 0, "show": 0, "switch": 0},
+			Formats: map[string]int{
+				"back": 0, "home": 0,
+				"find": 1, "search": 1,
+				"info": 1, "lists": 0, "show": 0, "switch": 0,
+				"cache": 0, "config": 0, "command": 0,
+				"module": 0, "domain": 0,
+			},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if m.Has("back") { // {{{
 					m.target = m.source
@@ -1885,6 +1891,56 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					// v.Meta = m.Meta
 					// v.Data = m.Data
 					switch {
+					case m.Has("cache"):
+						if len(arg) == 0 {
+							for k, v := range v.target.Caches {
+								m.Add("append", "key", k)
+								m.Add("append", "name", v.Name)
+								m.Add("append", "value", v.Value)
+								m.Add("append", "help", v.Help)
+							}
+						} else {
+							m.Echo(v.Cap(arg[0], arg[1:]...))
+						}
+					case m.Has("config"):
+						if len(arg) == 0 {
+							for k, v := range v.target.Configs {
+								m.Add("append", "key", k)
+								m.Add("append", "name", v.Name)
+								m.Add("append", "value", v.Value)
+								m.Add("append", "help", v.Help)
+							}
+						} else {
+							m.Echo(v.Conf(arg[0], arg[1:]...))
+						}
+					case m.Has("command"):
+						if len(arg) == 0 {
+							for k, v := range v.target.Commands {
+								m.Add("append", "key", k)
+								m.Add("append", "name", v.Name)
+								m.Add("append", "help", v.Help)
+							}
+						} else {
+							v.Cmd(arg)
+							m.Copy(v, "result").Copy(v, "append")
+						}
+					case m.Has("module"):
+						m.Travel(v.target, func(m *Message) bool {
+							m.Add("append", "name", m.target.Name)
+							m.Add("append", "help", m.target.Help)
+							m.Add("append", "module", m.Cap("module"))
+							m.Add("append", "status", m.Cap("status"))
+							m.Add("append", "stream", m.Cap("stream"))
+							return true
+						})
+					case m.Has("domain"):
+						msg := m.Find("ssh", true)
+						msg.Travel(msg.Target(), func(msg *Message) bool {
+							m.Add("append", "name", msg.Target().Name)
+							m.Add("append", "help", msg.Target().Help)
+							m.Add("append", "domain", msg.Cap("domain")+"."+msg.Conf("domains"))
+							return true
+						})
 					case m.Has("switch"), m.Has("back"):
 						m.target = v.target
 					case m.Has("show"):

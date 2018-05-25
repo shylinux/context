@@ -125,8 +125,8 @@
 </fieldset>
 {{end}}
 
-{{define "context"}}
-<fieldset><legend><input type="text" id="module" value="{{index .module 0}}" onkeydown="return Change(event)"></legend>
+{{define "module"}}
+<fieldset><legend><input type="text" id="module" value="{{index .current_module 0}}" onkeydown="return Change(event, 'module')"></legend>
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
@@ -138,7 +138,7 @@
 		{{range $key := index $meta "append"}}
 			{{if eq $key "name"}}
 				<td class="{{$key}}">
-					<code><a href="/travel?module={{index $meta "module" $i}}">{{index $meta $key $i}}</a></code>
+					<code><a href="" onclick="ctx.Search('module', '{{index $meta "module" $i}}'); return false">{{index $meta $key $i}}</a></code>
 				</td>
 			{{else}}
 				<td class="{{$key}}">
@@ -154,7 +154,7 @@
 {{end}}
 
 {{define "domain"}}
-<fieldset><legend><input type="text" id="domain" value="{{index . "domains" 0}}" onkeydown="return Change(event)"></legend>
+<fieldset><legend><input type="text" id="domain" value="{{index . "current_domain" 0}}" onkeydown="return Change(event, 'domain')"></legend>
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
@@ -166,7 +166,7 @@
 		{{range $key := index $meta "append"}}
 			{{if eq $key "name"}}
 				<td class="{{$key}}">
-					<code><a href="/travel?domain={{index $meta "domain" $i}}">{{index $meta $key $i}}</a></code>
+					<code><a href="" onclick="ctx.Search('domain', '{{index $meta "domain" $i}}'); return false">{{index $meta $key $i}}</a></code>
 				</td>
 			{{else}}
 				<td class="{{$key}}">
@@ -223,9 +223,15 @@
 		return false;
 	}
 
-	function Change(event) {
+	function Input(event, cb, key) {
 		if (event.keyCode == 13) {
-			ctx.Search("module", event.target.value);
+			cb(key, event.target.value);
+		}
+	}
+
+	function Change(event, key) {
+		if (event.keyCode == 13) {
+			ctx.Search(key, event.target.value);
 		}
 	}
 

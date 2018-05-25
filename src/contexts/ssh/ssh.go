@@ -167,7 +167,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						if m.Options("nsend") { //接收命令
 							msg := m.Spawn(m.Target())
 							msg.Cmd(arg)
-							m.Back(msg)
+							m.Copy(msg, "result").Copy(msg, "append")
+							m.Back(m)
 						} else { //发送命令
 							ssh.Message.Sesss("nfs").CallBack(m.Options("stdio"), func(host *ctx.Message) *ctx.Message {
 								m.Back(m.Copy(host, "result").Copy(host, "append"))
