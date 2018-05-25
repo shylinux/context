@@ -78,6 +78,7 @@
 			<th class="{{.}} sort" onclick="list('{{.}}')">{{.}}</th>
 		{{else if eq $reverse .}}
 			<th class="{{.}} reverse" onclick="list('{{.}}')">{{.}}</th>
+		{{else if eq . "path"}}
 		{{else}}
 			<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>
 		{{end}}
@@ -94,6 +95,7 @@
 			<td class="{{$key}}">
 				<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
 			</td>
+		{{else if eq $key "path"}}
 		{{else}}
 			<td class="{{$key}}">
 				<code>{{index $meta $key $i}}</code>
