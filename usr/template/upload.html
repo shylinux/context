@@ -1,3 +1,4 @@
+{{define "head"}}
 <!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
@@ -35,79 +36,83 @@
 	}
 </style>
 </head>
-
 <body>
-
-{{if index . "cmd"}}
-{{$cmd := index . "cmd" 0}}
-{{if eq $cmd "git"}}
-<fieldset><legend>branch</legend>
-	<pre>{{index . "branch"}}</pre>
-</fieldset>
-
-<fieldset><legend>status</legend>
-	<pre>{{index . "status"}}</pre>
-</fieldset>
-{{end}}
 {{end}}
 
-<fieldset><legend>upload</legend>
-	<form method="POST" action="/upload" enctype="multipart/form-data">
-		<input type="file" name="file"><input type="submit">
-	</form>
-</fieldset>
+{{define "git"}}
+	<fieldset><legend>branch</legend>
+		<pre>{{index . "branch"}}</pre>
+	</fieldset>
+	<fieldset><legend>status</legend>
+		<pre>{{index . "status"}}</pre>
+	</fieldset>
+{{end}}
 
-{{if index . "message" 0}}
+{{define "upload"}}
+	<fieldset><legend>upload</legend>
+		<form method="POST" action="/upload" enctype="multipart/form-data">
+			<input type="file" name="file"><input type="submit">
+		</form>
+	</fieldset>
+{{end}}
+
+{{define "message"}}
 <fieldset class="message"><legend>message</legend>
 	<pre>{{index . "message"}}</pre>
 </fieldset>
 {{end}}
 
-<fieldset><legend><input type="text" id="dir" value="{{index .file 0}}" onkeydown="return Change(event)"></legend>
-<table>
-<colgroup>
-	{{range .append}}
-		<col class="{{.}}">
-	{{end}}
-</colgroup>
-<tr>
-	{{$sort := index . "sort" 0}}
-	{{$reverse := index . "reverse" 0}}
-	{{range .append}}
-		{{if eq $sort .}}
-			<th class="{{.}} sort" onclick="list('{{.}}')">{{.}}</th>
-		{{else if eq $reverse .}}
-			<th class="{{.}} reverse" onclick="list('{{.}}')">{{.}}</th>
-		{{else if eq . "path"}}
-		{{else}}
-			<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>
+{{define "list"}}
+	<fieldset><legend><input type="text" id="dir" value="{{index .file 0}}" onkeydown="return Change(event)"></legend>
+	<table>
+	<colgroup>
+		{{range .append}}
+			<col class="{{.}}">
 		{{end}}
-	{{end}}
-</tr>
-
-{{$meta := .}}
-{{if .append}}
-{{$first := index .append 0}}
-{{range $i, $k := index . $first}}
-<tr>
-	{{range $key := index $meta "append"}}
-		{{if eq $key "name"}}
-			<td class="{{$key}}">
-				<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
-			</td>
-		{{else if eq $key "path"}}
-		{{else}}
-			<td class="{{$key}}">
-				<code>{{index $meta $key $i}}</code>
-			</td>
+	</colgroup>
+	<tr>
+		{{$sort := index . "sort" 0}}
+		{{$reverse := index . "reverse" 0}}
+		{{range .append}}
+			{{if eq $sort .}}
+				<th class="{{.}} sort" onclick="list('{{.}}')">{{.}}</th>
+			{{else if eq $reverse .}}
+				<th class="{{.}} reverse" onclick="list('{{.}}')">{{.}}</th>
+			{{else if eq . "path"}}
+			{{else}}
+				<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>
+			{{end}}
 		{{end}}
-	{{end}}
-</tr>
-{{end}}
-{{end}}
-</table>
-</fieldset>
+	</tr>
+	<script>
+		var file = '{{index .file 0}}';
+	</script>
 
+	{{$meta := .}}
+	{{if .append}}
+	{{$first := index .append 0}}
+	{{range $i, $k := index . $first}}
+	<tr>
+		{{range $key := index $meta "append"}}
+			{{if eq $key "name"}}
+				<td class="{{$key}}">
+					<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
+				</td>
+			{{else if eq $key "path"}}
+			{{else}}
+				<td class="{{$key}}">
+					<code>{{index $meta $key $i}}</code>
+				</td>
+			{{end}}
+		{{end}}
+	</tr>
+	{{end}}
+	{{end}}
+	</table>
+	</fieldset>
+{{end}}
+
+{{define "create"}}
 <fieldset><legend>create</legend>
 	<form method="POST" action="/upload">
 		<table>
@@ -116,7 +121,9 @@
 		</table>
 	</form>
 </fieldset>
+{{end}}
 
+{{define "tail"}}
 <script src="library/context.js"></script>
 <script>
 	function Change(event) {
@@ -132,3 +139,4 @@
 	}
 </script>
 </body>
+{{end}}

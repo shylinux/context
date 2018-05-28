@@ -2311,7 +2311,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"right": &Command{
 			Name:    "right [share|add|del group [cache|config|command item]]",
 			Help:    "用户组管理，查看、添加、删除用户组或是接口",
-			Formats: map[string]int{"add": 0, "del": 0, "cache": 0, "config": 0, "command": 0},
+			Formats: map[string]int{"check": 0, "add": 0, "del": 0, "cache": 0, "config": 0, "command": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				index := m.Target().Index // {{{
 				if index == nil {
@@ -2356,6 +2356,33 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				switch {
+				case m.Has("check"):
+					if group != nil {
+						switch {
+						case m.Has("cache"):
+							if _, ok := group.Caches[item]; ok {
+								m.Echo("ok")
+							}
+						case m.Has("config"):
+							if _, ok := group.Configs[item]; ok {
+								m.Echo("ok")
+							}
+						case m.Has("command"):
+							if x, ok := group.Commands[item]; ok {
+								if len(arg) > 2 {
+									if len(x.Options) > 0 {
+										for i := 2; i < len(arg)-1; i += 2 {
+											if x, ok := x.Options[arg[i]]; !ok || x != arg[i+1] {
+												return
+											}
+										}
+									}
+								}
+								m.Echo("ok")
+							}
+						}
+					}
+					return
 				case m.Has("add"):
 					if group == nil {
 						if _, ok := index[arg[0]]; ok {
@@ -2380,11 +2407,18 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							group.Configs[item] = x
 						}
 					case m.Has("command"):
-						if x, ok := current.Commands[item]; ok {
+						if _, ok := current.Commands[item]; ok {
 							if group.Commands == nil {
 								group.Commands = map[string]*Command{}
 							}
-							group.Commands[item] = x
+							// group.Commands[item] = x
+							options := map[string]string{}
+							for i := 2; i < len(arg)-1; i += 2 {
+								options[arg[i]] = arg[i+1]
+							}
+							group.Commands[item] = &Command{
+								Options: options,
+							}
 						}
 					}
 

@@ -1,0 +1,85 @@
+{{define "login"}}
+<fieldset><legend>login</legend>
+	<form method="POST" action="/login" onsubmit="return login(event)">
+		<label>username:</label><input type="text" name="username" value="{{index .username 0}}" required autofocus>
+		<label>password:</label><input type="password" name="password" required>
+		<input type="submit">
+	</form>
+</fieldset>
+<script>
+	function login(event) {
+		var fields = event.target.elements;
+		ctx.POST("/login", {
+			username: fields["username"].value,
+			password: fields["password"].value
+		}, function(msg) {
+			if (ctx.Cookie("sessid")) {
+				ctx.Refresh()
+			}
+		})
+		return false;
+	}
+</script>
+{{end}}
+
+{{define "userinfo"}}
+<fieldset><legend>userinfo</legend>
+	welcome {{index .username 0}}
+	<button onclick="return logout(event)">logout</button>
+</fieldset>
+<script>
+	function logout(event) {
+		ctx.Cookie("sessid", "");
+		ctx.Refresh();
+		return false;
+	}
+</script>
+{{end}}
+
+{{define "share"}}
+<fieldset><legend>share</legend>
+	<form method="POST" onsubmit="return share(event)">
+		<label>share to:</label><input type="text" name="shareto" required>
+		<input type="submit">
+	</form>
+	<table>
+	<colgroup>
+	{{range .append}}
+		<col class="{{.}}">
+	{{end}}
+	</colgroup>
+	<tr>
+	{{range .append}}
+		<th class="{{.}}">{{.}}</th>
+	{{end}}
+	</tr>
+
+	{{$meta := .}}
+	{{if .append}}
+		{{$first := index .append 0}}
+		{{range $i, $k := index . $first}}
+		<tr>
+			{{range $key := index $meta "append"}}
+			<td class="{{$key}}">
+				<code>{{index $meta $key $i}}</code>
+			</td>
+			{{end}}
+		</tr>
+		{{end}}
+	{{end}}
+	</table>
+</fieldset>
+<script>
+	function share(event) {
+		var fields = event.target.elements;
+		var shareto = fields["shareto"].value
+		ctx.POST("/upload", {
+			shareto: shareto,
+			sharefile: file,
+		}, function(msg) {
+			ctx.Refresh();
+		})
+		return false;
+	}
+</script>
+{{end}}

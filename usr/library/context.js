@@ -30,7 +30,7 @@ ctx = {
 				}
 			}
 		} else if (value == undefined) {
-			return args[key];
+			return args[key] || "";
 		} else {
 			args[key] = value;
 		}
@@ -76,6 +76,9 @@ ctx = {
 		var arg = args.join("&");
 		console.log("POST: "+url+"?"+arg);
 		xhr.send(arg);
+	},//}}}
+	Refresh: function() {//{{{
+		location.assign(location.href);
 	},//}}}
 
 	Cap: function(cap, cb) {//{{{

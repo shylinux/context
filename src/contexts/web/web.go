@@ -362,16 +362,17 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"count": &ctx.Cache{Name: "count", Value: "0", Help: "主机协议"},
 	},
 	Configs: map[string]*ctx.Config{
-		"protocol":   &ctx.Config{Name: "protocol", Value: "", Help: "主机协议"},
-		"hostname":   &ctx.Config{Name: "hostname", Value: "", Help: "主机地址"},
-		"port":       &ctx.Config{Name: "port", Value: "", Help: "主机端口"},
-		"dir":        &ctx.Config{Name: "dir", Value: "/", Help: "主机路由"},
-		"file":       &ctx.Config{Name: "file", Value: "", Help: "主机文件"},
-		"query":      &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
-		"output":     &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
-		"editor":     &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
-		"upload_tpl": &ctx.Config{Name: "upload_tpl", Value: "usr/template/upload.html", Help: "上传文件路径"},
-		"travel_tpl": &ctx.Config{Name: "travel_tpl", Value: "usr/template/travel.html", Help: "上传文件路径"},
+		"protocol":     &ctx.Config{Name: "protocol", Value: "", Help: "主机协议"},
+		"hostname":     &ctx.Config{Name: "hostname", Value: "", Help: "主机地址"},
+		"port":         &ctx.Config{Name: "port", Value: "", Help: "主机端口"},
+		"dir":          &ctx.Config{Name: "dir", Value: "/", Help: "主机路由"},
+		"file":         &ctx.Config{Name: "file", Value: "", Help: "主机文件"},
+		"query":        &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
+		"output":       &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
+		"editor":       &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
+		"upload_tpl":   &ctx.Config{Name: "upload_tpl", Value: "upload.html", Help: "上传文件路径"},
+		"travel_tpl":   &ctx.Config{Name: "travel_tpl", Value: "travel.html", Help: "上传文件路径"},
+		"template_dir": &ctx.Config{Name: "template_dir", Value: "usr/template/", Help: "上传文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -606,8 +607,38 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			dir := m.Option("file")
 
+			if !m.Options("username") {
+				m.Option("username", "")
+			}
+
+			m.Option("right", "")
+			if !m.Options("sessid") {
+				m.Option("sessid", "")
+				m.Option("message", "please login")
+			} else {
+				msg := m.Find("aaa").Cmd("login", m.Option("sessid"))
+				if msg.Result(0) == "error: " {
+					m.Option("sessid", "")
+					m.Option("message", "login failure")
+				} else {
+					m.Option("username", msg.Result(0))
+					msg = m.Spawn(m.Target())
+					msg.Cmd("right", "check", msg.Cap("group"), "command", "/upload", "file", dir)
+					if msg.Result(0) == "ok" {
+						m.Option("right", "ok")
+					} else {
+						m.Option("message", "your do not have the right of", dir)
+					}
+				}
+			}
+
 			if m.Option("method") == "POST" {
-				if m.Options("content") {
+				if m.Options("shareto") {
+					msg := m.Spawn(m.Target())
+					msg.Cmd("right", "add", m.Option("shareto"), "command", "/upload", "file", m.Option("sharefile"))
+					m.Append("link", "hello")
+					return
+				} else if m.Options("content") {
 					name := path.Join(dir, m.Option("filename"))
 					if _, e := os.Stat(name); e != nil {
 						f, e := os.Create(name)
@@ -637,14 +668,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Option("message", name, "already exist!")
 					}
 				}
-			}
-
-			switch m.Option("cmd") {
-			case "git":
-				branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
-				m.Option("branch", branch.Result(0))
-				status := m.Find("nfs").Cmd("git", "-C", dir, "status")
-				m.Option("status", status.Result(0))
 			}
 
 			file := m.Option("file")
@@ -707,7 +730,54 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			m.Assert(template.Must(template.ParseGlob(m.Conf("upload_tpl"))).Execute(w, m.Meta))
+			tmpl := template.Must(template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
+			m.Assert(tmpl)
+
+			tmpl.ExecuteTemplate(w, "head", m.Meta)
+			if m.Options("right") {
+				tmpl.ExecuteTemplate(w, "userinfo", m.Meta)
+
+				msg := m.Spawn(m.Target())
+
+				for k, v := range msg.Target().Index {
+					for i, j := range v.Commands {
+						for v, n := range j.Options {
+							if n == dir {
+								msg.Add("append", "group", k)
+								msg.Add("append", "command", i)
+								msg.Add("append", "argument", v)
+								msg.Add("append", "value", n)
+								m.Log("fuck", nil, "why %v", msg.Meta)
+							}
+						}
+					}
+				}
+
+				tmpl.ExecuteTemplate(w, "share", msg.Meta)
+
+				tmpl.ExecuteTemplate(w, "upload", m.Meta)
+			} else {
+				tmpl.ExecuteTemplate(w, "login", m.Meta)
+			}
+
+			switch m.Option("cmd") {
+			case "git":
+				branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
+				m.Option("branch", branch.Result(0))
+				status := m.Find("nfs").Cmd("git", "-C", dir, "status")
+				m.Option("status", status.Result(0))
+				tmpl.ExecuteTemplate(w, "git", m.Meta)
+			}
+
+			if m.Options("message") {
+				tmpl.ExecuteTemplate(w, "message", m.Meta)
+			}
+
+			tmpl.ExecuteTemplate(w, "list", m.Meta)
+			if m.Options("right") {
+				tmpl.ExecuteTemplate(w, "create", m.Meta)
+			}
+			tmpl.ExecuteTemplate(w, "tail", m.Meta)
 			delete(m.Meta, "result")
 			delete(m.Meta, "append")
 			// }}}
@@ -770,7 +840,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "head", m.Meta))
+			tmpl := template.Must(template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "travel.html"))
+			m.Assert(tmpl)
+
+			m.Assert(tmpl.ExecuteTemplate(w, "head", m.Meta))
 
 			if msg := m.Find(module, true); msg != nil {
 				for _, v := range []string{"cache", "config", "command", "module", "domain"} {
@@ -789,16 +862,20 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if len(msg.Meta["append"]) > 0 {
 						msg.Option("current_module", module)
 						msg.Option("current_domain", m.Option("domain"))
-						m.Log("fuck", nil, "fuck %v", msg.Meta)
-						m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, v, msg.Meta))
+						m.Assert(tmpl.ExecuteTemplate(w, v, msg.Meta))
 					}
 				}
 			}
 
-			m.Assert(template.Must(template.ParseGlob(m.Conf("travel_tpl"))).ExecuteTemplate(w, "tail", m.Meta))
+			m.Assert(tmpl.ExecuteTemplate(w, "tail", m.Meta))
 			delete(m.Meta, "result")
 			delete(m.Meta, "append")
 			// }}}
+		}},
+		"/login": &ctx.Command{Name: "/login", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Data["response"].(http.ResponseWriter)
+			msg := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password"))
+			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Result(0)})
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target())
