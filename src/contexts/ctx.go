@@ -46,6 +46,7 @@ type Command struct {
 
 	Formats map[string]int
 	Options map[string]string
+	Shares  map[string][]string
 	Appends map[string]string
 	Hand    func(m *Message, c *Context, key string, arg ...string)
 }
@@ -2368,18 +2369,27 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								m.Echo("ok")
 							}
 						case m.Has("command"):
-							if x, ok := group.Commands[item]; ok {
-								if len(arg) > 2 {
-									if len(x.Options) > 0 {
-										for i := 2; i < len(arg)-1; i += 2 {
-											if x, ok := x.Options[arg[i]]; !ok || x != arg[i+1] {
-												return
-											}
-										}
+
+							if len(arg) > 1 {
+								if _, ok := group.Commands[item]; !ok {
+									return
+								}
+							}
+							if len(arg) > 2 {
+								if _, ok := group.Commands[item].Shares[arg[2]]; !ok {
+									return
+								}
+							}
+							if len(arg) > 3 {
+								for _, v := range group.Commands[item].Shares[arg[2]] {
+									if arg[3] == v {
+										m.Echo("ok")
+										return
 									}
 								}
-								m.Echo("ok")
+								return
 							}
+							m.Echo("ok")
 						}
 					}
 					return
@@ -2411,14 +2421,18 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							if group.Commands == nil {
 								group.Commands = map[string]*Command{}
 							}
-							// group.Commands[item] = x
-							options := map[string]string{}
+
+							command, ok := group.Commands[item]
+							if !ok {
+								command = &Command{Shares: map[string][]string{}}
+								group.Commands[item] = command
+							}
+
 							for i := 2; i < len(arg)-1; i += 2 {
-								options[arg[i]] = arg[i+1]
+								command.Shares[arg[i]] = append(command.Shares[arg[i]], arg[i+1])
 							}
-							group.Commands[item] = &Command{
-								Options: options,
-							}
+
+							// group.Commands[item] = x
 						}
 					}
 
@@ -2445,7 +2459,38 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						case m.Has("config"):
 							delete(gs[i].Configs, item)
 						case m.Has("command"):
-							delete(gs[i].Commands, item)
+							if gs[i].Commands == nil {
+								break
+							}
+							if len(arg) == 2 {
+								delete(gs[i].Commands, item)
+								break
+							}
+
+							if gs[i].Commands[item] == nil {
+								break
+							}
+							shares := gs[i].Commands[item].Shares
+							if shares == nil {
+								break
+							}
+							if len(arg) == 3 {
+								delete(shares, arg[2])
+								break
+							}
+							m.Log("fuck", nil, "wh %v", shares)
+
+							for i := 0; i < len(shares[arg[2]]); i++ {
+								if shares[arg[2]][i] == arg[3] {
+									m.Log("fuck", nil, "====%v", arg[3])
+									for ; i < len(shares[arg[2]])-1; i++ {
+										shares[arg[2]][i] = shares[arg[2]][i+1]
+									}
+									shares[arg[2]] = shares[arg[2]][:i]
+									m.Log("fuck", nil, "====%v", shares)
+								}
+							}
+
 						default:
 							delete(index, gs[i].Name)
 							delete(current.Index, gs[i].Name)

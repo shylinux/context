@@ -2,6 +2,7 @@ package web // {{{
 // }}}
 import ( // {{{
 	"contexts"
+	"regexp"
 	"strconv"
 	"toolkit"
 
@@ -612,29 +613,30 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			m.Option("right", "")
-			if !m.Options("sessid") {
+			aaa := m.Find("aaa").Cmd("login", m.Option("sessid"))
+			if aaa.Result(0) == "error: " {
 				m.Option("sessid", "")
-				m.Option("message", "please login")
+				m.Option("message", "login failure")
 			} else {
-				msg := m.Find("aaa").Cmd("login", m.Option("sessid"))
-				if msg.Result(0) == "error: " {
-					m.Option("sessid", "")
-					m.Option("message", "login failure")
+				m.Option("username", aaa.Result(0))
+				msg := m.Spawn(m.Target())
+				msg.Cmd("right", "check", aaa.Cap("group"), "command", "/upload", "file", dir)
+				if msg.Result(0) == "ok" {
+					m.Option("right", aaa.Cap("group"))
 				} else {
-					m.Option("username", msg.Result(0))
-					msg = m.Spawn(m.Target())
-					msg.Cmd("right", "check", msg.Cap("group"), "command", "/upload", "file", dir)
-					if msg.Result(0) == "ok" {
-						m.Option("right", "ok")
-					} else {
-						m.Option("message", "your do not have the right of", dir)
-					}
+					m.Option("message", "your do not have the right of", dir)
 				}
 			}
 
 			if m.Option("method") == "POST" {
-				if m.Options("shareto") {
+				if m.Options("notshareto") {
 					msg := m.Spawn(m.Target())
+					msg.Cmd("right", "del", m.Option("notshareto"), "command", "/upload", "file", m.Option("sharefile"))
+					m.Append("link", "hello")
+					return
+				} else if m.Options("shareto") {
+					msg := aaa.Spawn(m.Target())
+					msg.Sesss("aaa", aaa)
 					msg.Cmd("right", "add", m.Option("shareto"), "command", "/upload", "file", m.Option("sharefile"))
 					m.Append("link", "hello")
 					return
@@ -739,15 +741,24 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				msg := m.Spawn(m.Target())
 
-				for k, v := range msg.Target().Index {
-					for i, j := range v.Commands {
-						for v, n := range j.Options {
-							if n == dir {
-								msg.Add("append", "group", k)
-								msg.Add("append", "command", i)
-								msg.Add("append", "argument", v)
-								msg.Add("append", "value", n)
-								m.Log("fuck", nil, "why %v", msg.Meta)
+				index := msg.Target().Index
+				if index != nil && index[m.Option("right")] != nil {
+					for k, v := range index[m.Option("right")].Index {
+						// for k, v := range index {
+						for i, j := range v.Commands {
+							for v, n := range j.Shares {
+								for _, nn := range n {
+									match, e := regexp.MatchString(nn, dir)
+									m.Log("fuck", nil, "why %s %s", nn, dir)
+									m.Assert(e)
+									if match {
+										msg.Add("append", "group", k)
+										msg.Add("append", "command", i)
+										msg.Add("append", "argument", v)
+										msg.Add("append", "value", nn)
+										msg.Add("append", "delete", "delete")
+									}
+								}
 							}
 						}
 					}

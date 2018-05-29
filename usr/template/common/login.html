@@ -61,7 +61,11 @@
 		<tr>
 			{{range $key := index $meta "append"}}
 			<td class="{{$key}}">
-				<code>{{index $meta $key $i}}</code>
+				{{if eq $key "delete"}}
+					<button onclick="return deleteshare(event, '{{index $meta "value" $i}}', '{{index $meta "group" $i}}')">delete</button>
+				{{else}}
+					<code>{{index $meta $key $i}}</code>
+				{{end}}
 			</td>
 			{{end}}
 		</tr>
@@ -80,6 +84,14 @@
 			ctx.Refresh();
 		})
 		return false;
+	}
+	function deleteshare(event, file, group) {
+		ctx.POST("/upload", {
+			notshareto: group,
+			sharefile: file,
+		}, function(msg) {
+			ctx.Refresh();
+		})
 	}
 </script>
 {{end}}
