@@ -43,34 +43,34 @@
 		<input type="submit">
 	</form>
 	<table>
-	<colgroup>
-	{{range .append}}
-		<col class="{{.}}">
-	{{end}}
-	</colgroup>
-	<tr>
-	{{range .append}}
-		<th class="{{.}}">{{.}}</th>
-	{{end}}
-	</tr>
-
-	{{$meta := .}}
-	{{if .append}}
-		{{$first := index .append 0}}
-		{{range $i, $k := index . $first}}
-		<tr>
-			{{range $key := index $meta "append"}}
-			<td class="{{$key}}">
-				{{if eq $key "delete"}}
-					<button onclick="return deleteshare(event, '{{index $meta "value" $i}}', '{{index $meta "group" $i}}')">delete</button>
-				{{else}}
-					<code>{{index $meta $key $i}}</code>
-				{{end}}
-			</td>
-			{{end}}
-		</tr>
+		<colgroup>
+		{{range .append}}
+			<col class="{{.}}">
 		{{end}}
-	{{end}}
+		</colgroup>
+		<tr>
+		{{range .append}}
+			<th class="{{.}}">{{.}}</th>
+		{{end}}
+		</tr>
+
+		{{$meta := .}}
+		{{if .append}}
+			{{$first := index .append 0}}
+			{{range $i, $k := index . $first}}
+			<tr>
+				{{range $key := index $meta "append"}}
+				<td class="{{$key}}">
+					{{if eq $key "delete"}}
+						<button onclick="return deleteshare(event, '{{index $meta "value" $i}}', '{{index $meta "group" $i}}')">delete</button>
+					{{else}}
+						<code>{{index $meta $key $i}}</code>
+					{{end}}
+				</td>
+				{{end}}
+			</tr>
+			{{end}}
+		{{end}}
 	</table>
 </fieldset>
 <script>

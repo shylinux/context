@@ -1,0 +1,35 @@
+{{define "head"}}
+<!DOCTYPE html>
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.ico" type="image/x-icon"/>
+<style>
+	legend {
+		font-size:16px;
+		font-weight:bold;
+	}
+	th {
+		cursor:pointer;
+		background-color:lightgray;
+	}
+	code {
+		font-size:14px;
+	}
+	.message {
+		color:red;
+	}
+</style>
+</head>
+<body>
+{{end}}
+
+{{define "message"}}
+<fieldset class="message"><legend>message</legend>
+	<pre>{{index . "message"}}</pre>
+</fieldset>
+{{end}}
+
+{{define "tail"}}
+<script src="library/context.js"></script>
+</body>
+{{end}}

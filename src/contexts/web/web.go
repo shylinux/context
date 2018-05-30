@@ -602,17 +602,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Data["request"].(*http.Request) // {{{
 			w := m.Data["response"].(http.ResponseWriter)
 
-			m.Option("message", "")
 			if !m.Options("file") {
 				m.Option("file", m.Cap("directory"))
 			}
-			dir := m.Option("file")
 
 			if !m.Options("username") {
 				m.Option("username", "")
 			}
 
 			m.Option("right", "")
+			m.Option("message", "")
 			aaa := m.Find("aaa").Cmd("login", m.Option("sessid"))
 			if aaa.Result(0) == "error: " {
 				m.Option("sessid", "")
@@ -620,15 +619,20 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			} else {
 				m.Option("username", aaa.Result(0))
 				msg := m.Spawn(m.Target())
-				msg.Cmd("right", "check", aaa.Cap("group"), "command", "/upload", "file", dir)
+				msg.Cmd("right", "check", aaa.Cap("group"), "command", "/upload", "file", m.Option("file"))
 				if msg.Result(0) == "ok" {
 					m.Option("right", aaa.Cap("group"))
 				} else {
-					m.Option("message", "your do not have the right of", dir)
+					m.Option("message", "your do not have the right of", m.Option("file"))
 				}
 			}
 
 			if m.Option("method") == "POST" {
+				if !m.Options("right") {
+					m.Echo("you do not have the rightt, please contact manager!")
+					return
+				}
+
 				if m.Options("notshareto") {
 					msg := m.Spawn(m.Target())
 					msg.Cmd("right", "del", m.Option("notshareto"), "command", "/upload", "file", m.Option("sharefile"))
@@ -641,7 +645,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Append("link", "hello")
 					return
 				} else if m.Options("content") {
-					name := path.Join(dir, m.Option("filename"))
+					name := path.Join(m.Option("file"), m.Option("filename"))
 					if _, e := os.Stat(name); e != nil {
 						f, e := os.Create(name)
 						m.Assert(e)
@@ -657,7 +661,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					file, header, e := r.FormFile("file")
 					m.Assert(e)
 
-					name := path.Join(dir, header.Filename)
+					name := path.Join(m.Option("file"), header.Filename)
 
 					if _, e := os.Stat(name); e != nil {
 						f, e := os.Create(name)
@@ -670,6 +674,19 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Option("message", name, "already exist!")
 					}
 				}
+			}
+
+			if !m.Options("right") {
+				w.Header().Add("Content-Type", "text/html")
+				tmpl := template.Must(template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
+				m.Assert(tmpl)
+
+				tmpl.ExecuteTemplate(w, "head", m.Meta)
+				tmpl.ExecuteTemplate(w, "login", m.Meta)
+				m.Option("message", "your do not have the right, please contact manager")
+				tmpl.ExecuteTemplate(w, "message", m.Meta)
+				tmpl.ExecuteTemplate(w, "tail", m.Meta)
+				return
 			}
 
 			file := m.Option("file")
@@ -736,46 +753,41 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Assert(tmpl)
 
 			tmpl.ExecuteTemplate(w, "head", m.Meta)
-			if m.Options("right") {
-				tmpl.ExecuteTemplate(w, "userinfo", m.Meta)
+			tmpl.ExecuteTemplate(w, "userinfo", m.Meta)
 
-				msg := m.Spawn(m.Target())
+			msg := m.Spawn(m.Target())
 
-				index := msg.Target().Index
-				if index != nil && index[m.Option("right")] != nil {
-					for k, v := range index[m.Option("right")].Index {
-						// for k, v := range index {
-						for i, j := range v.Commands {
-							for v, n := range j.Shares {
-								for _, nn := range n {
-									match, e := regexp.MatchString(nn, dir)
-									m.Log("fuck", nil, "why %s %s", nn, dir)
-									m.Assert(e)
-									if match {
-										msg.Add("append", "group", k)
-										msg.Add("append", "command", i)
-										msg.Add("append", "argument", v)
-										msg.Add("append", "value", nn)
-										msg.Add("append", "delete", "delete")
-									}
+			index := msg.Target().Index
+			if index != nil && index[m.Option("right")] != nil {
+				for k, v := range index[m.Option("right")].Index {
+					// for k, v := range index {
+					for i, j := range v.Commands {
+						for v, n := range j.Shares {
+							for _, nn := range n {
+								match, e := regexp.MatchString(nn, m.Option("file"))
+								m.Log("fuck", nil, "why %s %s", nn, m.Option("file"))
+								m.Assert(e)
+								if match {
+									msg.Add("append", "group", k)
+									msg.Add("append", "command", i)
+									msg.Add("append", "argument", v)
+									msg.Add("append", "value", nn)
+									msg.Add("append", "delete", "delete")
 								}
 							}
 						}
 					}
 				}
-
-				tmpl.ExecuteTemplate(w, "share", msg.Meta)
-
-				tmpl.ExecuteTemplate(w, "upload", m.Meta)
-			} else {
-				tmpl.ExecuteTemplate(w, "login", m.Meta)
 			}
+
+			tmpl.ExecuteTemplate(w, "share", msg.Meta)
+			tmpl.ExecuteTemplate(w, "upload", m.Meta)
 
 			switch m.Option("cmd") {
 			case "git":
-				branch := m.Find("nfs").Cmd("git", "-C", dir, "branch")
+				branch := m.Find("nfs").Cmd("git", "-C", m.Option("file"), "branch")
 				m.Option("branch", branch.Result(0))
-				status := m.Find("nfs").Cmd("git", "-C", dir, "status")
+				status := m.Find("nfs").Cmd("git", "-C", m.Option("file"), "status")
 				m.Option("status", status.Result(0))
 				tmpl.ExecuteTemplate(w, "git", m.Meta)
 			}
@@ -785,9 +797,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			tmpl.ExecuteTemplate(w, "list", m.Meta)
-			if m.Options("right") {
-				tmpl.ExecuteTemplate(w, "create", m.Meta)
-			}
+			tmpl.ExecuteTemplate(w, "create", m.Meta)
 			tmpl.ExecuteTemplate(w, "tail", m.Meta)
 			delete(m.Meta, "result")
 			delete(m.Meta, "append")
@@ -898,6 +908,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
+		}},
+		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Data["response"].(http.ResponseWriter)
+
+			w.Header().Add("Content-Type", "text/html")
+			tmpl := template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html"))
+			m.Assert(tmpl)
+
+			tmpl.ExecuteTemplate(w, "head", m.Meta)
+			tmpl.ExecuteTemplate(w, "tail", m.Meta)
 		}},
 	},
 }

@@ -1,16 +1,66 @@
-{{define "head"}}
-<!DOCTYPE html>
-<head>
-<meta charset="UTF-8">
+{{define "git"}}
+<fieldset><legend>branch</legend>
+	<pre>{{index . "branch"}}</pre>
+</fieldset>
+<fieldset><legend>status</legend>
+	<pre>{{index . "status"}}</pre>
+</fieldset>
+{{end}}
+
+{{define "upload"}}
+<fieldset><legend>upload</legend>
+	<form method="POST" action="/upload" enctype="multipart/form-data">
+		<input type="file" name="file"><input type="submit">
+	</form>
+</fieldset>
+{{end}}
+
+{{define "list"}}
+<fieldset><legend><input type="text" id="dir" value="{{index .file 0}}" onkeydown="return Change(event)"></legend>
+	<table>
+		<colgroup>
+		{{range .append}}
+			<col class="{{.}}">
+		{{end}}
+		</colgroup>
+		<tr>
+		{{$sort := index . "sort" 0}}
+		{{$reverse := index . "reverse" 0}}
+		{{range .append}}
+			{{if eq $sort .}}
+				<th class="{{.}} sort" onclick="list('{{.}}')">{{.}}</th>
+			{{else if eq $reverse .}}
+				<th class="{{.}} reverse" onclick="list('{{.}}')">{{.}}</th>
+			{{else if eq . "path"}}
+			{{else}}
+				<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>
+			{{end}}
+		{{end}}
+		</tr>
+
+		{{$meta := .}}
+		{{if .append}}
+			{{$first := index .append 0}}
+			{{range $i, $k := index . $first}}
+			<tr>
+				{{range $key := index $meta "append"}}
+					{{if eq $key "name"}}
+						<td class="{{$key}}">
+							<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
+						</td>
+					{{else if eq $key "path"}}
+					{{else}}
+						<td class="{{$key}}">
+							<code>{{index $meta $key $i}}</code>
+						</td>
+					{{end}}
+				{{end}}
+			</tr>
+			{{end}}
+		{{end}}
+	</table>
+</fieldset>
 <style>
-	legend {
-		font-size:16px;
-		font-weight:bold;
-	}
-	th {
-		cursor:pointer;
-		background-color:lightgray;
-	}
 	.time {
 		padding-right:20px;
 	}
@@ -28,104 +78,9 @@
 	.reverse {
 		color:green;
 	}
-	.message {
-		color:red;
-	}
-	code {
-		font-size:14px;
-	}
 </style>
-</head>
-<body>
-{{end}}
-
-{{define "git"}}
-	<fieldset><legend>branch</legend>
-		<pre>{{index . "branch"}}</pre>
-	</fieldset>
-	<fieldset><legend>status</legend>
-		<pre>{{index . "status"}}</pre>
-	</fieldset>
-{{end}}
-
-{{define "upload"}}
-	<fieldset><legend>upload</legend>
-		<form method="POST" action="/upload" enctype="multipart/form-data">
-			<input type="file" name="file"><input type="submit">
-		</form>
-	</fieldset>
-{{end}}
-
-{{define "message"}}
-<fieldset class="message"><legend>message</legend>
-	<pre>{{index . "message"}}</pre>
-</fieldset>
-{{end}}
-
-{{define "list"}}
-	<fieldset><legend><input type="text" id="dir" value="{{index .file 0}}" onkeydown="return Change(event)"></legend>
-	<table>
-	<colgroup>
-		{{range .append}}
-			<col class="{{.}}">
-		{{end}}
-	</colgroup>
-	<tr>
-		{{$sort := index . "sort" 0}}
-		{{$reverse := index . "reverse" 0}}
-		{{range .append}}
-			{{if eq $sort .}}
-				<th class="{{.}} sort" onclick="list('{{.}}')">{{.}}</th>
-			{{else if eq $reverse .}}
-				<th class="{{.}} reverse" onclick="list('{{.}}')">{{.}}</th>
-			{{else if eq . "path"}}
-			{{else}}
-				<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>
-			{{end}}
-		{{end}}
-	</tr>
-	<script>
-		var file = '{{index .file 0}}';
-	</script>
-
-	{{$meta := .}}
-	{{if .append}}
-	{{$first := index .append 0}}
-	{{range $i, $k := index . $first}}
-	<tr>
-		{{range $key := index $meta "append"}}
-			{{if eq $key "name"}}
-				<td class="{{$key}}">
-					<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
-				</td>
-			{{else if eq $key "path"}}
-			{{else}}
-				<td class="{{$key}}">
-					<code>{{index $meta $key $i}}</code>
-				</td>
-			{{end}}
-		{{end}}
-	</tr>
-	{{end}}
-	{{end}}
-	</table>
-	</fieldset>
-{{end}}
-
-{{define "create"}}
-<fieldset><legend>create</legend>
-	<form method="POST" action="/upload">
-		<table>
-			<tr><td>filename:</td><td><input type="text" name="filename" required><input type="submit"></td></tr>
-			<tr><td>content:</td><td><textarea rows="5" cols="80" name="content" required></textarea></td></tr>
-		</table>
-	</form>
-</fieldset>
-{{end}}
-
-{{define "tail"}}
-<script src="library/context.js"></script>
 <script>
+	var file = '{{index .file 0}}';
 	function Change(event) {
 		if (event.keyCode == 13) {
 			ctx.Search("file", event.target.value);
@@ -138,5 +93,15 @@
 		location.assign(location.href)
 	}
 </script>
-</body>
+{{end}}
+
+{{define "create"}}
+<fieldset><legend>create</legend>
+	<form method="POST" action="/upload">
+		<table>
+			<tr><td>filename:</td><td><input type="text" name="filename" required><input type="submit"></td></tr>
+			<tr><td>content:</td><td><textarea rows="5" cols="80" name="content" required></textarea></td></tr>
+		</table>
+	</form>
+</fieldset>
 {{end}}

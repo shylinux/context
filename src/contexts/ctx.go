@@ -2382,7 +2382,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							}
 							if len(arg) > 3 {
 								for _, v := range group.Commands[item].Shares[arg[2]] {
-									if arg[3] == v {
+									match, e := regexp.MatchString(v, arg[3])
+									m.Assert(e)
+									if match {
 										m.Echo("ok")
 										return
 									}
