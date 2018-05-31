@@ -1,7 +1,7 @@
 {{define "login"}}
 <fieldset><legend>login</legend>
 	<form method="POST" action="/login" onsubmit="return login(event)">
-		<label>username:</label><input type="text" name="username" value="{{index .username 0}}" required autofocus>
+		<label>username:</label><input type="text" name="username" value="{{meta .username}}" required autofocus>
 		<label>password:</label><input type="password" name="password" required>
 		<input type="submit">
 	</form>

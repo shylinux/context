@@ -2,7 +2,6 @@
 <!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
-<link rel="icon" href="favicon.ico" type="image/x-icon"/>
 <style>
 	legend {
 		font-size:16px;
@@ -21,11 +20,15 @@
 </style>
 </head>
 <body>
+<pre>
+{{meta .Meta}}<br/>
+{{meta . "context"}}<br/>
+</pre>
 {{end}}
 
 {{define "message"}}
 <fieldset class="message"><legend>message</legend>
-	<pre>{{index . "message"}}</pre>
+	<pre>{{meta . "message"}}</pre>
 </fieldset>
 {{end}}
 

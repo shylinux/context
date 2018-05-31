@@ -85,6 +85,71 @@ type WEB struct {
 	*ctx.Context
 }
 
+var funcmap = template.FuncMap{"meta": func(arg ...interface{}) string {
+	if len(arg) == 0 {
+		return ""
+	}
+
+	up := ""
+	if m, ok := arg[0].(*ctx.Message); ok {
+		if len(arg) == 1 {
+			return fmt.Sprintf("%v", m)
+		} else {
+			arg[0] = m.Meta
+			if key, ok := arg[1].(string); ok {
+				switch key {
+				case "context":
+					msg := m.Spawn(m.Target())
+					msg.Cmd("context")
+					up = strings.Join(msg.Meta["result"], "")
+				}
+			}
+		}
+	}
+
+	list := []string{}
+	switch data := arg[0].(type) {
+	case map[string][]string:
+		if len(arg) == 1 {
+			list = append(list, fmt.Sprintf("detail: %s\n", data["detail"]))
+			list = append(list, fmt.Sprintf("option: %s\n", data["option"]))
+			list = append(list, fmt.Sprintf("result: %s\n", data["result"]))
+			list = append(list, fmt.Sprintf("append: %s\n", data["append"]))
+			break
+		}
+		if key, ok := arg[1].(string); ok {
+			if list, ok = data[key]; ok {
+				arg = arg[1:]
+			} else {
+				return up
+			}
+		} else {
+			return fmt.Sprintf("%v", data)
+		}
+	case []string:
+		list = data
+	default:
+		if data == nil {
+			return ""
+		}
+		return fmt.Sprintf("%v", data)
+	}
+
+	if len(arg) == 1 {
+		return strings.Join(list, "")
+	}
+
+	index, ok := arg[1].(int)
+	if !ok {
+		return strings.Join(list, "")
+	}
+
+	if index >= len(list) {
+		return ""
+	}
+	return list[index]
+}}
+
 func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // {{{
 	add, e := url.Parse(uri)
 	m.Assert(e)
@@ -678,7 +743,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			if !m.Options("right") {
 				w.Header().Add("Content-Type", "text/html")
-				tmpl := template.Must(template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
+				tmpl := template.Must(template.Must(template.New("fuck").Funcs(funcmap).ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
 				m.Assert(tmpl)
 
 				tmpl.ExecuteTemplate(w, "head", m.Meta)
@@ -749,7 +814,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			tmpl := template.Must(template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
+			tmpl := template.Must(template.Must(template.New("fuck").Funcs(funcmap).ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
 			m.Assert(tmpl)
 
 			tmpl.ExecuteTemplate(w, "head", m.Meta)
@@ -861,7 +926,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			tmpl := template.Must(template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "travel.html"))
+			tmpl := template.Must(template.Must(template.New("fuck").Funcs(funcmap).ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "travel.html"))
 			m.Assert(tmpl)
 
 			m.Assert(tmpl.ExecuteTemplate(w, "head", m.Meta))
@@ -913,10 +978,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			w := m.Data["response"].(http.ResponseWriter)
 
 			w.Header().Add("Content-Type", "text/html")
-			tmpl := template.Must(template.ParseGlob(m.Conf("template_dir") + "/common/*.html"))
+			tmpl := template.Must(template.New("fuck").Funcs(funcmap).ParseGlob(m.Conf("template_dir") + "/common/*.html"))
 			m.Assert(tmpl)
 
-			tmpl.ExecuteTemplate(w, "head", m.Meta)
+			m.Option("message", "hello")
+			tmpl.ExecuteTemplate(w, "head", m)
 			tmpl.ExecuteTemplate(w, "tail", m.Meta)
 		}},
 	},
