@@ -1,6 +1,6 @@
 {{define "login"}}
 <fieldset><legend>login</legend>
-	<form method="POST" action="/login" onsubmit="return login(event)">
+	<form method="POST" onsubmit="return login(event)">
 		<label>username:</label><input type="text" name="username" value="{{meta .username}}" required autofocus>
 		<label>password:</label><input type="password" name="password" required>
 		<input type="submit">
@@ -24,9 +24,15 @@
 
 {{define "userinfo"}}
 <fieldset><legend>userinfo</legend>
-	welcome {{index .username 0}}
+	welcome <span class="username">{{meta .username}}</span> to context world
 	<button onclick="return logout(event)">logout</button>
 </fieldset>
+<style>
+	.username {
+		color:red;
+		font-weight:bold;
+	}
+</style>
 <script>
 	function logout(event) {
 		ctx.Cookie("sessid", "");
@@ -38,43 +44,35 @@
 
 {{define "share"}}
 <fieldset><legend>share</legend>
-	<form method="POST" onsubmit="return share(event)">
+	<form method="POST" onsubmit="return share(event, '{{msg . "option" "file"}}')">
 		<label>share to:</label><input type="text" name="shareto" required>
 		<input type="submit">
 	</form>
 	<table>
-		<colgroup>
-		{{range .append}}
-			<col class="{{.}}">
-		{{end}}
-		</colgroup>
-		<tr>
-		{{range .append}}
-			<th class="{{.}}">{{.}}</th>
-		{{end}}
-		</tr>
+		<colgroup>{{range .Meta.append}}<col class="{{.}}">{{end}}</colgroup>
+		<tr>{{range .Meta.append}}<th class="{{.}}">{{.}}</th>{{end}}</tr>
 
-		{{$meta := .}}
-		{{if .append}}
-			{{$first := index .append 0}}
-			{{range $i, $k := index . $first}}
-			<tr>
-				{{range $key := index $meta "append"}}
-				<td class="{{$key}}">
-					{{if eq $key "delete"}}
-						<button onclick="return deleteshare(event, '{{index $meta "value" $i}}', '{{index $meta "group" $i}}')">delete</button>
-					{{else}}
-						<code>{{index $meta $key $i}}</code>
-					{{end}}
-				</td>
+		{{if .Meta.append}}
+		{{$meta := .Meta}}
+		{{$first := index .Meta.append 0}}
+		{{range $i, $k := index $meta $first}}
+		<tr>
+			{{range $key := index $meta "append"}}
+			<td class="{{$key}}">
+				{{if eq $key "delete"}}
+					<button onclick="return deleteshare(event, '{{index $meta "value" $i}}', '{{index $meta "group" $i}}')">delete</button>
+				{{else}}
+					<code>{{index $meta $key $i}}</code>
 				{{end}}
-			</tr>
+			</td>
 			{{end}}
+		</tr>
+		{{end}}
 		{{end}}
 	</table>
 </fieldset>
 <script>
-	function share(event) {
+	function share(event, file) {
 		var fields = event.target.elements;
 		var shareto = fields["shareto"].value
 		ctx.POST("/upload", {

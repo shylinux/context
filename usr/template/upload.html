@@ -7,25 +7,14 @@
 </fieldset>
 {{end}}
 
-{{define "upload"}}
-<fieldset><legend>upload</legend>
-	<form method="POST" action="/upload" enctype="multipart/form-data">
-		<input type="file" name="file"><input type="submit">
-	</form>
-</fieldset>
-{{end}}
-
 {{define "list"}}
-<fieldset><legend><input type="text" id="dir" value="{{index .file 0}}" onkeydown="return Change(event)"></legend>
+<fieldset><legend><input type="text" id="dir" value="{{meta .file}}" onkeydown="return Change(event)"></legend>
 	<table>
-		<colgroup>
-		{{range .append}}
-			<col class="{{.}}">
-		{{end}}
-		</colgroup>
+		<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
+
 		<tr>
-		{{$sort := index . "sort" 0}}
-		{{$reverse := index . "reverse" 0}}
+		{{$sort := meta .sort}}
+		{{$reverse := meta .reverse}}
 		{{range .append}}
 			{{if eq $sort .}}
 				<th class="{{.}} sort" onclick="list('{{.}}')">{{.}}</th>
@@ -38,25 +27,25 @@
 		{{end}}
 		</tr>
 
-		{{$meta := .}}
 		{{if .append}}
-			{{$first := index .append 0}}
-			{{range $i, $k := index . $first}}
-			<tr>
-				{{range $key := index $meta "append"}}
-					{{if eq $key "name"}}
-						<td class="{{$key}}">
-							<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
-						</td>
-					{{else if eq $key "path"}}
-					{{else}}
-						<td class="{{$key}}">
-							<code>{{index $meta $key $i}}</code>
-						</td>
-					{{end}}
+		{{$meta := .}}
+		{{$first := index .append 0}}
+		{{range $i, $k := index . $first}}
+		<tr>
+			{{range $key := index $meta "append"}}
+				{{if eq $key "name"}}
+					<td class="{{$key}}">
+						<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
+					</td>
+				{{else if eq $key "path"}}
+				{{else}}
+					<td class="{{$key}}">
+						<code>{{index $meta $key $i}}</code>
+					</td>
 				{{end}}
-			</tr>
 			{{end}}
+		</tr>
+		{{end}}
 		{{end}}
 	</table>
 </fieldset>
@@ -80,7 +69,6 @@
 	}
 </style>
 <script>
-	var file = '{{index .file 0}}';
 	function Change(event) {
 		if (event.keyCode == 13) {
 			ctx.Search("file", event.target.value);
@@ -88,11 +76,19 @@
 	}
 
 	function list(what) {
+		ctx.Cookie("order", ctx.Cookie("order")*1 + 1);
 		ctx.Cookie("list", what);
-		ctx.Cookie("order", ctx.Cookie("order")*1 + 1)
-		location.assign(location.href)
+		ctx.Refresh();
 	}
 </script>
+{{end}}
+
+{{define "upload"}}
+<fieldset><legend>upload</legend>
+	<form method="POST" action="/upload" enctype="multipart/form-data">
+		<input type="file" name="file"><input type="submit">
+	</form>
+</fieldset>
 {{end}}
 
 {{define "create"}}

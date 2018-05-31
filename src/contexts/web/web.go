@@ -85,70 +85,88 @@ type WEB struct {
 	*ctx.Context
 }
 
-var funcmap = template.FuncMap{"meta": func(arg ...interface{}) string {
-	if len(arg) == 0 {
-		return ""
-	}
-
-	up := ""
-	if m, ok := arg[0].(*ctx.Message); ok {
-		if len(arg) == 1 {
-			return fmt.Sprintf("%v", m)
-		} else {
-			arg[0] = m.Meta
-			if key, ok := arg[1].(string); ok {
-				switch key {
-				case "context":
-					msg := m.Spawn(m.Target())
-					msg.Cmd("context")
-					up = strings.Join(msg.Meta["result"], "")
-				}
-			}
-		}
-	}
-
-	list := []string{}
-	switch data := arg[0].(type) {
-	case map[string][]string:
-		if len(arg) == 1 {
-			list = append(list, fmt.Sprintf("detail: %s\n", data["detail"]))
-			list = append(list, fmt.Sprintf("option: %s\n", data["option"]))
-			list = append(list, fmt.Sprintf("result: %s\n", data["result"]))
-			list = append(list, fmt.Sprintf("append: %s\n", data["append"]))
-			break
-		}
-		if key, ok := arg[1].(string); ok {
-			if list, ok = data[key]; ok {
-				arg = arg[1:]
-			} else {
-				return up
-			}
-		} else {
-			return fmt.Sprintf("%v", data)
-		}
-	case []string:
-		list = data
-	default:
-		if data == nil {
+var funcmap = template.FuncMap{
+	"meta": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
 			return ""
 		}
-		return fmt.Sprintf("%v", data)
-	}
 
-	if len(arg) == 1 {
-		return strings.Join(list, "")
-	}
+		up := ""
 
-	index, ok := arg[1].(int)
-	if !ok {
-		return strings.Join(list, "")
-	}
+		list := []string{}
+		switch data := arg[0].(type) {
+		case map[string][]string:
+			if len(arg) == 1 {
+				list = append(list, fmt.Sprintf("detail: %s\n", data["detail"]))
+				list = append(list, fmt.Sprintf("option: %s\n", data["option"]))
+				list = append(list, fmt.Sprintf("result: %s\n", data["result"]))
+				list = append(list, fmt.Sprintf("append: %s\n", data["append"]))
+				break
+			}
+			if key, ok := arg[1].(string); ok {
+				if list, ok = data[key]; ok {
+					arg = arg[1:]
+				} else {
+					return up
+				}
+			} else {
+				return fmt.Sprintf("%v", data)
+			}
+		case []string:
+			list = data
+		default:
+			if data == nil {
+				return ""
+			}
+			return fmt.Sprintf("%v", data)
+		}
 
-	if index >= len(list) {
+		if len(arg) == 1 {
+			return strings.Join(list, "")
+		}
+
+		index, ok := arg[1].(int)
+		if !ok {
+			return strings.Join(list, "")
+		}
+
+		if index >= len(list) {
+			return ""
+		}
+		return list[index]
+	}, // }}}
+	"msg": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+		if m, ok := arg[0].(*ctx.Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+
+			switch action := arg[1].(type) {
+			case string:
+				switch action {
+				case "option":
+					if len(arg) == 2 {
+						return fmt.Sprintf("%v", m.Meta["option"])
+					}
+
+					key, _ := arg[2].(string)
+					if len(arg) == 3 {
+						return m.Option(key)
+					}
+					value, _ := arg[3].(string)
+					if len(arg) == 4 {
+						return m.Option(key, value)
+					}
+				}
+			case int:
+			}
+		}
 		return ""
-	}
-	return list[index]
-}}
+	}, // }}}
+}
 
 func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // {{{
 	add, e := url.Parse(uri)
@@ -671,10 +689,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Option("file", m.Cap("directory"))
 			}
 
-			if !m.Options("username") {
-				m.Option("username", "")
-			}
-
 			m.Option("right", "")
 			m.Option("message", "")
 			aaa := m.Find("aaa").Cmd("login", m.Option("sessid"))
@@ -714,9 +728,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if _, e := os.Stat(name); e != nil {
 						f, e := os.Create(name)
 						m.Assert(e)
+						defer f.Close()
 
 						_, e = f.WriteString(m.Option("content"))
-						defer f.Close()
 						m.Assert(e)
 						m.Option("message", name, "upload success!")
 					} else {
@@ -731,6 +745,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if _, e := os.Stat(name); e != nil {
 						f, e := os.Create(name)
 						m.Assert(e)
+						defer f.Close()
 
 						_, e = io.Copy(f, file)
 						m.Assert(e)
@@ -741,27 +756,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 
+			tmpl := template.Must(template.Must(template.New("fuck").Funcs(funcmap).ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
+			m.Assert(tmpl)
+
 			if !m.Options("right") {
 				w.Header().Add("Content-Type", "text/html")
-				tmpl := template.Must(template.Must(template.New("fuck").Funcs(funcmap).ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
-				m.Assert(tmpl)
-
 				tmpl.ExecuteTemplate(w, "head", m.Meta)
 				tmpl.ExecuteTemplate(w, "login", m.Meta)
-				m.Option("message", "your do not have the right, please contact manager")
 				tmpl.ExecuteTemplate(w, "message", m.Meta)
 				tmpl.ExecuteTemplate(w, "tail", m.Meta)
 				return
 			}
 
-			file := m.Option("file")
-			s, e := os.Stat(file)
+			s, e := os.Stat(m.Option("file"))
 			if m.Assert(e); !s.IsDir() {
-				http.ServeFile(w, r, file)
+				http.ServeFile(w, r, m.Option("file"))
 				return
 			}
 
-			fs, e := ioutil.ReadDir(file)
+			fs, e := ioutil.ReadDir(m.Option("file"))
 			m.Assert(e)
 
 			max := true
@@ -798,6 +811,30 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 
+			share := m.Spawn(m.Target())
+			index := share.Target().Index
+			if index != nil && index[m.Option("right")] != nil {
+				for k, v := range index[m.Option("right")].Index {
+					for i, j := range v.Commands {
+						for v, n := range j.Shares {
+							for _, nn := range n {
+								match, e := regexp.MatchString(nn, m.Option("file"))
+								m.Assert(e)
+								if match {
+									share.Add("append", "group", k)
+									share.Add("append", "command", i)
+									share.Add("append", "argument", v)
+									share.Add("append", "value", nn)
+									share.Add("append", "delete", "delete")
+								}
+							}
+						}
+					}
+				}
+			}
+
+			list := m.Spawn(m.Target())
+			list.Option("file", m.Option("file"))
 			for _, v := range fs {
 				name := v.Name()
 				if v.IsDir() {
@@ -807,46 +844,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					continue
 				}
 
-				m.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
-				m.Add("append", "size", kit.FmtSize(v.Size()))
-				m.Add("append", "name", name)
-				m.Add("append", "path", path.Join(m.Option("file"), name))
+				list.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
+				list.Add("append", "size", kit.FmtSize(v.Size()))
+				list.Add("append", "name", name)
+				list.Add("append", "path", path.Join(m.Option("file"), name))
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			tmpl := template.Must(template.Must(template.New("fuck").Funcs(funcmap).ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "upload.html"))
-			m.Assert(tmpl)
-
 			tmpl.ExecuteTemplate(w, "head", m.Meta)
-			tmpl.ExecuteTemplate(w, "userinfo", m.Meta)
-
-			msg := m.Spawn(m.Target())
-
-			index := msg.Target().Index
-			if index != nil && index[m.Option("right")] != nil {
-				for k, v := range index[m.Option("right")].Index {
-					// for k, v := range index {
-					for i, j := range v.Commands {
-						for v, n := range j.Shares {
-							for _, nn := range n {
-								match, e := regexp.MatchString(nn, m.Option("file"))
-								m.Log("fuck", nil, "why %s %s", nn, m.Option("file"))
-								m.Assert(e)
-								if match {
-									msg.Add("append", "group", k)
-									msg.Add("append", "command", i)
-									msg.Add("append", "argument", v)
-									msg.Add("append", "value", nn)
-									msg.Add("append", "delete", "delete")
-								}
-							}
-						}
-					}
-				}
+			if m.Options("message") {
+				tmpl.ExecuteTemplate(w, "message", m.Meta)
 			}
 
-			tmpl.ExecuteTemplate(w, "share", msg.Meta)
-			tmpl.ExecuteTemplate(w, "upload", m.Meta)
+			tmpl.ExecuteTemplate(w, "userinfo", m.Meta)
+			tmpl.ExecuteTemplate(w, "share", share)
+			tmpl.ExecuteTemplate(w, "list", list.Meta)
 
 			switch m.Option("cmd") {
 			case "git":
@@ -857,15 +869,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				tmpl.ExecuteTemplate(w, "git", m.Meta)
 			}
 
-			if m.Options("message") {
-				tmpl.ExecuteTemplate(w, "message", m.Meta)
-			}
-
-			tmpl.ExecuteTemplate(w, "list", m.Meta)
+			tmpl.ExecuteTemplate(w, "upload", m.Meta)
 			tmpl.ExecuteTemplate(w, "create", m.Meta)
 			tmpl.ExecuteTemplate(w, "tail", m.Meta)
-			delete(m.Meta, "result")
-			delete(m.Meta, "append")
 			// }}}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
