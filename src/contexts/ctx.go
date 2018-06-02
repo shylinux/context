@@ -5,6 +5,7 @@ import ( // {{{
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"math/rand"
 	"os"
@@ -878,10 +879,13 @@ func (m *Message) Sess(key string, arg ...string) *Message { // {{{
 // }}}
 func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
 	if _, ok := m.Sessions[key]; !ok && len(arg) > 0 {
-		switch msg := arg[0].(type) {
+		switch value := arg[0].(type) {
 		case *Message:
-			m.Sessions[key] = msg
-			return msg
+			m.Sessions[key] = value
+			return m.Sessions[key]
+		case *Context:
+			m.Sessions[key] = m.Spawn(value)
+			return m.Sessions[key]
 		}
 
 		root := true
@@ -1586,6 +1590,306 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 }
 
 // }}}
+
+var CGI = template.FuncMap{
+	"meta": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		up := ""
+
+		list := []string{}
+		switch data := arg[0].(type) {
+		case map[string][]string:
+			if len(arg) == 1 {
+				list = append(list, fmt.Sprintf("detail: %s\n", data["detail"]))
+				list = append(list, fmt.Sprintf("option: %s\n", data["option"]))
+				list = append(list, fmt.Sprintf("result: %s\n", data["result"]))
+				list = append(list, fmt.Sprintf("append: %s\n", data["append"]))
+				break
+			}
+			if key, ok := arg[1].(string); ok {
+				if list, ok = data[key]; ok {
+					arg = arg[1:]
+				} else {
+					return up
+				}
+			} else {
+				return fmt.Sprintf("%v", data)
+			}
+		case []string:
+			list = data
+		default:
+			if data == nil {
+				return ""
+			}
+			return fmt.Sprintf("%v", data)
+		}
+
+		if len(arg) == 1 {
+			return strings.Join(list, "")
+		}
+
+		index, ok := arg[1].(int)
+		if !ok {
+			return strings.Join(list, "")
+		}
+
+		if index >= len(list) {
+			return ""
+		}
+		return list[index]
+	}, // }}}
+	"sess": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+
+			switch which := arg[1].(type) {
+			case string:
+				m.Log("fuck", nil, "sesss %s", which)
+				m.Sesss(which, arg[2:]...)
+				return ""
+			}
+		}
+		return ""
+	}, // }}}
+
+	"ctx": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+
+			switch which := arg[1].(type) {
+			case string:
+				switch which {
+				case "name":
+					return fmt.Sprintf("%s", m.target.Name)
+				case "help":
+					return fmt.Sprintf("%s", m.target.Help)
+				case "context":
+					return fmt.Sprintf("%s", m.target.context.Name)
+				case "contexts":
+					ctx := []string{}
+					for _, v := range m.target.contexts {
+						ctx = append(ctx, fmt.Sprintf("%d", v.Name))
+					}
+					return strings.Join(ctx, " ")
+				case "time":
+					return m.time.Format("2006-01-02 15:04:05")
+				case "source":
+					return m.source.Name
+				case "target":
+					return m.target.Name
+				case "message":
+					return fmt.Sprintf("%d", m.message.code)
+				case "messages":
+				case "sessions":
+					msg := []string{}
+					for k, _ := range m.Sessions {
+						msg = append(msg, fmt.Sprintf("%s", k))
+					}
+					return strings.Join(msg, " ")
+				}
+			case int:
+			}
+		}
+		return ""
+	}, // }}}
+	"msg": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+
+			switch which := arg[1].(type) {
+			case string:
+				switch which {
+				case "code":
+					return fmt.Sprintf("%d", m.code)
+				case "time":
+					return m.time.Format("2006-01-02 15:04:05")
+				case "source":
+					return m.source.Name
+				case "target":
+					return m.target.Name
+				case "message":
+					return fmt.Sprintf("%d", m.message.code)
+				case "messages":
+					msg := []string{}
+					for _, v := range m.messages {
+						msg = append(msg, fmt.Sprintf("%d", v.code))
+					}
+					return strings.Join(msg, " ")
+				case "sessions":
+					msg := []string{}
+					for k, _ := range m.Sessions {
+						msg = append(msg, fmt.Sprintf("%s", k))
+					}
+					return strings.Join(msg, " ")
+				}
+			case int:
+			}
+		}
+		return ""
+	}, // }}}
+
+	"cap": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+
+			switch which := arg[1].(type) {
+			case string:
+				if len(arg) == 2 {
+					return m.Cap(which)
+				}
+
+				switch value := arg[2].(type) {
+				case string:
+					return m.Cap(which, value)
+				case int:
+					return fmt.Sprintf("%d", m.Capi(which, value))
+				case bool:
+					return fmt.Sprintf("%t", m.Caps(which, value))
+				default:
+					return m.Cap(which, fmt.Sprintf("%v", arg[2]))
+				}
+			}
+		}
+		return ""
+	}, // }}}
+	"conf": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+
+			switch which := arg[1].(type) {
+			case string:
+				if len(arg) == 2 {
+					return m.Conf(which)
+				}
+
+				switch value := arg[2].(type) {
+				case string:
+					return m.Conf(which, value)
+				case int:
+					return fmt.Sprintf("%d", m.Confi(which, value))
+				case bool:
+					return fmt.Sprintf("%t", m.Confs(which, value))
+				default:
+					return m.Conf(which, fmt.Sprintf("%v", arg[2]))
+				}
+			}
+		}
+		return ""
+	}, // }}}
+	"cmd": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+
+			msg := m.Spawn(m.Target()).Cmd(arg[1:]...)
+			return strings.Join(msg.Meta["result"], "")
+		}
+		return ""
+	}, // }}}
+
+	"detail": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return strings.Join(m.Meta["detail"], "")
+			}
+			return m.Detail(0, arg[1:]...)
+		}
+		return ""
+	}, // }}}
+	"option": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+			switch which := arg[1].(type) {
+			case string:
+				if len(arg) == 2 {
+					return m.Option(which)
+				}
+
+				return m.Option(which, arg[2:]...)
+			}
+		}
+		return ""
+	}, // }}}
+	"result": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return strings.Join(m.Meta["result"], "")
+			}
+			return m.Result(0, arg[1:]...)
+		}
+		return ""
+	}, // }}}
+	"append": func(arg ...interface{}) string { // {{{
+		if len(arg) == 0 {
+			return ""
+		}
+
+		if m, ok := arg[0].(*Message); ok {
+			if len(arg) == 1 {
+				return fmt.Sprintf("%v", m)
+			}
+			switch which := arg[1].(type) {
+			case string:
+				if len(arg) == 2 {
+					return m.Append(which)
+				}
+
+				return m.Append(which, arg[2:]...)
+			}
+		}
+		return ""
+	}, // }}}
+}
 
 var Pulse = &Message{
 	code:     0,

@@ -1,12 +1,3 @@
-{{define "git"}}
-<fieldset><legend>branch</legend>
-	<pre>{{index . "branch"}}</pre>
-</fieldset>
-<fieldset><legend>status</legend>
-	<pre>{{index . "status"}}</pre>
-</fieldset>
-{{end}}
-
 {{define "list"}}
 <fieldset><legend><input type="text" id="dir" value="{{meta .file}}" onkeydown="return Change(event)"></legend>
 	<table>
@@ -83,6 +74,15 @@
 </script>
 {{end}}
 
+{{define "git"}}
+<fieldset><legend>branch</legend>
+	<pre>{{index . "branch"}}</pre>
+</fieldset>
+<fieldset><legend>status</legend>
+	<pre>{{index . "status"}}</pre>
+</fieldset>
+{{end}}
+
 {{define "upload"}}
 <fieldset><legend>upload</legend>
 	<form method="POST" action="/upload" enctype="multipart/form-data">
@@ -96,8 +96,33 @@
 	<form method="POST" action="/upload">
 		<table>
 			<tr><td>filename:</td><td><input type="text" name="filename" required><input type="submit"></td></tr>
-			<tr><td>content:</td><td><textarea rows="5" cols="80" name="content" required></textarea></td></tr>
+			<tr><td>content:</td><td><textarea rows="5" cols="80" name="content"></textarea></td></tr>
 		</table>
 	</form>
 </fieldset>
 {{end}}
+
+{{define "main"}}
+{{$msg := .}}
+{{$meta := .Meta}}
+{{range .Meta.tmpl}}
+	{{if eq . "login"}}
+		{{template "login" $meta}}
+	{{else if eq . "userinfo"}}
+		{{template "userinfo" $meta}}
+	{{else if eq . "share"}}
+		{{template "share" $msg.Sessions.share}}
+	{{else if eq . "list"}}
+		{{template "list" $msg.Sessions.list.Meta}}
+	{{else if eq . "git"}}
+		{{if $msg.Sessions.git}}
+			{{template "git" $msg.Sessions.git.Meta}}
+		{{end}}
+	{{else if eq . "upload"}}
+		{{template "upload" $meta}}
+	{{else if eq . "create"}}
+		{{template "create" $meta}}
+	{{end}}
+{{end}}
+{{end}}
+

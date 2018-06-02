@@ -1,0 +1,9 @@
+{{$msg := .}}
+{{$meta := .Meta}}
+
+{{template "head" $meta}}
+{{if meta $meta.message}}
+	{{template "message" $meta}}
+{{end}}
+{{template "main" $msg}}
+{{template "tail" $meta}}
