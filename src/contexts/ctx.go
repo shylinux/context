@@ -1960,9 +1960,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Color(32, "ctx ").Color(33, "cli ").Color(31, "aaa ").Color(33, "web\n")
 				m.Color(32, "lex ").Color(33, "yac ").Color(31, "log ").Color(33, "gdb\n")
 				m.Color(32, "tcp ").Color(33, "nfs ").Color(31, "ssh ").Color(33, "mdb\n")
-				m.Echo("\n")
-
-				m.Color(31, " edukid ").Color(32, "etcvpn\n")
+				m.Color(31, "template ").Color(32, "script\n")
 				return
 			}
 

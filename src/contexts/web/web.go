@@ -614,6 +614,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 权限检查
 			m.Option("right", "")
 			m.Option("message", "")
+			m.Option("username", "")
 			aaa := m.Find("aaa").Cmd("login", m.Option("sessid"))
 			if aaa.Result(0) == "error: " {
 				m.Option("sessid", "")
@@ -891,6 +892,24 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			delete(m.Meta, "result")
 			delete(m.Meta, "append")
 			// }}}
+		}},
+		"/check": &ctx.Command{Name: "/check", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Option("right", "")
+			m.Option("message", "")
+			m.Option("username", "")
+			aaa := m.Find("aaa").Cmd("login", m.Option("sessid"))
+			if aaa.Result(0) == "error: " {
+				m.Option("sessid", "")
+				m.Option("message", "login failure")
+			} else {
+				m.Option("username", aaa.Result(0))
+				msg := m.Spawn(m.Target()).Cmd("right", "check", aaa.Cap("group"), "command", "/upload", "file", m.Option("file"))
+				if msg.Result(0) == "ok" {
+					m.Option("right", aaa.Cap("group"))
+				} else {
+					m.Option("message", "your do not have the right of ", m.Option("file"))
+				}
+			}
 		}},
 		"/login": &ctx.Command{Name: "/login", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			w := m.Data["response"].(http.ResponseWriter)
