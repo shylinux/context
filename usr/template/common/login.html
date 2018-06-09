@@ -1,25 +1,11 @@
 {{define "login"}}
 <fieldset><legend>login</legend>
-	<form method="POST" onsubmit="return login(event)">
+	<form method="POST" action="/login">
 		<label>username:</label><input type="text" name="username" value="{{meta .username}}" required autofocus>
 		<label>password:</label><input type="password" name="password" required>
 		<input type="submit">
 	</form>
 </fieldset>
-<script>
-	function login(event) {
-		var fields = event.target.elements;
-		ctx.POST("/login", {
-			username: fields["username"].value,
-			password: fields["password"].value
-		}, function(msg) {
-			if (ctx.Cookie("sessid")) {
-				ctx.Refresh()
-			}
-		})
-		return false;
-	}
-</script>
 {{end}}
 
 {{define "userinfo"}}
@@ -93,3 +79,13 @@
 	}
 </script>
 {{end}}
+
+{{$msg := .}}
+{{$meta := .Meta}}
+
+{{template "head" $meta}}
+{{if meta $meta.message}}
+	{{template "message" $meta}}
+{{end}}
+{{template "login" $meta}}
+{{template "tail" $meta}}

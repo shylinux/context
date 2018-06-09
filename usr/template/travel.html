@@ -11,6 +11,9 @@
 		cursor:pointer;
 		background-color:lightgray;
 	}
+	code {
+		font-size:14px;
+	}
 	.name {
 		padding-left:10px;
 		text-align:left;
@@ -26,9 +29,6 @@
 	.stream {
 		padding-left:10px;
 		text-align:left;
-	}
-	code {
-		font-size:14px;
 	}
 	.result {
 		background-color:black;
@@ -244,4 +244,23 @@
 	}
 </script>
 </body>
+{{end}}
+
+{{define "main"}}
+{{$msg := .}}
+{{$meta := .Meta}}
+{{$sess := $msg.Sessions}}
+{{range .Meta.tmpl}}
+	{{if eq . "cache"}}
+		{{template "cache" $sess.cache.Meta}}
+	{{else if eq . "config"}}
+		{{template "config" $sess.config.Meta}}
+	{{else if eq . "command"}}
+		{{template "command" $sess.command.Meta}}
+	{{else if eq . "module"}}
+		{{template "module" $sess.module.Meta}}
+	{{else if eq . "domain"}}
+		{{template "domain" $sess.domain.Meta}}
+	{{end}}
+{{end}}
 {{end}}

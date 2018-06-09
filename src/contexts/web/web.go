@@ -153,14 +153,17 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 }
 
 // }}}
-
 func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
 	meta := map[string][]string{}
 	if !msg.Has("result") && !msg.Has("append") {
 		return ""
 	}
 
-	if meta["result"] = msg.Meta["result"]; msg.Has("append") {
+	if len(msg.Meta["result"]) > 0 {
+		meta["result"] = msg.Meta["result"]
+	}
+
+	if len(msg.Meta["append"]) > 0 {
 		meta["append"] = msg.Meta["append"]
 		for _, v := range msg.Meta["append"] {
 			meta[v] = msg.Meta[v]
@@ -603,6 +606,88 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Copy(msg, "result")
 			// }}}
 		}},
+		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if !m.Options("module") { //{{{
+				m.Option("module", "ctx")
+			}
+
+			r := m.Data["request"].(*http.Request)
+			w := m.Data["response"].(http.ResponseWriter)
+
+			// 权限检查
+			if m.Option("method") == "POST" {
+				if m.Options("domain") {
+					msg := m.Find("ssh", true)
+					msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", m.Option("module"), m.Option("ccc"))
+					if m.Options("name") {
+						msg.Add("detail", m.Option("name"))
+					}
+					if m.Options("value") {
+						msg.Add("detail", m.Option("value"))
+					}
+
+					msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
+						m.Copy(sub, "result").Copy(sub, "append")
+						return nil
+					})
+					return
+				}
+
+				msg := m.Find(m.Option("module"), true)
+				if msg == nil {
+					return
+				}
+
+				switch m.Option("ccc") {
+				case "cache":
+					m.Echo(msg.Cap(m.Option("name")))
+				case "config":
+					if m.Options("value") {
+						m.Echo(msg.Conf(m.Option("name"), m.Option("value")))
+					} else {
+						m.Echo(msg.Conf(m.Option("name")))
+					}
+				case "command":
+					msg = msg.Spawn(msg.Target())
+					msg.Detail(0, m.Option("name"))
+					if m.Options("value") {
+						msg.Add("detail", m.Option("value"))
+					}
+
+					msg.Cmd()
+					m.Copy(msg, "result").Copy(msg, "append")
+				}
+				return
+			}
+
+			// 解析模板
+			render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
+			defer render.Cmd(m.Conf("travel_main"), m.Conf("travel_tmpl"))
+
+			if msg := m.Find(m.Option("module"), true); msg != nil {
+				m.Option("tmpl", "")
+				for _, v := range []string{"cache", "config", "command", "module", "domain"} {
+					if m.Options("domain") {
+						msg = m.Find("ssh", true)
+						msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", m.Option("module"), v)
+						msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
+							msg.Copy(sub, "result").Copy(sub, "append")
+							return nil
+						})
+					} else {
+						msg = msg.Spawn(msg.Target())
+						msg.Cmd("context", "find", m.Option("module"), v)
+					}
+
+					if len(msg.Meta["append"]) > 0 {
+						render.Option("current_module", m.Option("module"))
+						render.Option("current_domain", m.Option("domain"))
+						render.Sesss(v, msg).Add("option", "tmpl", v)
+					}
+				}
+			}
+			// }}}
+		}},
 		"/upload": &ctx.Command{Name: "/upload", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Data["request"].(*http.Request) // {{{
 			w := m.Data["response"].(http.ResponseWriter)
@@ -611,37 +696,28 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Option("file", m.Cap("directory"))
 			}
 
-			// 权限检查
-			m.Option("right", "")
-			m.Option("message", "")
-			m.Option("username", "")
-			aaa := m.Find("aaa").Cmd("login", m.Option("sessid"))
-			if aaa.Result(0) == "error: " {
-				m.Option("sessid", "")
-				m.Option("message", "login failure")
-			} else {
-				m.Option("username", aaa.Result(0))
-				msg := m.Spawn(m.Target()).Cmd("right", "check", aaa.Cap("group"), "command", "/upload", "file", m.Option("file"))
-				if msg.Result(0) == "ok" {
-					m.Option("right", aaa.Cap("group"))
-				} else {
-					m.Option("message", "your do not have the right of ", m.Option("file"))
+			auth := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
+			auth.CallBack(true, func(aaa *ctx.Message) *ctx.Message {
+				m.Log("fuck", nil, "upload-----------%v", aaa.Meta)
+				if aaa != nil {
+					m.Sesss("aaa", aaa)
 				}
+				return aaa
+			}, "/check", "command", "/upload", "file", m.Option("file"))
+			m.Log("fuck", nil, "upload>>>>>>>>>>>%v", auth.Meta)
+
+			if auth.Append("right") != "ok" {
+				return
 			}
 
 			if m.Option("method") == "POST" {
-				if !m.Options("right") {
-					return
-				}
-
 				if m.Options("notshareto") { // 取消共享
 					msg := m.Spawn(m.Target())
 					msg.Cmd("right", "del", m.Option("notshareto"), "command", "/upload", "file", m.Option("sharefile"))
 					m.Append("link", "hello")
 					return
 				} else if m.Options("shareto") { //共享目录
-					msg := aaa.Spawn(m.Target())
-					msg.Sesss("aaa", aaa)
+					msg := m.Spawn(m.Target()) //TODO
 					msg.Cmd("right", "add", m.Option("shareto"), "command", "/upload", "file", m.Option("sharefile"))
 					m.Append("link", "hello")
 					return
@@ -684,18 +760,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			// 解析模板
-			tmpl := template.Must(template.New("fuck").Funcs(ctx.CGI).ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
-			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("upload_tmpl"))))
-			defer func() {
-				w.Header().Add("Content-Type", "text/html")
-				m.Assert(tmpl.ExecuteTemplate(w, m.Conf("upload_main"), m))
-			}()
-
-			if !m.Options("right") {
-				m.Option("title", "login")
-				m.Option("tmpl", "login")
-				return
-			}
+			render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
+			defer render.Cmd(m.Conf("upload_main"), m.Conf("upload_tmpl"))
 
 			// 输出文件
 			s, e := os.Stat(m.Option("file"))
@@ -707,8 +773,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 共享列表
 			share := m.Sesss("share", m.Target())
 			index := share.Target().Index
-			if index != nil && index[m.Option("right")] != nil {
-				for k, v := range index[m.Option("right")].Index {
+			if index != nil && index[m.Option("group")] != nil {
+				for k, v := range index[m.Option("group")].Index {
 					for i, j := range v.Commands {
 						for v, n := range j.Shares {
 							for _, nn := range n {
@@ -803,118 +869,64 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Option("tmpl", "userinfo", "share", "list", "git", "upload", "create")
 			// }}}
 		}},
-		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			w := m.Data["response"].(http.ResponseWriter) // {{{
+		"/render": &ctx.Command{Name: "/render [main [tmpl]]", Help: "生成模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Data["response"].(http.ResponseWriter)
 
-			if m.Option("method") == "POST" {
-				if m.Options("domain") {
-					msg := m.Find("ssh", true)
-					msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", m.Option("module"), m.Option("ccc"))
-					if m.Options("name") {
-						msg.Add("detail", m.Option("name"))
-					}
-					if m.Options("value") {
-						msg.Add("detail", m.Option("value"))
-					}
-
-					msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
-						m.Copy(sub, "result").Copy(sub, "append")
-						return nil
-					})
-					return
-				}
-
-				module := "ctx"
-				if m.Options("module") {
-					module = m.Option("module")
-				}
-				msg := m.Find(module, true)
-				if msg == nil {
-					return
-				}
-
-				switch m.Option("ccc") {
-				case "cache":
-					m.Echo(msg.Cap(m.Option("name")))
-				case "config":
-					if m.Options("value") {
-						m.Echo(msg.Conf(m.Option("name"), m.Option("value")))
-					} else {
-						m.Echo(msg.Conf(m.Option("name")))
-					}
-				case "command":
-					msg = msg.Spawn(msg.Target())
-					msg.Detail(0, m.Option("name"))
-					if m.Options("value") {
-						msg.Add("detail", m.Option("value"))
-					}
-
-					msg.Cmd()
-					m.Copy(msg, "result").Copy(msg, "append")
-				}
-				return
+			tpl := template.Must(template.New("fuck").Funcs(ctx.CGI).ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
+			if len(arg) > 1 {
+				tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), arg[1])))
 			}
 
-			module := "ctx"
-			if m.Options("module") {
-				module = m.Option("module")
+			main := m.Conf("common_main")
+			if len(arg) > 0 {
+				main = arg[0]
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			tmpl := template.Must(template.Must(template.New("fuck").Funcs(ctx.CGI).ParseGlob(m.Conf("template_dir") + "/common/*.html")).ParseGlob(m.Conf("template_dir") + "travel.html"))
-			m.Assert(tmpl)
-
-			m.Assert(tmpl.ExecuteTemplate(w, "head", m.Meta))
-
-			if msg := m.Find(module, true); msg != nil {
-				for _, v := range []string{"cache", "config", "command", "module", "domain"} {
-					if m.Options("domain") {
-						msg = m.Find("ssh", true)
-						msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", module, v)
-						msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
-							msg.Copy(sub, "result").Copy(sub, "append")
-							return nil
-						})
-					} else {
-						msg = msg.Spawn(msg.Target())
-						msg.Cmd("context", "find", module, v)
-					}
-
-					if len(msg.Meta["append"]) > 0 {
-						msg.Option("current_module", module)
-						msg.Option("current_domain", m.Option("domain"))
-						m.Assert(tmpl.ExecuteTemplate(w, v, msg.Meta))
-					}
-				}
-			}
-
-			m.Assert(tmpl.ExecuteTemplate(w, "tail", m.Meta))
-			delete(m.Meta, "result")
-			delete(m.Meta, "append")
-			// }}}
+			m.Assert(tpl.ExecuteTemplate(w, main, m))
 		}},
-		"/check": &ctx.Command{Name: "/check", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Option("right", "")
-			m.Option("message", "")
-			m.Option("username", "")
-			aaa := m.Find("aaa").Cmd("login", m.Option("sessid"))
-			if aaa.Result(0) == "error: " {
-				m.Option("sessid", "")
-				m.Option("message", "login failure")
-			} else {
-				m.Option("username", aaa.Result(0))
-				msg := m.Spawn(m.Target()).Cmd("right", "check", aaa.Cap("group"), "command", "/upload", "file", m.Option("file"))
-				if msg.Result(0) == "ok" {
-					m.Option("right", aaa.Cap("group"))
-				} else {
-					m.Option("message", "your do not have the right of ", m.Option("file"))
-				}
-			}
-		}},
-		"/login": &ctx.Command{Name: "/login", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/check": &ctx.Command{Name: "/check sessid", Help: "权限检查", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Data["request"].(*http.Request)
 			w := m.Data["response"].(http.ResponseWriter)
-			msg := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password"))
-			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Result(0)})
+
+			user := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
+			user.CallBack(true, func(aaa *ctx.Message) *ctx.Message {
+				if aaa.Caps("group") {
+					msg := aaa.Spawn(m.Target()).Cmd("right", "check", aaa.Cap("group"), arg)
+					m.Append("right", msg.Result(0))
+				}
+				m.Log("fuck", nil, "aaa: %v", aaa)
+				return aaa
+			}, "/login")
+			m.Log("fuck", nil, "aaa----: %v", m)
+		}},
+		"/login": &ctx.Command{Name: "/login", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Data["request"].(*http.Request)
+			w := m.Data["response"].(http.ResponseWriter)
+
+			if m.Options("sessid") {
+				if aaa := m.Find("aaa").Cmd("login", m.Option("sessid")); aaa.Result(0) != "error: " {
+					m.Append("username", aaa.Cap("username"))
+					m.Append("group", aaa.Cap("group"))
+					m.Back(aaa)
+					return
+				}
+			}
+
+			sessid := ""
+			if m.Options("password") {
+				msg := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password"))
+				sessid = msg.Result(0)
+				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid})
+			}
+
+			if sessid != "" {
+				http.Redirect(w, r, "/upload", http.StatusFound)
+			} else {
+				render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
+				render.Cmd("/render", "login.html")
+			}
+			m.Back(m)
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target())
@@ -937,9 +949,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Option("message", "hello")
 			tmpl.ExecuteTemplate(w, "head", m)
 			tmpl.ExecuteTemplate(w, "tail", m.Meta)
-		}},
-		"hi": &ctx.Command{Name: "hi", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Echo("hello")
 		}},
 	},
 }

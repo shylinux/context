@@ -1956,11 +1956,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Echo(" ARM Linux HTTP\n")
 				m.Echo("\n")
 
-				m.Color(31, "Content ").Color(32, "Message\n")
+				m.Color(31, "Context ").Color(32, "Message\n")
 				m.Color(32, "ctx ").Color(33, "cli ").Color(31, "aaa ").Color(33, "web\n")
 				m.Color(32, "lex ").Color(33, "yac ").Color(31, "log ").Color(33, "gdb\n")
 				m.Color(32, "tcp ").Color(33, "nfs ").Color(31, "ssh ").Color(33, "mdb\n")
-				m.Color(31, "template ").Color(32, "script\n")
+				m.Color(31, "script ").Color(32, "template\n")
 				return
 			}
 
