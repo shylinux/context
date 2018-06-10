@@ -1302,6 +1302,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 
 			if x, ok := s.Commands[key]; ok && x.Hand != nil && c.Check(m, "commands", key) {
 				m.AssertOne(m, true, func(m *Message) {
+					fmt.Printf("fuck1-------- %v\n", m.Meta)
 					m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
 
 					if x.Options != nil {
@@ -2621,6 +2622,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Target().Index = map[string]*Context{}
 				}
 
+				fmt.Printf("fuck3\n")
 				current := m.Target()
 				aaa := m.Sesss("aaa")
 				void := index["void"]

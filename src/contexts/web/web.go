@@ -696,29 +696,35 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Option("file", m.Cap("directory"))
 			}
 
+			a := m
 			auth := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
 			auth.CallBack(true, func(aaa *ctx.Message) *ctx.Message {
-				m.Log("fuck", nil, "upload-----------%v", aaa.Meta)
 				if aaa != nil {
-					m.Sesss("aaa", aaa)
+					a = aaa
+					// m.Sesss("aaa", aaa)
 				}
 				return aaa
 			}, "/check", "command", "/upload", "file", m.Option("file"))
-			m.Log("fuck", nil, "upload>>>>>>>>>>>%v", auth.Meta)
 
 			if auth.Append("right") != "ok" {
 				return
 			}
+			m.Log("fuck", nil, "why %v", auth.Meta)
 
 			if m.Option("method") == "POST" {
 				if m.Options("notshareto") { // 取消共享
 					msg := m.Spawn(m.Target())
+					msg.Sesss("aaa", a)
 					msg.Cmd("right", "del", m.Option("notshareto"), "command", "/upload", "file", m.Option("sharefile"))
 					m.Append("link", "hello")
 					return
 				} else if m.Options("shareto") { //共享目录
+					m.Log("fuck", nil, "why %v", auth.Meta)
 					msg := m.Spawn(m.Target()) //TODO
+					msg.Sesss("aaa", a)
+					fmt.Printf("fuck1--------\n")
 					msg.Cmd("right", "add", m.Option("shareto"), "command", "/upload", "file", m.Option("sharefile"))
+					fmt.Printf("fuck2---------\n")
 					m.Append("link", "hello")
 					return
 				} else if m.Options("filename") { //添加文件或目录
@@ -759,10 +765,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 
-			// 解析模板
-			render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
-			defer render.Cmd(m.Conf("upload_main"), m.Conf("upload_tmpl"))
-
 			// 输出文件
 			s, e := os.Stat(m.Option("file"))
 			if m.Assert(e); !s.IsDir() {
@@ -770,11 +772,17 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
+			// 解析模板
+			render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
+
+			m.Log("fuck", nil, "group: %v", a.Meta)
 			// 共享列表
-			share := m.Sesss("share", m.Target())
+			share := render.Sesss("share", m.Target())
 			index := share.Target().Index
-			if index != nil && index[m.Option("group")] != nil {
-				for k, v := range index[m.Option("group")].Index {
+			if index != nil && index[a.Append("group")] != nil {
+				m.Log("fuck", nil, "group: %v", index)
+				for k, v := range index[a.Append("group")].Index {
+					m.Log("fuck", nil, "group: %v", a.Meta)
 					for i, j := range v.Commands {
 						for v, n := range j.Shares {
 							for _, nn := range n {
@@ -795,7 +803,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			fs, e := ioutil.ReadDir(m.Option("file"))
 			m.Assert(e)
 			fs = append(fs, s)
-			list := m.Sesss("list", m.Target())
+			list := render.Sesss("list", m.Target())
 			list.Option("file", m.Option("file"))
 
 			// 目录排序
@@ -856,7 +864,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 执行命令
 			switch m.Option("cmd") {
 			case "git":
-				git := m.Sesss("git", m.Target())
+				git := render.Sesss("git", m.Target())
 
 				branch := m.Find("nfs").Cmd("git", "-C", m.Option("file"), "branch")
 				git.Option("branch", branch.Result(0))
@@ -865,8 +873,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				git.Option("status", status.Result(0))
 			}
 
-			m.Option("title", "upload")
-			m.Option("tmpl", "userinfo", "share", "list", "git", "upload", "create")
+			render.Option("title", "upload")
+			render.Option("tmpl", "userinfo", "share", "list", "git", "upload", "create")
+			render.Cmd("/render", m.Conf("upload_main"), m.Conf("upload_tmpl"))
 			// }}}
 		}},
 		"/render": &ctx.Command{Name: "/render [main [tmpl]]", Help: "生成模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -891,14 +900,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			user := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
 			user.CallBack(true, func(aaa *ctx.Message) *ctx.Message {
-				if aaa.Caps("group") {
-					msg := aaa.Spawn(m.Target()).Cmd("right", "check", aaa.Cap("group"), arg)
+				if aaa.Appends("group") {
+					msg := aaa.Spawn(m.Target()).Cmd("right", "check", aaa.Append("group"), arg)
 					m.Append("right", msg.Result(0))
 				}
-				m.Log("fuck", nil, "aaa: %v", aaa)
 				return aaa
 			}, "/login")
-			m.Log("fuck", nil, "aaa----: %v", m)
 		}},
 		"/login": &ctx.Command{Name: "/login", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Data["request"].(*http.Request)
@@ -908,7 +915,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if aaa := m.Find("aaa").Cmd("login", m.Option("sessid")); aaa.Result(0) != "error: " {
 					m.Append("username", aaa.Cap("username"))
 					m.Append("group", aaa.Cap("group"))
-					m.Back(aaa)
+					m.Back(m)
 					return
 				}
 			}
