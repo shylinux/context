@@ -124,7 +124,13 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 
 	args := []string{}
 	for i := 0; i < len(arg)-1; i += 2 {
-		args = append(args, arg[i]+"="+url.QueryEscape(arg[i+1]))
+		value := arg[i+1]
+		if len(value) > 1 {
+			if value[0] == '$' {
+				value = m.Cap(value[1:])
+			}
+		}
+		args = append(args, arg[i]+"="+url.QueryEscape(value))
 	}
 	p := strings.Join(args, "&")
 
