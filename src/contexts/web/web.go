@@ -124,13 +124,7 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 
 	args := []string{}
 	for i := 0; i < len(arg)-1; i += 2 {
-		value := arg[i+1]
-		if len(value) > 1 {
-			if value[0] == '$' {
-				value = m.Cap(value[1:])
-			}
-		}
-		args = append(args, arg[i]+"="+url.QueryEscape(value))
+		args = append(args, arg[i]+"="+url.QueryEscape(arg[i+1]))
 	}
 	p := strings.Join(args, "&")
 
@@ -715,7 +709,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if auth.Append("right") != "ok" {
 				return
 			}
-			m.Log("fuck", nil, "why %v", auth.Meta)
 
 			if m.Option("method") == "POST" {
 				if m.Options("notshareto") { // 取消共享
@@ -725,12 +718,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Append("link", "hello")
 					return
 				} else if m.Options("shareto") { //共享目录
-					m.Log("fuck", nil, "why %v", auth.Meta)
 					msg := m.Spawn(m.Target()) //TODO
 					msg.Sesss("aaa", a)
-					fmt.Printf("fuck1--------\n")
 					msg.Cmd("right", "add", m.Option("shareto"), "command", "/upload", "file", m.Option("sharefile"))
-					fmt.Printf("fuck2---------\n")
 					m.Append("link", "hello")
 					return
 				} else if m.Options("filename") { //添加文件或目录
@@ -781,14 +771,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 解析模板
 			render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
 
-			m.Log("fuck", nil, "group: %v", a.Meta)
 			// 共享列表
 			share := render.Sesss("share", m.Target())
 			index := share.Target().Index
 			if index != nil && index[a.Append("group")] != nil {
-				m.Log("fuck", nil, "group: %v", index)
 				for k, v := range index[a.Append("group")].Index {
-					m.Log("fuck", nil, "group: %v", a.Meta)
 					for i, j := range v.Commands {
 						for v, n := range j.Shares {
 							for _, nn := range n {
@@ -927,7 +914,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			sessid := ""
-			if m.Options("password") {
+			if m.Options("username") && m.Options("password") {
 				msg := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password"))
 				sessid = msg.Result(0)
 				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid})
