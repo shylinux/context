@@ -494,7 +494,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						io.Copy(part, file)
 						for i := 0; i < len(arg)-1; i += 2 {
-							writer.WriteField(arg[0], arg[1])
+							writer.WriteField(arg[i], arg[i])
 						}
 
 						contenttype = writer.FormDataContentType()
@@ -553,7 +553,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				buf, e := ioutil.ReadAll(res.Body)
 				m.Assert(e)
-				m.Echo(string(buf))
+
+				if res.Header.Get("Content-Type") == "application/json" {
+					result := map[string]interface{}{}
+					json.Unmarshal(buf, &result)
+					for k, v := range result {
+						switch value := v.(type) {
+						case string:
+							m.Append(k, value)
+						case float64:
+							m.Append(k, fmt.Sprintf("%d", int(value)))
+						default:
+							m.Put("append", k, value)
+						}
+					}
+				}
+
+				result := string(buf)
+				m.Echo(result)
+				m.Append("response", result)
 				// }}}
 			}},
 		"list": &ctx.Command{Name: "list [set|add|del [url]]", Help: "查看、访问、添加url", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

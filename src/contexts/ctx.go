@@ -2363,7 +2363,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"command": &Command{Name: "command [all] add [key [name help]]", Help: "查看或修改命令",
-			Formats: map[string]int{"all": 0, "delete": 0, "void": 0},
+			Formats: map[string]int{"all": 0, "delete": 0, "void": 0, "condition": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
 				if len(arg) == 0 {
@@ -2417,11 +2417,60 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Capi("part", 1)
 					return
 				case "list":
-					for i := 0; i < m.Capi("part"); i++ {
+					begin, end := 0, m.Capi("part")
+					if len(arg) > 1 {
+						n, e := strconv.Atoi(arg[1])
+						m.Assert(e)
+						begin = n
+					}
+					if len(arg) > 2 {
+						n, e := strconv.Atoi(arg[2])
+						m.Assert(e)
+						end = n
+					}
+					for i := begin; i < end; i++ {
 						if c, ok := m.target.Commands[fmt.Sprintf("%d", i)]; ok {
 							m.Echo("%d: %s\n", i, c.Name)
 						}
 					}
+					return
+				case "test":
+					begin, end := 0, m.Capi("part")
+					if len(arg) > 1 {
+						n, e := strconv.Atoi(arg[1])
+						m.Assert(e)
+						begin = n
+					}
+					if len(arg) > 2 {
+						n, e := strconv.Atoi(arg[2])
+						m.Assert(e)
+						end = n
+					}
+					success, failure := 0, 0
+					for i := begin; i < end; i++ {
+						key := fmt.Sprintf("%d", i)
+						if c, ok := m.target.Commands[key]; ok {
+							msg := m.Spawn(m.Target())
+							msg.Cmd(key)
+							if m.Options("condition") {
+								condition := m.Meta["condition"]
+								done := true
+								for j := 0; j < len(condition)-1; j += 2 {
+									if !msg.Has(condition[j]) || msg.Append(condition[j]) != condition[j+1] {
+										m.Echo("\033[31m%s %s %s\033[0m\n", key, " fail", c.Name)
+										failure++
+										done = false
+									}
+								}
+								if done {
+									// m.Echo("%s %s\n", key, " done")
+									m.Echo("%s %s %s\n", key, " done", c.Name)
+									success++
+								}
+							}
+						}
+					}
+					m.Echo("\033[32msuccess: %d\033[0m, \033[31mfailure: %d\033[0m, \033[33mtotal: %d\033[0m", success, failure, success+failure)
 					return
 				}
 

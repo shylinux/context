@@ -327,7 +327,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				t := time.Now() // {{{
 				if m.Options("parse") {
 					f := "2006-01-02 15:04:05"
-					n, e := time.Parse(f, m.Option("parse"))
+					n, e := time.ParseInLocation(f, m.Option("parse"), time.Local)
 					m.Assert(e)
 					t = n
 				}
