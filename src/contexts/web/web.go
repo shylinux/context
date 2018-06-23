@@ -196,26 +196,33 @@ func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
 // }}}
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
-		msg := m.Spawn(m.Target()).Set("detail", key)
-
-		msg.Add("option", "method", r.Method)
+		msg := m.Spawn().Set("detail", key)
+		msg.Option("method", r.Method)
+		msg.Option("referer", r.Header.Get("Referer"))
 
 		for k, v := range r.Form {
 			msg.Add("option", k, v...)
 		}
 		for _, v := range r.Cookies() {
-			msg.Add("option", v.Name, v.Value)
+			msg.Option(v.Name, v.Value)
 		}
-		msg.Log("cmd", nil, "%s [] %v", key, msg.Meta["option"])
 
+		msg.Log("cmd", nil, "%s [] %v", key, msg.Meta["option"])
 		msg.Put("option", "request", r).Put("option", "response", w)
-		if hand(msg, msg.Target(), key); len(msg.Meta["append"]) > -1 {
-			w.Write([]byte(web.AppendJson(msg)))
+
+		if hand(msg, msg.Target(), key); msg.Has("redirect") {
+			http.Redirect(w, r, msg.Append("redirect"), http.StatusFound)
 			return
 		}
-
+		if msg.Has("template") {
+			msg.Spawn().Cmd("/render", msg.Meta["template"])
+			return
+		}
+		if msg.Has("append") {
+			msg.Spawn().Copy(msg, "append").Cmd("/json")
+			return
+		}
 		for _, v := range msg.Meta["result"] {
-			msg.Log("info", nil, "%s", v)
 			w.Write([]byte(v))
 		}
 	})
@@ -707,97 +714,36 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/upload": &ctx.Command{Name: "/upload", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Data["request"].(*http.Request) // {{{
-			w := m.Data["response"].(http.ResponseWriter)
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
 
-			if !m.Options("file") {
-				m.Option("file", m.Cap("directory"))
+			if !m.Options("dir") {
+				m.Option("dir", m.Cap("directory"))
 			}
 
-			a := m
-			auth := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
-			auth.CallBack(true, func(aaa *ctx.Message) *ctx.Message {
-				if aaa != nil {
-					a = aaa
-					// m.Sesss("aaa", aaa)
-				}
-				return aaa
-			}, "/check", "command", "/upload", "file", m.Option("file"))
-
-			if auth.Append("right") != "ok" {
+			check := m.Spawn().Cmd("/share")
+			if !check.Results(0) {
+				m.Copy(check, "append")
 				return
 			}
-
-			if m.Option("method") == "POST" {
-				if m.Options("notshareto") { // 取消共享
-					msg := m.Spawn(m.Target())
-					msg.Sesss("aaa", a)
-					msg.Cmd("right", "del", m.Option("notshareto"), "command", "/upload", "file", m.Option("sharefile"))
-					m.Append("link", "hello")
-					return
-				} else if m.Options("shareto") { //共享目录
-					msg := m.Spawn(m.Target()) //TODO
-					msg.Sesss("aaa", a)
-					msg.Cmd("right", "add", m.Option("shareto"), "command", "/upload", "file", m.Option("sharefile"))
-					m.Append("link", "hello")
-					return
-				} else if m.Options("filename") { //添加文件或目录
-					name := path.Join(m.Option("file"), m.Option("filename"))
-					if _, e := os.Stat(name); e != nil {
-						if m.Options("content") {
-							f, e := os.Create(name)
-							m.Assert(e)
-							defer f.Close()
-
-							_, e = f.WriteString(m.Option("content"))
-							m.Assert(e)
-						} else {
-							e = os.Mkdir(name, 0766)
-							m.Assert(e)
-						}
-						m.Option("message", name, " create success!")
-					} else {
-						m.Option("message", name, "already exist!")
-					}
-				} else { //上传文件
-					file, header, e := r.FormFile("file")
-					m.Assert(e)
-
-					name := path.Join(m.Option("file"), header.Filename)
-
-					if _, e := os.Stat(name); e != nil {
-						f, e := os.Create(name)
-						m.Assert(e)
-						defer f.Close()
-
-						_, e = io.Copy(f, file)
-						m.Assert(e)
-						m.Option("message", name, "upload success!")
-					} else {
-						m.Option("message", name, "already exist!")
-					}
-				}
-			}
+			aaa := check.Appendv("aaa").(*ctx.Message)
 
 			// 输出文件
-			s, e := os.Stat(m.Option("file"))
+			s, e := os.Stat(m.Option("dir"))
 			if m.Assert(e); !s.IsDir() {
-				http.ServeFile(w, r, m.Option("file"))
+				http.ServeFile(w, r, m.Option("dir"))
 				return
 			}
 
-			// 解析模板
-			render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
-
 			// 共享列表
-			share := render.Sesss("share", m.Target())
+			share := m.Sesss("share", m.Target())
 			index := share.Target().Index
-			if index != nil && index[a.Append("group")] != nil {
-				for k, v := range index[a.Append("group")].Index {
+			if index != nil && index[aaa.Append("userrole")] != nil {
+				for k, v := range index[aaa.Append("userrole")].Index {
 					for i, j := range v.Commands {
 						for v, n := range j.Shares {
 							for _, nn := range n {
-								if match, e := regexp.MatchString(nn, m.Option("file")); m.Assert(e) && match {
+								if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
 									share.Add("append", "group", k)
 									share.Add("append", "command", i)
 									share.Add("append", "argument", v)
@@ -811,11 +757,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			// 输出目录
-			fs, e := ioutil.ReadDir(m.Option("file"))
+			fs, e := ioutil.ReadDir(m.Option("dir"))
 			m.Assert(e)
 			fs = append(fs, s)
-			list := render.Sesss("list", m.Target())
-			list.Option("file", m.Option("file"))
+			list := m.Sesss("list", m.Target())
+			list.Option("dir", m.Option("dir"))
 
 			// 目录排序
 			max := true
@@ -854,7 +800,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			for _, v := range fs {
 				name := v.Name()
 				if v == s {
-					if name == m.Option("file") {
+					if name == m.Option("dir") {
 						continue
 					}
 					name = ".."
@@ -869,30 +815,135 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				list.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
 				list.Add("append", "size", kit.FmtSize(v.Size()))
 				list.Add("append", "name", name)
-				list.Add("append", "path", path.Join(m.Option("file"), name))
+				list.Add("append", "path", path.Join(m.Option("dir"), name))
 			}
 
 			// 执行命令
 			switch m.Option("cmd") {
 			case "git":
-				git := render.Sesss("git", m.Target())
+				git := m.Sesss("git", m.Target())
 
-				branch := m.Find("nfs").Cmd("git", "-C", m.Option("file"), "branch")
+				branch := m.Find("nfs").Cmd("git", "-C", m.Option("dir"), "branch")
 				git.Option("branch", branch.Result(0))
 
-				status := m.Find("nfs").Cmd("git", "-C", m.Option("file"), "status")
+				status := m.Find("nfs").Cmd("git", "-C", m.Option("dir"), "status")
 				git.Option("status", status.Result(0))
 			}
 
-			render.Option("title", "upload")
-			render.Option("tmpl", "userinfo", "share", "list", "git", "upload", "create")
-			render.Cmd("/render", m.Conf("upload_main"), m.Conf("upload_tmpl"))
+			m.Append("title", "upload")
+			m.Append("tmpl", "userinfo", "share", "list", "git", "upload", "create")
+			m.Append("template", m.Conf("upload_main"), m.Conf("upload_tmpl"))
+		}},
+		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if check := m.Spawn().Cmd("/share"); !check.Results(0) { // {{{
+				m.Copy(check, "append")
+				return
+			}
+
+			r := m.Optionv("request").(*http.Request)
+			if m.Option("method") == "POST" {
+				if m.Options("filename") { //添加文件或目录
+					name := path.Join(m.Option("dir"), m.Option("filename"))
+					if _, e := os.Stat(name); e != nil {
+						if m.Options("content") {
+							f, e := os.Create(name)
+							m.Assert(e)
+							defer f.Close()
+
+							_, e = f.WriteString(m.Option("content"))
+							m.Assert(e)
+						} else {
+							e = os.Mkdir(name, 0766)
+							m.Assert(e)
+						}
+						m.Append("message", name, " create success!")
+					} else {
+						m.Append("message", name, "already exist!")
+					}
+				} else { //上传文件
+					file, header, e := r.FormFile("file")
+					m.Assert(e)
+
+					name := path.Join(m.Option("dir"), header.Filename)
+
+					if _, e := os.Stat(name); e != nil {
+						f, e := os.Create(name)
+						m.Assert(e)
+						defer f.Close()
+
+						_, e = io.Copy(f, file)
+						m.Assert(e)
+						m.Append("message", name, "upload success!")
+					} else {
+						m.Append("message", name, "already exist!")
+					}
+				}
+			}
+			m.Append("redirect", m.Option("referer"))
 			// }}}
 		}},
-		"/render": &ctx.Command{Name: "/render [main [tmpl]]", Help: "生成模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			w := m.Data["response"].(http.ResponseWriter)
+		"/share": &ctx.Command{Name: "/share", Help: "资源共享", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			check := m.Spawn().Cmd("/check", "command", "/share", "dir", m.Option("dir")) // {{{
+			if !check.Results(0) {
+				m.Copy(check, "append")
+				return
+			}
+			m.Log("fuck", nil, "wh")
 
-			tpl := template.Must(template.New("fuck").Funcs(ctx.CGI).ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
+			msg := check.Appendv("aaa").(*ctx.Message).Spawn(m.Target())
+			if m.Options("shareto") {
+				msg.Cmd("right", "add", m.Option("shareto"), "command", "/share", "dir", m.Option("dir"))
+			}
+			if m.Options("notshareto") {
+				m.Log("fuck", nil, "wh %v", msg)
+				msg.Cmd("right", "del", m.Option("notshareto"), "command", "/share", "dir", m.Option("dir"))
+				m.Log("fuck", nil, "wh %v", msg.Meta["result"])
+			}
+			m.Echo("ok")
+			// }}}
+		}},
+		"/check": &ctx.Command{Name: "/check cache|config|command name args", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Optionv("response").(http.ResponseWriter) //{{{
+			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
+				if msg := m.Spawn().Cmd("right", "check", login.Append("userrole"), arg); msg.Results(0) {
+					m.Copy(login, "append").Echo(msg.Result(0))
+					return
+				}
+				w.WriteHeader(http.StatusForbidden)
+				m.Append("message", "please contact manager")
+				m.Echo("no")
+				return
+			} else {
+				m.Copy(login, "append").Echo("no")
+			}
+			// }}}
+		}},
+		"/login": &ctx.Command{Name: "/login", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Optionv("response").(http.ResponseWriter) // {{{
+
+			if m.Options("sessid") {
+				if aaa := m.Find("aaa").Cmd("login", m.Option("sessid")); aaa.Results(0) {
+					m.Append("redirect", m.Option("referer"))
+					return
+				}
+			}
+
+			if m.Options("username") && m.Options("password") {
+				if aaa := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password")); aaa.Results(0) {
+					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: aaa.Result(0)})
+					m.Append("redirect", m.Option("referer"))
+					return
+				}
+			}
+
+			w.WriteHeader(http.StatusUnauthorized)
+			m.Append("template", "login.html")
+			// }}}
+		}},
+		"/render": &ctx.Command{Name: "/render [main [tmpl]]", Help: "模板响应, main: 模板入口, tmpl: 附加模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Optionv("response").(http.ResponseWriter) // {{{
+
+			tpl := template.Must(template.New("render").Funcs(ctx.CGI).ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
 			if len(arg) > 1 {
 				tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), arg[1])))
 			}
@@ -903,48 +954,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			w.Header().Add("Content-Type", "text/html")
-			m.Assert(tpl.ExecuteTemplate(w, main, m))
+			m.Assert(tpl.ExecuteTemplate(w, main, m.Message()))
+			// }}}
 		}},
-		"/check": &ctx.Command{Name: "/check sessid", Help: "权限检查", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Data["request"].(*http.Request)
-			w := m.Data["response"].(http.ResponseWriter)
+		"/json": &ctx.Command{Name: "/json", Help: "json响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Optionv("response").(http.ResponseWriter) // {{{
 
-			user := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
-			user.CallBack(true, func(aaa *ctx.Message) *ctx.Message {
-				if aaa.Appends("group") {
-					msg := aaa.Spawn(m.Target()).Cmd("right", "check", aaa.Append("group"), arg)
-					m.Append("right", msg.Result(0))
-				}
-				return aaa
-			}, "/login")
-		}},
-		"/login": &ctx.Command{Name: "/login", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Data["request"].(*http.Request)
-			w := m.Data["response"].(http.ResponseWriter)
-
-			if m.Options("sessid") {
-				if aaa := m.Find("aaa").Cmd("login", m.Option("sessid")); aaa.Result(0) != "error: " {
-					m.Append("username", aaa.Cap("username"))
-					m.Append("group", aaa.Cap("group"))
-					m.Back(m)
-					return
+			meta := map[string][]string{}
+			if len(m.Meta["append"]) > 0 {
+				meta["append"] = m.Meta["append"]
+				for _, v := range m.Meta["append"] {
+					meta[v] = m.Meta[v]
 				}
 			}
 
-			sessid := ""
-			if m.Options("username") && m.Options("password") {
-				msg := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password"))
-				sessid = msg.Result(0)
-				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid})
+			if b, e := json.Marshal(meta); m.Assert(e) {
+				w.Header().Set("Content-Type", "application/javascript")
+				w.Write(b)
 			}
-
-			if sessid != "" {
-				http.Redirect(w, r, "/upload", http.StatusFound)
-			} else {
-				render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
-				render.Cmd("/render", "login.html")
-			}
-			m.Back(m)
+			// }}}
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target())

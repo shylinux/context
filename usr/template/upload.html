@@ -1,5 +1,5 @@
 {{define "list"}}
-<fieldset><legend><input type="text" id="dir" value="{{meta .file}}" onkeydown="return Change(event)"></legend>
+<fieldset><legend><input type="text" id="dir" value="{{meta .dir}}" onkeydown="return Change(event)"></legend>
 	<table>
 		<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 
@@ -26,7 +26,7 @@
 			{{range $key := index $meta "append"}}
 				{{if eq $key "name"}}
 					<td class="{{$key}}">
-						<a href="/upload?file={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
+						<a href="/upload?dir={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
 					</td>
 				{{else if eq $key "path"}}
 				{{else}}
@@ -62,7 +62,7 @@
 <script>
 	function Change(event) {
 		if (event.keyCode == 13) {
-			ctx.Search("file", event.target.value);
+			ctx.Search("dir", event.target.value);
 		}
 	}
 
@@ -85,7 +85,7 @@
 
 {{define "upload"}}
 <fieldset><legend>upload</legend>
-	<form method="POST" action="/upload" enctype="multipart/form-data">
+	<form method="POST" action="/create?dir={{option . "dir"}}" enctype="multipart/form-data">
 		<input type="file" name="file"><input type="submit">
 	</form>
 </fieldset>
@@ -93,7 +93,7 @@
 
 {{define "create"}}
 <fieldset><legend>create</legend>
-	<form method="POST" action="/upload">
+	<form method="POST" action="/create?dir={{option . "dir"}}">
 		<table>
 			<tr><td>filename:</td><td><input type="text" name="filename" required><input type="submit"></td></tr>
 			<tr><td>content:</td><td><textarea rows="5" cols="80" name="content"></textarea></td></tr>
@@ -105,13 +105,14 @@
 {{define "main"}}
 {{$msg := .}}
 {{$meta := .Meta}}
+{{$sess := .Sessions}}
 {{range .Meta.tmpl}}
 	{{if eq . "login"}}
 		{{template "login" $meta}}
 	{{else if eq . "userinfo"}}
-		{{template "userinfo" $meta}}
+		{{template "userinfo" $msg}}
 	{{else if eq . "share"}}
-		{{template "share" $msg.Sessions.share}}
+		{{template "share" $sess.share}}
 	{{else if eq . "list"}}
 		{{template "list" $msg.Sessions.list.Meta}}
 	{{else if eq . "git"}}
@@ -119,9 +120,9 @@
 			{{template "git" $msg.Sessions.git.Meta}}
 		{{end}}
 	{{else if eq . "upload"}}
-		{{template "upload" $meta}}
+		{{template "upload" $msg}}
 	{{else if eq . "create"}}
-		{{template "create" $meta}}
+		{{template "create" $msg}}
 	{{end}}
 {{end}}
 {{end}}

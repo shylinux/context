@@ -21,7 +21,7 @@ import ( // {{{
 
 func Right(str string) bool {
 	switch str {
-	case "", "0", "false", "off":
+	case "", "0", "false", "off", "no", "error: ":
 		return false
 	}
 	return true
@@ -437,15 +437,16 @@ func (m *Message) Login(aaa *Message) { // {{{
 }
 
 // }}}
-func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{}) { // {{{
+func (m *Message) Log(action string, ctx *Context, str string, arg ...interface{}) *Message { // {{{
 	if !m.Options("log") {
-		return
+		return m
 	}
 
 	if l := m.Sesss("log"); l != nil {
 		l.Options("log", false)
 		l.Cmd("log", action, fmt.Sprintf(str, arg...))
 	}
+	return m
 }
 
 // }}}
@@ -706,7 +707,20 @@ func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message))
 
 // }}}
 
-func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
+func (m *Message) Spawn(arg ...interface{}) *Message { // {{{
+	c := m.target
+	if len(arg) > 0 {
+		if v, ok := arg[0].(*Context); ok {
+			c, arg = v, arg[1:]
+		}
+	}
+	key := ""
+	if len(arg) > 0 {
+		if v, ok := arg[0].(string); ok {
+			key, arg = v, arg[1:]
+		}
+	}
+
 	msg := &Message{
 		code:    m.root.Capi("nmessage", 1),
 		time:    time.Now(),
@@ -724,22 +738,22 @@ func (m *Message) Spawn(c *Context, key ...string) *Message { // {{{
 	msg.Sessions = make(map[string]*Message)
 
 	msg.Wait = make(chan bool)
-	if len(key) == 0 {
+	if key == "" {
 		return msg
 	}
 
 	if msg.source.Sessions == nil {
 		msg.source.Sessions = make(map[string]*Message)
 	}
-	msg.source.Sessions[key[0]] = msg
-	msg.Name = key[0]
+	msg.source.Sessions[key] = msg
+	msg.Name = key
 	return msg
 }
 
 // }}}
 func (m *Message) Reply(key ...string) *Message { // {{{
 	if m.Template == nil {
-		m.Template = m.Spawn(m.source, key...)
+		m.Template = m.Spawn(m.source)
 	}
 
 	msg := m.Template
@@ -1102,6 +1116,7 @@ func (m *Message) Color(color int, str string, arg ...interface{}) *Message { //
 // }}}
 func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {{{
 	switch meta {
+	case "session":
 	case "detail", "result":
 		m.Set(meta, msg.Meta[meta]...)
 	case "option", "append":
@@ -1256,15 +1271,44 @@ func (m *Message) Options(key string, arg ...bool) bool { // {{{
 }
 
 // }}}
+func (m *Message) Optionv(key string, arg ...interface{}) interface{} { // {{{
+	if len(arg) > 0 {
+		m.Put("option", key, arg[0])
+		return arg[0]
+	}
+
+	for msg := m; msg != nil; msg = msg.message {
+		if msg.Data == nil || msg.Data[key] == nil {
+			continue
+		}
+		if msg.Meta["option"] == nil || len(msg.Meta["option"]) == 0 {
+			continue
+		}
+		for _, v := range msg.Meta["option"] {
+			if v == key {
+				return msg.Data[key]
+			}
+		}
+	}
+	return nil
+}
+
+// }}}
 func (m *Message) Append(key string, arg ...interface{}) string { // {{{
 	m.Insert(key, 0, arg...)
 	if _, ok := m.Meta[key]; ok {
 		m.Add("append", key)
 	}
 
-	for msg := m; msg != nil; msg = msg.message {
-		if m.Has(key) {
-			return m.Get(key)
+	ms := []*Message{m}
+	for i := 0; i < len(ms); i++ {
+		ms = append(ms, ms[i].messages...)
+		if ms[i].Has(key) {
+			for j := 0; j < len(ms[i].Meta["append"]); j++ {
+				if ms[i].Meta["append"][j] == key {
+					return ms[i].Get(key)
+				}
+			}
 		}
 	}
 	return ""
@@ -1280,6 +1324,30 @@ func (m *Message) Appendi(key string, arg ...int) int { // {{{
 // }}}
 func (m *Message) Appends(key string, arg ...bool) bool { // {{{
 	return Right(m.Append(key, arg))
+}
+
+// }}}
+func (m *Message) Appendv(key string, arg ...interface{}) interface{} { // {{{
+	if len(arg) > 0 {
+		m.Put("append", key, arg[0])
+	}
+
+	ms := []*Message{m}
+	for i := 0; i < len(ms); i++ {
+		ms = append(ms, ms[i].messages...)
+		if ms[i].Data == nil || ms[i].Data[key] == nil {
+			continue
+		}
+		if ms[i].Meta["append"] == nil || len(ms[i].Meta["append"]) == 0 {
+			continue
+		}
+		for _, v := range ms[i].Meta["append"] {
+			if v == key {
+				return ms[i].Data[key]
+			}
+		}
+	}
+	return nil
 }
 
 // }}}
@@ -1339,7 +1407,8 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 					}
 
 					m.Hand = true
-					x.Hand(m.Set("result").Set("append"), s, key, arg...)
+					// x.Hand(m.Set("result").Set("append"), s, key, arg...)
+					x.Hand(m, s, key, arg...)
 
 					if x.Appends != nil {
 						for _, v := range m.Meta["append"] {
@@ -2662,7 +2731,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"right": &Command{
 			Name:    "right [share|add|del group [cache|config|command item]]",
 			Help:    "用户组管理，查看、添加、删除用户组或是接口",
-			Formats: map[string]int{"check": 0, "add": 0, "del": 0, "cache": 0, "config": 0, "command": 0},
+			Formats: map[string]int{"check": 0, "add": 0, "del": 0, "brow": 0, "cache": 0, "config": 0, "command": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				index := m.Target().Index // {{{
 				if index == nil {
@@ -2697,7 +2766,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				group := current
-				if len(arg) > 1 {
+				if len(arg) > 0 {
 					group = current.Index[arg[0]]
 				}
 
@@ -2713,20 +2782,24 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						case m.Has("cache"):
 							if _, ok := group.Caches[item]; ok {
 								m.Echo("ok")
+								return
 							}
 						case m.Has("config"):
 							if _, ok := group.Configs[item]; ok {
 								m.Echo("ok")
+								return
 							}
 						case m.Has("command"):
 
 							if len(arg) > 1 {
 								if _, ok := group.Commands[item]; !ok {
+									m.Echo("no")
 									return
 								}
 							}
 							if len(arg) > 2 {
 								if _, ok := group.Commands[item].Shares[arg[2]]; !ok {
+									m.Echo("no")
 									return
 								}
 							}
@@ -2739,11 +2812,17 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 										return
 									}
 								}
+								m.Echo("no")
 								return
 							}
 							m.Echo("ok")
+							return
+						default:
+							m.Echo("ok")
+							return
 						}
 					}
+					m.Echo("no")
 					return
 				case m.Has("add"):
 					if group == nil {
@@ -2839,6 +2918,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 									shares[arg[2]] = shares[arg[2]][:i]
 								}
 							}
+							gs[i].Commands[item].Shares = shares
 
 						default:
 							delete(index, gs[i].Name)
@@ -2847,40 +2927,40 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 
 				default:
-					m.Echo("%s:caches\n", current.Name)
+					m.Echo("%s:caches\n", group.Name)
 					if void != nil {
 						for k, c := range void.Caches {
 							m.Echo("  %s: %s\n", k, c.Value)
 						}
 					}
-					for k, c := range current.Caches {
+					for k, c := range group.Caches {
 						m.Echo("  %s: %s\n", k, c.Value)
 					}
-					m.Echo("%s:configs\n", current.Name)
+					m.Echo("%s:configs\n", group.Name)
 					if void != nil {
 						for k, c := range void.Configs {
 							m.Echo("  %s: %s\n", k, c.Value)
 						}
 					}
-					for k, c := range current.Configs {
+					for k, c := range group.Configs {
 						m.Echo("  %s: %s\n", k, c.Value)
 					}
-					m.Echo("%s:commands\n", current.Name)
+					m.Echo("%s:commands\n", group.Name)
 					if void != nil {
 						for k, c := range void.Commands {
 							m.Echo("  %s: %s\n", k, c.Name)
 						}
 					}
-					for k, c := range current.Commands {
-						m.Echo("  %s: %s\n", k, c.Name)
+					for k, c := range group.Commands {
+						m.Echo("  %s: %s %v\n", k, c.Name, c.Shares)
 					}
-					m.Echo("%s:contexts\n", current.Name)
+					m.Echo("%s:contexts\n", group.Name)
 					if void != nil {
 						for k, c := range void.Index {
 							m.Echo("  %s: %s\n", k, c.Name)
 						}
 					}
-					for k, c := range current.Index {
+					for k, c := range group.Index {
 						m.Echo("  %s: %s\n", k, c.Name)
 					}
 				} // }}}

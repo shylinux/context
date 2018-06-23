@@ -48,7 +48,12 @@ ctx = {
 				case 4:
 					switch (xhr.status) {
 						case 200:
-							var msg = JSON.parse(xhr.responseText||'{"result":[]}');
+							try {
+								var msg = JSON.parse(xhr.responseText||'{"result":[]}');
+							} catch (e) {
+								msg = {"result": [xhr.responseText]}
+							}
+
 							msg && console.log(msg)
 							msg.result && console.log(msg.result.join(""));
 							typeof cb == "function" && cb(msg)

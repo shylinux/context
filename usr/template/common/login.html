@@ -10,7 +10,7 @@
 
 {{define "userinfo"}}
 <fieldset><legend>userinfo</legend>
-	welcome <span class="username">{{meta .username}}</span> to context world
+	welcome <span class="username">{{append . "username"}}</span> to context world
 	<button onclick="return logout(event)">logout</button>
 </fieldset>
 <style>
@@ -30,8 +30,8 @@
 
 {{define "share"}}
 <fieldset><legend>share</legend>
-	<form method="POST" onsubmit="return share(event, '{{msg . "option" "file"}}')">
-		<label>share to:</label><input type="text" name="shareto" required>
+	<form method="POST">
+		<label>share to:</label><input type="text" name="shareto" value="{{msg . "option" "dir"}}" required>
 		<input type="submit">
 	</form>
 	<table>
@@ -58,21 +58,21 @@
 	</table>
 </fieldset>
 <script>
-	function share(event, file) {
+	function share(event, dir) {
 		var fields = event.target.elements;
 		var shareto = fields["shareto"].value
 		ctx.POST("/upload", {
 			shareto: shareto,
-			sharefile: file,
+			sharedir: dir,
 		}, function(msg) {
 			ctx.Refresh();
 		})
 		return false;
 	}
-	function deleteshare(event, file, group) {
-		ctx.POST("/upload", {
+	function deleteshare(event, dir, group) {
+		ctx.POST("/share", {
 			notshareto: group,
-			sharefile: file,
+			sharedir: dir,
 		}, function(msg) {
 			ctx.Refresh();
 		})
