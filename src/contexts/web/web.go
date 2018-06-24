@@ -87,7 +87,17 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 
 	args := []string{}
 	for i := 0; i < len(arg)-1; i += 2 {
-		args = append(args, arg[i]+"="+url.QueryEscape(arg[i+1]))
+		value := arg[i+1]
+		if len(arg[i+1]) > 1 {
+			switch arg[i+1][0] {
+			case '$':
+				value = m.Cap(arg[i+1][1:])
+			case '@':
+				value = m.Conf(arg[i+1][1:])
+			}
+		}
+
+		args = append(args, arg[i]+"="+url.QueryEscape(value))
 	}
 	p := strings.Join(args, "&")
 
@@ -423,7 +433,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						io.Copy(part, file)
 						for i := 0; i < len(arg)-1; i += 2 {
-							writer.WriteField(arg[i], arg[i])
+							value := arg[i+1]
+							if len(arg[i+1]) > 1 {
+								switch arg[i+1][0] {
+								case '$':
+									value = m.Cap(arg[i+1][1:])
+								case '@':
+									value = m.Conf(arg[i+1][1:])
+								}
+							}
+							writer.WriteField(arg[i], value)
 						}
 
 						contenttype = writer.FormDataContentType()

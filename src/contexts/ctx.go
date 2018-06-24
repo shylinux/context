@@ -2066,6 +2066,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 		"cert": &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
 		"key":  &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
+
+		"command_list_base": &Config{Name: "命令列表的起始位置", Value: "0", Help: "命令列表的起始位置"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2544,7 +2546,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Capi("part", 1)
 					return
 				case "list":
-					begin, end := 0, m.Capi("part")
+					begin, end := m.Confi("command_list_base"), m.Capi("part")
 					if len(arg) > 1 {
 						n, e := strconv.Atoi(arg[1])
 						m.Assert(e)
@@ -2580,8 +2582,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							msg := m.Spawn(m.Target())
 							msg.Cmd(key)
 							if m.Options("condition") {
-								condition := m.Meta["condition"]
 								done := true
+								condition := m.Meta["condition"]
 								for j := 0; j < len(condition)-1; j += 2 {
 									if !msg.Has(condition[j]) || msg.Append(condition[j]) != condition[j+1] {
 										m.Echo("\033[31m%s %s %s\033[0m\n", key, " fail", c.Name)
@@ -2594,6 +2596,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 									m.Echo("%s %s %s\n", key, " done", c.Name)
 									success++
 								}
+							} else {
+								for _, v := range msg.Meta["result"] {
+									m.Echo("%v", v)
+								}
+								m.Echo("\n")
+								success++
 							}
 						}
 					}
@@ -2767,14 +2775,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						m.Cap(arg[0], "")
 					}
 
-					if m.source == m.source.master {
-						m.source, m.target = m.target, m.source
-					}
+					// if m.source == m.source.master {
+					// 	m.source, m.target = m.target, m.source
+					// }
 					m.Echo("%s", m.Cap(arg[0]))
 				case 2:
-					if m.source == m.source.master {
-						m.source, m.target = m.target, m.source
-					}
+					// if m.source == m.source.master {
+					// 	m.source, m.target = m.target, m.source
+					// }
 					m.Cap(arg[0], arg[1])
 				case 3:
 					if m.source == m.source.master {

@@ -215,8 +215,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"get": &ctx.Command{Name: "get [where str] [parse str] [table [field]]", Help: "执行查询语句",
 			Formats: map[string]int{"where": 1, "parse": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-
-				where := m.Conf("where")
+				where := m.Conf("where") // {{{
 				if m.Options("where") {
 					where = m.Option("where")
 				}
@@ -254,23 +253,31 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						m.Echo("%v", row[field])
 					}
 					return false
-				})
+				}) // }}}
 			}},
-		"show": &ctx.Command{Name: "show table field [where condition]", Help: "执行查询语句",
-			Formats: map[string]int{"where": 1},
+		"show": &ctx.Command{Name: "show table field [where conditions]|[group fields]|[order fields]", Help: "执行查询语句",
+			Formats: map[string]int{"where": 1, "group": 1, "order": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				msg := m.Spawn(m.Target())
+				msg := m.Spawn(m.Target()) // {{{
 
 				fields := strings.Join(arg[1:], ",")
 				condition := ""
 				if m.Options("where") {
 					condition = fmt.Sprintf("where %s", m.Option("where"))
 				}
+				group := ""
+				if m.Options("group") {
+					group = fmt.Sprintf("group by %s", m.Option("group"))
+				}
+				order := ""
+				if m.Options("order") {
+					order = fmt.Sprintf("order by %s", m.Option("order"))
+				}
 
-				msg.Cmd("query", fmt.Sprintf("select %s from %s %s", fields, arg[0], condition))
-				m.Echo("%s %s\n", arg[0], condition)
+				msg.Cmd("query", fmt.Sprintf("select %s from %s %s %s %s", fields, arg[0], condition, group, order))
+				m.Echo("\033[31m%s\033[0m %s %s %s\n", arg[0], condition, group, order)
 				for _, k := range msg.Meta["append"] {
-					m.Echo("%s\t", k)
+					m.Echo("\033[32m%s\033[0m\t", k)
 				}
 				m.Echo("\n")
 				for i := 0; i < len(msg.Meta[msg.Meta["append"][0]]); i++ {
@@ -279,6 +286,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					}
 					m.Echo("\n")
 				}
+				// }}}
 			}},
 		"list": &ctx.Command{Name: "list add table field [where condition]", Help: "执行查询语句",
 			Formats: map[string]int{"where": 1},
