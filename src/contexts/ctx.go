@@ -1156,6 +1156,64 @@ func (m *Message) Table(cb func(map[string]string) bool) *Message { // {{{
 }
 
 // }}}
+func (m *Message) Sort(key string, arg ...string) {
+	table := []map[string]string{}
+	m.Table(func(line map[string]string) bool {
+		table = append(table, line)
+		return true
+	})
+
+	cmp := "string"
+	if len(arg) > 0 {
+		cmp = arg[0]
+	}
+
+	for i := 0; i < len(table)-1; i++ {
+		for j := i + 1; j < len(table); j++ {
+			result := false
+			switch cmp {
+			case "int":
+				a, e := strconv.Atoi(table[i][key])
+				m.Assert(e)
+				b, e := strconv.Atoi(table[j][key])
+				m.Assert(e)
+				if a > b {
+					result = true
+				}
+			case "int_r":
+				a, e := strconv.Atoi(table[i][key])
+				m.Assert(e)
+				b, e := strconv.Atoi(table[j][key])
+				m.Assert(e)
+				if a < b {
+					result = true
+				}
+			case "string":
+				if table[i][key] > table[j][key] {
+					result = true
+				}
+			case "string_r":
+				if table[i][key] < table[j][key] {
+					result = true
+				}
+			}
+
+			if result {
+				table[i], table[j] = table[j], table[i]
+			}
+		}
+	}
+
+	for _, k := range m.Meta["append"] {
+		delete(m.Meta, k)
+	}
+
+	for _, v := range table {
+		for _, k := range m.Meta["append"] {
+			m.Add("append", k, v[k])
+		}
+	}
+}
 
 func (m *Message) Insert(meta string, index int, arg ...interface{}) string { // {{{
 	if m.Meta == nil {
@@ -2965,6 +3023,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				} // }}}
 			}},
+		"sort": &Command{Name: "sort", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			m.Append("name", "shy", "yun")
+			m.Append("page", "10", "20")
+			m.Log("fuck", nil, "before %v", m.Meta)
+			m.Sort(arg[0], arg[1:]...)
+			m.Log("fuck", nil, "after %v", m.Meta)
+		}},
 	},
 	Index: map[string]*Context{
 		"void": &Context{Name: "void",

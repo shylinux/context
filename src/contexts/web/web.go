@@ -16,7 +16,6 @@ import ( // {{{
 	"bytes"
 	"mime/multipart"
 	"path/filepath"
-	"sort"
 
 	"bufio"
 	"fmt"
@@ -28,42 +27,6 @@ import ( // {{{
 )
 
 // }}}
-
-type listtime []os.FileInfo
-
-func (l listtime) Len() int {
-	return len(l)
-}
-func (l listtime) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
-}
-func (l listtime) Less(i, j int) bool {
-	return l[i].ModTime().After(l[j].ModTime())
-}
-
-type listsize []os.FileInfo
-
-func (l listsize) Len() int {
-	return len(l)
-}
-func (l listsize) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
-}
-func (l listsize) Less(i, j int) bool {
-	return l[i].Size() > (l[j].Size())
-}
-
-type listname []os.FileInfo
-
-func (l listname) Len() int {
-	return len(l)
-}
-func (l listname) Swap(i, j int) {
-	l[i], l[j] = l[j], l[i]
-}
-func (l listname) Less(i, j int) bool {
-	return l[i].Name() < (l[j].Name())
-}
 
 type MUX interface {
 	Handle(string, http.Handler)
@@ -153,47 +116,6 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 }
 
 // }}}
-func (web *WEB) AppendJson(msg *ctx.Message) string { // {{{
-	meta := map[string][]string{}
-	if !msg.Has("result") && !msg.Has("append") {
-		return ""
-	}
-
-	if len(msg.Meta["result"]) > 0 {
-		meta["result"] = msg.Meta["result"]
-	}
-
-	if len(msg.Meta["append"]) > 0 {
-		meta["append"] = msg.Meta["append"]
-		for _, v := range msg.Meta["append"] {
-			meta[v] = msg.Meta[v]
-		}
-	}
-
-	b, e := json.Marshal(meta)
-	msg.Assert(e)
-	return string(b)
-
-	result := []string{"{"}
-	for i, k := range msg.Meta["append"] {
-		result = append(result, fmt.Sprintf("\"%s\": [", k))
-		for j, v := range msg.Meta[k] {
-			result = append(result, fmt.Sprintf("\"%s\"", url.QueryEscape(v)))
-			if j < len(msg.Meta[k])-1 {
-				result = append(result, ",")
-			}
-		}
-		result = append(result, "]")
-		if i < len(msg.Meta["append"])-1 {
-			result = append(result, ", ")
-		}
-	}
-	result = append(result, "}")
-
-	return strings.Join(result, "")
-}
-
-// }}}
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn().Set("detail", key)
@@ -233,7 +155,7 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	if web.Message != nil {
 		web.Log("cmd", nil, "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
-		if web.Conf("logheaders") == "yes" {
+		if web.Confs("logheaders") {
 			for k, v := range r.Header {
 				web.Log("info", nil, "%s: %v", k, v)
 			}
@@ -250,7 +172,7 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 
 	web.ServeMux.ServeHTTP(w, r)
 
-	if web.Message != nil && web.Conf("logheaders") == "yes" {
+	if web.Message != nil && web.Confs("logheaders") {
 		for k, v := range w.Header() {
 			web.Log("info", nil, "%s: %v", k, v)
 		}
@@ -714,7 +636,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/upload": &ctx.Command{Name: "/upload", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request)
+			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 
 			if !m.Options("dir") {
@@ -740,13 +662,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			index := share.Target().Index
 			if index != nil && index[aaa.Append("userrole")] != nil {
 				for k, v := range index[aaa.Append("userrole")].Index {
-					for i, j := range v.Commands {
-						for v, n := range j.Shares {
+					for _, j := range v.Commands {
+						for _, n := range j.Shares {
 							for _, nn := range n {
 								if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
 									share.Add("append", "group", k)
-									share.Add("append", "command", i)
-									share.Add("append", "argument", v)
 									share.Add("append", "value", nn)
 									share.Add("append", "delete", "delete")
 								}
@@ -755,6 +675,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 			}
+			share.Sort("value", "string")
+			share.Sort("argument", "string")
 
 			// 输出目录
 			fs, e := ioutil.ReadDir(m.Option("dir"))
@@ -762,40 +684,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			fs = append(fs, s)
 			list := m.Sesss("list", m.Target())
 			list.Option("dir", m.Option("dir"))
-
-			// 目录排序
-			max := true
-			if i, e := strconv.Atoi(m.Option("order")); e == nil {
-				max = i%2 == 1
-			}
-			list.Option("sort", "")
-			list.Option("reverse", "")
-			switch m.Option("list") {
-			case "time":
-				if max {
-					list.Option("sort", "time")
-					sort.Sort(listtime(fs))
-				} else {
-					list.Option("reverse", "time")
-					sort.Sort(sort.Reverse(listtime(fs)))
-				}
-			case "size":
-				if max {
-					list.Option("sort", "size")
-					sort.Sort(listsize(fs))
-				} else {
-					list.Option("reverse", "size")
-					sort.Sort(sort.Reverse(listsize(fs)))
-				}
-			case "name":
-				if max {
-					list.Option("sort", "name")
-					sort.Sort(listname(fs))
-				} else {
-					list.Option("reverse", "name")
-					sort.Sort(sort.Reverse(listname(fs)))
-				}
-			}
 
 			for _, v := range fs {
 				name := v.Name()
@@ -812,11 +700,36 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					name += "/"
 				}
 
+				list.Add("append", "time_i", fmt.Sprintf("%d", v.ModTime().Unix()))
+				list.Add("append", "size_i", fmt.Sprintf("%d", v.Size()))
 				list.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
 				list.Add("append", "size", kit.FmtSize(v.Size()))
 				list.Add("append", "name", name)
 				list.Add("append", "path", path.Join(m.Option("dir"), name))
 			}
+
+			// 目录排序
+			max := true
+			if i, e := strconv.Atoi(m.Option("order")); e == nil {
+				max = i%2 == 1
+			}
+			switch m.Option("list") {
+			case "name":
+				if max {
+					list.Sort(m.Option("list"), "string")
+				} else {
+					list.Sort(m.Option("list"), "string_r")
+				}
+			case "size", "time":
+				if max {
+					list.Sort(m.Option("list")+"_i", "int")
+				} else {
+					list.Sort(m.Option("list")+"_i", "int_r")
+				}
+			}
+			list.Meta["append"] = list.Meta["append"][2:]
+			delete(list.Meta, "time_i")
+			delete(list.Meta, "size_i")
 
 			// 执行命令
 			switch m.Option("cmd") {
@@ -833,6 +746,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Append("title", "upload")
 			m.Append("tmpl", "userinfo", "share", "list", "git", "upload", "create")
 			m.Append("template", m.Conf("upload_main"), m.Conf("upload_tmpl"))
+			// }}}
 		}},
 		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if check := m.Spawn().Cmd("/share"); !check.Results(0) { // {{{
@@ -858,7 +772,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 						m.Append("message", name, " create success!")
 					} else {
-						m.Append("message", name, "already exist!")
+						m.Append("message", name, " already exist!")
 					}
 				} else { //上传文件
 					file, header, e := r.FormFile("file")
@@ -873,9 +787,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						_, e = io.Copy(f, file)
 						m.Assert(e)
-						m.Append("message", name, "upload success!")
+						m.Append("message", name, " upload success!")
 					} else {
-						m.Append("message", name, "already exist!")
+						m.Append("message", name, " already exist!")
 					}
 				}
 			}
@@ -888,16 +802,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Copy(check, "append")
 				return
 			}
-			m.Log("fuck", nil, "wh")
 
 			msg := check.Appendv("aaa").(*ctx.Message).Spawn(m.Target())
 			if m.Options("shareto") {
 				msg.Cmd("right", "add", m.Option("shareto"), "command", "/share", "dir", m.Option("dir"))
 			}
 			if m.Options("notshareto") {
-				m.Log("fuck", nil, "wh %v", msg)
 				msg.Cmd("right", "del", m.Option("notshareto"), "command", "/share", "dir", m.Option("dir"))
-				m.Log("fuck", nil, "wh %v", msg.Meta["result"])
 			}
 			m.Echo("ok")
 			// }}}
