@@ -140,7 +140,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			// }}}
 		}},
 		"send": &ctx.Command{Name: "send [domain str] cmd arg...", Help: "远程执行",
-			Formats: map[string]int{"domain": 1},
+			Form: map[string]int{"domain": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
 

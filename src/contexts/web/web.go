@@ -396,7 +396,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"get": &ctx.Command{Name: "get [method GET|POST] [file filename] url arg...", Help: "访问URL",
-			Formats: map[string]int{"method": 1, "file": 2},
+			Form: map[string]int{"method": 1, "file": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				web, ok := m.Target().Server.(*WEB) // {{{
 				m.Assert(ok)

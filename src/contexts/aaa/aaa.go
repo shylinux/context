@@ -210,7 +210,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			// }}}
 		}},
 		"md5": &ctx.Command{Name: "md5 [file filename][content]", Help: "散列",
-			Formats: map[string]int{"file": 1},
+			Form: map[string]int{"file": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if m.Options("file") { // {{{
 					f, e := os.Open(m.Option("file"))
@@ -235,7 +235,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					解密: rsa decrypt keyfile key.pem mmfile mm.txt
 					签名: rsa sign keyfile key.pem signfile sign.txt hello
 					验签: rsa verify keyfile pubkey.pem signfile sign.txt hello`,
-			Formats: map[string]int{"keyfile": 1, "key": 1, "mmfile": 1, "mm": 1, "signfile": 1, "signs": 1, "file": 1},
+			Form: map[string]int{"keyfile": 1, "key": 1, "mmfile": 1, "mm": 1, "signfile": 1, "signs": 1, "file": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if arg[0] == "gen" { // {{{
 					keys, e := rsa.GenerateKey(crand.Reader, 1024)
@@ -355,7 +355,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				// }}}
 			}},
 		"deal": &ctx.Command{Name: "deal init|sell|buy|done [keyfile name][key str]", Help: "散列",
-			Formats: map[string]int{"file": 1},
+			Form: map[string]int{"file": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if m.Options("file") { // {{{
 					f, e := os.Open(m.Option("file"))

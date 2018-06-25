@@ -322,8 +322,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			} // }}}
 		}},
 		"time": &ctx.Command{Name: "time [parse when] format when",
-			Formats: map[string]int{"parse": 1},
-			Help:    "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			Form: map[string]int{"parse": 1},
+			Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				t := time.Now() // {{{
 				if m.Options("parse") {
 					f := "2006-01-02 15:04:05"

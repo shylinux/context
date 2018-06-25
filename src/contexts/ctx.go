@@ -3,6 +3,7 @@ package ctx // {{{
 import ( // {{{
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -45,11 +46,12 @@ type Command struct {
 	Name string
 	Help string
 
-	Formats map[string]int
-	Options map[string]string
 	Shares  map[string][]string
+	Options map[string]string
 	Appends map[string]string
-	Hand    func(m *Message, c *Context, key string, arg ...string)
+
+	Form map[string]int
+	Hand func(m *Message, c *Context, key string, arg ...string)
 }
 
 type Server interface {
@@ -86,6 +88,144 @@ type Context struct {
 
 	Server
 }
+
+func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
+	s := &Context{Name: name, Help: help, root: c.root, context: c}
+
+	if m.target = s; c.Server != nil {
+		c.Register(s, c.Server.Spawn(m, s, m.Meta["detail"]...))
+	} else {
+		c.Register(s, nil)
+	}
+
+	if m.Template != nil {
+		m.Template.source = s
+	}
+
+	return s
+}
+
+// }}}
+func (c *Context) Begin(m *Message) *Context { // {{{
+	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
+	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
+
+	item := []string{}
+	m.BackTrace(func(m *Message) bool {
+		item = append(item, m.target.Name)
+		return true
+	})
+	for i := 0; i < len(item)/2; i++ {
+		item[i], item[len(item)-i-1] = item[len(item)-i-1], item[i]
+	}
+	c.Caches["module"] = &Cache{Name: "服务数据", Value: strings.Join(item, "."), Help: "服务数据"}
+
+	m.Index = 1
+	c.Pulse = m
+	c.Requests = []*Message{m}
+	c.Historys = []*Message{m}
+	c.Sessions = map[string]*Message{}
+
+	c.master = m.master.master
+	c.Owner = m.master.Owner
+
+	m.Log("begin", nil, "%d context %v %v", m.root.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
+	for k, x := range c.Configs {
+		if x.Hand != nil {
+			m.Conf(k, x.Value)
+		}
+	}
+
+	if c.Server != nil {
+		c.Server.Begin(m, m.Meta["detail"]...)
+	}
+
+	return c
+}
+
+// }}}
+func (c *Context) Start(m *Message) bool { // {{{
+	m.Hand = true
+
+	if m != c.Requests[0] {
+		c.Requests, m.Index = append(c.Requests, m), len(c.Requests)+1
+	}
+
+	if m.Cap("status") != "start" {
+		running := make(chan bool)
+		go m.TryCatch(m, true, func(m *Message) {
+			m.Log(m.Cap("status", "start"), nil, "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
+
+			if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
+				c.Close(m, m.Meta["detail"]...)
+			}
+		})
+		<-running
+	}
+	return true
+}
+
+// }}}
+func (c *Context) Close(m *Message, arg ...string) bool { // {{{
+	m.Log("close", c, "%d:%d %v", len(m.source.Sessions), len(m.target.Historys), arg)
+
+	if m.target == c {
+		if m.Index == 0 {
+			for i := len(c.Requests) - 1; i >= 0; i-- {
+				v := c.Requests[i]
+				if v.Index = -1; v.source != c && !v.source.Close(v, arg...) {
+					v.Index = i
+					return false
+				}
+				c.Requests = c.Requests[:i]
+			}
+		} else if m.Index > 0 {
+			for i := m.Index - 1; i < len(c.Requests)-1; i++ {
+				c.Requests[i] = c.Requests[i+1]
+			}
+			c.Requests = c.Requests[:len(c.Requests)-1]
+		}
+	}
+
+	if c.Server != nil && !c.Server.Close(m, arg...) {
+		return false
+	}
+
+	if m.source == c && m.target != c {
+		if _, ok := c.Sessions[m.Name]; ok {
+			delete(c.Sessions, m.Name)
+		}
+		return true
+	}
+
+	if len(c.Requests) > 1 {
+		return false
+	}
+
+	if m.Cap("status") == "start" {
+		m.Log(m.Cap("status", "close"), nil, "%d server %v", m.root.Capi("nserver", -1)+1, arg)
+		for _, v := range c.Sessions {
+			if v.target != c {
+				v.target.Close(v, arg...)
+			}
+		}
+	}
+
+	// if m.Index == 0 && c.context != nil && len(c.contexts) == 0 {
+	if c.context != nil {
+		m.Log("close", nil, "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
+		delete(c.context.contexts, c.Name)
+		c.context = nil
+		if c.Exit != nil {
+			m.Log("info", nil, "before exit<-")
+			c.Exit <- true
+			m.Log("info", nil, "after exit<-")
+		}
+	}
+	return true
+}
+
+// }}}
 
 func (c *Context) Password(meta string) string { // {{{
 	bs := md5.Sum([]byte(fmt.Sprintln("%d%d%s", time.Now().Unix(), rand.Int(), meta)))
@@ -177,143 +317,6 @@ func (c *Context) Check(m *Message, arg ...string) bool { // {{{
 
 	m.Log("check", nil, "%s %d %v failure", c.Name, m.code, arg)
 	return false
-}
-
-// }}}
-func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
-	s := &Context{Name: name, Help: help, root: c.root, context: c}
-
-	if m.target = s; c.Server != nil {
-		c.Register(s, c.Server.Spawn(m, s, m.Meta["detail"]...))
-	} else {
-		c.Register(s, nil)
-	}
-
-	if m.Template != nil {
-		m.Template.source = s
-	}
-
-	return s
-}
-
-// }}}
-func (c *Context) Begin(m *Message) *Context { // {{{
-	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
-	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
-
-	item := []string{}
-	m.BackTrace(func(m *Message) bool {
-		item = append(item, m.target.Name)
-		return true
-	})
-	for i := 0; i < len(item)/2; i++ {
-		item[i], item[len(item)-i-1] = item[len(item)-i-1], item[i]
-	}
-	c.Caches["module"] = &Cache{Name: "服务数据", Value: strings.Join(item, "."), Help: "服务数据"}
-
-	m.Index = 1
-	c.Pulse = m
-	c.Requests = []*Message{m}
-	c.Historys = []*Message{m}
-	c.Sessions = map[string]*Message{}
-
-	c.master = m.master.master
-	c.Owner = m.master.Owner
-
-	m.Log("begin", nil, "%d context %v %v", m.root.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
-	for k, x := range c.Configs {
-		if x.Hand != nil {
-			m.Conf(k, x.Value)
-		}
-	}
-
-	if c.Server != nil {
-		c.Server.Begin(m, m.Meta["detail"]...)
-	}
-
-	return c
-}
-
-// }}}
-func (c *Context) Start(m *Message) bool { // {{{
-	m.Hand = true
-
-	if m != c.Requests[0] {
-		c.Requests, m.Index = append(c.Requests, m), len(c.Requests)+1
-	}
-
-	if m.Cap("status") != "start" {
-		running := make(chan bool)
-		go m.AssertOne(m, true, func(m *Message) {
-			m.Log(m.Cap("status", "start"), nil, "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
-
-			if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
-				c.Close(m, m.Meta["detail"]...)
-			}
-		})
-		<-running
-	}
-	return true
-}
-
-// }}}
-func (c *Context) Close(m *Message, arg ...string) bool { // {{{
-	m.Log("close", c, "%d:%d %v", len(m.source.Sessions), len(m.target.Historys), arg)
-
-	if m.target == c {
-		if m.Index == 0 {
-			for i := len(c.Requests) - 1; i >= 0; i-- {
-				v := c.Requests[i]
-				if v.Index = -1; v.source != c && !v.source.Close(v, arg...) {
-					v.Index = i
-					return false
-				}
-				c.Requests = c.Requests[:i]
-			}
-		} else if m.Index > 0 {
-			for i := m.Index - 1; i < len(c.Requests)-1; i++ {
-				c.Requests[i] = c.Requests[i+1]
-			}
-			c.Requests = c.Requests[:len(c.Requests)-1]
-		}
-	}
-
-	if c.Server != nil && !c.Server.Close(m, arg...) {
-		return false
-	}
-
-	if m.source == c && m.target != c {
-		if _, ok := c.Sessions[m.Name]; ok {
-			delete(c.Sessions, m.Name)
-		}
-		return true
-	}
-
-	if len(c.Requests) > 1 {
-		return false
-	}
-
-	if m.Cap("status") == "start" {
-		m.Log(m.Cap("status", "close"), nil, "%d server %v", m.root.Capi("nserver", -1)+1, arg)
-		for _, v := range c.Sessions {
-			if v.target != c {
-				v.target.Close(v, arg...)
-			}
-		}
-	}
-
-	// if m.Index == 0 && c.context != nil && len(c.contexts) == 0 {
-	if c.context != nil {
-		m.Log("close", nil, "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
-		delete(c.context.contexts, c.Name)
-		c.context = nil
-		if c.Exit != nil {
-			m.Log("info", nil, "before exit<-")
-			c.Exit <- true
-			m.Log("info", nil, "after exit<-")
-		}
-	}
-	return true
 }
 
 // }}}
@@ -674,7 +677,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 }
 
 // }}}
-func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
+func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
 	defer func() {
 		if e := recover(); e != nil {
 
@@ -691,7 +694,7 @@ func (m *Message) AssertOne(msg *Message, safe bool, hand ...func(msg *Message))
 			}
 
 			if len(hand) > 1 {
-				m.AssertOne(msg, safe, hand[1:]...)
+				m.TryCatch(msg, safe, hand[1:]...)
 			} else if !safe {
 				msg.Assert(e)
 			}
@@ -1138,28 +1141,75 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {
 }
 
 // }}}
-func (m *Message) Table(cb func(map[string]string) bool) *Message { // {{{
-	if len(m.Meta["append"]) > 0 {
-		for i := 0; i < len(m.Meta[m.Meta["append"][0]]); i++ {
-			row := map[string]string{}
-			for _, k := range m.Meta["append"] {
-				if i < len(m.Meta[k]) {
-					row[k] = m.Meta[k][i]
-				}
-			}
-			if !cb(row) {
-				break
+func (m *Message) Table(cb func(map[string]string, []string, int) bool) *Message { // {{{
+	if len(m.Meta["append"]) == 0 {
+		return m
+	}
+
+	width := make(map[string]int, len(m.Meta[m.Meta["append"][0]]))
+	for _, k := range m.Meta["append"] {
+		title := k
+		if m.Options("extras") && k == "extra" {
+			title = "extra." + m.Option("extras")
+		}
+		width[k] = len(title)
+	}
+	for i := 0; i < len(m.Meta[m.Meta["append"][0]]); i++ {
+		for _, k := range m.Meta["append"] {
+			data := m.Meta[k][i]
+			if len(data) > width[k] {
+				width[k] = len(data)
 			}
 		}
 	}
+
+	row := map[string]string{}
+	wor := []string{}
+	for _, k := range m.Meta["append"] {
+		title := k
+		if m.Options("extras") && k == "extra" {
+			title = "extra." + m.Option("extras")
+		}
+		row[k] = title
+		title += strings.Repeat(" ", width[k]-len(title))
+		wor = append(wor, title)
+	}
+	if !cb(row, wor, -1) {
+		return m
+	}
+
+	for i := 0; i < len(m.Meta[m.Meta["append"][0]]); i++ {
+		row := map[string]string{}
+		wor := []string{}
+		for _, k := range m.Meta["append"] {
+			data := m.Meta[k][i]
+			if m.Options("extras") && k == "extra" {
+				extra := map[string]interface{}{}
+				json.Unmarshal([]byte(data), &extra)
+				data = fmt.Sprintf("%v", extra[m.Option("extras")])
+			}
+
+			if i < len(m.Meta[k]) {
+				row[k] = data
+				data += strings.Repeat(" ", width[k]-len(data))
+				wor = append(wor, data)
+			}
+		}
+		if !cb(row, wor, i) {
+			break
+		}
+	}
+
 	return m
 }
 
 // }}}
-func (m *Message) Sort(key string, arg ...string) {
+func (m *Message) Sort(key string, arg ...string) { // {{{
 	table := []map[string]string{}
-	m.Table(func(line map[string]string) bool {
-		table = append(table, line)
+	m.Table(func(line map[string]string, lists []string, index int) bool {
+		if index != -1 {
+			table = append(table, line)
+		}
 		return true
 	})
 
@@ -1214,6 +1264,8 @@ func (m *Message) Sort(key string, arg ...string) {
 		}
 	}
 }
+
+// }}}
 
 func (m *Message) Insert(meta string, index int, arg ...interface{}) string { // {{{
 	if m.Meta == nil {
@@ -1352,6 +1404,15 @@ func (m *Message) Optionv(key string, arg ...interface{}) interface{} { // {{{
 }
 
 // }}}
+func (m *Message) Optionx(key string, format string) interface{} { // {{{
+	value := m.Option(key)
+	if value != "" {
+		return fmt.Sprintf(format, value)
+	}
+	return ""
+}
+
+// }}}
 func (m *Message) Append(key string, arg ...interface{}) string { // {{{
 	m.Insert(key, 0, arg...)
 	if _, ok := m.Meta[key]; ok {
@@ -1427,7 +1488,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 		for s := c; s != nil; s = s.context {
 
 			if x, ok := s.Commands[key]; ok && x.Hand != nil && c.Check(m, "commands", key) {
-				m.AssertOne(m, true, func(m *Message) {
+				m.TryCatch(m, true, func(m *Message) {
 					m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
 
 					if x.Options != nil {
@@ -1441,9 +1502,9 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 					if m.Has("args") {
 						m.Meta["args"] = nil
 					}
-					if x.Formats != nil {
+					if x.Form != nil {
 						for i := 0; i < len(arg); i++ {
-							n, ok := x.Formats[arg[i]]
+							n, ok := x.Form[arg[i]]
 							if !ok {
 								m.Add("option", "args", arg[i])
 								continue
@@ -1496,7 +1557,7 @@ func (m *Message) Deal(pre func(msg *Message, arg ...string) bool, post func(msg
 	}
 
 	for run := true; run; {
-		m.AssertOne(<-m.target.messages, true, func(msg *Message) {
+		m.TryCatch(<-m.target.messages, true, func(msg *Message) {
 			defer func() {
 				if msg.Wait != nil {
 					msg.Wait <- true
@@ -1563,6 +1624,49 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 
 // }}}
 
+func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
+	if len(arg) == 0 {
+		return m.Conf(key)
+	}
+
+	skip := false
+	if len(arg) > 1 {
+		if v, ok := arg[1].(bool); ok && !v {
+			skip = true
+		}
+	}
+
+	if len(arg) > 0 {
+		switch v := arg[0].(type) {
+		case string:
+			if skip || v == "" {
+				return m.Conf(key)
+			}
+			return v
+		case []string:
+			which := 0
+			if len(arg) > 1 {
+				if x, ok := arg[1].(int); ok {
+					which = x
+				}
+			}
+			if which < len(v) {
+				return v[which]
+			}
+			return m.Conf(key)
+		default:
+			x := fmt.Sprintf("%v", v)
+			if skip || v == nil || x == "" {
+				return m.Conf(key)
+			}
+			return x
+		}
+	}
+
+	return ""
+}
+
+// }}}
 func (m *Message) Confs(key string, arg ...bool) bool { // {{{
 	if len(arg) > 0 {
 		if arg[0] {
@@ -1634,6 +1738,49 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 	}
 
 	m.Log("error", nil, "%s 配置项不存在", key)
+	return ""
+}
+
+// }}}
+func (m *Message) Capx(key string, arg ...interface{}) string { // {{{
+	if len(arg) == 0 {
+		return m.Cap(key)
+	}
+
+	skip := false
+	if len(arg) > 1 {
+		if v, ok := arg[1].(bool); ok && !v {
+			skip = true
+		}
+	}
+
+	if len(arg) > 0 {
+		switch v := arg[0].(type) {
+		case string:
+			if skip || v == "" {
+				return m.Cap(key)
+			}
+			return v
+		case []string:
+			which := 0
+			if len(arg) > 1 {
+				if x, ok := arg[1].(int); ok {
+					which = x
+				}
+			}
+			if which < len(v) {
+				return v[which]
+			}
+			return m.Cap(key)
+		default:
+			x := fmt.Sprintf("%v", v)
+			if skip || v == nil || x == "" {
+				return m.Cap(key)
+			}
+			return x
+		}
+	}
+
 	return ""
 }
 
@@ -2282,8 +2429,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 			// }}}
 		}},
-		"context": &Command{Name: "context back|[[home] [find|search] name] [info|lists|show|switch|[args]", Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Formats: map[string]int{
+		"context": &Command{
+			Name: "context back|[[home] [find|search] name] [info|lists|show|switch|[args]",
+			Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
+			Form: map[string]int{
 				"back": 0, "home": 0,
 				"find": 1, "search": 1,
 				"info": 1, "lists": 0, "show": 0, "switch": 0,
@@ -2456,43 +2605,47 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 				// }}}
 			}},
-		"server": &Command{Name: "server [spawn|begin|start|close|][args]", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			switch len(arg) { // {{{
-			case 0:
-				m.Travel(m.target.root, func(msg *Message) bool {
-					if msg.Cap("status") == "start" {
-						msg.Echo("%s(%s): %s\n", msg.target.Name, msg.Cap("stream"), msg.target.Help)
-					}
-					return true
-				})
+		"server": &Command{
+			Name: "server [spawn|begin|start|close|][args]",
+			Help: "服务启动停止切换",
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
+				switch len(arg) { // {{{
+				case 0:
+					m.Travel(m.target.root, func(msg *Message) bool {
+						if msg.Cap("status") == "start" {
+							msg.Echo("%s(%s): %s\n", msg.target.Name, msg.Cap("stream"), msg.target.Help)
+						}
+						return true
+					})
 
-			default:
-				switch arg[0] {
-				case "spawn":
-					if len(arg) > 1 {
+				default:
+					switch arg[0] {
+					case "spawn":
+						if len(arg) > 1 {
+							msg := m.Spawn(m.Target())
+							msg.Detail(0, arg[2:])
+							msg.Target().Spawn(msg, arg[0], arg[1])
+						}
+
+					case "begin":
 						msg := m.Spawn(m.Target())
-						msg.Detail(0, arg[2:])
-						msg.Target().Spawn(msg, arg[0], arg[1])
+						msg.Detail(0, arg)
+						msg.Target().Begin(msg)
+					case "start":
+						msg := m.Spawn(m.Target())
+						msg.Detail(0, arg)
+						msg.Target().Start(msg)
+					case "close":
+						msg := m.Spawn(m.Target())
+						msg.Detail(0, arg)
+						msg.Target().Close(msg)
 					}
-
-				case "begin":
-					msg := m.Spawn(m.Target())
-					msg.Detail(0, arg)
-					msg.Target().Begin(msg)
-				case "start":
-					msg := m.Spawn(m.Target())
-					msg.Detail(0, arg)
-					msg.Target().Start(msg)
-				case "close":
-					msg := m.Spawn(m.Target())
-					msg.Detail(0, arg)
-					msg.Target().Close(msg)
 				}
-			}
-			// }}}
-		}},
-		"command": &Command{Name: "command [all] add [key [name help]]", Help: "查看或修改命令",
-			Formats: map[string]int{"all": 0, "delete": 0, "void": 0, "condition": -1},
+				// }}}
+			}},
+		"command": &Command{
+			Name: "command [all] add [key [name help]]", Help: "查看或修改命令",
+			Form: map[string]int{"all": 0, "delete": 0, "void": 0, "condition": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
 				if len(arg) == 0 {
@@ -2681,8 +2834,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 				// }}}
 			}},
-		"config": &Command{Name: "config [all] [[delete|void] key [value]|[name value help]]", Help: "删除、置空、查看、修改或添加配置",
-			Formats: map[string]int{"all": 0, "delete": 0, "void": 0},
+		"config": &Command{
+			Name: "config [all] [[delete|void] key [value]|[name value help]]",
+			Help: "删除、置空、查看、修改或添加配置",
+			Form: map[string]int{"all": 0, "delete": 0, "void": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
 
@@ -2741,8 +2896,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 				// }}}
 			}},
-		"cache": &Command{Name: "cache [all] [[delete|void] key [value]|[name value help]]", Help: "删除、置空、查看、修改或添加缓存",
-			Formats: map[string]int{"all": 0, "delete": 0, "void": 0},
+		"cache": &Command{
+			Name: "cache [all] [[delete|void] key [value]|[name value help]]",
+			Help: "删除、置空、查看、修改或添加缓存",
+			Form: map[string]int{"all": 0, "delete": 0, "void": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				all := m.Has("all") // {{{
 
@@ -2795,9 +2952,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				// }}}
 			}},
 		"right": &Command{
-			Name:    "right [share|add|del group [cache|config|command item]]",
-			Help:    "用户组管理，查看、添加、删除用户组或是接口",
-			Formats: map[string]int{"check": 0, "add": 0, "del": 0, "brow": 0, "cache": 0, "config": 0, "command": 0},
+			Name: "right [share|add|del group [cache|config|command item]]",
+			Help: "用户组管理，查看、添加、删除用户组或是接口",
+			Form: map[string]int{"check": 0, "add": 0, "del": 0, "brow": 0, "cache": 0, "config": 0, "command": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				index := m.Target().Index // {{{
 				if index == nil {
@@ -3031,13 +3188,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				} // }}}
 			}},
-		"sort": &Command{Name: "sort", Help: "服务启动停止切换", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			m.Append("name", "shy", "yun")
-			m.Append("page", "10", "20")
-			m.Log("fuck", nil, "before %v", m.Meta)
-			m.Sort(arg[0], arg[1:]...)
-			m.Log("fuck", nil, "after %v", m.Meta)
-		}},
 	},
 	Index: map[string]*Context{
 		"void": &Context{Name: "void",

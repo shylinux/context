@@ -2,23 +2,20 @@ package mdb // {{{
 // }}}
 import ( // {{{
 	"contexts"
-	"encoding/json"
-	"strconv"
-	"strings"
-
 	"database/sql"
+	"encoding/json"
 	_ "github.com/go-sql-driver/mysql"
 
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 )
 
 // }}}
 
 type MDB struct {
 	*sql.DB
-
-	list     map[string][]string
-	list_key []string
 
 	table []string
 	*ctx.Context
@@ -73,7 +70,7 @@ func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch mdb.Context {
 	case m.Target():
 		if mdb.DB != nil {
-			m.Log("info", nil, "%d close %s %s", Pulse.Capi("nsource", -1)+1, m.Cap("driver"), m.Cap("source"))
+			m.Log("info", nil, "close")
 			mdb.DB.Close()
 			mdb.DB = nil
 		}
@@ -87,263 +84,199 @@ func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 	Caches: map[string]*ctx.Cache{
-		"count":   &ctx.Cache{Name: "count", Value: "0", Help: "主机协议"},
 		"nsource": &ctx.Cache{Name: "数据源数量", Value: "0", Help: "已打开数据库的数量"},
+		"dbname": &ctx.Cache{Name: "生成模块名", Value: "", Help: "生成模块名", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
+			return fmt.Sprintf("db%d", Pulse.Capi("nsource", 1))
+		}},
 	},
 	Configs: map[string]*ctx.Config{
-		"driver": &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
+		"driver":  &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
+		"csv_sep": &ctx.Config{Name: "字段分隔符", Value: "\t", Help: "字段分隔符"},
 	},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{Name: "open source [name]", Help: "打开数据库", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"open": &ctx.Command{Name: "open source [name]", Help: "打开数据库, source: 数据源, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Assert(len(arg) > 0, "缺少参数") // {{{
-			name := fmt.Sprintf("db%d", Pulse.Capi("nsource", 1))
-			if len(arg) > 1 {
-				name = arg[1]
-			}
-			m.Start(name, "数据存储", arg...)
-			Pulse.Cap("stream", Pulse.Cap("nsource"))
+			m.Start(m.Capx("dbname", arg, 1), "数据存储", arg...)
 			m.Echo(m.Target().Name)
 			// }}}
 		}},
-		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库",
+		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 查询参数",
 			Appends: map[string]string{"last": "最后插入元组的标识", "nrow": "修改元组的数量"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				mdb, ok := m.Target().Server.(*MDB) // {{{
-				m.Assert(ok, "目标模块类型错误")
-				m.Assert(len(arg) > 0, "缺少参数")
-				m.Assert(mdb.DB != nil, "数据库未打开")
+				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
+					which := make([]interface{}, 0, len(arg))
+					for _, v := range arg[1:] {
+						which = append(which, v)
+					}
 
+					ret, e := mdb.Exec(arg[0], which...)
+					m.Assert(e)
+					id, e := ret.LastInsertId()
+					m.Assert(e)
+					n, e := ret.RowsAffected()
+					m.Assert(e)
+
+					m.Log("info", nil, "last(%s) nrow(%s)", m.Append("last", id), m.Append("nrow", n))
+					m.Echo("%d", id).Echo("%d", n)
+				}
+				// }}}
+			}},
+		"query": &ctx.Command{Name: "query sql [arg]", Help: "查询数据库, sql: SQL语句, arg: 查询参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 				which := make([]interface{}, 0, len(arg))
 				for _, v := range arg[1:] {
 					which = append(which, v)
 				}
 
-				ret, e := mdb.Exec(arg[0], which...)
+				rows, e := mdb.Query(arg[0], which...)
 				m.Assert(e)
-				id, e := ret.LastInsertId()
+				defer rows.Close()
+
+				cols, e := rows.Columns()
 				m.Assert(e)
-				n, e := ret.RowsAffected()
-				m.Assert(e)
+				num := len(cols)
 
-				m.Echo("%d", id).Echo("%d", n)
-				m.Add("append", "last", fmt.Sprintf("%d", id))
-				m.Add("append", "nrow", fmt.Sprintf("%d", n))
-				m.Log("info", nil, "last(%d) nrow(%d)", id, n)
-				// }}}
-			}},
-		"query": &ctx.Command{Name: "query sql [arg]", Help: "执行查询语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			mdb, ok := m.Target().Server.(*MDB) // {{{
-			m.Assert(ok, "目标模块类型错误")
-			m.Assert(len(arg) > 0, "缺少参数")
-			m.Assert(mdb.DB != nil, "数据库未打开")
+				for rows.Next() {
+					vals := make([]interface{}, num)
+					ptrs := make([]interface{}, num)
+					for i := range vals {
+						ptrs[i] = &vals[i]
+					}
+					rows.Scan(ptrs...)
 
-			which := make([]interface{}, 0, len(arg))
-			for _, v := range arg[1:] {
-				which = append(which, v)
-			}
-
-			rows, e := mdb.Query(arg[0], which...)
-			m.Assert(e)
-			defer rows.Close()
-
-			cols, e := rows.Columns()
-			m.Assert(e)
-			num := len(cols)
-
-			for rows.Next() {
-				vals := make([]interface{}, num)
-				ptrs := make([]interface{}, num)
-				for i := range vals {
-					ptrs[i] = &vals[i]
-				}
-				rows.Scan(ptrs...)
-
-				for i, k := range cols {
-					switch b := vals[i].(type) {
-					case []byte:
-						m.Add("append", k, string(b))
-					case int64:
-						m.Add("append", k, fmt.Sprintf("%d", b))
-					default:
-						m.Add("append", k, "")
+					for i, k := range cols {
+						switch b := vals[i].(type) {
+						case []byte:
+							m.Add("append", k, string(b))
+						case int64:
+							m.Add("append", k, fmt.Sprintf("%d", b))
+						default:
+							m.Add("append", k, fmt.Sprintf("%v", b))
+						}
 					}
 				}
-			}
 
-			if len(m.Meta["append"]) > 0 {
-				m.Log("info", nil, "rows(%d) cols(%d)", len(m.Meta[m.Meta["append"][0]]), len(m.Meta["append"]))
-			} else {
-				m.Log("info", nil, "rows(0) cols(0)")
+				if len(m.Meta["append"]) > 0 {
+					m.Log("info", nil, "rows(%d) cols(%d)", len(m.Meta[m.Meta["append"][0]]), len(m.Meta["append"]))
+				} else {
+					m.Log("info", nil, "rows(0) cols(0)")
+				}
 			}
 			// }}}
 		}},
-		"table": &ctx.Command{Name: "table", Help: "执行查询语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			mdb, ok := m.Target().Server.(*MDB) // {{{
-			m.Assert(ok)
-			msg := m.Spawn(m.Target())
-			if len(arg) > 0 {
+		"table": &ctx.Command{Name: "table [which [field]]", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
+				msg := m.Spawn()
+				if len(arg) == 0 {
+					msg.Cmd("query", "show tables")
+					mdb.table = []string{}
+					for i, v := range msg.Meta[msg.Meta["append"][0]] {
+						mdb.table = append(mdb.table, v)
+						m.Echo("%d: %s\n", i, v)
+					}
+					return
+				}
+
 				table := arg[0]
 				index, e := strconv.Atoi(arg[0])
 				if e == nil && index < len(mdb.table) {
 					table = mdb.table[index]
 				}
-				msg.Cmd("query", fmt.Sprintf("desc %s", table))
 
-				if len(arg) > 1 {
-					for i, v := range msg.Meta[msg.Meta["append"][0]] {
-						if v == arg[1] {
-							for _, k := range msg.Meta["append"] {
-								m.Echo("%s: %s\n", k, msg.Meta[k][i])
-							}
-						}
-					}
-				} else {
+				msg.Cmd("query", fmt.Sprintf("desc %s", table))
+				if len(arg) == 1 {
 					for _, v := range msg.Meta[msg.Meta["append"][0]] {
 						m.Echo("%s\n", v)
 					}
+					return
 				}
-			} else {
-				msg.Cmd("query", "show tables")
-				mdb.table = []string{}
+
 				for i, v := range msg.Meta[msg.Meta["append"][0]] {
-					mdb.table = append(mdb.table, v)
-					m.Echo("%d: %s\n", i, v)
+					if v == arg[1] {
+						for _, k := range msg.Meta["append"] {
+							m.Echo("%s: %s\n", k, msg.Meta[k][i])
+						}
+					}
 				}
 			}
 			// }}}
 		}},
-		"get": &ctx.Command{Name: "get [where str] [parse str] [table [field]]", Help: "执行查询语句",
-			Formats: map[string]int{"where": 1, "parse": 1},
+		"show": &ctx.Command{
+			Name: "show table fields... [where conditions]|[group fields]|[order fields]|[save filename]",
+			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "extras": 1, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				where := m.Conf("where") // {{{
-				if m.Options("where") {
-					where = m.Option("where")
+				if m.Options("extras") { // {{{
+					arg = append(arg, "extra")
+				}
+				fields := strings.Join(arg[1:], ",")
+
+				where := m.Optionx("where", "where %s")
+				group := m.Optionx("group", "group by %s")
+				order := m.Optionx("order", "order by %s")
+
+				msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s", fields, arg[0], where, group, order))
+				if !m.Options("save") {
+					m.Echo("\033[31m%s\033[0m %s %s %s\n", arg[0], where, group, order)
+				}
+				msg.Table(func(maps map[string]string, lists []string, index int) bool {
+					for i, v := range lists {
+						if m.Options("save") {
+							m.Echo(maps[msg.Meta["append"][i]]).Echo(m.Conf("csv_sep"))
+						} else if index == -1 {
+							m.Echo("\033[32m%s\033[0m", v).Echo(m.Conf("csv_sep"))
+						} else {
+							m.Echo(v).Echo(m.Conf("csv_sep"))
+						}
+					}
+					m.Echo("\n")
+					return true
+				})
+
+				if m.Options("save") {
+					f, e := os.Create(m.Option("save"))
+					m.Assert(e)
+					defer f.Close()
+
+					for _, v := range m.Meta["result"] {
+						f.WriteString(v)
+					}
+				}
+				// }}}
+			}},
+		"get": &ctx.Command{Name: "get [where str] [parse str] [table [field]]", Help: "执行查询语句",
+			Form: map[string]int{"where": 1, "parse": 2},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				where := m.Confx("where", m.Option("where")) // {{{
+				if where != "" {
+					where = "where " + where
 				}
 
-				parse := m.Conf("parse")
-				if m.Options("parse") {
-					parse = m.Option("parse")
-				}
+				parse := m.Confx("parse", m.Option("parse"))
+				extra := m.Confx("extra", m.Meta["parse"], 1)
+				table := m.Confx("table", arg, 0)
+				field := m.Confx("field", arg, 1)
 
-				table := m.Conf("table")
-				if len(arg) > 0 {
-					table = arg[0]
-				}
-
-				field := m.Conf("field")
-				if len(arg) > 1 {
-					field = arg[1]
-				}
-
-				rest := []string{}
-				if len(arg) > 2 {
-					rest = arg[2:]
-				}
-
-				msg := m.Spawn(m.Target())
-				msg.Cmd("query", fmt.Sprintf("select %s from %s where %s", field, table, where), rest)
-				m.Copy(msg, "result").Copy(msg, "append")
-				m.Table(func(row map[string]string) bool {
+				msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s", field, table, where))
+				msg.Table(func(row map[string]string, lists []string, index int) bool {
+					if index == -1 {
+						return true
+					}
 					data := map[string]interface{}{}
 					switch parse {
 					case "json":
-						json.Unmarshal([]byte(row[field]), data)
-						m.Echo("%v", data)
+						if json.Unmarshal([]byte(row[field]), &data); extra == "" {
+							for k, v := range data {
+								m.Echo("%s: %v\n", k, v)
+							}
+						} else if v, ok := data[extra]; ok {
+							m.Echo("%v", v)
+						}
 					default:
 						m.Echo("%v", row[field])
 					}
 					return false
 				}) // }}}
-			}},
-		"show": &ctx.Command{Name: "show table field [where conditions]|[group fields]|[order fields]", Help: "执行查询语句",
-			Formats: map[string]int{"where": 1, "group": 1, "order": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				msg := m.Spawn(m.Target()) // {{{
-
-				fields := strings.Join(arg[1:], ",")
-				condition := ""
-				if m.Options("where") {
-					condition = fmt.Sprintf("where %s", m.Option("where"))
-				}
-				group := ""
-				if m.Options("group") {
-					group = fmt.Sprintf("group by %s", m.Option("group"))
-				}
-				order := ""
-				if m.Options("order") {
-					order = fmt.Sprintf("order by %s", m.Option("order"))
-				}
-
-				msg.Cmd("query", fmt.Sprintf("select %s from %s %s %s %s", fields, arg[0], condition, group, order))
-				m.Echo("\033[31m%s\033[0m %s %s %s\n", arg[0], condition, group, order)
-				for _, k := range msg.Meta["append"] {
-					m.Echo("\033[32m%s\033[0m\t", k)
-				}
-				m.Echo("\n")
-				for i := 0; i < len(msg.Meta[msg.Meta["append"][0]]); i++ {
-					for _, k := range msg.Meta["append"] {
-						m.Echo("%s\t", msg.Meta[k][i])
-					}
-					m.Echo("\n")
-				}
-				// }}}
-			}},
-		"list": &ctx.Command{Name: "list add table field [where condition]", Help: "执行查询语句",
-			Formats: map[string]int{"where": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				mdb, ok := m.Target().Server.(*MDB) // {{{
-				m.Assert(ok)
-				if len(arg) == 0 {
-					for _, k := range mdb.list_key {
-						m.Echo("%s: %v\n", k, mdb.list[k])
-					}
-					return
-				}
-
-				switch arg[0] {
-				case "add":
-					if mdb.list == nil {
-						mdb.list = make(map[string][]string)
-					}
-					mdb.list[m.Cap("count")] = append(mdb.list[m.Cap("count")], m.Option("where"))
-					mdb.list[m.Cap("count")] = append(mdb.list[m.Cap("count")], arg[1:]...)
-					mdb.list_key = append(mdb.list_key, m.Cap("count"))
-					m.Capi("count", 1)
-				case "set":
-					mdb.list[arg[1]] = []string{m.Option("where")}
-					mdb.list[arg[1]] = append(mdb.list[arg[1]], arg[2:]...)
-				default:
-					if table, ok := mdb.list[arg[0]]; ok {
-						msg := m.Spawn(m.Target())
-
-						fields := strings.Join(table[2:], ",")
-						condition := ""
-						if len(arg) > 1 && len(arg[1]) > 0 {
-							condition = fmt.Sprintf("where %s", arg[1])
-						} else if len(table[0]) > 0 {
-							condition = fmt.Sprintf("where %s", table[0])
-						}
-
-						other := ""
-						if len(arg) > 2 {
-							other = strings.Join(arg[2:], " ")
-						}
-
-						msg.Cmd("query", fmt.Sprintf("select %s from %s %s %s", fields, table[1], condition, other))
-						m.Echo("%s %s\n", table[1], condition)
-						for _, k := range msg.Meta["append"] {
-							m.Echo("%s\t", k)
-						}
-						m.Echo("\n")
-						for i := 0; i < len(msg.Meta[msg.Meta["append"][0]]); i++ {
-							for _, k := range msg.Meta["append"] {
-								m.Echo("%s\t", msg.Meta[k][i])
-							}
-							m.Echo("\n")
-						}
-					}
-				}
-				// }}}
 			}},
 	},
 	Index: map[string]*ctx.Context{
