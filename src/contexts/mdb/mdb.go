@@ -222,11 +222,14 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				msg.Table(func(maps map[string]string, lists []string, index int) bool {
 					for i, v := range lists {
 						if m.Options("save") {
-							m.Echo(maps[msg.Meta["append"][i]]).Echo(m.Conf("csv_sep"))
+							m.Echo(maps[msg.Meta["append"][i]])
 						} else if index == -1 {
-							m.Echo("\033[32m%s\033[0m", v).Echo(m.Conf("csv_sep"))
+							m.Echo("\033[32m%s\033[0m", v)
 						} else {
-							m.Echo(v).Echo(m.Conf("csv_sep"))
+							m.Echo(v)
+						}
+						if i < len(lists)-1 {
+							m.Echo(m.Conf("csv_sep"))
 						}
 					}
 					m.Echo("\n")
