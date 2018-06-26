@@ -1626,7 +1626,11 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 
 func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 	if len(arg) == 0 {
-		return m.Conf(key)
+		value := m.Option(key)
+		if value == "" {
+			value = m.Conf(key)
+		}
+		return value
 	}
 
 	skip := false
@@ -1744,7 +1748,11 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 // }}}
 func (m *Message) Capx(key string, arg ...interface{}) string { // {{{
 	if len(arg) == 0 {
-		return m.Cap(key)
+		value := m.Option(key)
+		if value == "" {
+			value = m.Cap(key)
+		}
+		return value
 	}
 
 	skip := false

@@ -21,15 +21,21 @@ type MDB struct {
 	*ctx.Context
 }
 
-func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
+func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{
-		"source": &ctx.Cache{Name: "数据库参数", Value: "", Help: "数据库参数"},
-		"driver": &ctx.Cache{Name: "数据库驱动", Value: "", Help: "数据库驱动"},
+		"database": &ctx.Cache{Name: "数据库", Value: m.Confx("database", arg, 0), Help: "数据库驱动"},
+		"username": &ctx.Cache{Name: "用户名", Value: m.Confx("username", arg, 1), Help: "数据库驱动"},
+		"password": &ctx.Cache{Name: "密码", Value: m.Confx("password", arg, 2), Help: "数据库驱动"},
+		"protocol": &ctx.Cache{Name: "协议", Value: m.Confx("protocol", arg, 4), Help: "数据库驱动"},
+		"address":  &ctx.Cache{Name: "地址", Value: m.Confx("address", arg, 3), Help: "数据库驱动"},
+		"driver":   &ctx.Cache{Name: "数据库驱动(mysql)", Value: m.Confx("driver", arg, 5), Help: "数据库驱动"},
 	}
 	c.Configs = map[string]*ctx.Config{
 		"table": &ctx.Config{Name: "关系表", Value: "", Help: "关系表"},
 		"field": &ctx.Config{Name: "字段名", Value: "", Help: "字段名"},
 		"where": &ctx.Config{Name: "条件", Value: "", Help: "条件"},
+		"group": &ctx.Config{Name: "聚合", Value: "", Help: "聚合"},
+		"order": &ctx.Config{Name: "排序", Value: "", Help: "排序"},
 		"parse": &ctx.Config{Name: "解析", Value: "", Help: "解析"},
 	}
 
@@ -38,7 +44,6 @@ func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 
-// }}}
 func (mdb *MDB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	mdb.Context.Master(nil)
 	if mdb.Context == Index {
@@ -49,19 +54,12 @@ func (mdb *MDB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
-	if len(arg) > 0 {
-		m.Cap("source", arg[0])
-	}
-	m.Cap("driver", Pulse.Conf("driver"))
-	if m.Cap("source") == "" || m.Cap("driver") == "" {
-		return false
-	}
-
-	db, e := sql.Open(m.Cap("driver"), m.Cap("source"))
+	db, e := sql.Open(m.Cap("driver"), fmt.Sprintf("%s:%s@%s(%s)/%s",
+		m.Cap("username"), m.Cap("password"), m.Cap("protocol"), m.Cap("address"), m.Cap("database")))
 	m.Assert(e)
 	mdb.DB = db
 
-	m.Log("info", nil, "%d open %s %s", Pulse.Capi("nsource"), m.Cap("driver"), m.Cap("stream", m.Cap("source")))
+	m.Log("info", nil, "%d open %s %s", m.Capi("nsource"), m.Cap("driver"), m.Cap("stream", m.Cap("database")))
 	return false
 }
 
@@ -85,21 +83,34 @@ var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 	Caches: map[string]*ctx.Cache{
 		"nsource": &ctx.Cache{Name: "数据源数量", Value: "0", Help: "已打开数据库的数量"},
-		"dbname": &ctx.Cache{Name: "生成模块名", Value: "", Help: "生成模块名", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-			return fmt.Sprintf("db%d", Pulse.Capi("nsource", 1))
-		}},
 	},
 	Configs: map[string]*ctx.Config{
-		"driver":  &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
+		"database": &ctx.Config{Name: "默认数据库", Value: "demo", Help: "数据库驱动"},
+		"username": &ctx.Config{Name: "默认用户名", Value: "demo", Help: "数据库驱动"},
+		"password": &ctx.Config{Name: "默认密码", Value: "demo", Help: "数据库驱动"},
+		"protocol": &ctx.Config{Name: "默认协议", Value: "tcp", Help: "数据库驱动"},
+		"address":  &ctx.Config{Name: "默认地址", Value: "", Help: "数据库驱动"},
+		"driver":   &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
+
+		"dbhelp": &ctx.Config{Name: "默认帮助", Value: "数据存储", Help: "默认帮助"},
+		"dbname": &ctx.Config{Name: "默认模块名", Value: "db", Help: "默认模块名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				return arg[0]
+			}
+			return fmt.Sprintf("%s%d", x.Value, m.Capi("nsource", 1))
+			// }}}
+		}},
+
 		"csv_sep": &ctx.Config{Name: "字段分隔符", Value: "\t", Help: "字段分隔符"},
 	},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{Name: "open source [name]", Help: "打开数据库, source: 数据源, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Assert(len(arg) > 0, "缺少参数") // {{{
-			m.Start(m.Capx("dbname", arg, 1), "数据存储", arg...)
-			m.Echo(m.Target().Name)
-			// }}}
-		}},
+		"open": &ctx.Command{
+			Name: "open [database [username [password [address [protocol [driver]]]]]] [dbname name] [dbhelp help]",
+			Help: "open打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 主机地址, protocol: 主机协议, driver: 数据库类型, dbname: 模块名称, dbhelp: 帮助信息",
+			Form: map[string]int{"dbname": 1, "dbhelp": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Start(m.Confx("dbname"), m.Confx("dbhelp"), arg...)
+			}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 查询参数",
 			Appends: map[string]string{"last": "最后插入元组的标识", "nrow": "修改元组的数量"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -202,7 +213,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			// }}}
 		}},
 		"show": &ctx.Command{
-			Name: "show table fields... [where conditions]|[group fields]|[order fields]|[save filename]",
+			Name: "show table fields... [where conditions] [group fields] [order fields] [save filename]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
 			Form: map[string]int{"where": 1, "group": 1, "order": 1, "extras": 1, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -250,7 +261,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"get": &ctx.Command{Name: "get [where str] [parse str] [table [field]]", Help: "执行查询语句",
 			Form: map[string]int{"where": 1, "parse": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				where := m.Confx("where", m.Option("where")) // {{{
+				where := m.Confx("where") // {{{
 				if where != "" {
 					where = "where " + where
 				}
