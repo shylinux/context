@@ -17,8 +17,9 @@ import ( // {{{
 type MDB struct {
 	*sql.DB
 
-	table []string
 	db    []string
+	table []string
+
 	*ctx.Context
 }
 
@@ -32,12 +33,14 @@ func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"driver":   &ctx.Cache{Name: "数据库驱动(mysql)", Value: m.Confx("driver", arg, 5), Help: "数据库驱动"},
 	}
 	c.Configs = map[string]*ctx.Config{
-		"table": &ctx.Config{Name: "关系表", Value: "", Help: "关系表"},
-		"field": &ctx.Config{Name: "字段名", Value: "", Help: "字段名"},
-		"where": &ctx.Config{Name: "条件", Value: "", Help: "条件"},
-		"group": &ctx.Config{Name: "聚合", Value: "", Help: "聚合"},
-		"order": &ctx.Config{Name: "排序", Value: "", Help: "排序"},
-		"parse": &ctx.Config{Name: "解析", Value: "", Help: "解析"},
+		"table":  &ctx.Config{Name: "关系表", Value: "", Help: "关系表"},
+		"field":  &ctx.Config{Name: "字段名", Value: "", Help: "字段名"},
+		"where":  &ctx.Config{Name: "条件", Value: "", Help: "条件"},
+		"group":  &ctx.Config{Name: "聚合", Value: "", Help: "聚合"},
+		"order":  &ctx.Config{Name: "排序", Value: "", Help: "排序"},
+		"limit":  &ctx.Config{Name: "分页", Value: "", Help: "分页"},
+		"offset": &ctx.Config{Name: "偏移", Value: "", Help: "偏移"},
+		"parse":  &ctx.Config{Name: "解析", Value: "", Help: "解析"},
 	}
 
 	s := new(MDB)
@@ -242,38 +245,38 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
-					table := arg[0]
-					index, e := strconv.Atoi(arg[0])
-					if e == nil && index < len(mdb.table) {
-						table = mdb.table[index]
+					table := m.Confx("table", arg, 0)
+					if i, e := strconv.Atoi(table); e == nil && i < len(mdb.table) {
+						table = mdb.table[i]
 					}
 
-					fields := arg[1:]
-					if len(arg) < 2 {
-						fields = []string{"*"}
-					}
-					if m.Options("extras") {
-						fields = append(fields, "extra")
+					fields := []string{"*"}
+					if len(arg) > 1 {
+						if fields = arg[1:]; m.Options("extras") {
+							fields = append(fields, "extra")
+						}
+					} else if m.Confs("field") {
+						fields = []string{m.Conf("field")}
 					}
 					field := strings.Join(fields, ",")
 
-					where := m.Optionx("where", "where %s")
-					group := m.Optionx("group", "group by %s")
-					order := m.Optionx("order", "order by %s")
-					limit := m.Optionx("limit", "limit %s")
-					offset := m.Optionx("offset", "offset %s")
+					where := m.Confx("where", m.Option("where"), "where %s")
+					group := m.Confx("group", m.Option("group"), "group by %s")
+					order := m.Confx("order", m.Option("order"), "order by %s")
+					limit := m.Confx("limit", m.Option("limit"), "limit %s")
+					offset := m.Confx("offset", m.Option("offset"), "offset %s")
 
 					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset))
 					if !m.Options("save") {
-						m.Echo("\033[31m%s\033[0m %s %s %s\n", table, where, group, order)
+						m.Color(31, table).Echo(" %s %s %s %s %s\n", where, group, order, limit, offset)
 					}
 
-					msg.Table(func(maps map[string]string, lists []string, index int) bool {
+					msg.Table(func(maps map[string]string, lists []string, line int) bool {
 						for i, v := range lists {
 							if m.Options("save") {
 								m.Echo(maps[msg.Meta["append"][i]])
-							} else if index == -1 {
-								m.Echo("\033[32m%s\033[0m", v)
+							} else if line == -1 {
+								m.Color(32, v)
 							} else {
 								m.Echo(v)
 							}
@@ -294,42 +297,40 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 							f.WriteString(v)
 						}
 					}
-				}
-				// }}}
+				} // }}}
 			}},
-		"get": &ctx.Command{Name: "get [where str] [parse str] [table [field]]", Help: "执行查询语句",
-			Form: map[string]int{"where": 1, "parse": 2},
+		"get": &ctx.Command{Name: "get field table where offset [parse func field]", Help: "执行查询语句",
+			Form: map[string]int{"parse": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				where := m.Confx("where") // {{{
-				if where != "" {
-					where = "where " + where
-				}
+				field := m.Confx("field", arg, 0) // {{{
+				table := m.Confx("table", arg, 1, "from %s")
+				where := m.Confx("where", arg, 2, "where %s")
+				limit := "limit 1"
+				offset := m.Confx("offset", arg, 3, "offset %s")
+
+				msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s %s %s %s %s", field, table, where, limit, offset))
+				value := m.Append(msg.Meta["append"][0])
 
 				parse := m.Confx("parse", m.Option("parse"))
-				extra := m.Confx("extra", m.Meta["parse"], 1)
-				table := m.Confx("table", arg, 0)
-				field := m.Confx("field", arg, 1)
-
-				msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s", field, table, where))
-				msg.Table(func(row map[string]string, lists []string, index int) bool {
-					if index == -1 {
-						return true
+				switch parse {
+				case "json":
+					extra := ""
+					if len(m.Meta["parse"]) > 1 {
+						extra = m.Meta["parse"][1]
 					}
 					data := map[string]interface{}{}
-					switch parse {
-					case "json":
-						if json.Unmarshal([]byte(row[field]), &data); extra == "" {
-							for k, v := range data {
-								m.Echo("%s: %v\n", k, v)
-							}
-						} else if v, ok := data[extra]; ok {
-							m.Echo("%v", v)
+					if json.Unmarshal([]byte(value), &data); extra == "" {
+						for k, v := range data {
+							m.Echo("%s: %v\n", k, v)
 						}
-					default:
-						m.Echo("%v", row[field])
+					} else if v, ok := data[extra]; ok {
+						m.Echo("%v", v)
 					}
-					return false
-				}) // }}}
+				default:
+					m.Echo("%v", value)
+				}
+				return
+				// }}}
 			}},
 	},
 	Index: map[string]*ctx.Context{

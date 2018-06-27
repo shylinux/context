@@ -1634,9 +1634,13 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 	}
 
 	skip := false
+	format := "%s"
 	if len(arg) > 1 {
-		if v, ok := arg[1].(bool); ok && !v {
-			skip = true
+		switch v := arg[1].(type) {
+		case bool:
+			skip = !v
+		case string:
+			format = v
 		}
 	}
 
@@ -1644,9 +1648,12 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 		switch v := arg[0].(type) {
 		case string:
 			if skip || v == "" {
-				return m.Conf(key)
+				v = m.Conf(key)
 			}
-			return v
+			if v == "" {
+				return v
+			}
+			return fmt.Sprintf(format, v)
 		case []string:
 			which := 0
 			if len(arg) > 1 {
@@ -1654,10 +1661,19 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 					which = x
 				}
 			}
+			value := ""
 			if which < len(v) {
-				return v[which]
+				value = v[which]
+			} else {
+				value = m.Conf(key)
 			}
-			return m.Conf(key)
+			if len(arg) > 2 {
+				format = arg[2].(string)
+			}
+			if value == "" {
+				return value
+			}
+			return fmt.Sprintf(format, value)
 		default:
 			x := fmt.Sprintf("%v", v)
 			if skip || v == nil || x == "" {
