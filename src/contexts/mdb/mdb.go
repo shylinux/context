@@ -18,6 +18,7 @@ type MDB struct {
 	*sql.DB
 
 	table []string
+	db    []string
 	*ctx.Context
 }
 
@@ -175,6 +176,29 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			}
 			// }}}
 		}},
+		"db": &ctx.Command{Name: "db", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
+				msg := m.Spawn()
+				if len(arg) == 0 {
+					msg.Cmd("query", "show databases")
+					mdb.db = []string{}
+					for i, v := range msg.Meta[msg.Meta["append"][0]] {
+						mdb.db = append(mdb.db, v)
+						m.Echo("%d: %s\n", i, v)
+					}
+					return
+				}
+
+				db := arg[0]
+				index, e := strconv.Atoi(arg[0])
+				if e == nil && index < len(mdb.db) {
+					db = mdb.db[index]
+				}
+				m.Cap("database", db)
+				mdb.Exec(fmt.Sprintf("use %s", db))
+			}
+			// }}}
+		}},
 		"table": &ctx.Command{Name: "table [which [field]]", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 				msg := m.Spawn()
@@ -213,47 +237,62 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			// }}}
 		}},
 		"show": &ctx.Command{
-			Name: "show table fields... [where conditions] [group fields] [order fields] [save filename]",
+			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"where": 1, "group": 1, "order": 1, "extras": 1, "save": 1},
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if m.Options("extras") { // {{{
-					arg = append(arg, "extra")
-				}
-				fields := strings.Join(arg[1:], ",")
-
-				where := m.Optionx("where", "where %s")
-				group := m.Optionx("group", "group by %s")
-				order := m.Optionx("order", "order by %s")
-
-				msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s", fields, arg[0], where, group, order))
-				if !m.Options("save") {
-					m.Echo("\033[31m%s\033[0m %s %s %s\n", arg[0], where, group, order)
-				}
-				msg.Table(func(maps map[string]string, lists []string, index int) bool {
-					for i, v := range lists {
-						if m.Options("save") {
-							m.Echo(maps[msg.Meta["append"][i]])
-						} else if index == -1 {
-							m.Echo("\033[32m%s\033[0m", v)
-						} else {
-							m.Echo(v)
-						}
-						if i < len(lists)-1 {
-							m.Echo(m.Conf("csv_sep"))
-						}
+				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
+					table := arg[0]
+					index, e := strconv.Atoi(arg[0])
+					if e == nil && index < len(mdb.table) {
+						table = mdb.table[index]
 					}
-					m.Echo("\n")
-					return true
-				})
 
-				if m.Options("save") {
-					f, e := os.Create(m.Option("save"))
-					m.Assert(e)
-					defer f.Close()
+					fields := arg[1:]
+					if len(arg) < 2 {
+						fields = []string{"*"}
+					}
+					if m.Options("extras") {
+						fields = append(fields, "extra")
+					}
+					field := strings.Join(fields, ",")
 
-					for _, v := range m.Meta["result"] {
-						f.WriteString(v)
+					where := m.Optionx("where", "where %s")
+					group := m.Optionx("group", "group by %s")
+					order := m.Optionx("order", "order by %s")
+					limit := m.Optionx("limit", "limit %s")
+					offset := m.Optionx("offset", "offset %s")
+
+					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset))
+					if !m.Options("save") {
+						m.Echo("\033[31m%s\033[0m %s %s %s\n", table, where, group, order)
+					}
+
+					msg.Table(func(maps map[string]string, lists []string, index int) bool {
+						for i, v := range lists {
+							if m.Options("save") {
+								m.Echo(maps[msg.Meta["append"][i]])
+							} else if index == -1 {
+								m.Echo("\033[32m%s\033[0m", v)
+							} else {
+								m.Echo(v)
+							}
+							if i < len(lists)-1 {
+								m.Echo(m.Conf("csv_sep"))
+							}
+						}
+						m.Echo("\n")
+						return true
+					})
+
+					if m.Options("save") {
+						f, e := os.Create(m.Option("save"))
+						m.Assert(e)
+						defer f.Close()
+
+						for _, v := range m.Meta["result"] {
+							f.WriteString(v)
+						}
 					}
 				}
 				// }}}
