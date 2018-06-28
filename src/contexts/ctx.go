@@ -2359,6 +2359,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				for i := 0; i < len(ms); i++ {
 					if ms[i].code == n {
 						switch arg[1] {
+						case "ncol":
+							m.Echo("%d", len(ms[i].Meta["append"]))
+							return
+						case "nrow":
+							m.Echo("%d", len(ms[i].Meta[ms[i].Meta["append"][0]]))
+							return
 						case "option", "session", "callback", "feedback":
 							msg := ms[i].Spawn(ms[i].target)
 							msg.Cmd(arg[1:])
@@ -2366,7 +2372,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							return
 						default:
 							index := 0
-							if len(arg) >= 3 {
+							if len(arg) > 2 {
 								n, e := strconv.Atoi(arg[2])
 								m.Assert(e)
 								index = n

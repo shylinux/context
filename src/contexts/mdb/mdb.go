@@ -240,9 +240,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			// }}}
 		}},
 		"show": &ctx.Command{
-			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename]",
+			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename] [other rest...]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "save": 1},
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "save": 1, "other": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 					table := m.Confx("table", arg, 0)
@@ -266,11 +266,12 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					limit := m.Confx("limit", m.Option("limit"), "limit %s")
 					offset := m.Confx("offset", m.Option("offset"), "offset %s")
 
-					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset))
+					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset), m.Meta["other"])
 					if !m.Options("save") {
-						m.Color(31, table).Echo(" %s %s %s %s %s\n", where, group, order, limit, offset)
+						m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
 					}
 
+					m.Optioni("query", msg.Code())
 					msg.Table(func(maps map[string]string, lists []string, line int) bool {
 						for i, v := range lists {
 							if m.Options("save") {
