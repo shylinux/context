@@ -680,10 +680,9 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
 	defer func() {
 		if e := recover(); e != nil {
-
-			switch e.(type) {
+			switch v := e.(type) {
 			case *Message:
-				panic(e)
+				e = strings.Join(v.Meta["result"][1:], "")
 			}
 
 			msg.Log("error", nil, "error: %v", e)
@@ -1204,6 +1203,39 @@ func (m *Message) Table(cb func(map[string]string, []string, int) bool) *Message
 }
 
 // }}}
+func (m *Message) Matrix(index int, arg ...interface{}) string { // {{{
+	if len(m.Meta["append"]) == 0 || index < 0 {
+		return ""
+	}
+
+	key := m.Meta["append"][0]
+	if len(arg) > 0 {
+		switch v := arg[0].(type) {
+		case string:
+			for _, k := range m.Meta["append"] {
+				if k == v {
+					key = v
+				}
+			}
+			if key != v {
+				return ""
+			}
+		case int:
+			if v < len(m.Meta["append"]) {
+				key = m.Meta["append"][v]
+			} else {
+				return ""
+			}
+		}
+	}
+	if index < len(m.Meta[key]) {
+		return m.Meta[key][index]
+
+	}
+	return ""
+}
+
+// }}}
 func (m *Message) Sort(key string, arg ...string) { // {{{
 	table := []map[string]string{}
 	m.Table(func(line map[string]string, lists []string, index int) bool {
@@ -1633,57 +1665,54 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 		return value
 	}
 
-	skip := false
+	value := ""
+	switch v := arg[0].(type) {
+	case string:
+		value = v
+	case []string:
+		which := 0
+		if len(arg) > 1 {
+			if x, ok := arg[1].(int); ok {
+				which = x
+				arg = arg[1:]
+			}
+		}
+		if which < len(v) {
+			value = v[which]
+		}
+	default:
+		x := fmt.Sprintf("%v", v)
+		if v != nil && x != "" {
+			value = x
+		}
+	}
+
+	force := false
+	if len(arg) > 1 {
+		if v, ok := arg[1].(bool); ok {
+			arg = arg[1:]
+			force = v
+		}
+	}
+	if !force && value == "" {
+		value = m.Conf(key)
+	}
+
 	format := "%s"
 	if len(arg) > 1 {
-		switch v := arg[1].(type) {
-		case bool:
-			skip = !v
-		case string:
+		if v, ok := arg[1].(string); ok {
+			arg = arg[1:]
 			format = v
 		}
 	}
-
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case string:
-			if skip || v == "" {
-				v = m.Conf(key)
-			}
-			if v == "" {
-				return v
-			}
-			return fmt.Sprintf(format, v)
-		case []string:
-			which := 0
-			if len(arg) > 1 {
-				if x, ok := arg[1].(int); ok {
-					which = x
-				}
-			}
-			value := ""
-			if which < len(v) {
-				value = v[which]
-			} else {
-				value = m.Conf(key)
-			}
-			if len(arg) > 2 {
-				format = arg[2].(string)
-			}
-			if value == "" {
-				return value
-			}
-			return fmt.Sprintf(format, value)
-		default:
-			x := fmt.Sprintf("%v", v)
-			if skip || v == nil || x == "" {
-				return m.Conf(key)
-			}
-			return x
+	if value != "" {
+		args := []interface{}{value}
+		for _, v := range arg[1:] {
+			args = append(args, v)
 		}
+		value = fmt.Sprintf(format, args...)
 	}
-
-	return ""
+	return value
 }
 
 // }}}
@@ -2641,9 +2670,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				switch len(arg) { // {{{
 				case 0:
-					m.Travel(m.target.root, func(msg *Message) bool {
-						if msg.Cap("status") == "start" {
-							msg.Echo("%s(%s): %s\n", msg.target.Name, msg.Cap("stream"), msg.target.Help)
+					m.Travel(m.target.root, func(m *Message) bool {
+						if m.Cap("status") == "start" {
+							m.Echo("%s(%s): %s\n", m.target.Name, m.Cap("stream"), m.target.Help)
 						}
 						return true
 					})
@@ -2651,24 +2680,20 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				default:
 					switch arg[0] {
 					case "spawn":
-						if len(arg) > 1 {
-							msg := m.Spawn(m.Target())
-							msg.Detail(0, arg[2:])
-							msg.Target().Spawn(msg, arg[0], arg[1])
+						if len(arg) > 2 {
+							msg := m.Spawn().Set("detail", arg[3:]...)
+							msg.target.Spawn(msg, arg[1], arg[2])
+							m.target = msg.target
 						}
-
 					case "begin":
-						msg := m.Spawn(m.Target())
-						msg.Detail(0, arg)
-						msg.Target().Begin(msg)
+						msg := m.Spawn().Set("detail", arg...)
+						msg.target.Begin(msg)
 					case "start":
-						msg := m.Spawn(m.Target())
-						msg.Detail(0, arg)
-						msg.Target().Start(msg)
+						msg := m.Spawn().Set("detail", arg...)
+						msg.target.Start(msg)
 					case "close":
-						msg := m.Spawn(m.Target())
-						msg.Detail(0, arg)
-						msg.Target().Close(msg)
+						msg := m.Spawn().Set("detail", arg...)
+						msg.target.Close(msg)
 					}
 				}
 				// }}}

@@ -41,9 +41,6 @@ type WEB struct {
 	client *http.Client
 	cookie map[string]*http.Cookie
 
-	list     map[string][]string
-	list_key []string
-
 	*ctx.Message
 	*ctx.Context
 }
@@ -220,9 +217,6 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 			}
 		}
 	}
-
-	web.list = map[string][]string{}
-
 	return web
 }
 
@@ -235,6 +229,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	m.Travel(m.Target(), func(m *ctx.Message) bool {
 		if h, ok := m.Target().Server.(http.Handler); ok && m.Cap("register") == "no" {
 			m.Cap("register", "yes")
+			m.Capi("nroute", 1)
 
 			p, i := m.Target(), 0
 			m.BackTrace(func(m *ctx.Message) bool {
@@ -258,6 +253,14 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return true
 	})
 
+	web.Configs["template_dir"] = &ctx.Config{Name: "template_dir", Value: "usr/template/", Help: "通用模板路径"}
+	web.Configs["common_tmpl"] = &ctx.Config{Name: "common_tmpl", Value: "common/*.html", Help: "通用模板路径"}
+	web.Configs["common_main"] = &ctx.Config{Name: "common_main", Value: "main.html", Help: "通用模板框架"}
+	web.Configs["upload_tmpl"] = &ctx.Config{Name: "upload_tmpl", Value: "upload.html", Help: "上传文件模板"}
+	web.Configs["upload_main"] = &ctx.Config{Name: "upload_main", Value: "main.html", Help: "上传文件框架"}
+	web.Configs["travel_tmpl"] = &ctx.Config{Name: "travel_tmpl", Value: "travel.html", Help: "浏览模块模板"}
+	web.Configs["travel_main"] = &ctx.Config{Name: "travel_main", Value: "main.html", Help: "浏览模块框架"}
+
 	web.Caches["address"] = &ctx.Cache{Name: "服务地址", Value: ":9191", Help: "服务地址"}
 	web.Caches["protocol"] = &ctx.Cache{Name: "服务协议", Value: "http", Help: "服务协议"}
 	if len(arg) > 1 {
@@ -274,6 +277,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
 
 	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "yes", Help: "日志输出报文头"}
+	m.Capi("nserve", 1)
 
 	if web.Message = m; m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
@@ -302,270 +306,248 @@ func (web *WEB) Close(m *ctx.Message, arg ...string) bool { // {{{
 
 var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	Caches: map[string]*ctx.Cache{
-		"count": &ctx.Cache{Name: "count", Value: "0", Help: "主机协议"},
+		"nserve": &ctx.Cache{Name: "nserve", Value: "0", Help: "主机数量"},
+		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
-	Configs: map[string]*ctx.Config{
-		"protocol": &ctx.Config{Name: "protocol", Value: "", Help: "主机协议"},
-		"hostname": &ctx.Config{Name: "hostname", Value: "", Help: "主机地址"},
-		"port":     &ctx.Config{Name: "port", Value: "", Help: "主机端口"},
-		"dir":      &ctx.Config{Name: "dir", Value: "/", Help: "主机路由"},
-		"file":     &ctx.Config{Name: "file", Value: "", Help: "主机文件"},
-		"query":    &ctx.Config{Name: "query", Value: "", Help: "主机参数"},
-		"output":   &ctx.Config{Name: "output", Value: "stdout", Help: "响应输出"},
-		"editor":   &ctx.Config{Name: "editor", Value: "vim", Help: "响应编辑器"},
-
-		"template_dir": &ctx.Config{Name: "template_dir", Value: "usr/template/", Help: "通用模板路径"},
-		"common_tmpl":  &ctx.Config{Name: "common_tmpl", Value: "common/*.html", Help: "通用模板路径"},
-		"common_main":  &ctx.Config{Name: "common_main", Value: "main.html", Help: "通用模板框架"},
-		"upload_tmpl":  &ctx.Config{Name: "upload_tmpl", Value: "upload.html", Help: "上传文件模板"},
-		"upload_main":  &ctx.Config{Name: "upload_main", Value: "main.html", Help: "上传文件框架"},
-		"travel_tmpl":  &ctx.Config{Name: "travel_tmpl", Value: "travel.html", Help: "浏览模块模板"},
-		"travel_main":  &ctx.Config{Name: "travel_main", Value: "main.html", Help: "浏览模块框架"},
-	},
+	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"serve": &ctx.Command{Name: "serve [directory [address [protocol]]]", Help: "开启应用服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Set("detail", arg...).Target().Start(m)
-		}},
-		"route": &ctx.Command{Name: "route directory|template|script route content", Help: "添加应用内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			mux, ok := m.Target().Server.(MUX) // {{{
-			m.Assert(ok, "模块类型错误")
-			m.Assert(len(arg) == 3, "缺少参数")
-
-			switch arg[0] {
-			case "directory":
-				mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
-			case "template":
-				mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
-					w := m.Data["response"].(http.ResponseWriter)
-
-					if _, e := os.Stat(arg[2]); e == nil {
-						template.Must(template.ParseGlob(arg[2])).Execute(w, m)
-					} else {
-						template.Must(template.New("temp").Parse(arg[2])).Execute(w, m)
+		"client": &ctx.Command{
+			Name: "client address [output [editor]]",
+			Help: "添加请求配置, address: 默认地址, output: 输出路径, editor: 编辑器",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if web, e := m.Target().Server.(*WEB); m.Assert(e) { // {{{
+					if len(arg) == 0 {
+						return
 					}
 
-				})
-			case "script":
-				cli := m.Find("cli")
-				lex := m.Find("lex")
-				mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
-					f, e := os.Open(arg[2])
-					line, bio := "", bufio.NewReader(f)
-					if e != nil {
-						line = arg[2]
-					}
+					uri, e := url.Parse(arg[0])
+					m.Assert(e)
+					web.Configs["method"] = &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"}
+					web.Configs["protocol"] = &ctx.Config{Name: "protocol", Value: uri.Scheme, Help: "服务协议"}
+					web.Configs["hostname"] = &ctx.Config{Name: "hostname", Value: uri.Hostname(), Help: "服务主机"}
+					web.Configs["port"] = &ctx.Config{Name: "port", Value: uri.Port(), Help: "服务端口"}
 
-					for {
-						if line = strings.TrimSpace(line); line != "" {
-							lex.Cmd("split", line, "void")
-							cli.Wait = make(chan bool)
-							cli.Cmd(lex.Meta["result"])
-							m.Meta["result"] = cli.Meta["result"]
+					dir, file := path.Split(uri.EscapedPath())
+					web.Configs["path"] = &ctx.Config{Name: "path", Value: dir, Help: "服务路由"}
+					web.Configs["file"] = &ctx.Config{Name: "file", Value: file, Help: "服务文件"}
+					web.Configs["query"] = &ctx.Config{Name: "query", Value: uri.RawQuery, Help: "服务参数"}
+
+					web.Configs["output"] = &ctx.Config{Name: "output", Value: "stdout", Help: "文件缓存"}
+					if len(arg) > 1 {
+						m.Conf("output", arg[1])
+					}
+					web.Configs["editor"] = &ctx.Config{Name: "editor", Value: "vim", Help: "文件编辑器"}
+					if len(arg) > 2 {
+						m.Conf("editor", arg[2])
+					}
+				} // }}}
+			}},
+		"cookie": &ctx.Command{
+			Name: "cookie [name [value]]",
+			Help: "读写请求的Cookie, name: 变量名, value: 变量值",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
+					switch len(arg) {
+					case 0:
+						for k, v := range web.cookie {
+							m.Echo("%s: %v\n", k, v.Value)
 						}
-
-						if line, e = bio.ReadString('\n'); e != nil {
-							break
+					case 1:
+						if v, ok := web.cookie[arg[0]]; ok {
+							m.Echo("%s", v.Value)
+						}
+					default:
+						if web.cookie == nil {
+							web.cookie = make(map[string]*http.Cookie)
+						}
+						if v, ok := web.cookie[arg[0]]; ok {
+							v.Value = arg[1]
+						} else {
+							web.cookie[arg[0]] = &http.Cookie{Name: arg[0], Value: arg[1]}
 						}
 					}
-				})
-			} // }}}
-		}},
-		"cookie": &ctx.Command{Name: "cookie add|del arg...", Help: "访问URL", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			web, ok := m.Target().Server.(*WEB) // {{{
-			m.Assert(ok)
-
-			switch len(arg) {
-			case 0:
-				for k, v := range web.cookie {
-					m.Echo("%s: %v\n", k, v.Value)
-				}
-			case 1:
-				if v, ok := web.cookie[arg[0]]; ok {
-					m.Echo("%s", v.Value)
-				}
-			default:
-				if web.cookie == nil {
-					web.cookie = make(map[string]*http.Cookie)
-				}
-				if v, ok := web.cookie[arg[0]]; ok {
-					v.Value = arg[1]
-				} else {
-					web.cookie[arg[0]] = &http.Cookie{Name: arg[0], Value: arg[1]}
-				}
-			}
-			// }}}
-		}},
-		"get": &ctx.Command{Name: "get [method GET|POST] [file filename] url arg...", Help: "访问URL",
+				} // }}}
+			}},
+		"get": &ctx.Command{
+			Name: "get [method GET|POST] [file name filename] url arg...",
+			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
 			Form: map[string]int{"method": 1, "file": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				web, ok := m.Target().Server.(*WEB) // {{{
-				m.Assert(ok)
-
-				if web.client == nil {
-					web.client = &http.Client{}
-				}
-
-				method := "GET"
-				if m.Options("method") {
-					method = m.Option("method")
-				}
-
-				uri := web.generate(m, arg[0], arg[1:]...)
-				m.Log("info", nil, "GET %s", uri)
-				m.Echo("%s: %s\n", method, uri)
-
-				var body io.Reader
-				index := strings.Index(uri, "?")
-				contenttype := ""
-
-				switch method {
-				case "POST":
-					if m.Options("file") {
-						file, e := os.Open(m.Meta["file"][1])
-						m.Assert(e)
-						defer file.Close()
-
-						buf := &bytes.Buffer{}
-						writer := multipart.NewWriter(buf)
-
-						part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
-						m.Assert(e)
-
-						io.Copy(part, file)
-						for i := 0; i < len(arg)-1; i += 2 {
-							value := arg[i+1]
-							if len(arg[i+1]) > 1 {
-								switch arg[i+1][0] {
-								case '$':
-									value = m.Cap(arg[i+1][1:])
-								case '@':
-									value = m.Conf(arg[i+1][1:])
-								}
-							}
-							writer.WriteField(arg[i], value)
-						}
-
-						contenttype = writer.FormDataContentType()
-						body = buf
-						writer.Close()
-					} else if index > 0 {
-						contenttype = "application/x-www-form-urlencoded"
-						body = strings.NewReader(uri[index+1:])
-						uri = uri[:index]
+				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
+					if web.client == nil {
+						web.client = &http.Client{}
 					}
-				}
 
-				req, e := http.NewRequest(method, uri, body)
-				m.Assert(e)
+					method := m.Confx("method")
+					uri := web.generate(m, arg[0], arg[1:]...)
+					m.Log("info", nil, "GET %s", uri)
+					m.Echo("%s: %s\n", method, uri)
 
-				if len(contenttype) > 0 {
-					req.Header.Set("Content-Type", contenttype)
-				}
+					var body io.Reader
+					index := strings.Index(uri, "?")
+					contenttype := ""
 
-				for _, v := range web.cookie {
-					req.AddCookie(v)
-				}
+					switch method {
+					case "POST":
+						if m.Options("file") {
+							file, e := os.Open(m.Meta["file"][1])
+							m.Assert(e)
+							defer file.Close()
 
-				res, e := web.client.Do(req)
-				m.Assert(e)
+							buf := &bytes.Buffer{}
+							writer := multipart.NewWriter(buf)
 
-				if web.cookie == nil {
-					web.cookie = make(map[string]*http.Cookie)
-				}
-				for _, v := range res.Cookies() {
-					web.cookie[v.Name] = v
-				}
+							part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+							m.Assert(e)
+							io.Copy(part, file)
 
-				for k, v := range res.Header {
-					m.Log("info", nil, "%s: %v", k, v)
-				}
+							for i := 0; i < len(arg)-1; i += 2 {
+								value := arg[i+1]
+								if len(arg[i+1]) > 1 {
+									switch arg[i+1][0] {
+									case '$':
+										value = m.Cap(arg[i+1][1:])
+									case '@':
+										value = m.Conf(arg[i+1][1:])
+									}
+								}
+								writer.WriteField(arg[i], value)
+							}
 
-				if m.Confs("output") {
-					if _, e := os.Stat(m.Conf("output")); e == nil {
-						name := path.Join(m.Conf("output"), fmt.Sprintf("%d", time.Now().Unix()))
-						f, e := os.Create(name)
-						m.Assert(e)
-						io.Copy(f, res.Body)
-						if m.Confs("editor") {
-							cmd := exec.Command(m.Conf("editor"), name)
-							cmd.Stdin = os.Stdin
-							cmd.Stdout = os.Stdout
-							cmd.Stderr = os.Stderr
-							cmd.Run()
-						} else {
-							m.Echo("write to %s\n", name)
+							contenttype = writer.FormDataContentType()
+							body = buf
+							writer.Close()
+						} else if index > 0 {
+							contenttype = "application/x-www-form-urlencoded"
+							body = strings.NewReader(uri[index+1:])
+							uri = uri[:index]
+						}
+					}
+
+					req, e := http.NewRequest(method, uri, body)
+					m.Assert(e)
+
+					if len(contenttype) > 0 {
+						req.Header.Set("Content-Type", contenttype)
+					}
+
+					for _, v := range web.cookie {
+						req.AddCookie(v)
+					}
+
+					res, e := web.client.Do(req)
+					m.Assert(e)
+
+					if web.cookie == nil {
+						web.cookie = make(map[string]*http.Cookie)
+					}
+					for _, v := range res.Cookies() {
+						web.cookie[v.Name] = v
+					}
+
+					for k, v := range res.Header {
+						m.Log("info", nil, "%s: %v", k, v)
+					}
+
+					if m.Confs("output") {
+						if _, e := os.Stat(m.Conf("output")); e == nil {
+							name := path.Join(m.Conf("output"), fmt.Sprintf("%d", time.Now().Unix()))
+							f, e := os.Create(name)
+							m.Assert(e)
+							io.Copy(f, res.Body)
+							if m.Confs("editor") {
+								cmd := exec.Command(m.Conf("editor"), name)
+								cmd.Stdin = os.Stdin
+								cmd.Stdout = os.Stdout
+								cmd.Stderr = os.Stderr
+								cmd.Run()
+							} else {
+								m.Echo("write to %s\n", name)
+							}
+							return
+						}
+					}
+
+					buf, e := ioutil.ReadAll(res.Body)
+					m.Assert(e)
+
+					if res.Header.Get("Content-Type") == "application/json" {
+						result := map[string]interface{}{}
+						json.Unmarshal(buf, &result)
+						for k, v := range result {
+							switch value := v.(type) {
+							case string:
+								m.Append(k, value)
+							case float64:
+								m.Append(k, fmt.Sprintf("%d", int(value)))
+							default:
+								m.Put("append", k, value)
+							}
+						}
+					}
+
+					result := string(buf)
+					m.Echo(result)
+					m.Append("response", result)
+				} // }}}
+			}},
+		"serve": &ctx.Command{
+			Name: "serve [directory [address [protocol]]]",
+			Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http)",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Set("detail", arg...).Target().Start(m)
+			}},
+		"route": &ctx.Command{
+			Name: "route directory|template|script route content",
+			Help: "添加响应, directory: 目录响应, template: 模板响应, script: 脚本响应, route: 请求路由, content: 响应内容",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if mux, ok := m.Target().Server.(MUX); m.Assert(ok) { // {{{
+					if len(arg) < 3 {
+						for k, v := range m.Target().Commands {
+							if k[0] == '/' {
+								m.Echo("%s: %s\n", k, v.Name)
+							}
 						}
 						return
 					}
-				}
+					switch arg[0] {
+					case "directory":
+						mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
+					case "template":
+						mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+							w := m.Optionv("response").(http.ResponseWriter)
+							if _, e := os.Stat(arg[2]); e == nil {
+								template.Must(template.ParseGlob(arg[2])).Execute(w, m)
+							} else {
+								template.Must(template.New("temp").Parse(arg[2])).Execute(w, m)
+							}
+						})
+					case "script":
+						cli := m.Find("cli")
+						lex := m.Find("lex")
+						mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+							f, e := os.Open(arg[2])
+							line, bio := "", bufio.NewReader(f)
+							if e != nil {
+								line = arg[2]
+							}
 
-				buf, e := ioutil.ReadAll(res.Body)
-				m.Assert(e)
+							for {
+								if line = strings.TrimSpace(line); line != "" {
+									lex.Cmd("split", line, "void")
+									cli.Wait = make(chan bool)
+									cli.Cmd(lex.Meta["result"])
+									m.Meta["result"] = cli.Meta["result"]
+								}
 
-				if res.Header.Get("Content-Type") == "application/json" {
-					result := map[string]interface{}{}
-					json.Unmarshal(buf, &result)
-					for k, v := range result {
-						switch value := v.(type) {
-						case string:
-							m.Append(k, value)
-						case float64:
-							m.Append(k, fmt.Sprintf("%d", int(value)))
-						default:
-							m.Put("append", k, value)
-						}
+								if line, e = bio.ReadString('\n'); e != nil {
+									break
+								}
+							}
+						})
 					}
-				}
-
-				result := string(buf)
-				m.Echo(result)
-				m.Append("response", result)
-				// }}}
+				} // }}}
 			}},
-		"list": &ctx.Command{Name: "list [set|add|del [url]]", Help: "查看、访问、添加url", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			web, ok := m.Target().Server.(*WEB) // {{{
-			m.Assert(ok)
-
-			switch len(arg) {
-			case 0:
-				for _, k := range web.list_key {
-					if v, ok := web.list[k]; ok {
-						m.Echo("%s: %s\n", k, v)
-					}
-				}
-			case 1:
-				msg := m.Spawn(m.Target()).Cmd("get", web.list[arg[0]])
-				m.Copy(msg, "result")
-			default:
-				switch arg[0] {
-				case "add":
-					web.list[m.Cap("count")] = arg[1:]
-					web.list_key = append(web.list_key, m.Cap("count"))
-					m.Capi("count", 1)
-				case "del":
-					delete(web.list, arg[1])
-				case "set":
-					web.list[arg[1]] = arg[2:]
-				default:
-					list := []string{}
-					j := 1
-					for _, v := range web.list[arg[0]] {
-						if v == "_" && j < len(arg) {
-							list = append(list, arg[j])
-							j++
-						} else {
-							list = append(list, v)
-						}
-					}
-					for ; j < len(arg); j++ {
-						list = append(list, arg[j])
-					}
-
-					msg := m.Spawn(m.Target()).Cmd("get", list)
-					m.Copy(msg, "result")
-				}
-			} // }}}
-		}},
 		"upload": &ctx.Command{Name: "upload file", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target()) // {{{
 			msg.Cmd("get", "/upload", "method", "POST", "file", "file", arg[0])

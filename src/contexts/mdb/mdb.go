@@ -25,11 +25,11 @@ type MDB struct {
 
 func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{
-		"database": &ctx.Cache{Name: "数据库", Value: m.Confx("database", arg, 0), Help: "数据库驱动"},
-		"username": &ctx.Cache{Name: "用户名", Value: m.Confx("username", arg, 1), Help: "数据库驱动"},
-		"password": &ctx.Cache{Name: "密码", Value: m.Confx("password", arg, 2), Help: "数据库驱动"},
-		"protocol": &ctx.Cache{Name: "协议", Value: m.Confx("protocol", arg, 4), Help: "数据库驱动"},
-		"address":  &ctx.Cache{Name: "地址", Value: m.Confx("address", arg, 3), Help: "数据库驱动"},
+		"database": &ctx.Cache{Name: "数据库", Value: m.Confx("database", arg, 0), Help: "数据库"},
+		"username": &ctx.Cache{Name: "账户", Value: m.Confx("username", arg, 1), Help: "账户"},
+		"password": &ctx.Cache{Name: "密码", Value: m.Confx("password", arg, 2), Help: "密码"},
+		"address":  &ctx.Cache{Name: "服务地址", Value: m.Confx("address", arg, 3), Help: "服务地址"},
+		"protocol": &ctx.Cache{Name: "服务协议(tcp)", Value: m.Confx("protocol", arg, 4), Help: "服务协议"},
 		"driver":   &ctx.Cache{Name: "数据库驱动(mysql)", Value: m.Confx("driver", arg, 5), Help: "数据库驱动"},
 	}
 	c.Configs = map[string]*ctx.Config{
@@ -62,8 +62,7 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Cap("username"), m.Cap("password"), m.Cap("protocol"), m.Cap("address"), m.Cap("database")))
 	m.Assert(e)
 	mdb.DB = db
-
-	m.Log("info", nil, "%d open %s %s", m.Capi("nsource"), m.Cap("driver"), m.Cap("stream", m.Cap("database")))
+	m.Log("info", nil, "mdb open %s", m.Cap("database"))
 	return false
 }
 
@@ -72,7 +71,7 @@ func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch mdb.Context {
 	case m.Target():
 		if mdb.DB != nil {
-			m.Log("info", nil, "close")
+			m.Log("info", nil, "mdb close %s", m.Cap("database"))
 			mdb.DB.Close()
 			mdb.DB = nil
 		}
@@ -89,11 +88,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"nsource": &ctx.Cache{Name: "数据源数量", Value: "0", Help: "已打开数据库的数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"database": &ctx.Config{Name: "默认数据库", Value: "demo", Help: "数据库驱动"},
-		"username": &ctx.Config{Name: "默认用户名", Value: "demo", Help: "数据库驱动"},
-		"password": &ctx.Config{Name: "默认密码", Value: "demo", Help: "数据库驱动"},
-		"protocol": &ctx.Config{Name: "默认协议", Value: "tcp", Help: "数据库驱动"},
-		"address":  &ctx.Config{Name: "默认地址", Value: "", Help: "数据库驱动"},
+		"database": &ctx.Config{Name: "默认数据库", Value: "demo", Help: "默认数据库"},
+		"username": &ctx.Config{Name: "默认用户名", Value: "demo", Help: "默认用户名"},
+		"password": &ctx.Config{Name: "默认密码", Value: "demo", Help: "默认密码"},
+		"protocol": &ctx.Config{Name: "默认协议", Value: "tcp", Help: "默认协议"},
+		"address":  &ctx.Config{Name: "默认地址", Value: "", Help: "默认地址"},
 		"driver":   &ctx.Config{Name: "数据库驱动(mysql)", Value: "mysql", Help: "数据库驱动"},
 
 		"dbhelp": &ctx.Config{Name: "默认帮助", Value: "数据存储", Help: "默认帮助"},
@@ -105,17 +104,18 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			// }}}
 		}},
 
-		"csv_sep": &ctx.Config{Name: "字段分隔符", Value: "\t", Help: "字段分隔符"},
+		"csv_col_sep": &ctx.Config{Name: "字段分隔符", Value: "\t", Help: "字段分隔符"},
+		"csv_row_sep": &ctx.Config{Name: "记录分隔符", Value: "\n", Help: "记录分隔符"},
 	},
 	Commands: map[string]*ctx.Command{
 		"open": &ctx.Command{
 			Name: "open [database [username [password [address [protocol [driver]]]]]] [dbname name] [dbhelp help]",
-			Help: "open打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 主机地址, protocol: 主机协议, driver: 数据库类型, dbname: 模块名称, dbhelp: 帮助信息",
+			Help: "open打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 服务地址, protocol: 服务协议, driver: 数据库类型, dbname: 模块名称, dbhelp: 帮助信息",
 			Form: map[string]int{"dbname": 1, "dbhelp": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				m.Start(m.Confx("dbname"), m.Confx("dbhelp"), arg...)
 			}},
-		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 查询参数",
+		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 操作参数",
 			Appends: map[string]string{"last": "最后插入元组的标识", "nrow": "修改元组的数量"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
@@ -179,11 +179,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			}
 			// }}}
 		}},
-		"db": &ctx.Command{Name: "db", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"db": &ctx.Command{Name: "db [which]", Help: "查看或选择数据库信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
-				msg := m.Spawn()
 				if len(arg) == 0 {
-					msg.Cmd("query", "show databases")
+					msg := m.Spawn().Cmd("query", "show databases")
 					mdb.db = []string{}
 					for i, v := range msg.Meta[msg.Meta["append"][0]] {
 						mdb.db = append(mdb.db, v)
@@ -193,20 +192,18 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 
 				db := arg[0]
-				index, e := strconv.Atoi(arg[0])
-				if e == nil && index < len(mdb.db) {
-					db = mdb.db[index]
+				if i, e := strconv.Atoi(arg[0]); e == nil && i < len(mdb.db) {
+					db = mdb.db[i]
 				}
+				m.Assert(m.Spawn().Cmd("exec", fmt.Sprintf("use %s", db)))
 				m.Cap("database", db)
-				mdb.Exec(fmt.Sprintf("use %s", db))
 			}
 			// }}}
 		}},
 		"table": &ctx.Command{Name: "table [which [field]]", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
-				msg := m.Spawn()
 				if len(arg) == 0 {
-					msg.Cmd("query", "show tables")
+					msg := m.Spawn().Cmd("query", "show tables")
 					mdb.table = []string{}
 					for i, v := range msg.Meta[msg.Meta["append"][0]] {
 						mdb.table = append(mdb.table, v)
@@ -216,12 +213,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 
 				table := arg[0]
-				index, e := strconv.Atoi(arg[0])
-				if e == nil && index < len(mdb.table) {
-					table = mdb.table[index]
+				if i, e := strconv.Atoi(arg[0]); e == nil && i < len(mdb.table) {
+					table = mdb.table[i]
 				}
 
-				msg.Cmd("query", fmt.Sprintf("desc %s", table))
+				msg := m.Spawn().Cmd("query", fmt.Sprintf("desc %s", table))
 				if len(arg) == 1 {
 					for _, v := range msg.Meta[msg.Meta["append"][0]] {
 						m.Echo("%s\n", v)
@@ -267,11 +263,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					offset := m.Confx("offset", m.Option("offset"), "offset %s")
 
 					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset), m.Meta["other"])
-					if !m.Options("save") {
+					if m.Optioni("query", msg.Code()); !m.Options("save") {
 						m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
 					}
 
-					m.Optioni("query", msg.Code())
 					msg.Table(func(maps map[string]string, lists []string, line int) bool {
 						for i, v := range lists {
 							if m.Options("save") {
@@ -282,10 +277,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 								m.Echo(v)
 							}
 							if i < len(lists)-1 {
-								m.Echo(m.Conf("csv_sep"))
+								m.Echo(m.Conf("csv_col_sep"))
 							}
 						}
-						m.Echo("\n")
+						m.Echo(m.Conf("csv_row_sep"))
 						return true
 					})
 
@@ -300,20 +295,25 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					}
 				} // }}}
 			}},
-		"get": &ctx.Command{Name: "get field table where offset [parse func field]", Help: "执行查询语句",
+		"get": &ctx.Command{Name: "get field offset table where [parse func field]", Help: "执行查询语句",
 			Form: map[string]int{"parse": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				field := m.Confx("field", arg, 0) // {{{
-				table := m.Confx("table", arg, 1, "from %s")
-				where := m.Confx("where", arg, 2, "where %s")
+				index := 0 // {{{
+				if len(arg) > 1 {
+					if i, e := strconv.Atoi(arg[1]); e == nil {
+						index = i
+					}
+				}
+				field := m.Confx("field", arg, 0)
+				offset := m.Confx("offset", arg, 1, "offset %s")
+				table := m.Confx("table", arg, 2, "from %s")
+				where := m.Confx("where", arg, 3, "where %s")
 				limit := "limit 1"
-				offset := m.Confx("offset", arg, 3, "offset %s")
 
 				msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s %s %s %s %s", field, table, where, limit, offset))
-				value := m.Append(msg.Meta["append"][0])
+				value := msg.Matrix(index, field)
 
-				parse := m.Confx("parse", m.Option("parse"))
-				switch parse {
+				switch m.Confx("parse", m.Option("parse")) {
 				case "json":
 					extra := ""
 					if len(m.Meta["parse"]) > 1 {
@@ -330,7 +330,6 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				default:
 					m.Echo("%v", value)
 				}
-				return
 				// }}}
 			}},
 	},
