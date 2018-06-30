@@ -26,7 +26,7 @@
 			{{range $key := index $meta "append"}}
 				{{if eq $key "name"}}
 					<td class="{{$key}}">
-						<a href="/upload?dir={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
+						<a download="{{index $meta $key $i}}" href="/upload?dir={{index $meta "path" $i}}"><code>{{index $meta $key $i}}</code></a>
 					</td>
 				{{else if eq $key "path"}}
 				{{else}}

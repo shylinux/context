@@ -927,6 +927,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				fmt.Fprint(f, strings.Join(arg[1:], ""))
 			} // }}}
 		}},
+		"append": &ctx.Command{Name: "append file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if f, e := os.OpenFile(arg[0], os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); m.Assert(e) { // {{{
+				defer f.Close()
+				fmt.Fprint(f, strings.Join(arg[1:], ""))
+			} // }}}
+		}},
 		"genqr": &ctx.Command{Name: "genqr [size] file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			size := 256 // {{{
 			if len(arg) > 2 {
