@@ -47,7 +47,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	s.lex = cli.lex
 	s.yac = cli.yac
 	s.nfs = cli.nfs
-	s.target = cli.target
+	s.target = m.Source()
 	if len(arg) > 0 {
 		s.target = c
 	}
@@ -204,6 +204,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	for i, v := range arg {
 		cli.Caches[fmt.Sprintf("%d", i)] = &ctx.Cache{Name: "执行参数", Value: v, Help: "执行参数"}
 	}
+	cli.Caches["current_cli"] = &ctx.Cache{Name: "当前命令中心", Value: fmt.Sprintf("%d", m.Code()), Help: "当前命令中心"}
 
 	if m.Has("level") {
 		m.Cap("level", m.Option("level"))
@@ -666,9 +667,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			} // }}}
 		}},
 		"source": &ctx.Command{Name: "source file", Help: "运行脚本, file: 脚本文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
-				m.Start(fmt.Sprintf("%s_%d_%s", key, m.Optioni("level", m.Capi("level")+1), arg[0]), "脚本文件", arg[0])
-				<-m.Target().Exit
+			target := m.Target()
+			if _, ok := m.Source().Server.(*CLI); ok {
+				target = m.Source()
+			}
+
+			if !m.Caps("skip") { // {{{
+				msg := m.Spawn(target)
+				msg.Start(fmt.Sprintf("%s_%d_%s", key, msg.Optioni("level", msg.Capi("level")+1), arg[0]), "脚本文件", arg[0])
+				<-msg.Target().Exit
+				m.Copy(msg, "result").Copy(msg, "append")
 			} // }}}
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, rusult: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

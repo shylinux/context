@@ -894,6 +894,7 @@ func (m *Message) Sess(key string, arg ...string) *Message { // {{{
 
 // }}}
 func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
+	spawn := true
 	if _, ok := m.Sessions[key]; !ok && len(arg) > 0 {
 		switch value := arg[0].(type) {
 		case *Message:
@@ -902,29 +903,34 @@ func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
 		case *Context:
 			m.Sessions[key] = m.Spawn(value)
 			return m.Sessions[key]
-		}
+		case string:
+			root := true
+			if len(arg) > 2 {
+				root = Right(arg[2].(string))
+			}
+			method := "find"
+			if len(arg) > 1 {
+				method = arg[1].(string)
+			}
 
-		root := true
-		if len(arg) > 2 {
-			root = Right(arg[2].(string))
+			switch method {
+			case "find":
+				m.Sessions[key] = m.Find(value, root)
+			case "search":
+				m.Sessions[key] = m.Search(value, root)[0]
+			}
+			return m.Sessions[key]
+		case bool:
+			spawn = value
 		}
-		method := "find"
-		if len(arg) > 1 {
-			method = arg[1].(string)
-		}
-
-		switch method {
-		case "find":
-			m.Sessions[key] = m.Find(arg[0].(string), root)
-		case "search":
-			m.Sessions[key] = m.Search(arg[0].(string), root)[0]
-		}
-		return m.Sessions[key]
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
 		if x, ok := msg.Sessions[key]; ok {
-			return m.Spawn(x.target)
+			if spawn {
+				return m.Spawn(x.target)
+			}
+			return x
 		}
 	}
 
@@ -1302,6 +1308,12 @@ func (m *Message) Sort(key string, arg ...string) { // {{{
 func (m *Message) Insert(meta string, index int, arg ...interface{}) string { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
+	}
+	if len(arg) == 0 {
+		if -1 < index && index < len(m.Meta[meta]) {
+			return m.Meta[meta][index]
+		}
+		return ""
 	}
 
 	str := []string{}
@@ -2268,6 +2280,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"key":  &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 
 		"command_list_base": &Config{Name: "命令列表的起始位置", Value: "0", Help: "命令列表的起始位置"},
+
+		"search_method": &Config{Name: "search_method(find/search)", Value: "find", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_index":  &Config{Name: "search_index", Value: "0", Help: "搜索索引"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2419,51 +2434,133 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 			// }}}
 		}},
-		"option": &Command{Name: "option", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			for msg := m; msg != nil; msg = msg.message { // {{{
-				if len(arg) == 0 {
-					m.Echo("%d(%s->%s): %v\n", msg.code, msg.source.Name, msg.target.Name, msg.Meta["detail"])
+		"detail": &Command{Name: "detail [index]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			msg := m.Sesss("cli", false) // {{{
+			switch len(arg) {
+			case 0:
+				m.Echo("%v\n", msg.Meta["detail"])
+			case 1:
+				if i, e := strconv.Atoi(arg[0]); e == nil {
+					m.Echo(msg.Detail(i))
 				}
-				for _, k := range msg.Meta["option"] {
-					if v, ok := msg.Meta[k]; ok {
-						if len(arg) == 0 {
-							m.Echo("  %s: %v\n", k, v)
-						} else if k == arg[0] {
-							if len(arg) > 1 {
-								msg.Option(k, arg[1])
-							}
-							if len(v) > 0 {
-								m.Echo("%v", v[0])
-							}
-						}
-					}
+			default:
+				if i, e := strconv.Atoi(arg[0]); e == nil {
+					m.Echo(msg.Detail(i, arg[1:]))
 				}
-			}
-			// }}}
+			} // }}}
 		}},
-		"session": &Command{Name: "session", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			for msg := m; msg != nil; msg = msg.message { // {{{
-				if len(arg) == 0 {
-					m.Echo("%d(%s->%s): %v\n", msg.code, msg.source.Name, msg.target.Name, msg.Meta["detail"])
-				}
-				for k, v := range msg.Sessions {
-					if len(arg) == 0 {
-						m.Echo("  %s(%s->%s): %d(%s)\n", k, v.source.Name, v.target.Name, v.code, msg.time.Format("15:04:05"))
-					} else if k == arg[0] {
-						if len(arg) > 1 {
-							sub := msg.Sesss(k).Cmd(arg[1:])
-							m.Copy(sub, "result")
+		"option": &Command{Name: "option [key [value...]]", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			for msg := m.Sesss("cli", false); msg != nil; msg = msg.message { // {{{
+				switch len(arg) {
+				case 0:
+					for _, k := range msg.Meta["option"] {
+						m.Echo("%s: %v\n", k, msg.Meta[k])
+					}
+				case 1:
+					for _, k := range msg.Meta["option"] {
+						if k == arg[0] {
+							m.Echo("%s", msg.Option(k))
 							return
 						}
-						m.Echo("msg(%s->%s): %d(%s)\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"))
-						m.Echo("  %s(%s->%s): %d(%s)\n", k, v.source.Name, v.target.Name, msg.code, msg.time.Format("15:04:05"))
 					}
+				default:
+					msg.Option(arg[0], arg[1:])
+					return
+				}
+			} // }}}
+		}},
+		"result": &Command{Name: "result [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			msg := m.Sesss("cli", false) // {{{
+			switch len(arg) {
+			case 0:
+				m.Echo("%v\n", msg.Meta["result"])
+			default:
+				msg.Set("result", arg...)
+			} // }}}
+		}},
+		"append": &Command{Name: "append [key [value...]]", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			ms := []*Message{m.Sesss("cli", false)} // {{{
+			for i := 0; i < len(ms); i++ {
+				ms = append(ms, ms[i].messages...)
+				switch len(arg) {
+				case 0:
+					for _, k := range ms[i].Meta["append"] {
+						m.Echo("%s: %v\n", k, ms[i].Meta[k])
+					}
+				case 1:
+					for _, k := range ms[i].Meta["append"] {
+						if arg[0] == k {
+							m.Echo("%s", ms[i].Append(k))
+							return
+						}
+					}
+				default:
+					m.Echo(ms[i].Append(arg[0], arg[1:]))
+					return
+				}
+			} // }}}
+		}},
+		"session": &Command{Name: "session [key [name [find|search index]]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			for msg := m.Sesss("cli", false); msg != nil; msg = msg.message { // {{{
+				switch len(arg) {
+				case 0:
+					for k, v := range msg.Sessions {
+						m.Echo("%s: %d(%s->%s) %v %v\n", k, v.code, v.source.Name, v.target.Name, v.Meta["detail"], v.Meta["option"])
+					}
+				case 1:
+					for k, v := range msg.Sessions {
+						if k == arg[0] {
+							m.Echo("%d", v.code)
+							return
+						}
+					}
+				default:
+					method := m.Confx("search_method", arg, 2)
+					index := m.Confx("search_index", arg, 3)
+					switch method {
+					case "find":
+						msg.Sessions[arg[0]] = msg.Find(arg[1])
+					case "search":
+						ms := msg.Search(arg[1])
+						if i, e := strconv.Atoi(index); e == nil && i < len(ms) {
+							msg.Sessions[arg[0]] = ms[i]
+						}
+					}
+					return
 				}
 			}
 			// }}}
 		}},
-		"callback": &Command{Name: "callback", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			for msg := m; msg != nil; msg = msg.message { // {{{
+		"callback": &Command{Name: "callback index", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			index := 0
+			for msg := m.Sesss("cli", false); msg != nil; msg = msg.message { // {{{
+				index--
+				switch len(arg) {
+				case 0:
+					if msg.callback.hand == nil {
+						return
+					}
+
+					m.Echo("%d: %v\n", index, msg.callback.hand)
+				case 1:
+					if msg.callback.hand == nil {
+						return
+					}
+
+					if i, e := strconv.Atoi(arg[0]); e == nil && i == index {
+						m.Echo("%v", msg.callback.hand)
+					}
+				default:
+					if i, e := strconv.Atoi(arg[0]); e == nil && i == index {
+						msg.callback.hand = func(msg *Message) *Message {
+							return msg
+						}
+						m.Echo("%v", msg.callback.hand)
+					}
+					return
+				}
+				continue
+
 				if len(arg) == 0 {
 					m.Echo("msg(%s->%s): %d(%s) %v\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"), msg.Meta["detail"])
 					if msg.callback.hand != nil {

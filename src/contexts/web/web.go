@@ -200,6 +200,7 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+	m.Sesss("cli", "cli")
 	web.Context.Master(nil)
 	web.Caches["route"] = &ctx.Cache{Name: "请求路径", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
 	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已初始化"}
@@ -898,15 +899,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Add("append", "hi", "hello")
 		}},
 		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			w := m.Data["response"].(http.ResponseWriter)
-
-			w.Header().Add("Content-Type", "text/html")
-			tmpl := template.Must(template.New("fuck").Funcs(ctx.CGI).ParseGlob(m.Conf("template_dir") + "/common/*.html"))
-			m.Assert(tmpl)
-
-			m.Option("message", "hello")
-			tmpl.ExecuteTemplate(w, "head", m)
-			tmpl.ExecuteTemplate(w, "tail", m.Meta)
+			msg := m.Sesss("cli")
+			msg.Cmd("source", "etc/demo.shy")
+			m.Copy(msg, "result").Copy(msg, "append")
+			return
 		}},
 	},
 }
