@@ -270,6 +270,8 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 		if _, ok := m.Source().Server.(*CLI); ok {
 			// p.target = cli.target
 		}
+		msg := m.Sesss("nfs")
+		msg.Target().Close(msg)
 	case m.Source():
 		if m.Name == "aaa" {
 			if !cli.Context.Close(m.Spawn(cli.Context), arg...) {
@@ -285,13 +287,13 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "cli", Help: "管理中心",
-	Caches: map[string]*ctx.Cache{},
-	Configs: map[string]*ctx.Config{
-		"time": &ctx.Config{Name: "time", Value: "0", Help: "所有模块的当前目录", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+	Caches: map[string]*ctx.Cache{
+		"time": &ctx.Cache{Name: "time", Value: "0", Help: "所有模块的当前目录", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
 			t := time.Now().Unix()
 			return fmt.Sprintf("%d", t)
 		}},
 	},
+	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"alias": &ctx.Command{Name: "alias [short [long]]|[delete short]", Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
@@ -322,30 +324,26 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			} // }}}
 		}},
-		"time": &ctx.Command{Name: "time [parse when] format when",
+		"time": &ctx.Command{Name: "time [parse when] when",
 			Form: map[string]int{"parse": 1},
 			Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				t := time.Now() // {{{
+				f := "2006-01-02 15:04:05"
+				if len(arg) > 0 {
+					if i, e := strconv.Atoi(arg[0]); e == nil {
+						t = time.Unix(int64(i), 0)
+					}
+				}
 				if m.Options("parse") {
-					f := "2006-01-02 15:04:05"
 					n, e := time.ParseInLocation(f, m.Option("parse"), time.Local)
 					m.Assert(e)
 					t = n
 				}
 
-				f := ""
-				if len(arg) > 0 {
-					n, e := strconv.Atoi(arg[0])
-					m.Assert(e)
-					t = time.Unix(int64(n), 0)
-					f = "2006-01-02 15:04:05"
-				}
-
-				if f == "" {
-					m.Echo("%d", t.Unix())
-				} else {
-					m.Echo(t.Format(f))
-				} // }}}
+				m.Echo("%d", t.Unix())
+				m.Echo(" ")
+				m.Echo(t.Format(f))
+				// }}}
 			}},
 		"express": &ctx.Command{Name: "express exp", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			result := "false" // {{{
@@ -569,19 +567,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					case "@":
 						m.Echo(msg.Conf(arg[1]))
 					}
-				case 4:
-					switch arg[0] {
-					case "$":
-						m.Echo(arg[2])
-					case "@":
-						m.Echo(arg[2])
-					}
 				default:
+					last := len(arg) - 1
 					switch arg[0] {
 					case "$":
-						m.Result(0, "cache", arg[1:])
+						m.Result(0, arg[2:last])
 					case "@":
-						m.Result(0, "config", arg[1:])
+						m.Result(0, arg[2:last])
 					}
 				}
 			} else {

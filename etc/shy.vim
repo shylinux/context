@@ -13,8 +13,13 @@ syn keyword shStatement break cd chdir continue eval exec exit kill newgrp pwd r
 syn keyword shStatement source return function
 syn keyword shStatement if else elif end for
 syn keyword shStatement let var
-syn keyword shStatement cache
-syn keyword shStatement config
+
+syn match   shStatement "\(^\|\t\|$(\)cache"
+syn match   shStatement "\(^\|\t\|$(\)config"
+syn match   shStatement "\(^\|\t\|$(\)detail"
+syn match   shStatement "\(^\|\t\|$(\)option"
+syn match   shStatement "\(^\|\t\|$(\)append"
+syn match   shStatement "\(^\|\t\|$(\)result"
 
 syn keyword shCommand command
 syn keyword shCommand open

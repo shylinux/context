@@ -2434,7 +2434,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 			// }}}
 		}},
-		"detail": &Command{Name: "detail [index]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
+		"detail": &Command{Name: "detail [index [value...]]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.Sesss("cli", false) // {{{
 			switch len(arg) {
 			case 0:
@@ -2475,7 +2475,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			case 0:
 				m.Echo("%v\n", msg.Meta["result"])
 			default:
-				msg.Set("result", arg...)
+				msg.Result(-2, arg)
 			} // }}}
 		}},
 		"append": &Command{Name: "append [key [value...]]", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) {

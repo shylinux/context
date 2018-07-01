@@ -17,7 +17,6 @@ import ( // {{{
 	"mime/multipart"
 	"path/filepath"
 
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -200,7 +199,6 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	m.Sesss("cli", "cli")
 	web.Context.Master(nil)
 	web.Caches["route"] = &ctx.Cache{Name: "请求路径", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
 	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已初始化"}
@@ -277,7 +275,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	m.Log("info", nil, "protocol [%s]", m.Cap("protocol"))
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
 
-	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "yes", Help: "日志输出报文头"}
+	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "no", Help: "日志输出报文头"}
 	m.Capi("nserve", 1)
 
 	if web.Message = m; m.Cap("protocol") == "https" {
@@ -524,27 +522,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						})
 					case "script":
-						cli := m.Find("cli")
-						lex := m.Find("lex")
 						mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
-							f, e := os.Open(arg[2])
-							line, bio := "", bufio.NewReader(f)
-							if e != nil {
-								line = arg[2]
-							}
-
-							for {
-								if line = strings.TrimSpace(line); line != "" {
-									lex.Cmd("split", line, "void")
-									cli.Wait = make(chan bool)
-									cli.Cmd(lex.Meta["result"])
-									m.Meta["result"] = cli.Meta["result"]
-								}
-
-								if line, e = bio.ReadString('\n'); e != nil {
-									break
-								}
-							}
+							msg := m.Find("cli").Cmd("source", arg[2])
+							m.Copy(msg, "result").Copy(msg, "append")
 						})
 					}
 				} // }}}
