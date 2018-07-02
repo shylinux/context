@@ -48,27 +48,14 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 	add, e := url.Parse(uri)
 	m.Assert(e)
 
-	adds := []string{}
-
-	if add.Scheme != "" {
-		adds = append(adds, add.Scheme)
-	} else if m.Confs("protocol") {
-		adds = append(adds, m.Conf("protocol"))
-	}
-	adds = append(adds, "://")
-
-	if add.Host != "" {
+	adds := []string{m.Confx("protocol", add.Scheme, "%s://")}
+	if add.Host == "" {
+		adds = append(adds, m.Confx("hostname", "", "%s%s", m.Confx("port", "", ":%s")))
+	} else {
 		adds = append(adds, add.Host)
-	} else if m.Confs("hostname") {
-		adds = append(adds, m.Conf("hostname"))
-		if m.Confs("port") {
-			adds = append(adds, ":")
-			adds = append(adds, m.Conf("port"))
-		}
 	}
 
-	dir, file := path.Split(add.EscapedPath())
-	if path.IsAbs(dir) {
+	if dir, file := path.Split(add.EscapedPath()); path.IsAbs(dir) {
 		adds = append(adds, dir)
 		adds = append(adds, file)
 	} else {
@@ -92,31 +79,16 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 				value = m.Conf(arg[i+1][1:])
 			}
 		}
-
 		args = append(args, arg[i]+"="+url.QueryEscape(value))
 	}
-	p := strings.Join(args, "&")
 
-	if add.RawQuery != "" {
-		adds = append(adds, "?")
-		adds = append(adds, add.RawQuery)
-		if p != "" {
-			adds = append(adds, "&")
-			adds = append(adds, p)
-		}
-	} else if m.Confs("query") {
-		adds = append(adds, "?")
-		adds = append(adds, m.Conf("query"))
-		if p != "" {
-			adds = append(adds, "&")
-			adds = append(adds, p)
-		}
-	} else {
-		if p != "" {
-			adds = append(adds, "?")
-			adds = append(adds, p)
-		}
+	query := strings.Join(args, "&")
+	if query == "" {
+		query = add.RawQuery
+	} else if add.RawQuery != "" {
+		query = add.RawQuery + "&" + query
 	}
+	adds = append(adds, m.Confx("query", query, "?%s"))
 
 	return strings.Join(adds, "")
 }
@@ -314,29 +286,27 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			Name: "client address [output [editor]]",
 			Help: "添加请求配置, address: 默认地址, output: 输出路径, editor: 编辑器",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if web, e := m.Target().Server.(*WEB); m.Assert(e) { // {{{
+				if _, e := m.Target().Server.(*WEB); m.Assert(e) { // {{{
 					if len(arg) == 0 {
 						return
 					}
 
 					uri, e := url.Parse(arg[0])
 					m.Assert(e)
-					web.Configs["method"] = &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"}
-					web.Configs["protocol"] = &ctx.Config{Name: "protocol", Value: uri.Scheme, Help: "服务协议"}
-					web.Configs["hostname"] = &ctx.Config{Name: "hostname", Value: uri.Hostname(), Help: "服务主机"}
-					web.Configs["port"] = &ctx.Config{Name: "port", Value: uri.Port(), Help: "服务端口"}
+					m.Conf("method", "method", "GET", "请求方法")
+					m.Conf("protocol", "protocol", uri.Scheme, "服务协议")
+					m.Conf("hostname", "hostname", uri.Hostname(), "服务主机")
+					m.Conf("port", "port", uri.Port(), "服务端口")
 
 					dir, file := path.Split(uri.EscapedPath())
-					web.Configs["path"] = &ctx.Config{Name: "path", Value: dir, Help: "服务路由"}
-					web.Configs["file"] = &ctx.Config{Name: "file", Value: file, Help: "服务文件"}
-					web.Configs["query"] = &ctx.Config{Name: "query", Value: uri.RawQuery, Help: "服务参数"}
+					m.Conf("path", "path", dir, "服务路由")
+					m.Conf("file", "file", file, "服务文件")
+					m.Conf("query", "query", uri.RawQuery, "服务参数")
 
-					web.Configs["output"] = &ctx.Config{Name: "output", Value: "stdout", Help: "文件缓存"}
-					if len(arg) > 1 {
+					if m.Conf("output", "output", "stdout", "文件缓存"); len(arg) > 1 {
 						m.Conf("output", arg[1])
 					}
-					web.Configs["editor"] = &ctx.Config{Name: "editor", Value: "vim", Help: "文件编辑器"}
-					if len(arg) > 2 {
+					if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
 						m.Conf("editor", arg[2])
 					}
 				} // }}}
@@ -497,35 +467,42 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Set("detail", arg...).Target().Start(m)
 			}},
 		"route": &ctx.Command{
-			Name: "route directory|template|script route content",
-			Help: "添加响应, directory: 目录响应, template: 模板响应, script: 脚本响应, route: 请求路由, content: 响应内容",
+			Name: "route script|template|directory route content",
+			Help: "添加响应, script: 脚本响应, template: 模板响应, directory: 目录响应, route: 请求路由, content: 响应内容",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mux, ok := m.Target().Server.(MUX); m.Assert(ok) { // {{{
-					if len(arg) < 3 {
+					switch len(arg) {
+					case 0:
 						for k, v := range m.Target().Commands {
 							if k[0] == '/' {
 								m.Echo("%s: %s\n", k, v.Name)
 							}
 						}
-						return
-					}
-					switch arg[0] {
-					case "directory":
-						mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
-					case "template":
-						mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
-							w := m.Optionv("response").(http.ResponseWriter)
-							if _, e := os.Stat(arg[2]); e == nil {
-								template.Must(template.ParseGlob(arg[2])).Execute(w, m)
-							} else {
-								template.Must(template.New("temp").Parse(arg[2])).Execute(w, m)
+					case 1:
+						for k, v := range m.Target().Commands {
+							if k == arg[0] {
+								m.Echo("%s: %s\n%s", k, v.Name, v.Help)
 							}
-						})
-					case "script":
-						mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
-							msg := m.Find("cli").Cmd("source", arg[2])
-							m.Copy(msg, "result").Copy(msg, "append")
-						})
+						}
+					case 3:
+						switch arg[0] {
+						case "script":
+							mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+								msg := m.Find("cli").Cmd("source", arg[2])
+								m.Copy(msg, "result").Copy(msg, "append")
+							})
+						case "template":
+							mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+								w := m.Optionv("response").(http.ResponseWriter)
+								if _, e := os.Stat(arg[2]); e == nil {
+									template.Must(template.ParseGlob(arg[2])).Execute(w, m)
+								} else {
+									template.Must(template.New("temp").Parse(arg[2])).Execute(w, m)
+								}
+							})
+						case "directory":
+							mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
+						}
 					}
 				} // }}}
 			}},
@@ -877,12 +854,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
-		}},
-		"/demo": &ctx.Command{Name: "/demo", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Sesss("cli")
-			msg.Cmd("source", "etc/demo.shy")
-			m.Copy(msg, "result").Copy(msg, "append")
-			return
 		}},
 	},
 }
