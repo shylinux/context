@@ -48,18 +48,13 @@ func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // 
 	add, e := url.Parse(uri)
 	m.Assert(e)
 
-	adds := []string{m.Confx("protocol", add.Scheme, "%s://")}
-	if add.Host == "" {
-		adds = append(adds, m.Confx("hostname", "", "%s%s", m.Confx("port", "", ":%s")))
-	} else {
-		adds = append(adds, add.Host)
-	}
+	adds := []string{m.Confx("protocol", add.Scheme, "%s://"), m.Confx("hostname", add.Host)}
 
 	if dir, file := path.Split(add.EscapedPath()); path.IsAbs(dir) {
 		adds = append(adds, dir)
 		adds = append(adds, file)
 	} else {
-		adds = append(adds, m.Conf("dir"))
+		adds = append(adds, m.Conf("path"))
 		if dir == "" && file == "" {
 			adds = append(adds, m.Conf("file"))
 		} else {
@@ -295,8 +290,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Assert(e)
 					m.Conf("method", "method", "GET", "请求方法")
 					m.Conf("protocol", "protocol", uri.Scheme, "服务协议")
-					m.Conf("hostname", "hostname", uri.Hostname(), "服务主机")
-					m.Conf("port", "port", uri.Port(), "服务端口")
+					m.Conf("hostname", "hostname", uri.Host, "服务主机")
 
 					dir, file := path.Split(uri.EscapedPath())
 					m.Conf("path", "path", dir, "服务路由")
@@ -655,14 +649,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					continue
 				}
 
-				if v.IsDir() {
-					name += "/"
-				}
-
 				list.Add("append", "time_i", fmt.Sprintf("%d", v.ModTime().Unix()))
 				list.Add("append", "size_i", fmt.Sprintf("%d", v.Size()))
 				list.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
 				list.Add("append", "size", kit.FmtSize(v.Size()))
+
+				if v.IsDir() {
+					name += "/"
+					list.Add("append", "type", "dir")
+				} else {
+					list.Add("append", "type", "file")
+				}
+
 				list.Add("append", "name", name)
 				list.Add("append", "path", path.Join(m.Option("dir"), name))
 			}

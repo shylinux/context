@@ -270,8 +270,6 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 		if _, ok := m.Source().Server.(*CLI); ok {
 			// p.target = cli.target
 		}
-		msg := m.Sesss("nfs")
-		msg.Target().Close(msg)
 	case m.Source():
 		if m.Name == "aaa" {
 			if !cli.Context.Close(m.Spawn(cli.Context), arg...) {
@@ -659,16 +657,18 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			} // }}}
 		}},
 		"source": &ctx.Command{Name: "source file", Help: "运行脚本, file: 脚本文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			target := m.Target()
+			target := m.Target() // {{{
 			if _, ok := m.Source().Server.(*CLI); ok {
 				target = m.Source()
 			}
 
-			if !m.Caps("skip") { // {{{
+			if !m.Caps("skip") {
 				msg := m.Spawn(target)
 				msg.Start(fmt.Sprintf("%s_%d_%s", key, msg.Optioni("level", msg.Capi("level")+1), arg[0]), "脚本文件", arg[0])
 				<-msg.Target().Exit
 				m.Copy(msg, "result").Copy(msg, "append")
+				nfs := msg.Sesss("nfs")
+				nfs.Target().Close(nfs)
 			} // }}}
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, rusult: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
