@@ -102,7 +102,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 				yac.Cmd("train", "void", "void", "[\t ]+")
 
 				yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
-				yac.Cmd("train", "num", "num", "mul{", "[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
+				yac.Cmd("train", "num", "num", "mul{", "0", "[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
 				yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
 
 				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9_]+", "}")
@@ -291,7 +291,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return fmt.Sprintf("%d", t)
 		}},
 	},
-	Configs: map[string]*ctx.Config{},
+	Configs: map[string]*ctx.Config{
+		"time_format": &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
+	},
 	Commands: map[string]*ctx.Command{
 		"alias": &ctx.Command{Name: "alias [short [long]]|[delete short]", Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
@@ -322,11 +324,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			} // }}}
 		}},
-		"time": &ctx.Command{Name: "time [parse when] when",
-			Form: map[string]int{"parse": 1},
+		"time": &ctx.Command{Name: "time [parse when] [time_format format] when",
+			Form: map[string]int{"parse": 1, "time_format": 1},
 			Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				t := time.Now() // {{{
-				f := "2006-01-02 15:04:05"
+				f := m.Confx("time_format")
 				if len(arg) > 0 {
 					if i, e := strconv.Atoi(arg[0]); e == nil {
 						t = time.Unix(int64(i), 0)
@@ -338,8 +340,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					t = n
 				}
 
-				m.Echo("%d", t.Unix())
-				m.Echo(" ")
+				if m.Options("parse") || !m.Options("time_format") {
+					m.Echo("%d", t.Unix())
+					m.Echo(" ")
+				}
 				m.Echo(t.Format(f))
 				// }}}
 			}},
