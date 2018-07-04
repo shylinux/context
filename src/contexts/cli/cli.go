@@ -69,6 +69,18 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	cli.Caches["back"] = &ctx.Cache{Name: "前一条指令", Value: "", Help: "前一条指令"}
 	cli.Caches["next"] = &ctx.Cache{Name: "下一条指令", Value: "", Help: "下一条指令"}
 
+	cli.Configs["target"] = &ctx.Config{Name: "词法解析器", Value: "cli", Help: "命令行词法解析器", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+		if len(arg) > 0 && len(arg[0]) > 0 { // {{{
+			cli, ok := m.Target().Server.(*CLI)
+			m.Assert(ok, "模块类型错误")
+
+			target := m.Find(arg[0])
+			cli.target = target.Target()
+			return arg[0]
+		}
+		return x.Value
+		// }}}
+	}}
 	cli.Configs["lex"] = &ctx.Config{Name: "词法解析器", Value: "", Help: "命令行词法解析器", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 && len(arg[0]) > 0 { // {{{
 			cli, ok := m.Target().Server.(*CLI)
@@ -102,11 +114,11 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 				yac.Cmd("train", "void", "void", "[\t ]+")
 
 				yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
-				yac.Cmd("train", "num", "num", "mul{", "0", "[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
+				yac.Cmd("train", "num", "num", "mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
 				yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
 
 				yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9_]+", "}")
-				yac.Cmd("train", "word", "word", "mul{", "~", "!", "tran", "str", "[a-zA-Z0-9_/.:]+", "}")
+				yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "tran", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
 
 				yac.Cmd("train", "op1", "op1", "mul{", "$", "@", "}")
 				yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
@@ -129,6 +141,9 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 				yac.Cmd("train", "stm", "function", "function", "rep{", "key", "}")
 				yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
 
+				yac.Cmd("train", "cmd", "cmd", "cache", "rep{", "word", "}")
+				yac.Cmd("train", "cmd", "cmd", "cache", "key", "rep{", "word", "}")
+				yac.Cmd("train", "cmd", "cmd", "cache", "key", "opt{", "=", "exp", "}")
 				yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
 				yac.Cmd("train", "tran", "tran", "$", "(", "cmd", ")")
 
@@ -341,10 +356,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				if m.Options("parse") || !m.Options("time_format") {
-					m.Echo("%d", t.Unix())
-					m.Echo(" ")
+					m.Echo("%d000", t.Unix())
+				} else {
+					m.Echo(t.Format(f))
 				}
-				m.Echo(t.Format(f))
 				// }}}
 			}},
 		"express": &ctx.Command{Name: "express exp", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -661,18 +676,23 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			} // }}}
 		}},
 		"source": &ctx.Command{Name: "source file", Help: "运行脚本, file: 脚本文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			target := m.Target() // {{{
-			if _, ok := m.Source().Server.(*CLI); ok {
-				target = m.Source()
+			cli, ok := m.Source().Server.(*CLI) // {{{
+			if !ok {
+				cli, ok = m.Target().Server.(*CLI)
 			}
 
 			if !m.Caps("skip") {
-				msg := m.Spawn(target)
+				msg := m.Spawn(cli)
 				msg.Start(fmt.Sprintf("%s_%d_%s", key, msg.Optioni("level", msg.Capi("level")+1), arg[0]), "脚本文件", arg[0])
 				<-msg.Target().Exit
 				m.Copy(msg, "result").Copy(msg, "append")
 				nfs := msg.Sesss("nfs")
 				nfs.Target().Close(nfs)
+
+				sub, _ := msg.Target().Server.(*CLI)
+				if sub.target != msg.Target() {
+					cli.target = sub.target
+				}
 			} // }}}
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, rusult: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
