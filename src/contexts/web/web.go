@@ -44,10 +44,9 @@ type WEB struct {
 	*ctx.Context
 }
 
-func (web *WEB) generate(m *ctx.Message, uri string, arg ...string) string { // {{{
+func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string { // {{{
 	add, e := url.Parse(uri)
 	m.Assert(e)
-
 	adds := []string{m.Confx("protocol", add.Scheme, "%s://"), m.Confx("hostname", add.Host)}
 
 	if dir, file := path.Split(add.EscapedPath()); path.IsAbs(dir) {
@@ -342,7 +341,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					method := m.Confx("method")
-					uri := web.generate(m, arg[0], arg[1:]...)
+					uri := web.Merge(m, arg[0], arg[1:]...)
 					m.Log("info", nil, "GET %s", uri)
 					m.Echo("%s: %s\n", method, uri)
 

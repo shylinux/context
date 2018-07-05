@@ -2,3 +2,5 @@ var a = 0
 source etc/local.shy
 ~aaa
 	login root root
+~web
+	command add get "https://chat.shylinux.com"

@@ -1658,7 +1658,7 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 		m.Detail(0, arg...)
 	}
 
-	if s := m.target.master; s != nil && s != m.source.master {
+	if s, t := m.source.master, m.target.master; t != nil && s != t {
 		m.Post(s)
 	} else {
 		m.Exec(m.Meta["detail"][0], m.Meta["detail"][1:]...)
@@ -2282,7 +2282,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 		"command_list_base": &Config{Name: "命令列表的起始位置", Value: "0", Help: "命令列表的起始位置"},
 
-		"search_method": &Config{Name: "search_method(find/search)", Value: "find", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_choice": &Config{Name: "search_choice(first/last/rand/magic)", Value: "magic", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_action": &Config{Name: "search_method(list/switch)", Value: "switch", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_index":  &Config{Name: "search_index", Value: "0", Help: "搜索索引"},
 	},
 	Commands: map[string]*Command{
@@ -2587,42 +2590,121 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"context": &Command{
-			Name: "context back|[[home] [find|search] name] [info|lists|show|switch|[args]",
+			// Name: "context back|[[home] [find|search] name] [info|lists|show|switch|[args]",
+			Name: "context [[find [root|home]|search [root|home] [name|help] [magic|rand|first|last]] name] [list|info|cache|config|command|switch] [args]",
 			Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Form: map[string]int{
-				"back": 0, "home": 0,
-				"find": 1, "search": 1,
-				"info": 1, "lists": 0, "show": 0, "switch": 0,
-				"cache": 0, "config": 0, "command": 0,
-				"module": 0, "domain": 0,
-			},
+			Form: map[string]int{},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if m.Has("back") { // {{{
 					m.target = m.source
 					return
 				}
-				root := !m.Has("home")
 
 				ms := []*Message{}
-				switch {
-				case m.Has("search"):
-					if s := m.Search(m.Get("search"), root); len(s) > 0 {
-						ms = append(ms, s...)
-					}
-				case m.Has("find"):
-					if msg := m.Find(m.Get("find"), root); msg != nil {
-						ms = append(ms, msg)
-					}
-				case m.Has("args"):
-					if s := m.Search(m.Get("args"), root); len(s) > 0 {
-						ms = append(ms, s...)
+
+				action := m.Conf("search_action")
+				method := m.Conf("search_method")
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "find", "search":
+						method = arg[0]
 						arg = arg[1:]
-						break
 					}
-					fallthrough
-				default:
+				}
+
+				root := m.Confs("search_root")
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "root":
+						root = true
+						arg = arg[1:]
+					case "home":
+						root = false
+						arg = arg[1:]
+					}
+				}
+
+				if len(arg) > 0 {
+					switch method {
+					case "find":
+						if msg := m.Find(arg[0], root); msg != nil {
+							ms = append(ms, msg)
+						}
+						arg = arg[1:]
+					case "search":
+						choice := m.Conf("search_choice")
+						switch arg[0] {
+						case "magic", "rand", "first", "last":
+							choice = arg[0]
+							arg = arg[1:]
+						}
+
+						if s := m.Search(arg[0], root); len(s) > 0 {
+							switch choice {
+							case "first":
+								ms = append(ms, s[0])
+							case "last":
+								ms = append(ms, s[len(s)-1])
+							case "rand":
+								ms = append(ms, s[rand.Intn(len(s))])
+							case "magic":
+								ms = append(ms, s...)
+							}
+						}
+						arg = arg[1:]
+					}
+				} else {
 					ms = append(ms, m)
 				}
+
+				if len(arg) == 0 {
+					arg = []string{action}
+				}
+
+				for _, msg := range ms {
+					switch arg[0] {
+					case "switch":
+						m.target = msg.target
+					case "list":
+						msg.Travel(msg.target, func(msg *Message) bool {
+							target := msg.target
+							m.Echo("%s(", target.Name)
+
+							if target.context != nil {
+								m.Echo("%s", target.context.Name)
+							}
+							m.Echo(":")
+
+							if target.master != nil {
+								m.Echo("%s", target.master.Name)
+							}
+							m.Echo(":")
+
+							if target.Owner != nil {
+								m.Echo("%s", target.Owner.Name)
+							}
+							m.Echo(":")
+
+							msg.target = msg.target.Owner
+							if msg.target != nil && msg.Check(msg.target, "caches", "username") && msg.Check(msg.target, "caches", "group") {
+								m.Echo("%s:%s", msg.Cap("username"), msg.Cap("group"))
+							}
+							m.Echo("): ")
+							msg.target = target
+
+							if msg.Check(msg.target, "caches", "status") && msg.Check(msg.target, "caches", "stream") {
+								m.Echo("%s(%s) ", msg.Cap("status"), msg.Cap("stream"))
+							}
+							m.Echo("%s\n", target.Help)
+							return true
+						})
+					default:
+						msg.Cmd(arg)
+						m.Meta["result"] = append(m.Meta["result"], msg.Meta["result"]...)
+						m.Copy(msg, "append")
+					}
+				}
+				return
 
 				for _, v := range ms {
 					// v.Meta = m.Meta
@@ -2763,8 +2845,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				// }}}
 			}},
 		"server": &Command{
-			Name: "server [spawn|begin|start|close|][args]",
-			Help: "服务启动停止切换",
+			Name: "server [spawn|begin|start|close][args]",
+			Help: "查看、新建、初始化、启动、停止服务",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				switch len(arg) { // {{{
 				case 0:
@@ -2791,6 +2873,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						msg.target.Start(msg)
 					case "close":
 						msg := m.Spawn().Set("detail", arg...)
+						m.target = msg.target.context
 						msg.target.Close(msg)
 					}
 				}
@@ -2798,10 +2881,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}},
 		"command": &Command{
 			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]", Help: "查看或修改命令",
-			Form: map[string]int{"delete": 0, "condition": -1},
+			Form: map[string]int{"condition": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				all := m.Has("all") // {{{
-				if len(arg) == 0 {
+				if len(arg) == 0 { // {{{
 					keys := []string{}
 					for k, _ := range m.target.Commands {
 						keys = append(keys, k)
@@ -2931,72 +3013,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					if _, ok := m.target.Commands[arg[1]]; ok {
 						delete(m.target.Commands, arg[1])
 					}
-				}
-
-				switch len(arg) {
-				case 0:
-				case 1:
-					switch {
-					case m.Has("delete"):
-					case m.Has("void"):
-						if x, ok := m.target.Commands[arg[0]]; ok {
-							if m.target.Owner == nil || m.master.Owner == m.target.Owner {
-								x.Hand = nil
-							}
-						}
-					default:
-						msg := m.Spawn(m.Target()).Cmd(arg)
-						msg.Option("nrecv", m.Option("nrecv"))
-						m.Meta = msg.Meta
-					}
-					return
-
-					m.BackTrace(func(m *Message) bool {
-						if all {
-							m.Echo("%s commands:\n", m.target.Name)
-						}
-						if x, ok := m.target.Commands[arg[0]]; ok {
-							if all {
-								m.Echo("  ")
-							}
-							if m.Check(m.target, "commands", arg[0]) {
-								m.Echo("%s\n    %s\n", x.Name, x.Help)
-							}
-						}
-						return all
-					})
-					m.Assert(m.Has("result"), "%s 命令不存在", arg[0])
-				default:
-					msg := m.Spawn(m.Target()).Cmd(arg)
-					msg.Option("nrecv", m.Option("nrecv"))
-					m.Meta = msg.Meta
-					/*
-						case 3:
-							cmd := &Command{}
-							m.BackTrace(func(m *Message) bool {
-								if x, ok := m.target.Commands[arg[0]]; ok && x.Hand != nil {
-									*cmd = *x
-								}
-								return all
-							})
-
-							if m.Check(m.target, "commands", arg[0]) {
-								if x, ok := m.target.Commands[arg[0]]; ok {
-									if m.target.Owner == nil || m.master.Owner == m.target.Owner {
-										x.Name = arg[1]
-										x.Help = arg[2]
-										m.Echo("%s\n    %s\n", x.Name, x.Help)
-									}
-								} else {
-									if m.target.Commands == nil {
-										m.target.Commands = map[string]*Command{}
-									}
-									cmd.Name = arg[1]
-									cmd.Help = arg[2]
-									m.target.Commands[arg[0]] = cmd
-								}
-							}
-					*/
 				}
 				// }}}
 			}},
