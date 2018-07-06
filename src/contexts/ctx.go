@@ -806,8 +806,13 @@ func (m *Message) Travel(c *Context, hand func(m *Message) bool) { // {{{
 			break
 		}
 
-		for _, v := range cs[i].contexts {
-			cs = append(cs, v)
+		keys := []string{}
+		for k, _ := range cs[i].contexts {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			cs = append(cs, cs[i].contexts[k])
 		}
 	}
 
@@ -929,7 +934,7 @@ func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
 	for msg := m; msg != nil; msg = msg.message {
 		if x, ok := msg.Sessions[key]; ok {
 			if spawn {
-				return m.Spawn(x.target)
+				x = m.Spawn(x.target)
 			}
 			return x
 		}
@@ -2287,6 +2292,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"search_action": &Config{Name: "search_method(list/switch)", Value: "switch", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_index":  &Config{Name: "search_index", Value: "0", Help: "搜索索引"},
+
+		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
+		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2438,101 +2446,123 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 			// }}}
 		}},
-		"detail": &Command{Name: "detail [index [value...]]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
+		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.Sesss("cli", false) // {{{
-			switch len(arg) {
-			case 0:
+			if len(arg) == 0 {
 				m.Echo("%v\n", msg.Meta["detail"])
-			case 1:
-				if i, e := strconv.Atoi(arg[0]); e == nil {
-					m.Echo(msg.Detail(i))
-				}
-			default:
-				if i, e := strconv.Atoi(arg[0]); e == nil {
-					m.Echo(msg.Detail(i, arg[1:]))
-				}
-			} // }}}
+				return
+			}
+
+			index := m.Confi("detail_index")
+			if i, e := strconv.Atoi(arg[0]); e == nil {
+				index, arg = i, arg[1:]
+			}
+			m.Echo("%s", msg.Detail(index, arg))
+			// }}}
 		}},
 		"option": &Command{Name: "option [key [value...]]", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			for msg := m.Sesss("cli", false); msg != nil; msg = msg.message { // {{{
-				switch len(arg) {
-				case 0:
+			msg := m.Sesss("cli", false) // {{{
+			if len(arg) == 0 {
+				keys := []string{}
+				values := map[string][]string{}
+
+				for msg = msg; msg != nil; msg = msg.message {
 					for _, k := range msg.Meta["option"] {
-						m.Echo("%s: %v\n", k, msg.Meta[k])
-					}
-				case 1:
-					for _, k := range msg.Meta["option"] {
-						if k == arg[0] {
-							m.Echo("%s", msg.Option(k))
-							return
+						if _, ok := values[k]; ok {
+							continue
 						}
+						keys = append(keys, k)
+						values[k] = msg.Meta[k]
 					}
-				default:
-					msg.Option(arg[0], arg[1:])
-					return
 				}
-			} // }}}
+
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s: %v\n", k, values[k])
+				}
+				return
+			}
+
+			m.Echo("%s", msg.Option(arg[0], arg[1:]))
+			// }}}
 		}},
 		"result": &Command{Name: "result [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.Sesss("cli", false) // {{{
-			switch len(arg) {
-			case 0:
+			if len(arg) == 0 {
 				m.Echo("%v\n", msg.Meta["result"])
-			default:
-				msg.Result(-2, arg)
-			} // }}}
+				return
+			}
+
+			index := m.Confi("result_index")
+			if i, e := strconv.Atoi(arg[0]); e == nil {
+				index, arg = i, arg[1:]
+			}
+			m.Echo("%s", msg.Result(index, arg))
+			// }}}
 		}},
 		"append": &Command{Name: "append [key [value...]]", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			ms := []*Message{m.Sesss("cli", false)} // {{{
-			for i := 0; i < len(ms); i++ {
-				ms = append(ms, ms[i].messages...)
-				switch len(arg) {
-				case 0:
+			msg := m.Sesss("cli", false) // {{{
+			if len(arg) == 0 {
+				keys := []string{}
+				values := map[string][]string{}
+
+				ms := []*Message{msg}
+				for i := 0; i < len(ms); i++ {
+					ms = append(ms, ms[i].messages...)
 					for _, k := range ms[i].Meta["append"] {
-						m.Echo("%s: %v\n", k, ms[i].Meta[k])
-					}
-				case 1:
-					for _, k := range ms[i].Meta["append"] {
-						if arg[0] == k {
-							m.Echo("%s", ms[i].Append(k))
-							return
+						if _, ok := values[k]; ok {
+							continue
 						}
+
+						keys = append(keys, k)
+						values[k] = ms[i].Meta[k]
 					}
-				default:
-					m.Echo(ms[i].Append(arg[0], arg[1:]))
-					return
 				}
-			} // }}}
+
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s: %v\n", k, values[k])
+				}
+				return
+			}
+
+			m.Echo("%s", msg.Append(arg[0], arg[1:]))
+			// }}}
 		}},
-		"session": &Command{Name: "session [key [name [find|search index]]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			for msg := m.Sesss("cli", false); msg != nil; msg = msg.message { // {{{
-				switch len(arg) {
-				case 0:
+		"session": &Command{Name: "session [key [cmd...]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			msg := m.Sesss("cli", false) // {{{
+			if len(arg) == 0 {
+				for msg = msg; msg != nil; msg = msg.message {
 					for k, v := range msg.Sessions {
 						m.Echo("%s: %d(%s->%s) %v %v\n", k, v.code, v.source.Name, v.target.Name, v.Meta["detail"], v.Meta["option"])
 					}
-				case 1:
-					for k, v := range msg.Sessions {
-						if k == arg[0] {
-							m.Echo("%d", v.code)
-							return
-						}
+				}
+				return
+			}
+
+			var sub *Message
+			for m := msg; m != nil; m = m.message {
+				for k, v := range m.Sessions {
+					if k == arg[0] {
+						sub = v
 					}
-				default:
-					method := m.Confx("search_method", arg, 2)
-					index := m.Confx("search_index", arg, 3)
-					switch method {
-					case "find":
-						msg.Sessions[arg[0]] = msg.Find(arg[1])
-					case "search":
-						ms := msg.Search(arg[1])
-						if i, e := strconv.Atoi(index); e == nil && i < len(ms) {
-							msg.Sessions[arg[0]] = ms[i]
-						}
-					}
-					return
 				}
 			}
+
+			if len(arg) == 1 {
+				if sub != nil {
+					m.Echo("%d", sub.code)
+				}
+				return
+			}
+
+			if sub == nil {
+				sub = msg
+			}
+
+			cmd := msg.Spawn(sub.target).Cmd(arg[1:])
+			m.Copy(cmd, "result").Copy(cmd, "append")
+			msg.Sessions[arg[0]] = cmd
 			// }}}
 		}},
 		"callback": &Command{Name: "callback index", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2590,19 +2620,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"context": &Command{
-			// Name: "context back|[[home] [find|search] name] [info|lists|show|switch|[args]",
 			Name: "context [[find [root|home]|search [root|home] [name|help] [magic|rand|first|last]] name] [list|info|cache|config|command|switch] [args]",
 			Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
-			Form: map[string]int{},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				if m.Has("back") { // {{{
-					m.target = m.source
-					return
+				action := m.Conf("search_action") // {{{
+				if len(arg) == 0 {
+					action = "list"
 				}
 
-				ms := []*Message{}
-
-				action := m.Conf("search_action")
 				method := m.Conf("search_method")
 				if len(arg) > 0 {
 					switch arg[0] {
@@ -2624,6 +2649,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				}
 
+				ms := []*Message{}
 				if len(arg) > 0 {
 					switch method {
 					case "find":
@@ -2666,180 +2692,88 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					case "switch":
 						m.target = msg.target
 					case "list":
-						msg.Travel(msg.target, func(msg *Message) bool {
-							target := msg.target
-							m.Echo("%s(", target.Name)
-
-							if target.context != nil {
-								m.Echo("%s", target.context.Name)
+						which := ""
+						if len(arg) > 1 {
+							which = arg[1]
+						}
+						m.Log("fuck", nil, "what %s", which)
+						switch which {
+						case "cache":
+							for k, v := range msg.target.Caches {
+								m.Add("append", "key", k)
+								m.Add("append", "name", v.Name)
+								m.Add("append", "value", v.Value)
+								m.Add("append", "help", v.Help)
 							}
-							m.Echo(":")
-
-							if target.master != nil {
-								m.Echo("%s", target.master.Name)
+						case "config":
+							for k, v := range msg.target.Configs {
+								m.Add("append", "key", k)
+								m.Add("append", "name", v.Name)
+								m.Add("append", "value", v.Value)
+								m.Add("append", "help", v.Help)
 							}
-							m.Echo(":")
-
-							if target.Owner != nil {
-								m.Echo("%s", target.Owner.Name)
+						case "command":
+							for k, v := range msg.target.Commands {
+								m.Add("append", "key", k)
+								m.Add("append", "name", v.Name)
+								m.Add("append", "help", v.Help)
 							}
-							m.Echo(":")
+						case "module":
+							m.Travel(msg.target, func(msg *Message) bool {
+								m.Add("append", "name", msg.target.Name)
+								m.Add("append", "help", msg.target.Help)
+								m.Add("append", "module", msg.Cap("module"))
+								m.Add("append", "status", msg.Cap("status"))
+								m.Add("append", "stream", msg.Cap("stream"))
+								return true
+							})
+						case "domain":
+							msg := m.Find("ssh", true)
+							msg.Travel(msg.target, func(msg *Message) bool {
+								m.Add("append", "name", msg.target.Name)
+								m.Add("append", "help", msg.target.Help)
+								m.Add("append", "domain", msg.Cap("domain")+"."+msg.Conf("domains"))
+								return true
+							})
+						default:
+							msg.Travel(msg.target, func(msg *Message) bool {
+								target := msg.target
+								m.Echo("%s(", target.Name)
 
-							msg.target = msg.target.Owner
-							if msg.target != nil && msg.Check(msg.target, "caches", "username") && msg.Check(msg.target, "caches", "group") {
-								m.Echo("%s:%s", msg.Cap("username"), msg.Cap("group"))
-							}
-							m.Echo("): ")
-							msg.target = target
+								if target.context != nil {
+									m.Echo("%s", target.context.Name)
+								}
+								m.Echo(":")
 
-							if msg.Check(msg.target, "caches", "status") && msg.Check(msg.target, "caches", "stream") {
-								m.Echo("%s(%s) ", msg.Cap("status"), msg.Cap("stream"))
-							}
-							m.Echo("%s\n", target.Help)
-							return true
-						})
+								if target.master != nil {
+									m.Echo("%s", target.master.Name)
+								}
+								m.Echo(":")
+
+								if target.Owner != nil {
+									m.Echo("%s", target.Owner.Name)
+								}
+								m.Echo(":")
+
+								msg.target = msg.target.Owner
+								if msg.target != nil && msg.Check(msg.target, "caches", "username") && msg.Check(msg.target, "caches", "group") {
+									m.Echo("%s:%s", msg.Cap("username"), msg.Cap("group"))
+								}
+								m.Echo("): ")
+								msg.target = target
+
+								if msg.Check(msg.target, "caches", "status") && msg.Check(msg.target, "caches", "stream") {
+									m.Echo("%s(%s) ", msg.Cap("status"), msg.Cap("stream"))
+								}
+								m.Echo("%s\n", target.Help)
+								return true
+							})
+						}
 					default:
 						msg.Cmd(arg)
 						m.Meta["result"] = append(m.Meta["result"], msg.Meta["result"]...)
 						m.Copy(msg, "append")
-					}
-				}
-				return
-
-				for _, v := range ms {
-					// v.Meta = m.Meta
-					// v.Data = m.Data
-					switch {
-					case m.Has("cache"):
-						if len(arg) == 0 {
-							for k, v := range v.target.Caches {
-								m.Add("append", "key", k)
-								m.Add("append", "name", v.Name)
-								m.Add("append", "value", v.Value)
-								m.Add("append", "help", v.Help)
-							}
-						} else {
-							m.Echo(v.Cap(arg[0], arg[1:]...))
-						}
-					case m.Has("config"):
-						if len(arg) == 0 {
-							for k, v := range v.target.Configs {
-								m.Add("append", "key", k)
-								m.Add("append", "name", v.Name)
-								m.Add("append", "value", v.Value)
-								m.Add("append", "help", v.Help)
-							}
-						} else {
-							m.Echo(v.Conf(arg[0], arg[1:]...))
-						}
-					case m.Has("command"):
-						if len(arg) == 0 {
-							for k, v := range v.target.Commands {
-								m.Add("append", "key", k)
-								m.Add("append", "name", v.Name)
-								m.Add("append", "help", v.Help)
-							}
-						} else {
-							v.Cmd(arg)
-							m.Copy(v, "result").Copy(v, "append")
-						}
-					case m.Has("module"):
-						m.Travel(v.target, func(m *Message) bool {
-							m.Add("append", "name", m.target.Name)
-							m.Add("append", "help", m.target.Help)
-							m.Add("append", "module", m.Cap("module"))
-							m.Add("append", "status", m.Cap("status"))
-							m.Add("append", "stream", m.Cap("stream"))
-							return true
-						})
-					case m.Has("domain"):
-						msg := m.Find("ssh", true)
-						msg.Travel(msg.Target(), func(msg *Message) bool {
-							m.Add("append", "name", msg.Target().Name)
-							m.Add("append", "help", msg.Target().Help)
-							m.Add("append", "domain", msg.Cap("domain")+"."+msg.Conf("domains"))
-							return true
-						})
-					case m.Has("switch"), m.Has("back"):
-						m.target = v.target
-					case m.Has("show"):
-						m.Echo("%s(%s): %s\n", v.target.Name, v.target.Owner.Name, v.target.Help)
-						if len(v.target.Requests) > 0 {
-							m.Echo("模块资源：\n")
-							for i, v := range v.target.Requests {
-								m.Echo("  %d: <- %s %s\n", i, v.source.Name, v.Meta["detail"])
-								// for i, v := range v.Messages {
-								// 	m.Echo("    %d: -> %s %s\n", i, v.source.Name, v.Meta["detail"])
-								// }
-							}
-						}
-						if len(v.target.Sessions) > 0 {
-							m.Echo("模块引用：\n")
-							for k, v := range v.target.Sessions {
-								m.Echo("  %s: -> %s %v\n", k, v.target.Name, v.Meta["detail"])
-							}
-						}
-					case m.Has("info"):
-						switch m.Get("info") {
-						case "name":
-							m.Echo("%s", v.target.Name)
-						case "path":
-							path := []string{}
-							m.BackTrace(func(m *Message) bool {
-								path = append(path, m.target.Name)
-								return true
-							})
-
-							list := []string{}
-							for i := len(path) - 1; i >= 0; i-- {
-								list = append(list, path[i])
-							}
-
-							m.Echo("%s", strings.Join(list, "."))
-						case "owner":
-							m.Echo("%s", v.target.Owner.Name)
-						default:
-							m.Echo("%s(%s): %s\n", v.target.Name, v.target.Owner.Name, v.target.Help)
-						}
-					case m.Has("lists") || len(m.Meta["detail"]) == 1:
-						m.Travel(v.target, func(msg *Message) bool {
-							target := msg.target
-							m.Echo("%s(", target.Name)
-
-							if target.context != nil {
-								m.Echo("%s", target.context.Name)
-							}
-							m.Echo(":")
-
-							if target.master != nil {
-								m.Echo("%s", target.master.Name)
-							}
-							m.Echo(":")
-
-							if target.Owner != nil {
-								m.Echo("%s", target.Owner.Name)
-							}
-							m.Echo(":")
-
-							msg.target = msg.target.Owner
-							if msg.target != nil && msg.Check(msg.target, "caches", "username") && msg.Check(msg.target, "caches", "group") {
-								m.Echo("%s:%s", msg.Cap("username"), msg.Cap("group"))
-							}
-							m.Echo("): ")
-							msg.target = target
-
-							if msg.Check(msg.target, "caches", "status") && msg.Check(msg.target, "caches", "stream") {
-								m.Echo("%s(%s) ", msg.Cap("status"), msg.Cap("stream"))
-							}
-							m.Echo("%s\n", target.Help)
-							return true
-						})
-					case len(arg) > 0 && v != m:
-						v.Meta = m.Meta
-						v.Cmd(arg)
-						m.Meta = v.Meta
-					default:
-						m.target = v.target
+						m.target = msg.target
 					}
 				}
 				// }}}

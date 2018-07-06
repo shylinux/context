@@ -5,6 +5,7 @@ import ( // {{{
 	"database/sql"
 	"encoding/json"
 	_ "github.com/go-sql-driver/mysql"
+	"path"
 
 	"fmt"
 	"os"
@@ -238,7 +239,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"show": &ctx.Command{
 			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename] [other rest...]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "save": 1, "other": -1},
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "save": 1, "export": 1, "other": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 					table := m.Confx("table", arg, 0)
@@ -283,6 +284,44 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						m.Echo(m.Conf("csv_row_sep"))
 						return true
 					})
+
+					if m.Options("export") {
+						f, e := os.Create(m.Option("export"))
+						m.Assert(e)
+						defer f.Close()
+
+						table_name := path.Base(m.Option("export"))
+
+						msg.Table(func(maps map[string]string, lists []string, line int) bool {
+							if line == -1 {
+								f.WriteString("insert into ")
+								f.WriteString(table_name)
+							}
+
+							f.WriteString("(")
+							for i, _ := range lists {
+								if line != -1 {
+									f.WriteString("'")
+								}
+								f.WriteString(maps[msg.Meta["append"][i]])
+								if line != -1 {
+									f.WriteString("'")
+								}
+								if i < len(lists)-1 {
+									// f.WriteString(m.Conf("csv_col_sep"))
+									f.WriteString(",")
+								}
+							}
+							f.WriteString(")")
+							if line == -1 {
+								f.WriteString(" values")
+							} else {
+								f.WriteString(",")
+							}
+							f.WriteString("\n")
+							return true
+						})
+					}
 
 					if m.Options("save") {
 						f, e := os.Create(m.Option("save"))
