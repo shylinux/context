@@ -2285,13 +2285,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"cert": &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
 		"key":  &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 
-		"command_list_base": &Config{Name: "命令列表的起始位置", Value: "0", Help: "命令列表的起始位置"},
-
 		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_choice": &Config{Name: "search_choice(first/last/rand/magic)", Value: "magic", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
-		"search_action": &Config{Name: "search_method(list/switch)", Value: "switch", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_action": &Config{Name: "search_action(list/switch)", Value: "switch", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
-		"search_index":  &Config{Name: "search_index", Value: "0", Help: "搜索索引"},
 
 		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
 		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
@@ -2326,128 +2323,82 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 			// }}}
 		}},
-		"message": &Command{Name: "message code meta index", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			switch len(arg) { // {{{
-			case 0:
-				pulse := m.target.Pulse
-				if pulse != nil {
-					m.Echo("\033[31mPulse:\033[0m\n")
-					m.Echo("%d %s\n", pulse.code, pulse.Format())
-				}
-
-				m.Echo("\033[31mrequests:\033[0m\n")
-				for i, v := range m.target.Requests {
-					m.Echo("%d %s\n", i, v.Format())
-					for i, v := range v.messages {
-						if v.Detail(0) != "log" {
-							m.Echo("  %d %s\n", i, v.Format())
+		"message": &Command{Name: "message [code] [all]|[cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			msg := m.Sesss("cli", false) // {{{
+			if len(arg) > 0 {
+				if code, e := strconv.Atoi(arg[0]); e == nil {
+					ms := []*Message{m.root}
+					for i := 0; i < len(ms); i++ {
+						ms = append(ms, ms[i].messages...)
+						if ms[i].code == code {
+							msg, arg = ms[i], arg[1:]
+							break
 						}
 					}
-				}
-
-				m.Echo("\033[32msessions:\033[0m\n")
-				for k, v := range m.Sessions {
-					m.Echo("%s %s\n", k, v.Format())
-				}
-
-				m.Echo("\033[33mhistorys:\033[0m\n")
-				for i, v := range m.target.Historys {
-					m.Echo("%d %s\n", i, v.Format())
-					for i, v := range v.messages {
-						if v.Detail(0) != "log" {
-							m.Echo("  %d %s\n", i, v.Format())
-						}
-					}
-				}
-			case 1:
-				n, e := strconv.Atoi(arg[0])
-				m.Assert(e)
-
-				ms := []*Message{m.root}
-				for i := 0; i < len(ms); i++ {
-					if ms[i].code == n {
-						if ms[i].message != nil {
-							m.Echo("message: %d\n", ms[i].message.code)
-						}
-
-						m.Echo("%s\n", ms[i].Format())
-						if len(ms[i].Meta["option"]) > 0 {
-							m.Echo("option: %v\n", ms[i].Meta["option"])
-						}
-						for _, k := range ms[i].Meta["option"] {
-							m.Echo("  %s: %v\n", k, ms[i].Meta[k])
-						}
-
-						m.Echo("sessions:\n")
-						for k, v := range ms[i].Sessions {
-							m.Echo("  %s: %s\n", k, v.Format())
-						}
-
-						if ms[i].callback.hand != nil {
-							m.Echo("callback: %d\n", ms[i].callback.ncall)
-						}
-
-						if len(ms[i].Meta["result"]) > 0 {
-							m.Echo("result: %v\n", ms[i].Meta["result"])
-						}
-						if len(ms[i].Meta["append"]) > 0 {
-							m.Echo("append: %v\n", ms[i].Meta["append"])
-						}
-						for _, k := range ms[i].Meta["append"] {
-							m.Echo("  %s: %v\n", k, ms[i].Meta[k])
-						}
-
-						if len(ms[i].messages) > 0 {
-							m.Echo("messages: %d\n", len(ms[i].messages))
-						}
-						for _, v := range ms[i].messages {
-							m.Echo("  %s\n", v.Format())
-						}
-						break
-					}
-					ms = append(ms, ms[i].messages...)
-				}
-			default:
-				n, e := strconv.Atoi(arg[0])
-				m.Assert(e)
-
-				ms := []*Message{m.root}
-				for i := 0; i < len(ms); i++ {
-					if ms[i].code == n {
-						switch arg[1] {
-						case "ncol":
-							m.Echo("%d", len(ms[i].Meta["append"]))
-							return
-						case "nrow":
-							m.Echo("%d", len(ms[i].Meta[ms[i].Meta["append"][0]]))
-							return
-						case "option", "session", "callback", "feedback":
-							msg := ms[i].Spawn(ms[i].target)
-							msg.Cmd(arg[1:])
-							m.Copy(msg, "result")
-							return
-						default:
-							index := 0
-							if len(arg) > 2 {
-								n, e := strconv.Atoi(arg[2])
-								m.Assert(e)
-								index = n
-							}
-
-							if meta, ok := ms[i].Meta[arg[1]]; ok {
-								m.Echo(meta[index])
-							}
-						}
-
-					}
-					ms = append(ms, ms[i].messages...)
 				}
 			}
 
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				all, arg = true, arg[1:]
+			}
+
+			if len(arg) == 0 {
+				m.Echo("%s\n", msg.Format())
+				if len(msg.Meta["option"]) > 0 {
+					m.Color(31, "option: %v\n", msg.Meta["option"])
+					for _, k := range msg.Meta["option"] {
+						if v, ok := msg.Data[k]; ok {
+							m.Echo(" %s: %v\n", k, v)
+						} else {
+							m.Echo(" %s: %v\n", k, msg.Meta[k])
+						}
+					}
+				}
+
+				m.Color(31, "result: %v\n", msg.Meta["result"])
+				if len(msg.Meta["append"]) > 0 {
+					m.Color(31, "append: %v\n", msg.Meta["append"])
+					for _, k := range msg.Meta["append"] {
+						if v, ok := msg.Data[k]; ok {
+							m.Echo(" %s: %v\n", k, v)
+						} else {
+							m.Echo(" %s: %v\n", k, msg.Meta[k])
+						}
+					}
+				}
+
+				m.Color(31, "message:\n")
+				m.Echo(" %s\n", msg.message.Format())
+
+				if len(msg.messages) > 0 {
+					m.Color(31, "messages:\n")
+					for i, v := range msg.messages {
+						if !all {
+							switch v.target.Name {
+							case "log", "yac":
+								continue
+							}
+						}
+						m.Echo(" %d %s\n", i, v.Format())
+					}
+				}
+
+				if len(msg.Sessions) > 0 {
+					m.Color(31, "sessions:\n")
+					for k, v := range msg.Sessions {
+						m.Echo(" %s %s\n", k, v.Format())
+					}
+				}
+				return
+			}
+
+			sub := msg.Spawn().Cmd(arg)
+			m.Copy(sub, "result").Copy(sub, "append")
 			// }}}
 		}},
 		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Sesss("cli", false) // {{{
+			msg := m.message // {{{
 			if len(arg) == 0 {
 				m.Echo("%v\n", msg.Meta["detail"])
 				return
@@ -2461,7 +2412,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"option": &Command{Name: "option [key [value...]]", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Sesss("cli", false) // {{{
+			msg := m.message // {{{
 			if len(arg) == 0 {
 				keys := []string{}
 				values := map[string][]string{}
@@ -2487,7 +2438,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"result": &Command{Name: "result [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Sesss("cli", false) // {{{
+			msg := m.message // {{{
 			if len(arg) == 0 {
 				m.Echo("%v\n", msg.Meta["result"])
 				return
@@ -2501,7 +2452,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"append": &Command{Name: "append [key [value...]]", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Sesss("cli", false) // {{{
+			msg := m.message // {{{
 			if len(arg) == 0 {
 				keys := []string{}
 				values := map[string][]string{}
@@ -2526,11 +2477,26 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				return
 			}
 
+			switch arg[0] {
+			case "ncol":
+				if msg.Meta != nil && len(msg.Meta["append"]) > 0 {
+					m.Echo("%d", len(msg.Meta["append"]))
+				} else {
+					m.Echo("0")
+				}
+			case "nrow":
+				if msg.Meta != nil && len(msg.Meta["append"]) > 0 {
+					m.Echo("%d", len(msg.Meta[msg.Meta["append"][0]]))
+				} else {
+					m.Echo("0")
+				}
+			}
+
 			m.Echo("%s", msg.Append(arg[0], arg[1:]))
 			// }}}
 		}},
 		"session": &Command{Name: "session [key [cmd...]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Sesss("cli", false) // {{{
+			msg := m.message // {{{
 			if len(arg) == 0 {
 				for msg = msg; msg != nil; msg = msg.message {
 					for k, v := range msg.Sessions {
@@ -2632,8 +2598,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				if len(arg) > 0 {
 					switch arg[0] {
 					case "find", "search":
-						method = arg[0]
-						arg = arg[1:]
+						method, arg = arg[0], arg[1:]
 					}
 				}
 
@@ -2641,11 +2606,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				if len(arg) > 0 {
 					switch arg[0] {
 					case "root":
-						root = true
-						arg = arg[1:]
+						root, arg = true, arg[1:]
 					case "home":
-						root = false
-						arg = arg[1:]
+						root, arg = false, arg[1:]
 					}
 				}
 
@@ -2654,15 +2617,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					switch method {
 					case "find":
 						if msg := m.Find(arg[0], root); msg != nil {
-							ms = append(ms, msg)
+							ms, arg = append(ms, msg), arg[1:]
 						}
-						arg = arg[1:]
 					case "search":
 						choice := m.Conf("search_choice")
 						switch arg[0] {
 						case "magic", "rand", "first", "last":
-							choice = arg[0]
-							arg = arg[1:]
+							choice, arg = arg[0], arg[1:]
 						}
 
 						if s := m.Search(arg[0], root); len(s) > 0 {
@@ -2676,8 +2637,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							case "magic":
 								ms = append(ms, s...)
 							}
+							arg = arg[1:]
 						}
-						arg = arg[1:]
 					}
 				} else {
 					ms = append(ms, m)
@@ -2814,7 +2775,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				// }}}
 			}},
 		"command": &Command{
-			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]", Help: "查看或修改命令",
+			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]",
+			Help: "查看或修改命令",
 			Form: map[string]int{"condition": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if len(arg) == 0 { // {{{
@@ -3298,19 +3260,20 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				"bench.log": &Config{},
 			},
 			Commands: map[string]*Command{
+				"help":     &Command{},
 				"message":  &Command{},
+				"detail":   &Command{},
 				"option":   &Command{},
+				"result":   &Command{},
+				"append":   &Command{},
 				"session":  &Command{},
 				"callback": &Command{},
-				"feedback": &Command{},
-
-				"context": &Command{},
-				"server":  &Command{},
-				"command": &Command{},
-				"config":  &Command{},
-				"cache":   &Command{},
-
-				"right": &Command{},
+				"context":  &Command{},
+				"server":   &Command{},
+				"command":  &Command{},
+				"config":   &Command{},
+				"cache":    &Command{},
+				"right":    &Command{},
 			},
 		},
 	},

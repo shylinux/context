@@ -1,5 +1,5 @@
-var a = 0
 source etc/local.shy
+
 ~aaa
 	login root root
 ~web

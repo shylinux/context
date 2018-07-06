@@ -1,6 +1,8 @@
 syn match   shComment			"#.*$"
+syn match   shString			"'[^']*'"
+syn match   shString			"\"[^\"]*\""
 syn match   shNumber			"-\=\<\d\+\>#\="
-syn match   shComment			"\"[^\"]*\""
+
 syn match   shOperator			"=\|+\|-\|*\|/"
 syn match   shOperator			"<\|<=\|>\|>=\|!=\|=="
 syn match   shOperator			"\\"
@@ -14,6 +16,7 @@ syn keyword shStatement source return function
 syn keyword shStatement if else elif end for
 syn keyword shStatement let var
 
+" ctx command
 syn match   shStatement "\(^\|\t\|$(\)cache"
 syn match   shStatement "\(^\|\t\|$(\)config"
 syn match   shStatement "\(^\|\t\|$(\)detail"
@@ -21,15 +24,28 @@ syn match   shStatement "\(^\|\t\|$(\)option"
 syn match   shStatement "\(^\|\t\|$(\)append"
 syn match   shStatement "\(^\|\t\|$(\)result"
 
-syn keyword shCommand command
-syn keyword shCommand open
-syn keyword shCommand cookie
-syn keyword shCommand login
+" ctx command
+syn match   shCommand "\(^\|\t\|$(\)message"
+syn match   shCommand "\(^\|\t\|$(\)session"
+syn match   shCommand "\(^\|\t\|$(\)context"
+syn match   shCommand "\(^\|\t\|$(\)server"
+syn match   shCommand "\(^\|\t\|$(\)command"
+syn match   shCommand "\(^\|\t\|$(\)right"
 
+" tcp command
+syn match   shCommand "\(^\|\t\|$(\)listen"
+
+" web command
+syn match   shCommand "\(^\|\t\|$(\)serve"
+syn match   shCommand "\(^\|\t\|$(\)route"
+
+syn match   shCommand "\(^\|\t\|$(\)open"
+syn match   shCommand "\(^\|\t\|$(\)cookie"
+syn match   shCommand "\(^\|\t\|$(\)login"
 
 hi def link shComment			Comment
-hi def link shNumber			Number
 hi def link shString			String
+hi def link shNumber			Number
 hi def link shOperator			Operator
 hi def link shShellVariables	PreProc
 hi def link shStatement			Statement
