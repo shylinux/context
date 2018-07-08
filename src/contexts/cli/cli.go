@@ -307,7 +307,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 	},
 	Configs: map[string]*ctx.Config{
-		"time_format": &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
+		"time_format":   &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
+		"time_interval": &ctx.Config{Name: "time_interval(open/close)", Value: "open", Help: "时间区间"},
 	},
 	Commands: map[string]*ctx.Command{
 		"alias": &ctx.Command{Name: "alias [short [long]]|[delete short]", Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -339,20 +340,73 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			} // }}}
 		}},
-		"time": &ctx.Command{Name: "time [parse when] [time_format format] when",
-			Form: map[string]int{"parse": 1, "time_format": 1},
+		"time": &ctx.Command{Name: "time [time_format format] [parse when] when [begin|end|yestoday|tommorow|monday|sunday|first|last|origin|last]",
+			Form: map[string]int{"parse": 1, "time_format": 1, "time_interval": 1},
 			Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				t := time.Now() // {{{
 				f := m.Confx("time_format")
-				if len(arg) > 0 {
-					if i, e := strconv.Atoi(arg[0]); e == nil {
-						t = time.Unix(int64(i), 0)
-					}
-				}
+
 				if m.Options("parse") {
 					n, e := time.ParseInLocation(f, m.Option("parse"), time.Local)
 					m.Assert(e)
 					t = n
+				}
+
+				if len(arg) > 0 {
+					if i, e := strconv.Atoi(arg[0]); e == nil {
+						t = time.Unix(int64(i/1000), 0)
+						arg = arg[1:]
+					}
+				}
+
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "begin":
+						// t.Add(-((time.Second)t.Second() + (time.Minute)t.Minute() + (time.Hour)t.Hour()))
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t = t.Add(-d)
+					case "end":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds%dns", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()))
+						m.Assert(e)
+						t = t.Add(time.Duration(24*time.Hour) - d)
+						if m.Confx("time_interval") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "yestoday":
+						t = t.Add(-time.Duration(24 * time.Hour))
+					case "tomorrow":
+						t = t.Add(time.Duration(24 * time.Hour))
+					case "monday":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t = t.Add(-d)
+					case "sunday":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t = t.Add(time.Duration(7*24*time.Hour) - d)
+						if m.Confx("time_interval") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "first":
+						t = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.Local)
+					case "last":
+						month, year := t.Month()+1, t.Year()
+						if month >= 13 {
+							month, year = 1, year+1
+						}
+						t = time.Date(year, month, 1, 0, 0, 0, 0, time.Local)
+						if m.Confx("time_interval") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "origin":
+						t = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.Local)
+					case "final":
+						t = time.Date(t.Year()+1, 1, 1, 0, 0, 0, 0, time.Local)
+						if m.Confx("time_interval") == "close" {
+							t = t.Add(-time.Second)
+						}
+					}
 				}
 
 				if m.Options("parse") || !m.Options("time_format") {

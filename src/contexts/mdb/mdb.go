@@ -259,11 +259,23 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 					where := m.Confx("where", m.Option("where"), "where %s")
 					group := m.Confx("group", m.Option("group"), "group by %s")
-					order := m.Confx("order", m.Option("order"), "order by %s")
+					order := m.Confx("order", m.Option("orders"), "order by %s")
 					limit := m.Confx("limit", m.Option("limit"), "limit %s")
 					offset := m.Confx("offset", m.Option("offset"), "offset %s")
 
-					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset), m.Meta["other"])
+					other := m.Meta["other"]
+					for i, v := range other {
+						if len(v) > 1 {
+							switch v[0] {
+							case '$':
+								other[i] = m.Cap(v[1:])
+							case '@':
+								other[i] = m.Conf(v[1:])
+							}
+						}
+					}
+
+					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset), other)
 					if m.Optioni("query", msg.Code()); !m.Options("save") {
 						m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
 					}

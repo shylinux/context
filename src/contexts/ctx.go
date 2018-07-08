@@ -1124,7 +1124,10 @@ func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 
 // }}}
 func (m *Message) Color(color int, str string, arg ...interface{}) *Message { // {{{
-	return m.Add("result", fmt.Sprintf("\033[%dm%s\033[0m", color, fmt.Sprintf(str, arg...)))
+	if str = fmt.Sprintf(str, arg...); m.Options("terminal_color") {
+		str = fmt.Sprintf("\033[%dm%s\033[0m", color, str)
+	}
+	return m.Add("result", str)
 }
 
 // }}}
@@ -2393,8 +2396,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				return
 			}
 
-			sub := msg.Spawn().Cmd(arg)
-			m.Copy(sub, "result").Copy(sub, "append")
+			switch arg[0] {
+			case "message":
+				for msg := m; msg != nil; msg = msg.message {
+					m.Echo("%d: %s\n", msg.code, msg.Format())
+				}
+			default:
+				sub := msg.Spawn().Cmd(arg)
+				m.Copy(sub, "result").Copy(sub, "append")
+			}
+
 			// }}}
 		}},
 		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2657,7 +2668,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						if len(arg) > 1 {
 							which = arg[1]
 						}
-						m.Log("fuck", nil, "what %s", which)
 						switch which {
 						case "cache":
 							for k, v := range msg.target.Caches {
@@ -3306,6 +3316,7 @@ func Start(args ...string) {
 	}
 
 	Pulse.Options("log", true)
+	Pulse.Options("terminal_color", true)
 	Pulse.Sesss("log", "log").Conf("bench.log", Pulse.Conf("bench.log"))
 
 	for _, m := range Pulse.Search(Pulse.Conf("start")) {

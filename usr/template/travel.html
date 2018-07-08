@@ -90,6 +90,14 @@
 	{{end}}
 	</table>
 </fieldset>
+<script>
+	function Config(event, name) {
+		if (event.keyCode == 13) {
+			ctx.Conf(name, event.currentTarget.value, function(msg) {ctx.Refresh()});
+		}
+	}
+
+</script>
 {{end}}
 
 {{define "command"}}
@@ -119,9 +127,48 @@
 	</table>
 </fieldset>
 <fieldset><legend><input id="direct" type="text" onkeydown="return Command(event)"></legend>
-<pre class="result"><code id="result">
-</code></pre>
+<pre class="result"><code id="result"></code></pre>
+<table id="append"></table>
 </fieldset>
+<script>
+	function Result(msg) {
+		var result = document.getElementById("result");
+		result.innerHTML = msg.result.join("");
+
+		var append = document.getElementById("append");
+		var tr = document.createElement("tr");
+		append.appendChild(tr)
+		for (var k in msg.append) {
+			var th = document.createElement("th");
+			th.innerHTML = k;
+		}
+	}
+
+	function Command(event, name) {
+		if (event.keyCode == 13) {
+			var direct = document.getElementById("direct");
+			if (name) {
+				direct.value = name;
+				ctx.Cmd(name, event.currentTarget.value, Result);
+			} else {
+				ctx.Cmd(event.currentTarget.value, "", Result);
+			}
+		}
+	}
+
+	function Direct(event, name, value) {
+		console.log(event)
+		if (!name) {
+			name = event.currentTarget.value;
+		}
+
+		var direct = document.getElementById("direct");
+		direct.value = name;
+		ctx.Cmd(name, value, Result);
+		return false;
+	}
+
+</script>
 {{end}}
 
 {{define "module"}}
@@ -183,51 +230,6 @@
 {{define "tail"}}
 <script src="library/context.js"></script>
 <script>
-	function Refresh() {
-		location.assign(location.href);
-	}
-
-	function Config(event, name) {
-		if (event.keyCode == 13) {
-			ctx.Conf(name, event.currentTarget.value, function(msg) {Refresh()});
-		}
-	}
-
-	function Result(msg) {
-		var result = document.getElementById("result");
-		result.innerHTML = msg.result.join("");
-	}
-
-	function Command(event, name) {
-		if (event.keyCode == 13) {
-			var direct = document.getElementById("direct");
-			if (name) {
-				direct.value = name;
-				ctx.Cmd(name, event.currentTarget.value, Result);
-			} else {
-				ctx.Cmd(event.currentTarget.value, "", Result);
-			}
-		}
-	}
-
-	function Direct(event, name, value) {
-		console.log(event)
-		if (!name) {
-			name = event.currentTarget.value;
-		}
-
-		var direct = document.getElementById("direct");
-		direct.value = name;
-		ctx.Cmd(name, value, Result);
-		return false;
-	}
-
-	function Input(event, cb, key) {
-		if (event.keyCode == 13) {
-			cb(key, event.target.value);
-		}
-	}
-
 	function Change(event, key) {
 		if (event.keyCode == 13) {
 			ctx.Search(key, event.target.value);
@@ -239,9 +241,6 @@
 		ctx.Cookie("order", ctx.Cookie("order")*1 + 1);
 		location.assign(location.href);
 	}
-	function show(name) {
-		ctx.Cap(name, function(msg) {console.log(msg)});
-	}
 </script>
 </body>
 {{end}}
@@ -251,7 +250,13 @@
 {{$meta := .Meta}}
 {{$sess := $msg.Sessions}}
 {{range .Meta.tmpl}}
-	{{if eq . "cache"}}
+	{{if eq . "login"}}
+		{{template "login" $meta}}
+	{{else if eq . "userinfo"}}
+		{{template "userinfo" $msg}}
+	{{else if eq . "share"}}
+		{{template "share" $sess.share}}
+	{{else if eq . "cache"}}
 		{{template "cache" $sess.cache.Meta}}
 	{{else if eq . "config"}}
 		{{template "config" $sess.config.Meta}}

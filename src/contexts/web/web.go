@@ -91,6 +91,7 @@ func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string { // {{{
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn().Set("detail", key)
+		msg.Option("terminal_color", false)
 		msg.Option("method", r.Method)
 		msg.Option("referer", r.Header.Get("Referer"))
 
@@ -506,12 +507,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if !m.Options("module") { //{{{
+			// r := m.Optionv("request").(*http.Request) // {{{
+			// w := m.Optionv("response").(http.ResponseWriter)
+
+			if !m.Options("module") {
 				m.Option("module", "ctx")
 			}
 
-			r := m.Data["request"].(*http.Request)
-			w := m.Data["response"].(http.ResponseWriter)
+			check := m.Spawn().Cmd("/share", "/travel", "module", m.Option("module"))
+			if !check.Results(0) {
+				m.Copy(check, "append")
+				return
+			}
 
 			// 权限检查
 			if m.Option("method") == "POST" {
@@ -560,11 +567,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			// 解析模板
-			render := m.Spawn(m.Target()).Put("option", "request", r).Put("option", "response", w)
-			defer render.Cmd(m.Conf("travel_main"), m.Conf("travel_tmpl"))
-
+			m.Set("append", "tmpl", "userinfo", "share")
 			if msg := m.Find(m.Option("module"), true); msg != nil {
-				m.Option("tmpl", "")
 				for _, v := range []string{"cache", "config", "command", "module", "domain"} {
 					if m.Options("domain") {
 						msg = m.Find("ssh", true)
@@ -574,17 +578,19 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							return nil
 						})
 					} else {
-						msg = msg.Spawn(msg.Target())
-						msg.Cmd("context", "find", m.Option("module"), v)
+						msg = msg.Spawn()
+						msg.Cmd("context", "find", msg.Cap("module"), "list", v)
 					}
 
 					if len(msg.Meta["append"]) > 0 {
-						render.Option("current_module", m.Option("module"))
-						render.Option("current_domain", m.Option("domain"))
-						render.Sesss(v, msg).Add("option", "tmpl", v)
+						msg.Option("current_module", m.Option("module"))
+						msg.Option("current_domain", m.Option("domain"))
+						m.Add("option", "tmpl", v)
+						m.Sesss(v, msg)
 					}
 				}
 			}
+			m.Append("template", m.Conf("travel_main"), m.Conf("travel_tmpl"))
 			// }}}
 		}},
 		"/upload": &ctx.Command{Name: "/upload", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -595,7 +601,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Option("dir", m.Cap("directory"))
 			}
 
-			check := m.Spawn().Cmd("/share")
+			check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir"))
 			if !check.Results(0) {
 				m.Copy(check, "append")
 				return
@@ -753,7 +759,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/share": &ctx.Command{Name: "/share", Help: "资源共享", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			check := m.Spawn().Cmd("/check", "command", "/share", "dir", m.Option("dir")) // {{{
+			check := m.Spawn().Cmd("/check", "command", arg[0], arg[1], arg[2]) // {{{
 			if !check.Results(0) {
 				m.Copy(check, "append")
 				return
@@ -761,10 +767,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg := check.Appendv("aaa").(*ctx.Message).Spawn(m.Target())
 			if m.Options("shareto") {
-				msg.Cmd("right", "add", m.Option("shareto"), "command", "/share", "dir", m.Option("dir"))
+				msg.Cmd("right", "add", m.Option("shareto"), "command", arg[0], arg[1], arg[2])
 			}
 			if m.Options("notshareto") {
-				msg.Cmd("right", "del", m.Option("notshareto"), "command", "/share", "dir", m.Option("dir"))
+				msg.Cmd("right", "del", m.Option("notshareto"), "command", arg[0], arg[1], arg[2])
 			}
 			m.Echo("ok")
 			// }}}
