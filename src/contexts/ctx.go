@@ -1941,6 +1941,7 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 
 var CGI = template.FuncMap{
 	"meta": func(arg ...interface{}) string { // {{{
+		//meta meta [key [index]]
 		if len(arg) == 0 {
 			return ""
 		}

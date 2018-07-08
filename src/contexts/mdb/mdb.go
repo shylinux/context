@@ -276,6 +276,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					}
 
 					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset), other)
+					m.Copy(msg, "append")
 					if m.Optioni("query", msg.Code()); !m.Options("save") {
 						m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
 					}

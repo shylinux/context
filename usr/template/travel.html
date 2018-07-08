@@ -11,9 +11,6 @@
 		cursor:pointer;
 		background-color:lightgray;
 	}
-	code {
-		font-size:14px;
-	}
 	.name {
 		padding-left:10px;
 		text-align:left;
@@ -35,6 +32,9 @@
 		color:white;
 		padding:10px;
 		margin:0px;
+	}
+	code {
+		font-size:14px;
 	}
 </style>
 </head>
@@ -100,6 +100,147 @@
 </script>
 {{end}}
 
+{{define "command2"}}
+{{$meta := .}}
+<fieldset><legend>command</legend>
+	<div>
+	{{$l := index .append|len}}
+	{{if gt $l 0}}
+		{{$first := index .append 0}}
+		{{range $i, $k := index . $first}}
+			<div>
+			{{$command := index $meta "key" $i}}
+			{{range $key := index $meta "append"}}
+				<div class="{{$key}}">
+				{{if eq $key "input"}}
+					<input type="text" name="{{$command}}" onkeydown="return Command(event, '{{$command}}')">
+				{{else if eq $key "key"}}
+					<code><a href="" onclick="return Shell(event, '{{$command}}')">{{$command}}</a></code>
+				{{else}}
+					<code>{{index $meta $key $i}}</code>
+				{{end}}
+				</div>
+			{{end}}
+			<pre class="result" hidden><code id="result_{{$command}}"></code></pre>
+			<table id="append_{{$command}}" hidden></table>
+			</div>
+		{{end}}
+	{{end}}
+	</div>
+</fieldset>
+<fieldset><legend><input id="direct" type="text" onkeydown="return Shell(event)"></legend>
+	<pre class="result"><code id="result2"></code></pre>
+</fieldset>
+<script>
+	function Result(msg, command) {
+		var result = document.getElementById("result"+command);
+		result.innerHTML = msg.result.join("");
+
+		var append = document.getElementById("append"+command);
+		var tr = document.createElement("tr");
+		append.appendChild(tr)
+		for (var k in msg.append) {
+			var th = document.createElement("th");
+			th.innerHTML = k;
+		}
+	}
+
+	function show(msg, command) {
+		console.log(msg);
+		if (msg.result) {
+			var result = document.getElementById("result_"+command);
+			if (!result) {
+				var result = document.getElementById("result2");
+			}
+			result.innerHTML = msg.result.join("");
+		}
+
+		var append = document.getElementById("append_"+command);
+		append.innerHTML = "";
+		if (msg.append) {
+			append.hidden = false;
+
+			var tr = document.createElement("tr");
+			append.appendChild(tr)
+			for (var k in msg.append) {
+				var th = document.createElement("th");
+				th.innerHTML = msg.append[k];
+				tr.appendChild(th)
+			}
+
+			for (var i in msg[msg.append[0]]) {
+				var tr = document.createElement("tr");
+				append.appendChild(tr)
+				for (var k in msg.append) {
+					var td = document.createElement("td");
+					td.innerHTML = msg[msg.append[k]][i]
+					tr.appendChild(td)
+				}
+			}
+		}
+	}
+
+	function Shell(event, command) {
+		console.log(event);
+		switch (event.type) {
+		case "keydown":
+			if (event.key != "Enter") {
+				return true;
+			}
+			command = event.target.value
+			// no break
+		case "click":
+			var result = document.getElementById("result_"+command);
+			var append = document.getElementById("append_"+command);
+			if (!result) {
+				var result = document.getElementById("result2");
+			} else {
+				result = result.parentElement;
+				result.hidden = !result.hidden;
+				append.hidden = result.hidden;
+			}
+			if (!result.hidden) {
+				ctx.Cmd(command, null, function(msg) {
+					show(msg, command);
+					if (!msg.result) {
+					}
+				});
+			}
+			return false;
+		}
+		return true;
+	}
+
+	function Command(event, name) {
+		if (event.keyCode == 13) {
+			var direct = document.getElementById("direct");
+			if (name) {
+				direct.value = name;
+				ctx.Cmd(name, event.currentTarget.value, Result);
+			} else {
+				ctx.Cmd(event.currentTarget.value, "", Result);
+			}
+		}
+	}
+
+	function Direct(event, name, value) {
+		debugger;
+		console.log(event)
+		if (!name) {
+			name = event.currentTarget.value;
+		}
+
+		var direct = document.getElementById("direct");
+		direct.value = name;
+		ctx.Cmd(name, value, function(msg){
+			Result(msg, name);
+		});
+		return false;
+	}
+
+</script>
+{{end}}
+
 {{define "command"}}
 <fieldset><legend>command</legend>
 	<table>
@@ -127,8 +268,8 @@
 	</table>
 </fieldset>
 <fieldset><legend><input id="direct" type="text" onkeydown="return Command(event)"></legend>
-<pre class="result"><code id="result"></code></pre>
 <table id="append"></table>
+<pre class="result"><code id="result"></code></pre>
 </fieldset>
 <script>
 	function Result(msg) {
@@ -262,6 +403,7 @@
 		{{template "config" $sess.config.Meta}}
 	{{else if eq . "command"}}
 		{{template "command" $sess.command.Meta}}
+		{{template "command2" $sess.command.Meta}}
 	{{else if eq . "module"}}
 		{{template "module" $sess.module.Meta}}
 	{{else if eq . "domain"}}
