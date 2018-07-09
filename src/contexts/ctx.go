@@ -2296,6 +2296,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
 		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
+
+		"list_help": &Config{Name: "list_help", Value: "list command", Help: "返回值的索引"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2788,7 +2790,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"command": &Command{
 			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]",
 			Help: "查看或修改命令",
-			Form: map[string]int{"condition": -1},
+			Form: map[string]int{"condition": -1, "list_help": 1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if len(arg) == 0 { // {{{
 					keys := []string{}
@@ -2832,7 +2834,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 					m.target.Commands[m.Cap("list_count")] = &Command{
 						Name: strings.Join(arg[1:], " "),
-						Help: "list_command",
+						Help: m.Confx("list_help"),
 						Hand: func(m *Message, c *Context, key string, args ...string) {
 							list := []string{}
 							j := 0

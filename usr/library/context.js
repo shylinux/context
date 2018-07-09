@@ -140,7 +140,7 @@ ctx = {
 			args.name = cmd
 		}
 		if (value != undefined) {
-			args.value = value
+			args.value = JSON.stringify(value)
 		}
 
 		this.POST("", args, cb);

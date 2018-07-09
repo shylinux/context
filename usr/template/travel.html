@@ -108,19 +108,19 @@
 	{{if gt $l 0}}
 		{{$first := index .append 0}}
 		{{range $i, $k := index . $first}}
-			<div>
 			{{$command := index $meta "key" $i}}
-			{{range $key := index $meta "append"}}
-				<div class="{{$key}}">
-				{{if eq $key "input"}}
-					<input type="text" name="{{$command}}" onkeydown="return Command(event, '{{$command}}')">
-				{{else if eq $key "key"}}
-					<code><a href="" onclick="return Shell(event, '{{$command}}')">{{$command}}</a></code>
-				{{else}}
-					<code>{{index $meta $key $i}}</code>
-				{{end}}
+			<div>
+				<div>
+					<code>
+						{{$command}}:
+						<a href="" onclick="return shell(event, '{{$command}}')">{{index $meta "name" $i}}</a>
+						{{index $meta "help" $i}}
+					</code>
 				</div>
-			{{end}}
+			<div id="argument_{{$command}}">
+				<button onclick="return Argument(event, 'add', '{{$command}}')">add</button>
+				<button onclick="return Argument(event, 'del', '{{$command}}')">del</button>
+			</div>
 			<pre class="result" hidden><code id="result_{{$command}}"></code></pre>
 			<table id="append_{{$command}}" hidden></table>
 			</div>
@@ -128,7 +128,7 @@
 	{{end}}
 	</div>
 </fieldset>
-<fieldset><legend><input id="direct" type="text" onkeydown="return Shell(event)"></legend>
+<fieldset><legend><input id="direct" type="text" onkeydown="return shell(event)"></legend>
 	<pre class="result"><code id="result2"></code></pre>
 </fieldset>
 <script>
@@ -180,7 +180,24 @@
 		}
 	}
 
-	function Shell(event, command) {
+	function Argument(event, action, command) {
+		var argument = document.getElementById("argument_"+command);
+		switch (action) {
+		case "add":
+			var arg = document.createElement("input");
+			arg.type = "text";
+			argument.appendChild(arg);
+			break;
+		case "del":
+			var arg = argument.lastElementChild;
+			if (arg.type == "text") {
+				argument.removeChild(arg);
+			}
+			break;
+		}
+	}
+
+	function shell(event, command) {
 		console.log(event);
 		switch (event.type) {
 		case "keydown":
@@ -190,17 +207,25 @@
 			command = event.target.value
 			// no break
 		case "click":
+			var detail = [];
 			var result = document.getElementById("result_"+command);
 			var append = document.getElementById("append_"+command);
 			if (!result) {
 				var result = document.getElementById("result2");
 			} else {
+				var div = document.getElementById("argument_"+command);
+				var input = div.getElementsByTagName("input");
+				for (var i in input) {
+					if (input[i].value) {
+						detail.push(input[i].value);
+					}
+				}
 				result = result.parentElement;
 				result.hidden = !result.hidden;
 				append.hidden = result.hidden;
 			}
 			if (!result.hidden) {
-				ctx.Cmd(command, null, function(msg) {
+				ctx.Cmd(command, detail, function(msg) {
 					show(msg, command);
 					if (!msg.result) {
 					}

@@ -557,7 +557,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					msg = msg.Spawn(msg.Target())
 					msg.Detail(0, m.Option("name"))
 					if m.Options("value") {
-						msg.Add("detail", m.Option("value"))
+						value := []string{}
+						json.Unmarshal([]byte(m.Option("value")), &value)
+						if len(value) > 0 {
+							msg.Add("detail", value[0], value[1:]...)
+						}
 					}
 
 					msg.Cmd()
