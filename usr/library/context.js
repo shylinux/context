@@ -102,10 +102,10 @@ ctx = {
 			typeof cb == "function" && cb(value);
 		});
 	},//}}}
-	Conf: function(conf, value, cb) {//{{{
-		if (typeof conf == "function") {
-			value = conf;
-			conf = undefined;
+	Conf: function(name, value, cb) {//{{{
+		if (typeof name == "function") {
+			value = name;
+			name = undefined;
 		}
 		if (typeof value == "function") {
 			cb = value;

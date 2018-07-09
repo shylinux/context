@@ -42,25 +42,41 @@
 {{end}}
 
 {{define "cache"}}
+{{$meta := .}}
 <fieldset><legend>cache</legend>
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
 	{{$l := index .append|len}}
 	{{if gt $l 0}}
-	{{$meta := .}} {{$first := index .append 0}}
-	{{range $i, $k := index . $first}}
-	<tr>
-		{{range $key := index $meta "append"}}
-			<td class="{{$key}}">
-				<code>{{index $meta $key $i}}</code>
-			</td>
+		{{$first := index .append 0}}
+		{{range $i, $k := index . $first}}
+		<tr>
+			{{range $key := index $meta "append"}}
+				{{$content := index $meta $key $i}}
+				<td class="{{$key}}">
+						<code>{{$content}}</code>
+				</td>
+			{{end}}
+		</tr>
 		{{end}}
-	</tr>
-	{{end}}
 	{{end}}
 	</table>
 </fieldset>
+<script>
+function cache(event, key, value) {
+	console.log(event);
+	switch (event.type) {
+	case "keydown":
+		if (event.key != "Enter") {
+			return true;
+		}
+
+		value = event.target.value;
+		ctx.Cap(key, value);
+	}
+}
+</script>
 {{end}}
 
 {{define "config"}}
@@ -74,10 +90,9 @@
 	{{range $i, $k := index . $first}}
 	<tr>{{$config := index $meta "key" $i}}
 		{{range $key := index $meta "append"}}
-			{{if eq $key "input"}}
+			{{if eq $key "value"}}
 				<td class="{{$key}}">
-					<input type="text" name="{{$config}}" onkeydown="return Config(event, '{{$config}}')">
-					<code>{{index $meta $key $i}}</code>
+					<input type="text" value="{{index $meta $key $i}}" onkeydown="return Config(event, '{{$config}}')">
 				</td>
 			{{else}}
 				<td class="{{$key}}">
@@ -92,8 +107,8 @@
 </fieldset>
 <script>
 	function Config(event, name) {
-		if (event.keyCode == 13) {
-			ctx.Conf(name, event.currentTarget.value, function(msg) {ctx.Refresh()});
+		if (event.type=="keydown" && event.key == "Enter") {
+			ctx.Conf(name, event.target.value, function(msg) {alert("ok")});
 		}
 	}
 
@@ -131,19 +146,6 @@
 	<pre class="result"><code id="result2"></code></pre>
 </fieldset>
 <script>
-	function Result(msg, command) {
-		var result = document.getElementById("result"+command);
-		result.innerHTML = msg.result.join("");
-
-		var append = document.getElementById("append"+command);
-		var tr = document.createElement("tr");
-		append.appendChild(tr)
-		for (var k in msg.append) {
-			var th = document.createElement("th");
-			th.innerHTML = k;
-		}
-	}
-
 	function show(msg, command) {
 		console.log(msg);
 		if (msg.result) {
@@ -237,18 +239,6 @@
 			return false;
 		}
 		return true;
-	}
-
-	function Command(event, name) {
-		if (event.keyCode == 13) {
-			var direct = document.getElementById("direct");
-			if (name) {
-				direct.value = name;
-				ctx.Cmd(name, event.currentTarget.value, Result);
-			} else {
-				ctx.Cmd(event.currentTarget.value, "", Result);
-			}
-		}
 	}
 
 	function Direct(event, name, value) {

@@ -557,7 +557,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				case "cache":
 					m.Echo(msg.Cap(m.Option("name")))
 				case "config":
-					if m.Options("value") {
+					if m.Has("value") {
 						m.Echo(msg.Conf(m.Option("name"), m.Option("value")))
 					} else {
 						m.Echo(msg.Conf(m.Option("name")))
