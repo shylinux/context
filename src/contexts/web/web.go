@@ -454,6 +454,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Append("response", result)
 				} // }}}
 			}},
+		"post": &ctx.Command{Name: "post", Help: "访问服务",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				msg := m.Spawn().Cmd("get", "method", "POST", arg)
+				m.Copy(msg, "result").Copy(msg, "append")
+			}},
 		"serve": &ctx.Command{
 			Name: "serve [directory [address [protocol]]]",
 			Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http)",
@@ -510,11 +515,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// r := m.Optionv("request").(*http.Request) // {{{
 			// w := m.Optionv("response").(http.ResponseWriter)
 
-			if !m.Options("module") {
-				m.Option("module", "ctx")
+			if !m.Options("dir") {
+				m.Option("dir", "ctx")
 			}
 
-			check := m.Spawn().Cmd("/share", "/travel", "module", m.Option("module"))
+			check := m.Spawn().Cmd("/share", "/travel", "dir", m.Option("dir"))
 			if !check.Results(0) {
 				m.Copy(check, "append")
 				return
@@ -524,12 +529,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if m.Option("method") == "POST" {
 				if m.Options("domain") {
 					msg := m.Find("ssh", true)
-					msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", m.Option("module"), m.Option("ccc"))
-					if m.Options("name") {
+					msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", m.Option("dir"))
+					if m.Option("name") != "" {
 						msg.Add("detail", m.Option("name"))
 					}
 					if m.Options("value") {
-						msg.Add("detail", m.Option("value"))
+						value := []string{}
+						json.Unmarshal([]byte(m.Option("value")), &value)
+						if len(value) > 0 {
+							msg.Add("detail", value[0], value[1:]...)
+						}
 					}
 
 					msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
@@ -539,7 +548,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					return
 				}
 
-				msg := m.Find(m.Option("module"), true)
+				msg := m.Find(m.Option("dir"), true)
 				if msg == nil {
 					return
 				}
@@ -572,26 +581,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			// 解析模板
 			m.Set("append", "tmpl", "userinfo", "share")
-			if msg := m.Find(m.Option("module"), true); msg != nil {
-				for _, v := range []string{"cache", "config", "command", "module", "domain"} {
-					if m.Options("domain") {
-						msg = m.Find("ssh", true)
-						msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", m.Option("module"), v)
-						msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
-							msg.Copy(sub, "result").Copy(sub, "append")
-							return nil
-						})
-					} else {
-						msg = msg.Spawn()
-						msg.Cmd("context", "find", msg.Cap("module"), "list", v)
-					}
+			msg := m
+			for _, v := range []string{"cache", "config", "command", "module", "domain"} {
+				if m.Options("domain") {
+					msg = m.Find("ssh", true)
+					msg.Detail(0, "send", "domain", m.Option("domain"), "context", "find", m.Option("dir"), "list", v)
+					msg.CallBack(true, func(sub *ctx.Message) *ctx.Message {
+						msg.Copy(sub, "result").Copy(sub, "append")
+						return nil
+					})
+				} else {
+					msg = m.Spawn()
+					msg.Cmd("context", "find", msg.Option("dir"), "list", v)
+				}
 
-					if len(msg.Meta["append"]) > 0 {
-						msg.Option("current_module", m.Option("module"))
-						msg.Option("current_domain", m.Option("domain"))
-						m.Add("option", "tmpl", v)
-						m.Sesss(v, msg)
-					}
+				if len(msg.Meta["append"]) > 0 {
+					msg.Option("current_module", m.Option("dir"))
+					msg.Option("current_domain", m.Option("domain"))
+					m.Add("option", "tmpl", v)
+					m.Sesss(v, msg)
 				}
 			}
 			m.Append("template", m.Conf("travel_main"), m.Conf("travel_tmpl"))
@@ -676,7 +684,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			// 目录排序
 			max := true
-			if i, e := strconv.Atoi(m.Option("order")); e == nil {
+			if i, e := strconv.Atoi(m.Option("sort_order")); e == nil {
 				max = i%2 == 1
 			}
 			switch m.Option("list") {
@@ -715,7 +723,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if check := m.Spawn().Cmd("/share"); !check.Results(0) { // {{{
+			if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
 				m.Copy(check, "append")
 				return
 			}

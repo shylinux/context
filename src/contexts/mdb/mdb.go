@@ -259,7 +259,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 					where := m.Confx("where", m.Option("where"), "where %s")
 					group := m.Confx("group", m.Option("group"), "group by %s")
-					order := m.Confx("order", m.Option("orders"), "order by %s")
+					order := m.Confx("order", m.Option("order"), "order by %s")
 					limit := m.Confx("limit", m.Option("limit"), "limit %s")
 					offset := m.Confx("offset", m.Option("offset"), "offset %s")
 

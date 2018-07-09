@@ -2673,21 +2673,40 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 						switch which {
 						case "cache":
-							for k, v := range msg.target.Caches {
+							keys := []string{}
+							for k, _ := range msg.target.Caches {
+								keys = append(keys, k)
+							}
+							sort.Strings(keys)
+							for _, k := range keys {
+								v := msg.target.Caches[k]
 								m.Add("append", "key", k)
 								m.Add("append", "name", v.Name)
 								m.Add("append", "value", v.Value)
 								m.Add("append", "help", v.Help)
+
 							}
 						case "config":
-							for k, v := range msg.target.Configs {
+							keys := []string{}
+							for k, _ := range msg.target.Configs {
+								keys = append(keys, k)
+							}
+							sort.Strings(keys)
+							for _, k := range keys {
+								v := msg.target.Configs[k]
 								m.Add("append", "key", k)
 								m.Add("append", "name", v.Name)
 								m.Add("append", "value", v.Value)
 								m.Add("append", "help", v.Help)
 							}
 						case "command":
-							for k, v := range msg.target.Commands {
+							keys := []string{}
+							for k, _ := range msg.target.Commands {
+								keys = append(keys, k)
+							}
+							sort.Strings(keys)
+							for _, k := range keys {
+								v := msg.target.Commands[k]
 								m.Add("append", "key", k)
 								m.Add("append", "name", v.Name)
 								m.Add("append", "help", v.Help)
@@ -2868,7 +2887,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 					for i := begin; i < end; i++ {
 						if c, ok := m.target.Commands[fmt.Sprintf("%d", i)]; ok {
-							m.Echo("%d: %s\n", i, c.Name)
+							m.Echo("%d(%s): %s\n", i, c.Help, c.Name)
 						}
 					}
 					return

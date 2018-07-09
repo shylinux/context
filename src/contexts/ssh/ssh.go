@@ -192,6 +192,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						return miss
 					})
 
+					if miss {
+						if name == m.Cap("domain") {
+						}
+					}
+
 					if miss { //向上搜索
 						if ssh, ok := c.Server.(*SSH); m.Assert(ok) && ssh.nfs != nil {
 							msg := m.Spawn(ssh.nfs)

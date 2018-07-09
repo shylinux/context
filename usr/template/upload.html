@@ -69,7 +69,7 @@
 	}
 
 	function list(what) {
-		ctx.Cookie("order", ctx.Cookie("order")*1 + 1);
+		ctx.Cookie("list_order", ctx.Cookie("list_order")*1 + 1);
 		ctx.Cookie("list", what);
 		ctx.Refresh();
 	}

@@ -112,9 +112,8 @@
 			<div>
 				<div>
 					<code>
-						{{$command}}:
+						{{$command}}: {{index $meta "help" $i}}<br/>
 						<a href="" onclick="return shell(event, '{{$command}}')">{{index $meta "name" $i}}</a>
-						{{index $meta "help" $i}}
 					</code>
 				</div>
 			<div id="argument_{{$command}}">
@@ -173,8 +172,12 @@
 				append.appendChild(tr)
 				for (var k in msg.append) {
 					var td = document.createElement("td");
-					td.innerHTML = msg[msg.append[k]][i]
-					tr.appendChild(td)
+					var pre = document.createElement("pre");
+					var code = document.createElement("code");
+					code.innerHTML = msg[msg.append[k]][i];
+					pre.appendChild(code)
+					td.appendChild(pre)
+					tr.appendChild(td);
 				}
 			}
 		}
@@ -338,7 +341,7 @@
 {{end}}
 
 {{define "module"}}
-<fieldset><legend><input type="text" id="module" value="{{index .current_module 0}}" onkeydown="return Change(event, 'module')"></legend>
+<fieldset><legend><input type="text" id="module" value="{{index .current_module 0}}" onkeydown="return Change(event, 'dir')"></legend>
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
@@ -350,7 +353,7 @@
 		{{range $key := index $meta "append"}}
 			{{if eq $key "name"}}
 				<td class="{{$key}}">
-					<code><a href="" onclick="ctx.Search('module', '{{index $meta "module" $i}}'); return false">{{index $meta $key $i}}</a></code>
+					<code><a href="" onclick="ctx.Search('dir', '{{index $meta "module" $i}}'); return false">{{index $meta $key $i}}</a></code>
 				</td>
 			{{else}}
 				<td class="{{$key}}">
@@ -366,7 +369,7 @@
 {{end}}
 
 {{define "domain"}}
-<fieldset><legend><input type="text" id="domain" value="{{index . "current_domain" 0}}" onkeydown="return Change(event, 'domain')"></legend>
+<fieldset><legend><input type="text" id="domain" value="{{index . "current_domain" 0}}" onkeydown="return Change(event, 'dir')"></legend>
 	<table>
 	<colgroup>{{range .append}}<col class="{{.}}">{{end}}</colgroup>
 	<tr>{{range .append}}<th class="{{.}}" onclick="list('{{.}}')">{{.}}</th>{{end}}</tr>
@@ -404,7 +407,7 @@
 
 	function list(what) {
 		ctx.Cookie("list", what);
-		ctx.Cookie("order", ctx.Cookie("order")*1 + 1);
+		ctx.Cookie("sort_order", ctx.Cookie("sort_order")*1 + 1);
 		location.assign(location.href);
 	}
 </script>
