@@ -1198,9 +1198,34 @@ func (m *Message) Table(cb func(map[string]string, []string, int) bool) *Message
 		for _, k := range m.Meta["append"] {
 			data := m.Meta[k][i]
 			if m.Options("extras") && k == "extra" {
-				extra := map[string]interface{}{}
+				var extra interface{}
 				json.Unmarshal([]byte(data), &extra)
-				data = fmt.Sprintf("%v", extra[m.Option("extras")])
+				for _, k := range m.Meta["extras"] {
+					if i, e := strconv.Atoi(k); e == nil && i >= 0 {
+						if d, ok := extra.([]interface{}); ok && i < len(d) {
+							extra = d[i]
+							continue
+						}
+					}
+
+					if d, ok := extra.(map[string]interface{}); ok {
+						extra = d[k]
+						continue
+					}
+
+					extra = nil
+					break
+				}
+
+				if extra == nil {
+					data = ""
+				} else {
+					format := m.Confx("extra_format")
+					if format == "" {
+						format = "%v"
+					}
+					data = fmt.Sprintf(format, extra)
+				}
 			}
 
 			if i < len(m.Meta[k]) {
@@ -1567,11 +1592,11 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 								n += len(arg) - i
 							}
 
-							if x, ok := m.Meta[arg[i]]; ok && len(x) == n {
-								m.Add("option", "args", arg[i])
-								continue
-							}
-
+							// if x, ok := m.Meta[arg[i]]; ok && len(x) == n {
+							// 	m.Add("option", "args", arg[i])
+							// 	continue
+							// }
+							//
 							m.Add("option", arg[i], arg[i+1:i+1+n]...)
 							i += n
 						}

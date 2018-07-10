@@ -239,7 +239,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"show": &ctx.Command{
 			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename] [other rest...]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "save": 1, "export": 1, "other": -1},
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2, "save": 1, "export": 1, "other": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 					table := m.Confx("table", arg, 0)
@@ -281,10 +281,21 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
 					}
 
-					msg.Table(func(maps map[string]string, lists []string, line int) bool {
+					m.Table(func(maps map[string]string, lists []string, line int) bool {
 						for i, v := range lists {
 							if m.Options("save") {
-								m.Echo(maps[msg.Meta["append"][i]])
+								key := m.Meta["append"][i]
+								value := maps[key]
+								if key == m.Option("trans_field") {
+									for i := 0; i < len(m.Meta["trans_map"])-1; i += 2 {
+										if value == m.Meta["trans_map"][i] {
+											value = m.Meta["trans_map"][i+1]
+											break
+										}
+									}
+								}
+
+								m.Echo(value)
 							} else if line == -1 {
 								m.Color(32, v)
 							} else {
@@ -305,7 +316,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 						table_name := path.Base(m.Option("export"))
 
-						msg.Table(func(maps map[string]string, lists []string, line int) bool {
+						m.Table(func(maps map[string]string, lists []string, line int) bool {
 							if line == -1 {
 								f.WriteString("insert into ")
 								f.WriteString(table_name)
@@ -316,7 +327,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 								if line != -1 {
 									f.WriteString("'")
 								}
-								f.WriteString(maps[msg.Meta["append"][i]])
+								f.WriteString(maps[m.Meta["append"][i]])
 								if line != -1 {
 									f.WriteString("'")
 								}
@@ -383,6 +394,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					m.Echo("%v", value)
 				}
 				// }}}
+			}},
+		"demo": &ctx.Command{Name: "get field offset table where [parse func field]", Help: "执行查询语句",
+			Form: map[string]int{"parse": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Echo("%v", m.Meta)
 			}},
 	},
 	Index: map[string]*ctx.Context{

@@ -141,6 +141,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 				yac.Cmd("train", "stm", "function", "function", "rep{", "key", "}")
 				yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
 
+				yac.Cmd("train", "cmd", "echo", "rep{", "exp", "}")
 				yac.Cmd("train", "cmd", "cmd", "cache", "rep{", "word", "}")
 				yac.Cmd("train", "cmd", "cmd", "cache", "key", "rep{", "word", "}")
 				yac.Cmd("train", "cmd", "cmd", "cache", "key", "opt{", "=", "exp", "}")
@@ -832,6 +833,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			for i := 0; i < 100; i++ {
 				m.Echo("%d\n", i)
 			}
+		}},
+		"echo": &ctx.Command{Name: "echo arg...", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Echo("%s", strings.Join(arg, ""))
 		}},
 	},
 	Index: map[string]*ctx.Context{
