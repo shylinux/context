@@ -1,9 +1,9 @@
+scan_file etc/demo.shy
+
+return
 source etc/local.shy
 
 ~aaa
 	login root root
 ~web
 	command add get "https://chat.shylinux.com"
-
-~yac
-	scan_file etc/demo.shy demo_file

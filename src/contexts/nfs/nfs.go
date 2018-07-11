@@ -441,8 +441,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		for {
 			buf := make([]byte, m.Confi("buffer_size"))
 			n, e := in.Read(buf)
-			if m.Assert(e); n == 0 {
-				break
+			if e != nil && e != io.EOF {
+				m.Assert(e)
 			}
 
 			buf = buf[0:n]
@@ -450,6 +450,9 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			m.Put("append", m.Cap("nread"), buf)
 			m.Capi("nread", n)
 			m.Back(m)
+			if n == 0 {
+				break
+			}
 		}
 		return false
 	}

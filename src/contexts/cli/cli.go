@@ -293,6 +293,7 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 			}
 		}
 	}
+	return false
 
 	return true
 }
@@ -739,15 +740,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if !m.Caps("skip") {
 				msg := m.Spawn(cli)
 				msg.Start(fmt.Sprintf("%s_%d_%s", key, msg.Optioni("level", msg.Capi("level")+1), arg[0]), "脚本文件", arg[0])
-				<-msg.Target().Exit
-				m.Copy(msg, "result").Copy(msg, "append")
-				nfs := msg.Sesss("nfs")
-				nfs.Target().Close(nfs)
-
-				sub, _ := msg.Target().Server.(*CLI)
-				if sub.target != msg.Target() {
-					cli.target = sub.target
-				}
+				// <-msg.Target().Exit
+				// m.Copy(msg, "result").Copy(msg, "append")
+				// nfs := msg.Sesss("nfs")
+				// nfs.Target().Close(nfs)
+				//
+				// sub, _ := msg.Target().Server.(*CLI)
+				// if sub.target != msg.Target() {
+				// 	cli.target = sub.target
+				// }
 			} // }}}
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, rusult: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -836,6 +837,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"echo": &ctx.Command{Name: "echo arg...", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Echo("%s", strings.Join(arg, ""))
+		}},
+		"scan_file": &ctx.Command{Name: "scan_file", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Find("yac").Call(func(cmd *ctx.Message) *ctx.Message {
+				cmd.Source(m.Target())
+				cmd.Target(m.Target())
+				m.Log("fuck", nil, "------cmd run- %v %s", cmd.Meta, cmd.Hand)
+				cmd.Cmd()
+				m.Log("fuck", nil, "------cmd run- %v", cmd.Meta)
+				return nil
+			}, "scan_file", arg[0])
 		}},
 	},
 	Index: map[string]*ctx.Context{

@@ -302,7 +302,6 @@ func (lex *LEX) scan(m *ctx.Message, page int, line []byte) (hash int, rest []by
 			s, star = star, 0
 		}
 	}
-	m.Log("fucK", nil, "why %d", pos)
 
 	if pos == len(line) {
 		hash, pos, word = -1, 0, word[:0]
@@ -430,10 +429,8 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 					page = lex.index("npage", arg[1])
 				}
 
-				m.Log("fuck", nil, "%d %s %s", page, arg[1], arg[0])
 				hash, rest, word := lex.scan(m, page, []byte(arg[0]))
 				m.Result(0, hash, string(rest), string(word))
-				m.Log("fuck", nil, "\033[31m[%v]\033[0m %d [%v]", string(word), hash, string(rest))
 			} // }}}
 		}},
 		"split": &ctx.Command{Name: "split line page void help", Help: "分割语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

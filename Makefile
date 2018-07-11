@@ -6,7 +6,7 @@ install:
 	@cp etc/shy.vim ~/.vim/syntax/
 	@touch etc/local.shy
 	go install $(BENCH)
-	@md5 `which bench`
+	# @md5 `which bench`
 	@date
 
 build:
