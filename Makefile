@@ -2,10 +2,12 @@
 BENCH=src/example/bench.go
 
 install:
+	@cp etc/go.snippets ~/.vim/snippets/
+	@cp etc/shy.vim ~/.vim/syntax/
+	@touch etc/local.shy
 	go install $(BENCH)
-	touch etc/local.shy
-	cp etc/shy.vim ~/.vim/syntax/
-	cp etc/go.snippets ~/.vim/snippets/
+	@md5 `which bench`
+	@date
 
 build:
 	go build $(BENCH)

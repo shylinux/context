@@ -387,26 +387,33 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 // }}}
 
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
-	c.Caches = map[string]*ctx.Cache{
-		"pos":    &ctx.Cache{Name: "读写位置", Value: "0", Help: "读写位置"},
-		"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
-		"return": &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
+	if len(arg) > 0 && arg[0] == "scan_file" {
+		c.Caches = map[string]*ctx.Cache{
+			"nread": &ctx.Cache{Name: "nread", Value: "0", Help: "nread"},
+		}
+		c.Configs = map[string]*ctx.Config{}
+	} else {
+		c.Caches = map[string]*ctx.Cache{
+			"pos":    &ctx.Cache{Name: "读写位置", Value: "0", Help: "读写位置"},
+			"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
+			"return": &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
 
-		"nbytes": &ctx.Cache{Name: "消息发送字节", Value: "0", Help: "消息发送字节"},
-		"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
-		"nrecv":  &ctx.Cache{Name: "消息接收数量", Value: "0", Help: "消息接收数量"},
-		"target": &ctx.Cache{Name: "消息接收模块", Value: "ssh", Help: "消息接收模块"},
-		"result": &ctx.Cache{Name: "前一条指令执行结果", Value: "", Help: "前一条指令执行结果"},
-		"sessid": &ctx.Cache{Name: "会话令牌", Value: "", Help: "会话令牌"},
-	}
-	c.Configs = map[string]*ctx.Config{}
+			"nbytes": &ctx.Cache{Name: "消息发送字节", Value: "0", Help: "消息发送字节"},
+			"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
+			"nrecv":  &ctx.Cache{Name: "消息接收数量", Value: "0", Help: "消息接收数量"},
+			"target": &ctx.Cache{Name: "消息接收模块", Value: "ssh", Help: "消息接收模块"},
+			"result": &ctx.Cache{Name: "前一条指令执行结果", Value: "", Help: "前一条指令执行结果"},
+			"sessid": &ctx.Cache{Name: "会话令牌", Value: "", Help: "会话令牌"},
+		}
+		c.Configs = map[string]*ctx.Config{}
 
-	if len(arg) > 1 {
-		if info, e := os.Stat(arg[1]); e == nil {
-			c.Caches["name"] = &ctx.Cache{Name: "name", Value: info.Name(), Help: "文件名"}
-			c.Caches["mode"] = &ctx.Cache{Name: "mode", Value: info.Mode().String(), Help: "文件权限"}
-			c.Caches["size"] = &ctx.Cache{Name: "size", Value: fmt.Sprintf("%d", info.Size()), Help: "文件大小"}
-			c.Caches["time"] = &ctx.Cache{Name: "time", Value: info.ModTime().Format("15:03:04"), Help: "创建时间"}
+		if len(arg) > 1 {
+			if info, e := os.Stat(arg[1]); e == nil {
+				c.Caches["name"] = &ctx.Cache{Name: "name", Value: info.Name(), Help: "文件名"}
+				c.Caches["mode"] = &ctx.Cache{Name: "mode", Value: info.Mode().String(), Help: "文件权限"}
+				c.Caches["size"] = &ctx.Cache{Name: "size", Value: fmt.Sprintf("%d", info.Size()), Help: "文件大小"}
+				c.Caches["time"] = &ctx.Cache{Name: "time", Value: info.ModTime().Format("15:03:04"), Help: "创建时间"}
+			}
 		}
 	}
 
@@ -427,6 +434,26 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
+	if len(arg) > 0 && arg[0] == "scan_file" {
+		in, ok := m.Optionv("in").(*os.File)
+		m.Assert(ok)
+
+		for {
+			buf := make([]byte, m.Confi("buffer_size"))
+			n, e := in.Read(buf)
+			if m.Assert(e); n == 0 {
+				break
+			}
+
+			buf = buf[0:n]
+			m.Result(0, m.Cap("nread"), n)
+			m.Put("append", m.Cap("nread"), buf)
+			m.Capi("nread", n)
+			m.Back(m)
+		}
+		return false
+	}
+
 	m.Target().Sessions["nfs"] = m
 	m.Sessions["nfs"] = m
 
@@ -675,8 +702,25 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"pscolor":         &ctx.Config{Name: "pscolor", Value: "2", Help: "读取文件的默认大小值"},
 		"statuscolor":     &ctx.Config{Name: "statuspscolor", Value: "1", Help: "读取文件的默认大小值"},
 		"statusbackcolor": &ctx.Config{Name: "statusbackcolor", Value: "2", Help: "读取文件的默认大小值"},
+
+		"nfs_name": &ctx.Config{Name: "nfs_name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				return arg[0]
+			}
+			return x.Value + m.Cap("nfile")
+			// }}}
+		}},
+		"nfs_help":    &ctx.Config{Name: "nfs_help", Value: "file", Help: "默认模块帮助"},
+		"buffer_size": &ctx.Config{Name: "buffer_size", Value: "16", Help: "缓存区大小"},
 	},
 	Commands: map[string]*ctx.Command{
+		"scan_file": &ctx.Command{Name: "scan_file filename", Help: "扫描文件, filename: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
+				f, e := os.Open(arg[0])
+				m.Assert(e)
+				m.Put("option", "in", f).Start(m.Confx("nfs_name", arg, 0), m.Confx("nfs_help", arg, 1), "scan_file", arg[0])
+			} // }}}
+		}},
 		"buffer": &ctx.Command{Name: "buffer [index string]", Help: "扫描文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.buf != nil { // {{{
 				for i, v := range nfs.buf {

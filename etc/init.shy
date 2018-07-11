@@ -4,3 +4,6 @@ source etc/local.shy
 	login root root
 ~web
 	command add get "https://chat.shylinux.com"
+
+~yac
+	scan_file etc/demo.shy demo_file
