@@ -215,6 +215,24 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
+	if len(arg) > 0 && arg[0] == "scan_file" {
+		cli.Context.Exit = make(chan bool)
+		m.Find("yac").Call(func(cmd *ctx.Message) *ctx.Message {
+			if cmd.Detail(0) == "scan_end" {
+				msg := m.Spawn()
+				cli.Exit <- true
+				m.Target().Close(msg)
+				return nil
+			}
+
+			cmd.Source(m.Target())
+			cmd.Target(m.Target())
+			cmd.Cmd()
+			return nil
+		}, "scan_file", arg[1])
+		return false
+	}
+
 	m.Sesss("cli", m)
 	cli.Caches["#"] = &ctx.Cache{Name: "参数个数", Value: fmt.Sprintf("%d", len(arg)), Help: "参数个数"}
 	for i, v := range arg {
@@ -251,13 +269,29 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 			cli.nfs = m.Sesss("nfs", "nfs")
 			if m.Has("stdio") {
-				cli.nfs.Cmd("scan", m.Cap("stream", "stdio"), m.Spawn(m.Target()).Cmd("source", m.Cap("init.shy")).Get("result"))
+				m.Spawn().Cmd("scan_file", m.Cap("stream", m.Cap("init.shy")))
+				cli.Context.Exit = make(chan bool)
+				m.Find("yac").Call(func(cmd *ctx.Message) *ctx.Message {
+					if cmd.Detail(0) == "scan_end" {
+						msg := m.Spawn()
+						cli.Exit <- true
+						m.Target().Close(msg)
+						return nil
+					}
+
+					cmd.Source(m.Target())
+					cmd.Target(m.Target())
+					cmd.Cmd()
+					return nil
+				}, "scan_file", m.Cap("stream", "stdio"))
 			} else {
 				if _, e := os.Stat(m.Cap("init.shy")); e == nil {
+					// m.Spawn().Cmd("scan_file", m.Cap("stream", m.Cap("init.shy")))
 					cli.nfs.Cmd("scan", m.Cap("stream", m.Cap("init.shy")))
 				}
 			}
 		}()
+		return false
 	}
 
 	m.Deal(func(msg *ctx.Message, arg ...string) bool {
@@ -293,8 +327,6 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 			}
 		}
 	}
-	return false
-
 	return true
 }
 
@@ -839,14 +871,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Echo("%s", strings.Join(arg, ""))
 		}},
 		"scan_file": &ctx.Command{Name: "scan_file", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Find("yac").Call(func(cmd *ctx.Message) *ctx.Message {
-				cmd.Source(m.Target())
-				cmd.Target(m.Target())
-				m.Log("fuck", nil, "------cmd run- %v %s", cmd.Meta, cmd.Hand)
-				cmd.Cmd()
-				m.Log("fuck", nil, "------cmd run- %v", cmd.Meta)
-				return nil
-			}, "scan_file", arg[0])
+			m.Start(arg[0], "cli", "scan_file", arg[0])
+			<-m.Target().Exit
 		}},
 	},
 	Index: map[string]*ctx.Context{

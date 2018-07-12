@@ -958,7 +958,11 @@ func (m *Message) Back(msg *Message) *Message { // {{{
 		return m
 	}
 
-	m.Log("cb", nil, "%d %v %v", msg.code, msg.Meta["result"], msg.Meta["append"])
+	if msg.Hand {
+		m.Log("cb", nil, "%d %v %v", msg.code, msg.Meta["result"], msg.Meta["append"])
+	} else {
+		m.Log("cb", nil, "%d %v %v", msg.code, msg.Meta["detail"], msg.Meta["option"])
+	}
 
 	m.callback.ncall++
 	if sub := m.callback.hand(msg); sub != nil && m.message != nil && m.message != m {

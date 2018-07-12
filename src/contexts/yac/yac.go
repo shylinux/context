@@ -3,6 +3,7 @@ package yac // {{{
 import ( // {{{
 	"contexts"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 )
@@ -258,7 +259,8 @@ func (yac *YAC) parse(m *ctx.Message, cli *ctx.Context, page, void int, line str
 
 // }}}
 func (yac *YAC) scan(m *ctx.Message, page int, void int, line string) (string, []string) { // {{{
-	m.Log("fuck", nil, "begin--%v-----%v", page, yac.word[page])
+	level := m.Optioni("level2")
+	m.Optioni("level2", level+1)
 	if line == "" { //加载数据
 		if data, ok := m.Optionv("data").(chan []byte); ok {
 			if buf := <-data; len(buf) > 0 {
@@ -266,31 +268,49 @@ func (yac *YAC) scan(m *ctx.Message, page int, void int, line string) (string, [
 			}
 		}
 	}
+	m.Assert(line != "")
 
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
-		line = m.Sesss("lex", "lex").Cmd("scan", line, yac.name(void)).Result(1)
-		lex := m.Sesss("lex", "lex").Cmd("scan", line, yac.name(s))
-
+		lex := m.Sesss("lex", "lex").Cmd("scan", line, yac.name(void))
 		if lex.Result(0) == "-1" { //加载数据
+			if next, ok := m.Optionv("next").(chan bool); ok {
+				next <- true
+			}
 			if data, ok := m.Optionv("data").(chan []byte); ok {
 				if buf := <-data; len(buf) > 0 {
 					line += string(buf)
 					continue
 				}
 			}
-			break
+			m.Assert(false)
+		}
+		line = lex.Result(1)
+
+		lex = m.Sesss("lex", "lex").Cmd("scan", line, yac.name(s))
+
+		if lex.Result(0) == "-1" { //加载数据
+			if next, ok := m.Optionv("next").(chan bool); ok {
+				next <- true
+			}
+			if data, ok := m.Optionv("data").(chan []byte); ok {
+				if buf := <-data; len(buf) > 0 {
+					line += string(buf)
+					continue
+				}
+			}
+			m.Assert(false)
 		}
 
 		c := byte(lex.Resulti(0))
 		state := yac.mat[s][c]
 
 		if state != nil { //全局语法检查
-			line, word = lex.Result(1), append(word, lex.Result(2))
-			// if key := m.Find("lex").Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(2)) <= len(lex.Result(2)) {
-			// } else {
-			// 	state = nil
-			// }
+			if key := m.Sesss("lex").Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(2)) <= len(lex.Result(2)) {
+				line, word = lex.Result(1), append(word, lex.Result(2))
+			} else {
+				state = nil
+			}
 		}
 
 		if state == nil { //嵌套语法递归解析
@@ -321,10 +341,11 @@ func (yac *YAC) scan(m *ctx.Message, page int, void int, line string) (string, [
 		msg := m.Spawn().Add("detail", yac.hand[hash], word...)
 		if m.Back(msg); msg.Hand {
 			word = msg.Meta["result"]
+			m.Assert(!msg.Has("return"))
 		}
 	}
 
-	m.Log("fuck", nil, "return--%s-----%v", line, word)
+	m.Optioni("level2", level)
 	return line, word
 }
 
@@ -506,18 +527,58 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
 				m.Optioni("page", yac.page["line"])
 				m.Optioni("void", yac.page["void"])
+				m.Options("scan_end", false)
+				m.Option("level2", "1")
 
 				data := make(chan []byte)
+				next := make(chan bool, 1)
+				m.Optionv("next", next)
+				end := make(chan bool, 1)
+				var out io.Writer
 				m.Find("nfs").Call(func(nfs *ctx.Message) *ctx.Message {
-					buf := nfs.Appendv(nfs.Result(0)).([]byte)
-					data <- buf
+					o := nfs.Optionv("out")
+					if o != nil {
+						out = o.(io.Writer)
+					}
+
+					buf := []byte{}
+					switch v := nfs.Appendv(nfs.Result(0)).(type) {
+					case []byte:
+						buf = v
+					case string:
+						buf = []byte(v)
+					}
+					select {
+					case data <- buf:
+						<-next
+					case <-end:
+					}
 					return nil
 				}, "scan_file", arg[0], "脚本解析")
 
 				go func() {
+					defer func() {
+						if e := recover(); e != nil {
+							end <- true
+							m.Option("scan_end", true)
+							m.Back(m.Spawn().Add("detail", "scan_end"))
+						}
+					}()
 					m.Optionv("data", data)
-					line, word := yac.scan(m, m.Optioni("page"), m.Optioni("void"), "")
-					m.Log("fuck", nil, "----%s---%v", line, word)
+					m.Optionv("next", next)
+					line := ""
+					word := []string{}
+					for {
+						line, word = yac.scan(m, m.Optioni("page"), m.Optioni("void"), line)
+						if out != nil {
+							for i, v := range word {
+								if i == len(word)-1 {
+									break
+								}
+								fmt.Fprintf(out, "%s", v)
+							}
+						}
+					}
 				}()
 			}
 			// }}}

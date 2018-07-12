@@ -93,7 +93,8 @@ func (nfs *NFS) prompt(arg ...string) { // {{{
 		rest = arg[1]
 	}
 
-	if nfs.color(nfs.cli.Conf("PS1"), nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
+	// if nfs.color(nfs.cli.Conf("PS1"), nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
+	if fmt.Fprintf(nfs.out, "> %s%s", line, rest); len(rest) > 0 {
 		fmt.Fprintf(nfs.out, "\033[%dD", len(rest))
 	}
 }
@@ -198,8 +199,10 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 	if nfs.Cap("stream") != "stdio" {
 		return nfs.in.Read(p)
 	}
+	nfs.Log("fuck", nil, "why")
 
 	nfs.width, nfs.height = termbox.Size()
+	nfs.Log("fuck", nil, "why %d %d", nfs.width, nfs.height)
 
 	buf := make([]rune, 0, 1024)
 	rest := make([]rune, 0, 1024)
@@ -435,10 +438,35 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 // }}}
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if len(arg) > 0 && arg[0] == "scan_file" {
+		if arg[1] == "stdio" {
+			if in, ok := m.Data["in"]; ok {
+				nfs.in = in.(*os.File)
+			}
+			if out, ok := m.Data["out"]; ok {
+				nfs.out = out.(*os.File)
+			}
+			bio := bufio.NewScanner(nfs)
+			nfs.Message = m
+			termbox.Init()
+			defer termbox.Close()
+
+			m.Cap("stream", "stdio")
+			nfs.prompt()
+			for bio.Scan() {
+				text := bio.Text() + "; "
+				m.Result(0, 0, len(text))
+				m.Put("append", "0", text)
+				m.Back(m)
+				nfs.prompt()
+			}
+
+			return true
+		}
+
 		in, ok := m.Optionv("in").(*os.File)
 		m.Assert(ok)
 
-		for {
+		for !m.Options("scan_end") {
 			buf := make([]byte, m.Confi("buffer_size"))
 			n, e := in.Read(buf)
 			if e != nil && e != io.EOF {
@@ -454,7 +482,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				break
 			}
 		}
-		return false
+		return true
 	}
 
 	m.Target().Sessions["nfs"] = m
@@ -641,22 +669,28 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 			for text = nfs.buf[pos] + "\n"; text != ""; {
 
-				line := m.Spawn(yac.Target())
-				line.Optioni("pos", pos)
-				line.Options("stdio", true)
-				line.Put("option", "cli", cli.Target())
-				text = line.Cmd("parse", "line", "void", text).Get("result")
-				cli.Target(line.Data["cli"].(*ctx.Context))
-				if line.Has("return") {
-					goto out
-				}
-				if line.Has("back") {
-					pos = line.Appendi("back")
+				if true {
+					m.Result(0, 0, len(text))
+					m.Put("append", fmt.Sprintf("%d", len(text)), text)
+					m.Back(m)
+				} else {
+					line := m.Spawn(yac.Target())
+					line.Optioni("pos", pos)
+					line.Options("stdio", true)
+					line.Put("option", "cli", cli.Target())
+					text = line.Cmd("parse", "line", "void", text).Get("result")
+					cli.Target(line.Data["cli"].(*ctx.Context))
+					if line.Has("return") {
+						goto out
+					}
+					if line.Has("back") {
+						pos = line.Appendi("back")
+					}
+					if result := strings.TrimRight(strings.Join(line.Meta["result"][1:len(line.Meta["result"])-1], ""), "\n"); len(result) > 0 {
+						nfs.print("%s", result+"\n")
+					}
 				}
 
-				if result := strings.TrimRight(strings.Join(line.Meta["result"][1:len(line.Meta["result"])-1], ""), "\n"); len(result) > 0 {
-					nfs.print("%s", result+"\n")
-				}
 			}
 		}
 
@@ -714,14 +748,21 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			// }}}
 		}},
 		"nfs_help":    &ctx.Config{Name: "nfs_help", Value: "file", Help: "默认模块帮助"},
-		"buffer_size": &ctx.Config{Name: "buffer_size", Value: "16", Help: "缓存区大小"},
+		"buffer_size": &ctx.Config{Name: "buffer_size", Value: "1024", Help: "缓存区大小"},
 	},
 	Commands: map[string]*ctx.Command{
 		"scan_file": &ctx.Command{Name: "scan_file filename", Help: "扫描文件, filename: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
-				f, e := os.Open(arg[0])
-				m.Assert(e)
-				m.Put("option", "in", f).Start(m.Confx("nfs_name", arg, 0), m.Confx("nfs_help", arg, 1), "scan_file", arg[0])
+				if arg[0] == "stdio" {
+					m.Put("option", "in", os.Stdin)
+					m.Put("option", "out", os.Stdout)
+				} else {
+					f, e := os.Open(arg[0])
+					m.Assert(e)
+					m.Put("option", "in", f)
+				}
+
+				m.Start(m.Confx("nfs_name", arg, 0), m.Confx("nfs_help", arg, 1), "scan_file", arg[0])
 			} // }}}
 		}},
 		"buffer": &ctx.Command{Name: "buffer [index string]", Help: "扫描文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

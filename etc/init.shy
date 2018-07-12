@@ -1,9 +1,13 @@
-scan_file etc/demo.shy
-
+~cli config debug on
 return
+scan_file etc/demo.shy
+echo "who"
+~web
+	command add get "https://chat.shylinux.com"
 source etc/local.shy
 
 ~aaa
 	login root root
-~web
-	command add get "https://chat.shylinux.com"
+
+~yac
+	scan_file etc/demo.shy demo_file
