@@ -156,6 +156,7 @@ func (c *Context) Start(m *Message) bool { // {{{
 		running := make(chan bool)
 		go m.TryCatch(m, true, func(m *Message) {
 			m.Log(m.Cap("status", "start"), nil, "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
+			c.Exit = make(chan bool, 1)
 
 			if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
 				c.Close(m, m.Meta["detail"]...)
@@ -1695,6 +1696,8 @@ func (m *Message) Cmd(arg ...interface{}) *Message { // {{{
 		m.Detail(0, arg...)
 	}
 
+	m.Exec(m.Meta["detail"][0], m.Meta["detail"][1:]...)
+	return m
 	if s, t := m.source.master, m.target.master; t != nil && s != t {
 		m.Post(s)
 	} else {
@@ -3370,9 +3373,6 @@ func Start(args ...string) {
 	Pulse.Options("terminal_color", true)
 	Pulse.Sesss("log", "log").Conf("bench.log", Pulse.Conf("bench.log"))
 
-	for _, m := range Pulse.Search(Pulse.Conf("start")) {
-		m.Set("detail", Pulse.Conf("init.shy")).Set("option", "stdio").target.Start(m)
-	}
-
-	<-Index.master.Exit
+	Pulse.Find("cli").Cmd("scan_file", "etc/init.shy")
+	Pulse.Find("cli").Cmd("scan_file", "stdio")
 }

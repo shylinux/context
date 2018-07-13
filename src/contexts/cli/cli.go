@@ -56,6 +56,17 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+	cli.alias = map[string][]string{
+		"~": []string{"context"},
+		"!": []string{"message"},
+		"@": []string{"config"},
+		"$": []string{"cache"},
+	}
+
+	if len(arg) > 0 && arg[0] == "scan_file" {
+		return cli
+	}
+
 	cli.Caches["level"] = &ctx.Cache{Name: "嵌套层级", Value: "0", Help: "嵌套层级"}
 	cli.Caches["skip"] = &ctx.Cache{Name: "跳过执行", Value: "0", Help: "命令只解析不执行"}
 	cli.Caches["else"] = &ctx.Cache{Name: "解析选择语句", Value: "false", Help: "解析选择语句"}
@@ -199,13 +210,6 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		// }}}
 	}}
 
-	cli.alias = map[string][]string{
-		"~": []string{"context"},
-		"!": []string{"message"},
-		"@": []string{"config"},
-		"$": []string{"cache"},
-	}
-
 	if cli.Context == Index {
 		Pulse = m
 	}
@@ -216,20 +220,66 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 // }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if len(arg) > 0 && arg[0] == "scan_file" {
-		cli.Context.Exit = make(chan bool)
-		m.Find("yac").Call(func(cmd *ctx.Message) *ctx.Message {
+		yac := m.Find("yac")
+		if yac.Cap("status") != "start" {
+			yac.Target().Start(yac)
+			yac.Cmd("train", "void", "void", "[\t ]+")
+
+			yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
+			yac.Cmd("train", "num", "num", "mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
+			yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
+
+			yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9_]+", "}")
+			yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "tran", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
+
+			yac.Cmd("train", "op1", "op1", "mul{", "$", "@", "}")
+			yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
+			yac.Cmd("train", "op1", "op1", "mul{", "-e", "-f", "-d", "}")
+			yac.Cmd("train", "op1", "op1", "mul{", "-", "+", "}")
+			yac.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "}")
+			yac.Cmd("train", "op2", "op2", "mul{", ">", ">=", "<", "<=", "=", "!=", "}")
+
+			yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "tran", "}")
+			yac.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
+			yac.Cmd("train", "val", "val", "(", "exp", ")")
+
+			yac.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
+			yac.Cmd("train", "stm", "let", "let", "key", "mul{", "=", "<-", "}", "exp")
+			yac.Cmd("train", "stm", "if", "if", "exp")
+			yac.Cmd("train", "stm", "elif", "elif", "exp")
+			yac.Cmd("train", "stm", "for", "for", "exp")
+			yac.Cmd("train", "stm", "else", "else")
+			yac.Cmd("train", "stm", "end", "end")
+			yac.Cmd("train", "stm", "function", "function", "rep{", "key", "}")
+			yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
+
+			yac.Cmd("train", "cmd", "echo", "rep{", "exp", "}")
+			yac.Cmd("train", "cmd", "cmd", "cache", "rep{", "word", "}")
+			yac.Cmd("train", "cmd", "cmd", "cache", "key", "rep{", "word", "}")
+			yac.Cmd("train", "cmd", "cmd", "cache", "key", "opt{", "=", "exp", "}")
+			yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
+			yac.Cmd("train", "tran", "tran", "$", "(", "cmd", ")")
+
+			yac.Cmd("train", "line", "line", "opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}")
+		}
+
+		m.Option("target", m.Target().Name)
+		yac = m.Find("yac")
+		yac.Call(func(cmd *ctx.Message) *ctx.Message {
 			if cmd.Detail(0) == "scan_end" {
-				msg := m.Spawn()
-				cli.Exit <- true
-				m.Target().Close(msg)
+				m.Target().Close(m.Spawn())
 				return nil
 			}
 
-			cmd.Source(m.Target())
-			cmd.Target(m.Target())
 			cmd.Cmd()
+			m.Option("target", cli.target.Name)
+			if cmd.Has("return") {
+				m.Target().Close(m.Spawn())
+				cmd.Append("scan_file", false)
+			}
 			return nil
-		}, "scan_file", arg[1])
+		}, "parse", arg[1])
+		m.Cap("stream", yac.Target().Name)
 		return false
 	}
 
@@ -339,10 +389,19 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			t := time.Now().Unix()
 			return fmt.Sprintf("%d", t)
 		}},
+		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "模块数量"},
 	},
 	Configs: map[string]*ctx.Config{
 		"time_format":   &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 		"time_interval": &ctx.Config{Name: "time_interval(open/close)", Value: "open", Help: "时间区间"},
+		"cli_name": &ctx.Config{Name: "cli_name", Value: "shell", Help: "时间格式", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				return arg[0]
+			}
+			return fmt.Sprintf("%s%d", x.Value, m.Capi("nshell", 1))
+			// }}}
+		}},
+		"cli_help": &ctx.Config{Name: "cli_help", Value: "shell", Help: "时间区间"},
 	},
 	Commands: map[string]*ctx.Command{
 		"alias": &ctx.Command{Name: "alias [short [long]]|[delete short]", Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -870,10 +929,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"echo": &ctx.Command{Name: "echo arg...", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Echo("%s", strings.Join(arg, ""))
 		}},
-		"scan_file": &ctx.Command{Name: "scan_file", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Start(arg[0], "cli", "scan_file", arg[0])
-			<-m.Target().Exit
-		}},
+		"scan_file": &ctx.Command{
+			Name: "scan_file filename [cli_name [cli_help]]",
+			Help: "解析脚本, filename: 文件名, cli_name: 模块名, cli_help: 模块帮助",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Start(m.Confx("cli_name", arg, 1), m.Confx("cli_help", arg, 2), key, arg[0])
+				<-m.Target().Exit
+			}},
 	},
 	Index: map[string]*ctx.Context{
 		"void": &ctx.Context{Name: "void",
