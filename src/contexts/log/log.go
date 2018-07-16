@@ -14,7 +14,7 @@ import ( // {{{
 
 type LOG struct {
 	module map[string]map[string]bool
-	slient map[string]bool
+	silent map[string]bool
 	color  map[string]int
 	*Log.Logger
 
@@ -33,10 +33,6 @@ func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	if log.Context == Index {
-		Pulse = m
-	}
-	log.Context.Master(nil)
 	log.Message = m
 
 	log.Configs["flag_date"] = &ctx.Config{Name: "输出日期", Value: "true", Help: "模块日志输出消息日期"}
@@ -50,7 +46,7 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		if len(arg) > 0 {
 			if m.Sess("nfs") == nil {
 				os.Create(arg[0])
-				m.Sess("nfs", "nfs").Cmd("open", arg[0])
+				m.Sess("nfs", "nfs").Cmd("open", arg[0], "", "日志文件")
 			}
 			return arg[0]
 		}
@@ -82,12 +78,12 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
-		"slient": &ctx.Command{Name: "slient [[module] level state]", Help: "查看或设置日志开关, module: 模块名, level: 日志类型, state(true/false): 是否打印日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"silent": &ctx.Command{Name: "silent [[module] level state]", Help: "查看或设置日志开关, module: 模块名, level: 日志类型, state(true/false): 是否打印日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
 				switch len(arg) {
 				case 2:
 					if len(arg) > 1 {
-						log.slient[arg[0]] = ctx.Right(arg[1])
+						log.silent[arg[0]] = ctx.Right(arg[1])
 					}
 				case 3:
 					if log.module[arg[0]] == nil {
@@ -96,7 +92,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 					log.module[arg[0]][arg[1]] = ctx.Right(arg[2])
 				}
 
-				for k, v := range log.slient {
+				for k, v := range log.silent {
 					m.Echo("%s: %t\n", k, v)
 				}
 				for k, v := range log.module {
@@ -121,7 +117,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 		}},
 		"log": &ctx.Command{Name: "log level string...", Help: "输出日志, level: 日志类型, string: 日志内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
-				if s, ok := log.slient[arg[0]]; ok && s == true {
+				if s, ok := log.silent[arg[0]]; ok && s == true {
 					return
 				}
 
@@ -216,7 +212,7 @@ func init() {
 		"close":  36,
 		"debug":  0,
 	}
-	log.slient = map[string]bool{
+	log.silent = map[string]bool{
 		// "lock": true,
 	}
 	log.module = map[string]map[string]bool{

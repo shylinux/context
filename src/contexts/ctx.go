@@ -107,7 +107,11 @@ func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
 }
 
 // }}}
-func (c *Context) Begin(m *Message) *Context { // {{{
+func (c *Context) Begin(m *Message, arg ...string) *Context { // {{{
+	if len(arg) > 0 {
+		m.Meta["detail"] = arg
+	}
+
 	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
 	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
 
@@ -145,7 +149,11 @@ func (c *Context) Begin(m *Message) *Context { // {{{
 }
 
 // }}}
-func (c *Context) Start(m *Message) bool { // {{{
+func (c *Context) Start(m *Message, arg ...string) bool { // {{{
+	if len(arg) > 0 {
+		m.Meta["detail"] = arg
+	}
+
 	m.Hand = true
 
 	if m != c.Requests[0] {
@@ -998,7 +1006,29 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 
 // }}}
 
-func (m *Message) Add(meta string, key string, value ...string) *Message { // {{{
+func (m *Message) Trans(arg ...interface{}) []string {
+	ls := []string{}
+	for _, v := range arg {
+		value := ""
+		switch val := v.(type) {
+		case []string:
+			ls = append(ls, val...)
+			continue
+		case string:
+			value = val
+		case bool:
+			value = fmt.Sprintf("%t", val)
+		case int, int8, int16, int32, int64:
+			value = fmt.Sprintf("%d", val)
+		default:
+			value = fmt.Sprintf("%v", val)
+		}
+		ls = append(ls, value)
+	}
+	return ls
+}
+
+func (m *Message) Add(meta string, key string, value ...interface{}) *Message { // {{{
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
@@ -1009,13 +1039,13 @@ func (m *Message) Add(meta string, key string, value ...string) *Message { // {{
 	switch meta {
 	case "detail", "result":
 		m.Meta[meta] = append(m.Meta[meta], key)
-		m.Meta[meta] = append(m.Meta[meta], value...)
+		m.Meta[meta] = append(m.Meta[meta], m.Trans(value...)...)
 
 	case "option", "append":
 		if _, ok := m.Meta[key]; !ok {
 			m.Meta[key] = make([]string, 0, 3)
 		}
-		m.Meta[key] = append(m.Meta[key], value...)
+		m.Meta[key] = append(m.Meta[key], m.Trans(value...)...)
 
 		for _, v := range m.Meta[meta] {
 			if v == key {
@@ -1055,7 +1085,7 @@ func (m *Message) Set(meta string, arg ...string) *Message { // {{{
 	}
 
 	if len(arg) > 0 {
-		m.Add(meta, arg[0], arg[1:]...)
+		m.Add(meta, arg[0], arg[1:])
 	}
 
 	return m
@@ -1148,7 +1178,7 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {
 
 		for _, k := range arg {
 			if v, ok := msg.Meta[k]; ok {
-				m.Set(meta, k).Add(meta, k, v...)
+				m.Set(meta, k).Add(meta, k, v)
 			}
 			if v, ok := msg.Data[k]; ok {
 				m.Put(meta, k, v)
@@ -1160,11 +1190,12 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {
 }
 
 // }}}
-func (m *Message) Table(cb func(map[string]string, []string, int) bool) *Message { // {{{
+func (m *Message) Table(cb func(maps map[string]string, list []string, line int) (goon bool)) *Message { // {{{
 	if len(m.Meta["append"]) == 0 {
 		return m
 	}
 
+	//计算列宽
 	width := make(map[string]int, len(m.Meta[m.Meta["append"][0]]))
 	for _, k := range m.Meta["append"] {
 		title := k
@@ -1182,6 +1213,7 @@ func (m *Message) Table(cb func(map[string]string, []string, int) bool) *Message
 		}
 	}
 
+	//输出字段名
 	row := map[string]string{}
 	wor := []string{}
 	for _, k := range m.Meta["append"] {
@@ -1202,6 +1234,7 @@ func (m *Message) Table(cb func(map[string]string, []string, int) bool) *Message
 		wor := []string{}
 		for _, k := range m.Meta["append"] {
 			data := m.Meta[k][i]
+			//解析extra字段
 			if m.Options("extras") && k == "extra" {
 				var extra interface{}
 				json.Unmarshal([]byte(data), &extra)
@@ -1569,7 +1602,6 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 
 	for _, c := range []*Context{m.target, m.target.master, m.target.Owner, m.source, m.source.master, m.source.Owner} {
 		for s := c; s != nil; s = s.context {
-
 			if x, ok := s.Commands[key]; ok && x.Hand != nil && c.Check(m, "commands", key) {
 				m.TryCatch(m, true, func(m *Message) {
 					m.Log("cmd", s, "%d %s %v %v", len(m.target.Historys), key, arg, m.Meta["option"])
@@ -1602,7 +1634,7 @@ func (m *Message) Exec(key string, arg ...string) string { // {{{
 							// 	continue
 							// }
 							//
-							m.Add("option", arg[i], arg[i+1:i+1+n]...)
+							m.Add("option", arg[i], arg[i+1:i+1+n])
 							i += n
 						}
 						arg = m.Meta["args"]
@@ -2414,7 +2446,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					for i, v := range msg.messages {
 						if !all {
 							switch v.target.Name {
-							case "log", "yac":
+							case "log", "yac", "lex":
 								continue
 							}
 						}
@@ -3373,6 +3405,6 @@ func Start(args ...string) {
 	Pulse.Options("terminal_color", true)
 	Pulse.Sesss("log", "log").Conf("bench.log", Pulse.Conf("bench.log"))
 
-	Pulse.Find("cli").Cmd("scan_file", "etc/init.shy")
-	Pulse.Find("cli").Cmd("scan_file", "stdio")
+	cli := Pulse.Find("cli").Cmd("scan_file", "stdio", "async")
+	<-cli.target.Exit
 }

@@ -96,7 +96,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 		msg.Option("referer", r.Header.Get("Referer"))
 
 		for k, v := range r.Form {
-			msg.Add("option", k, v...)
+			msg.Add("option", k, v)
 		}
 		for _, v := range r.Cookies() {
 			msg.Option(v.Name, v.Value)
@@ -537,7 +537,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						value := []string{}
 						json.Unmarshal([]byte(m.Option("value")), &value)
 						if len(value) > 0 {
-							msg.Add("detail", value[0], value[1:]...)
+							msg.Add("detail", value[0], value[1:])
 						}
 					}
 
@@ -569,7 +569,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						value := []string{}
 						json.Unmarshal([]byte(m.Option("value")), &value)
 						if len(value) > 0 {
-							msg.Add("detail", value[0], value[1:]...)
+							msg.Add("detail", value[0], value[1:])
 						}
 					}
 

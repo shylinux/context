@@ -51,6 +51,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	if len(arg) > 0 {
 		s.target = c
 	}
+	s.target = cli.target
 	return s
 }
 
@@ -280,6 +281,10 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			return nil
 		}, "parse", arg[1])
 		m.Cap("stream", yac.Target().Name)
+
+		if arg[1] == "stdio" {
+			m.Spawn().Cmd("scan_file", "etc/init.shy")
+		}
 		return false
 	}
 
@@ -844,7 +849,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, rusult: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) && !m.Caps("skip") { // {{{
-				m.Add("append", "return", arg[1:]...)
+				m.Add("append", "return", arg[1:])
 			} // }}}
 		}},
 		"if": &ctx.Command{Name: "if exp", Help: "条件语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -930,11 +935,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Echo("%s", strings.Join(arg, ""))
 		}},
 		"scan_file": &ctx.Command{
-			Name: "scan_file filename [cli_name [cli_help]]",
+			Name: "scan_file filename [async [cli_name [cli_help]]",
 			Help: "解析脚本, filename: 文件名, cli_name: 模块名, cli_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Start(m.Confx("cli_name", arg, 1), m.Confx("cli_help", arg, 2), key, arg[0])
-				<-m.Target().Exit
+				if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
+					m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
+					if len(arg) > 1 && arg[1] != "async" {
+						<-m.Target().Exit
+						sub := m.Target().Server.(*CLI)
+						cli.target = sub.target
+					}
+				}
 			}},
 	},
 	Index: map[string]*ctx.Context{
