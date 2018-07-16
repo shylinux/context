@@ -519,7 +519,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		}
 
 		line := ""
-		for nfs.prompt(); bio.Scan(); nfs.prompt() {
+		for nfs.prompt(); !m.Options("scan_end") && bio.Scan(); nfs.prompt() {
 			text := bio.Text()
 			m.Capi("nread", len(text))
 

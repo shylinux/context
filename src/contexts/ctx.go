@@ -227,9 +227,7 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 		delete(c.context.contexts, c.Name)
 		c.context = nil
 		if c.Exit != nil {
-			m.Log("info", nil, "before exit<-")
 			c.Exit <- true
-			m.Log("info", nil, "after exit<-")
 		}
 	}
 	return true
@@ -3405,6 +3403,9 @@ func Start(args ...string) {
 	Pulse.Options("terminal_color", true)
 	Pulse.Sesss("log", "log").Conf("bench.log", Pulse.Conf("bench.log"))
 
-	cli := Pulse.Find("cli").Cmd("scan_file", "stdio", "async")
+	Pulse.Sesss("nfs", "nfs")
+	Pulse.Sesss("yac", "yac")
+	Pulse.Sesss("lex", "lex")
+	cli := Pulse.Find("cli").Cmd("source", "stdio", "async")
 	<-cli.target.Exit
 }

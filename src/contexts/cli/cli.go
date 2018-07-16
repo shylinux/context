@@ -64,7 +64,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		"$": []string{"cache"},
 	}
 
-	if len(arg) > 0 && arg[0] == "scan_file" {
+	if len(arg) > 0 && arg[0] == "source" {
 		return cli
 	}
 
@@ -220,8 +220,8 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
-	if len(arg) > 0 && arg[0] == "scan_file" {
-		yac := m.Find("yac")
+	if len(arg) > 0 && arg[0] == "source" {
+		yac := m.Sesss("yac")
 		if yac.Cap("status") != "start" {
 			yac.Target().Start(yac)
 			yac.Cmd("train", "void", "void", "[\t ]+")
@@ -264,8 +264,9 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			yac.Cmd("train", "line", "line", "opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}")
 		}
 
+		m.Options("scan_end", false)
 		m.Option("target", m.Target().Name)
-		yac = m.Find("yac")
+		yac = m.Sesss("yac")
 		yac.Call(func(cmd *ctx.Message) *ctx.Message {
 			if cmd.Detail(0) == "scan_end" {
 				m.Target().Close(m.Spawn())
@@ -276,14 +277,14 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			m.Option("target", cli.target.Name)
 			if cmd.Has("return") {
 				m.Target().Close(m.Spawn())
-				cmd.Append("scan_file", false)
+				m.Options("scan_end", true)
 			}
 			return nil
 		}, "parse", arg[1])
 		m.Cap("stream", yac.Target().Name)
 
 		if arg[1] == "stdio" {
-			m.Spawn().Cmd("scan_file", "etc/init.shy")
+			m.Spawn().Cmd("source", "etc/init.shy")
 		}
 		return false
 	}
@@ -314,40 +315,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	m.Caps("exit", false)
 	cli.Context.Exit = make(chan bool)
 	cli.Context.Master(cli.Context)
-
-	if m.Has("stdio") || len(arg) > 0 {
-		go func() {
-			cli.Caches["init.shy"] = &ctx.Cache{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"}
-			if m.Conf("yac", "yac"); len(arg) > 0 {
-				m.Cap("init.shy", arg[0])
-			}
-
-			cli.nfs = m.Sesss("nfs", "nfs")
-			if m.Has("stdio") {
-				m.Spawn().Cmd("scan_file", m.Cap("stream", m.Cap("init.shy")))
-				cli.Context.Exit = make(chan bool)
-				m.Find("yac").Call(func(cmd *ctx.Message) *ctx.Message {
-					if cmd.Detail(0) == "scan_end" {
-						msg := m.Spawn()
-						cli.Exit <- true
-						m.Target().Close(msg)
-						return nil
-					}
-
-					cmd.Source(m.Target())
-					cmd.Target(m.Target())
-					cmd.Cmd()
-					return nil
-				}, "scan_file", m.Cap("stream", "stdio"))
-			} else {
-				if _, e := os.Stat(m.Cap("init.shy")); e == nil {
-					// m.Spawn().Cmd("scan_file", m.Cap("stream", m.Cap("init.shy")))
-					cli.nfs.Cmd("scan", m.Cap("stream", m.Cap("init.shy")))
-				}
-			}
-		}()
-		return false
-	}
 
 	m.Deal(func(msg *ctx.Message, arg ...string) bool {
 		return !m.Caps("skip") || Index.Has(msg.Get("detail"), "command")
@@ -827,7 +794,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Set("result", arg...)
 			} // }}}
 		}},
-		"source": &ctx.Command{Name: "source file", Help: "运行脚本, file: 脚本文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"source_old": &ctx.Command{Name: "source_old file", Help: "运行脚本, file: 脚本文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			cli, ok := m.Source().Server.(*CLI) // {{{
 			if !ok {
 				cli, ok = m.Target().Server.(*CLI)
@@ -934,17 +901,18 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"echo": &ctx.Command{Name: "echo arg...", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Echo("%s", strings.Join(arg, ""))
 		}},
-		"scan_file": &ctx.Command{
-			Name: "scan_file filename [async [cli_name [cli_help]]",
+		"source": &ctx.Command{
+			Name: "source filename [async [cli_name [cli_help]]",
 			Help: "解析脚本, filename: 文件名, cli_name: 模块名, cli_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
 					m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
-					if len(arg) > 1 && arg[1] != "async" {
-						<-m.Target().Exit
-						sub := m.Target().Server.(*CLI)
-						cli.target = sub.target
+					if len(arg) > 1 && arg[1] == "async" {
+						return
 					}
+					<-m.Target().Exit
+					sub := m.Target().Server.(*CLI)
+					cli.target = sub.target
 				}
 			}},
 	},

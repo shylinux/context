@@ -1,6 +1,7 @@
+source etc/demo.shy
+return
 ~file1
 	history load hi.cmd
-return
 scan_file etc/demo.shy
 echo "who"
 ~web

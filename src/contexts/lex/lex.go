@@ -315,6 +315,7 @@ func (lex *LEX) scan(m *ctx.Message, page int, line []byte) (hash int, rest []by
 // }}}
 
 func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
+	lex.Message = m
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -325,10 +326,7 @@ func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	if lex.Message = m; lex.Context == Index {
-		Pulse = m
-	}
-	lex.Context.Master(nil)
+	lex.Message = m
 
 	lex.Caches["ncell"] = &ctx.Cache{Name: "字符上限", Value: "128", Help: "字符集合的最大数量"}
 	lex.Caches["nlang"] = &ctx.Cache{Name: "词法上限", Value: "32", Help: "词法集合的最大数量"}
@@ -380,12 +378,12 @@ func (lex *LEX) Close(m *ctx.Message, arg ...string) bool { // {{{
 	case m.Target():
 	case m.Source():
 	}
+	return false
 	return true
 }
 
 // }}}
 
-var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},

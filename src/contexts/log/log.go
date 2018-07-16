@@ -217,7 +217,7 @@ func init() {
 	}
 	log.module = map[string]map[string]bool{
 		"log": {"cmd": true},
-		"lex": {"cmd": true, "debug": true},
+		"lex": {"cmd": false, "debug": true},
 		"yac": {"cmd": true, "debug": true},
 	}
 }
