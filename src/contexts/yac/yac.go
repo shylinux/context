@@ -313,8 +313,6 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		defer func() {
 			if e := recover(); e != nil {
-				m.Log("fuck", nil, "why %v", e)
-				// m.Target().Close(m.Spawn())
 				// m.Option("scan_end", true)
 				next <- true
 			}
@@ -351,7 +349,9 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) bool { // {{{
 func (yac *YAC) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch yac.Context {
 	case m.Target():
+		return true
 	case m.Source():
+		return false
 	}
 	return true
 }
@@ -373,8 +373,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			// }}}
 		}},
 		"help":  &ctx.Config{Name: "help", Value: "解析模块", Help: "模块帮助"},
-		"line":  &ctx.Config{Name: "line", Value: "line", Help: "默认语法"},
-		"void":  &ctx.Config{Name: "void", Value: "void", Help: "默认空白"},
 		"label": &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -453,8 +451,8 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			Help: "解析文件, filename: name:模块名, help:模块帮助, 文件名, line: 默认语法, void: 默认空白",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
-					m.Optioni("page", yac.page[m.Confx("line")])
-					m.Optioni("void", yac.page[m.Confx("void")])
+					m.Optioni("page", yac.page["line"])
+					m.Optioni("void", yac.page["void"])
 					m.Start(m.Confx("name", arg, 1), m.Confx("help", arg, 2), key, arg[0])
 				}
 				// }}}

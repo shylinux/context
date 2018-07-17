@@ -1354,6 +1354,22 @@ func (m *Message) Sort(key string, arg ...string) { // {{{
 				if table[i][key] < table[j][key] {
 					result = true
 				}
+			case "time":
+				ti, e := time.ParseInLocation(m.Conf("time_layout"), table[i][key], time.Local)
+				m.Assert(e)
+				tj, e := time.ParseInLocation(m.Conf("time_layout"), table[j][key], time.Local)
+				m.Assert(e)
+				if tj.Before(ti) {
+					result = true
+				}
+			case "time_r":
+				ti, e := time.ParseInLocation(m.Conf("time_layout"), table[i][key], time.Local)
+				m.Assert(e)
+				tj, e := time.ParseInLocation(m.Conf("time_layout"), table[j][key], time.Local)
+				m.Assert(e)
+				if ti.Before(tj) {
+					result = true
+				}
 			}
 
 			if result {
@@ -2360,6 +2376,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
 
 		"list_help": &Config{Name: "list_help", Value: "list command", Help: "返回值的索引"},
+
+		"time_layout": &Config{Name: "time_layout", Value: "2006-01-02 15:04:05", Help: "返回值的索引"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {

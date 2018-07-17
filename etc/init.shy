@@ -1,3 +1,4 @@
+config debug on
 source etc/demo.shy
 return
 ~file1

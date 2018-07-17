@@ -42,7 +42,7 @@ type NFS struct {
 	*ctx.Context
 }
 
-func dir(m *ctx.Message, name string, level int) {
+func dir(m *ctx.Message, name string, level int) { // {{{
 	back, e := os.Getwd()
 	m.Assert(e)
 	os.Chdir(name)
@@ -84,9 +84,12 @@ func dir(m *ctx.Message, name string, level int) {
 			}
 
 			filename := ""
-			if m.Confx("dir_name") == "name" {
+			switch m.Confx("dir_name") {
+			case "name":
+				filename = f.Name()
+			case "tree":
 				filename = strings.Repeat("  ", level) + f.Name()
-			} else {
+			default:
 				filename = path.Join(back, name, f.Name())
 			}
 
@@ -95,7 +98,6 @@ func dir(m *ctx.Message, name string, level int) {
 				m.Add("append", "filename", filename)
 				m.Add("append", "dir", f.IsDir())
 				m.Add("append", "size", f.Size())
-				m.Log("fuck", nil, "why %s %d", f.Name(), f.Size())
 				m.Add("append", "line", line)
 				m.Add("append", "time", f.ModTime().Format("2006-01-02 15:04:05"))
 			}
@@ -107,6 +109,7 @@ func dir(m *ctx.Message, name string, level int) {
 	}
 }
 
+// }}}
 func (nfs *NFS) insert(rest []rune, letters []rune) []rune { // {{{
 	n := len(rest)
 	l := len(letters)
@@ -455,25 +458,18 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 // }}}
 
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
-	if len(arg) > 0 && arg[0] == "scan" {
-		nfs.Message = m
+	nfs.Message = m
+	if len(arg) > 0 && (arg[0] == "scan" || arg[0] == "open") {
 		c.Caches = map[string]*ctx.Cache{
+			"pos":    &ctx.Cache{Name: "pos", Value: "0", Help: "pos"},
+			"size":   &ctx.Cache{Name: "size", Value: "0", Help: "size"},
 			"nread":  &ctx.Cache{Name: "nread", Value: "0", Help: "nread"},
 			"nwrite": &ctx.Cache{Name: "nwrite", Value: "0", Help: "nwrite"},
-		}
-		c.Configs = map[string]*ctx.Config{}
-	} else if len(arg) > 0 && arg[0] == "open" {
-		c.Caches = map[string]*ctx.Cache{
-			"pos":  &ctx.Cache{Name: "pos", Value: "0", Help: "pos"},
-			"size": &ctx.Cache{Name: "size", Value: "0", Help: "size"},
+			"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
 		}
 		c.Configs = map[string]*ctx.Config{}
 	} else {
 		c.Caches = map[string]*ctx.Cache{
-			"pos":    &ctx.Cache{Name: "读写位置", Value: "0", Help: "读写位置"},
-			"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
-			"return": &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
-
 			"nbytes": &ctx.Cache{Name: "消息发送字节", Value: "0", Help: "消息发送字节"},
 			"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
 			"nrecv":  &ctx.Cache{Name: "消息接收数量", Value: "0", Help: "消息接收数量"},
@@ -482,15 +478,6 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 			"sessid": &ctx.Cache{Name: "会话令牌", Value: "", Help: "会话令牌"},
 		}
 		c.Configs = map[string]*ctx.Config{}
-
-		if len(arg) > 1 {
-			if info, e := os.Stat(arg[1]); e == nil {
-				c.Caches["name"] = &ctx.Cache{Name: "name", Value: info.Name(), Help: "文件名"}
-				c.Caches["mode"] = &ctx.Cache{Name: "mode", Value: info.Mode().String(), Help: "文件权限"}
-				c.Caches["size"] = &ctx.Cache{Name: "size", Value: fmt.Sprintf("%d", info.Size()), Help: "文件大小"}
-				c.Caches["time"] = &ctx.Cache{Name: "time", Value: info.ModTime().Format("15:03:04"), Help: "创建时间"}
-			}
-		}
 	}
 
 	s := new(NFS)
@@ -507,10 +494,13 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
+	nfs.Message = m
 	if len(arg) > 0 && arg[0] == "scan" {
-		nfs.Message = m
 		nfs.in = m.Optionv("in").(*os.File)
 		bio := bufio.NewScanner(nfs)
+		s, e := nfs.in.Stat()
+		m.Assert(e)
+		m.Capi("size", int(s.Size()))
 
 		if m.Cap("stream", arg[1]) == "stdio" {
 			termbox.Init()
@@ -521,7 +511,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		line := ""
 		for nfs.prompt(); !m.Options("scan_end") && bio.Scan(); nfs.prompt() {
 			text := bio.Text()
-			m.Capi("nread", len(text))
+			m.Capi("nread", len(text)+1)
+			m.Capi("nline", 1)
 
 			if line += text; len(text) > 0 && text[len(text)-1] == '\\' {
 				line = line[:len(line)-1]
@@ -530,9 +521,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			nfs.history = append(nfs.history, line)
 
 			msg := m.Spawn(m.Source()).Set("detail", line)
-			if m.Back(msg); m.Options("scan_end") {
-				break
-			}
+			m.Back(msg)
 
 			for _, v := range msg.Meta["result"] {
 				m.Capi("nwrite", len(v))
@@ -540,15 +529,19 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 			line = ""
 		}
+		if !m.Options("scan_end") {
+			msg := m.Spawn(m.Source()).Set("detail", "return")
+			m.Back(msg)
+		}
 		return true
 	}
 
 	if len(arg) > 0 && arg[0] == "open" {
+		nfs.out = m.Optionv("out").(*os.File)
 		nfs.in = m.Optionv("in").(*os.File)
 		s, e := nfs.in.Stat()
 		m.Assert(e)
 		m.Capi("size", int(s.Size()))
-		nfs.out = m.Optionv("out").(*os.File)
 		m.Cap("stream", arg[1])
 		return false
 	}
@@ -724,28 +717,38 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"statuscolor":     &ctx.Config{Name: "statuspscolor", Value: "1", Help: "读取文件的默认大小值"},
 		"statusbackcolor": &ctx.Config{Name: "statusbackcolor", Value: "2", Help: "读取文件的默认大小值"},
 
-		"name": &ctx.Config{Name: "name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+		"nfs_name": &ctx.Config{Name: "nfs_name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				return arg[0]
 			}
 			return fmt.Sprintf("%s%d", x.Value, m.Capi("nfile", 1))
 			// }}}
 		}},
-		"help":       &ctx.Config{Name: "help", Value: "file", Help: "默认模块帮助"},
-		"buf_size":   &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的默认大小值"},
-		"qr_size":    &ctx.Config{Name: "qr_size", Value: "256", Help: "读取文件的默认大小值"},
-		"dir_name":   &ctx.Config{Name: "dir_name", Value: "name", Help: "读取文件的默认大小值"},
-		"dir_info":   &ctx.Config{Name: "dir_info", Value: "info", Help: "读取文件的默认大小值"},
-		"dir_type":   &ctx.Config{Name: "dir_type", Value: "type", Help: "读取文件的默认大小值"},
-		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "读取文件的默认大小值"},
-		"sort_type":  &ctx.Config{Name: "sort_type", Value: "int", Help: "读取文件的默认大小值"},
-		"git_status": &ctx.Config{Name: "git_status", Value: "-sb", Help: "读取文件的默认大小值"},
-		"git_path":   &ctx.Config{Name: "git_path", Value: ".", Help: "读取文件的默认大小值"},
+		"nfs_help": &ctx.Config{Name: "nfs_help", Value: "file", Help: "默认模块帮助"},
+
+		"buf_size": &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
+		"qr_size":  &ctx.Config{Name: "qr_size", Value: "256", Help: "生成二维码的图片的大小"},
+
+		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
+		"dir_info":   &ctx.Config{Name: "dir_info(info)", Value: "info", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
+		"dir_type":   &ctx.Config{Name: "dir_type(file/dir)", Value: "file", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
+		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
+		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
+
+		"git_status": &ctx.Config{Name: "git_status", Value: "-sb", Help: "版本控制状态参数"},
+		"git_diff":   &ctx.Config{Name: "git_diff", Value: "--stat", Help: "版本控制状态参数"},
+		// "git_log":    &ctx.Config{Name: "git_log", Value: "--pretty='%h %an %ad %s'  --date='format:%m/%d %H:%M'  --graph  --stat", Help: "版本控制状态参数"},
+		"git_log":      &ctx.Config{Name: "git_log", Value: "--pretty=%h %an(%ad) %s  --date=format:%m/%d %H:%M  --graph", Help: "版本控制状态参数"},
+		"git_log_form": &ctx.Config{Name: "git_log", Value: "stat", Help: "版本控制状态参数"},
+		"git_log_skip": &ctx.Config{Name: "git_log", Value: "0", Help: "版本控制状态参数"},
+		"git_log_line": &ctx.Config{Name: "git_log", Value: "3", Help: "版本控制状态参数"},
+		// "git_log":  &ctx.Config{Name: "git_log", Value: "--pretty=oneline --graph --stat", Help: "版本控制状态参数"},
+		"git_path": &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"scan": &ctx.Command{
-			Name: "scan filename [name [help]]",
-			Help: "扫描文件, filename: 文件名, name: 模块名, help: 模块帮助",
+			Name: "scan filename [nfs_name [nfs_help]]",
+			Help: "扫描文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
 					if arg[0] == "stdio" {
@@ -755,96 +758,100 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						m.Optionv("in", f)
 					}
 
-					m.Start(m.Confx("name", arg, 1), m.Confx("help", arg, 2), key, arg[0])
+					m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), key, arg[0])
 				} // }}}
 			}},
-		"history": &ctx.Command{Name: "history [save|load filename [lines [pos]]] [find|search string]", Help: "扫描文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
-				if len(arg) == 0 {
-					for i, v := range nfs.history {
-						m.Echo("%d: %s\n", i, v)
-					}
-					return
-				}
-				switch arg[0] {
-				case "load":
-					f, e := os.Open(arg[1])
-					m.Assert(e)
-					defer f.Close()
-
-					pos, lines := 0, -1
-					if len(arg) > 3 {
-						i, e := strconv.Atoi(arg[3])
-						m.Assert(e)
-						pos = i
-
-					}
-					if len(arg) > 2 {
-						i, e := strconv.Atoi(arg[2])
-						m.Assert(e)
-						lines = i
-					}
-
-					bio := bufio.NewScanner(f)
-					for i := 0; bio.Scan(); i++ {
-						if i < pos {
-							continue
-						}
-						if lines != -1 && (i-pos) >= lines {
-							break
-						}
-						nfs.history = append(nfs.history, bio.Text())
-					}
-				case "save":
-					f, e := os.Create(arg[1])
-					m.Assert(e)
-					defer f.Close()
-
-					pos, lines := 0, -1
-					if len(arg) > 3 {
-						i, e := strconv.Atoi(arg[3])
-						m.Assert(e)
-						pos = i
-
-					}
-					if len(arg) > 2 {
-						i, e := strconv.Atoi(arg[2])
-						m.Assert(e)
-						lines = i
-					}
-
-					for i, v := range nfs.history {
-						if i < pos {
-							continue
-						}
-						if lines != -1 && (i-pos) >= lines {
-							break
-						}
-						fmt.Fprintln(f, v)
-					}
-				case "find":
-					for i, v := range nfs.history {
-						if strings.HasPrefix(v, arg[1]) {
+		"history": &ctx.Command{
+			Name: "history [save|load filename [lines [pos]]] [find|search key]",
+			Help: "扫描记录, save: 保存记录, load: 加载记录, filename: 文件名, lines: 加载或保存记录数量, pos: 加载或保存的起始位置, find: 查找记录, search: 搜索记录, key: 查找或搜索的参数",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
+					if len(arg) == 0 {
+						for i, v := range nfs.history {
 							m.Echo("%d: %s\n", i, v)
 						}
+						return
 					}
-				case "search":
-				default:
-					if i, e := strconv.Atoi(arg[0]); e == nil && i < len(nfs.history) {
-						m.Echo(nfs.history[i])
+					switch arg[0] {
+					case "load":
+						f, e := os.Open(arg[1])
+						m.Assert(e)
+						defer f.Close()
+
+						pos, lines := 0, -1
+						if len(arg) > 3 {
+							i, e := strconv.Atoi(arg[3])
+							m.Assert(e)
+							pos = i
+
+						}
+						if len(arg) > 2 {
+							i, e := strconv.Atoi(arg[2])
+							m.Assert(e)
+							lines = i
+						}
+
+						bio := bufio.NewScanner(f)
+						for i := 0; bio.Scan(); i++ {
+							if i < pos {
+								continue
+							}
+							if lines != -1 && (i-pos) >= lines {
+								break
+							}
+							nfs.history = append(nfs.history, bio.Text())
+						}
+						m.Capi("nline", 0, len(nfs.history))
+					case "save":
+						f, e := os.Create(arg[1])
+						m.Assert(e)
+						defer f.Close()
+
+						pos, lines := 0, -1
+						if len(arg) > 3 {
+							i, e := strconv.Atoi(arg[3])
+							m.Assert(e)
+							pos = i
+
+						}
+						if len(arg) > 2 {
+							i, e := strconv.Atoi(arg[2])
+							m.Assert(e)
+							lines = i
+						}
+
+						for i, v := range nfs.history {
+							if i < pos {
+								continue
+							}
+							if lines != -1 && (i-pos) >= lines {
+								break
+							}
+							fmt.Fprintln(f, v)
+						}
+					case "find":
+						for i, v := range nfs.history {
+							if strings.HasPrefix(v, arg[1]) {
+								m.Echo("%d: %s\n", i, v)
+							}
+						}
+					case "search":
+					default:
+						if i, e := strconv.Atoi(arg[0]); e == nil && i < len(nfs.history) {
+							m.Echo(nfs.history[i])
+						}
 					}
-				}
-			} // }}}
-		}},
+				} // }}}
+			}},
 		"open": &ctx.Command{
-			Name: "open filename [name [help]]",
-			Help: "打开文件, filename: 文件名, name: 模块名, help: 模块帮助",
+			Name: "open filename [nfs_name [nfs_help]]",
+			Help: "打开文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if m.Has("io") { // {{{
 				} else if f, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE, os.ModePerm); m.Assert(e) {
 					m.Put("option", "in", f).Put("option", "out", f)
 				}
-				m.Start(m.Confx("name", arg, 1), m.Confx("help", arg, 2), "open", arg[0])
+				m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), "open", arg[0])
 				m.Echo(m.Target().Name)
 				// }}}
 			}},
@@ -861,6 +868,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				if n, e = nfs.in.ReadAt(buf, int64(m.Capi("pos"))); e != io.EOF {
 					m.Assert(e)
 				}
+				m.Capi("nread", n)
 				m.Echo(string(buf))
 
 				if m.Capi("pos", n); n == 0 {
@@ -880,7 +888,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Cap("pos", "0")
 				} else {
 					n, e := nfs.out.WriteAt([]byte(arg[0]), int64(m.Capi("pos")))
-					if m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
+					if m.Capi("nwrite", n); m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
 						m.Cap("size", m.Cap("pos"))
 					}
 					nfs.out.Sync()
@@ -889,7 +897,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Echo(m.Cap("pos"))
 			} // }}}
 		}},
-		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if f, e := os.Open(arg[0]); m.Assert(e) { // {{{
 				defer f.Close()
 
@@ -910,7 +918,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 			} // }}}
 		}},
-		"save": &ctx.Command{Name: "save file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"save": &ctx.Command{Name: "save file string...", Help: "保存文件, file: 保存的文件, string: 保存的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if f, e := os.Create(arg[0]); m.Assert(e) { // {{{
 				defer f.Close()
 
@@ -919,7 +927,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 			} // }}}
 		}},
-		"print": &ctx.Command{Name: "print file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"print": &ctx.Command{Name: "print file string...", Help: "输出文件, file: 输出的文件, string: 输出的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if f, e := os.OpenFile(arg[0], os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); m.Assert(e) { // {{{
 				defer f.Close()
 
@@ -929,12 +937,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				fmt.Fprint(f, "\n")
 			} // }}}
 		}},
-		"genqr": &ctx.Command{Name: "genqr [qr_size size] file string...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"genqr": &ctx.Command{Name: "genqr [qr_size size] filename string...", Help: "生成二维码图片, qr_size: 图片大小, filename: 文件名, string: 输出内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if size, e := strconv.Atoi(m.Confx("qr_size")); m.Assert(e) { // {{{
 				qrcode.WriteFile(strings.Join(arg[1:], ""), qrcode.Medium, size, arg[0])
 			} // }}}
 		}},
-		"json": &ctx.Command{Name: "json [key value]...", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"json": &ctx.Command{Name: "json [key value]...", Help: "生成格式化内容, key: 参数名, value: 参数值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			data := map[string]interface{}{} // {{{
 			for _, k := range m.Meta["option"] {
 				if v, ok := m.Data[k]; ok {
@@ -953,15 +961,15 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			m.Echo(string(buf))
 			// }}}
 		}},
-		"pwd": &ctx.Command{Name: "pwd", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"pwd": &ctx.Command{Name: "pwd", Help: "查看当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			wd, e := os.Getwd() // {{{
 			m.Assert(e)
 			m.Echo(wd) // }}}
 		}},
 		"dir": &ctx.Command{
-			Name: "dir dir [dir_info info] [dir_name name|path|full] [dir_type file|dir] [sort_field name] [sort_type type]",
-			Help: "查看目录, dir: 目录名, dir_info: 显示统计信息, dir_name: 文件名类型, dir_type: 文件类型, sort_field: 排序字段, sort_type: 排序类型",
-			Form: map[string]int{"dir_info": 1, "dir_name": 1, "dir_type": 1, "sort_field": 1, "sort_type": 1},
+			Name: "dir dir [dir_info info] [dir_name name|tree|path|full] [dir_type file|dir] [sort_field name] [sort_order type]",
+			Help: "查看目录, dir: 目录名, dir_info: 显示统计信息, dir_name: 文件名类型, dir_type: 文件类型, sort_field: 排序字段, sort_order: 排序类型",
+			Form: map[string]int{"dir_info": 1, "dir_name": 1, "dir_type": 1, "sort_field": 1, "sort_order": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				d := "." // {{{
 				if len(arg) > 0 {
@@ -981,7 +989,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Option("dirs", 0)
 				}
 				dir(m, d, 0)
-				m.Sort(m.Confx("sort_field"), m.Confx("sort_type"))
+				m.Sort(m.Confx("sort_field"), m.Confx("sort_order"))
 				m.Table(func(maps map[string]string, list []string, line int) bool {
 					for i, v := range list {
 						key := m.Meta["append"][i]
@@ -1007,13 +1015,24 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				// }}}
 			}},
 		"git": &ctx.Command{
-			Name: "git cmd",
-			Help: "写入文件, string: 写入内容, pos: 写入位置",
-			Form: map[string]int{"git_path": 1},
+			Name: "git branch|status|diff|log|info arg... [git_path path]...",
+			Help: "版本控制, branch: 分支管理, status: 查看状态, info: 查看分支与状态, git_path: 指定路径",
+			Form: map[string]int{"git_path": 1, "git_log": 1, "git_log_form": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				cmds := []string{arg[0]} // {{{
+				if len(arg) == 0 { // {{{
+					arg = []string{"info"}
+				}
+				cmds := []string{arg[0]}
+				switch arg[0] {
+				case "s":
+					arg[0] = "status"
+				case "b":
+					arg[0] = "branch"
+				case "d":
+					arg[0] = "diff"
+				}
 				if arg[0] == "info" {
-					cmds = []string{"branch", "status"}
+					cmds = []string{"branch", "status", "diff"}
 				}
 				wd, e := os.Getwd()
 				m.Assert(e)
@@ -1024,16 +1043,23 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					if !path.IsAbs(p) {
 						p = path.Join(wd, p)
 					}
+					m.Echo("path: %s\n", p)
 					for _, c := range cmds {
 						args := []string{}
 						switch c {
 						case "status":
 							args = append(args, m.Confx("git_status", arg, 1))
+						case "diff":
+							args = append(args, m.Confx("git_diff", arg, 1))
+						case "log":
+							args = append(args, strings.Split(m.Confx("git_log"), "  ")...)
+							args = append(args, fmt.Sprintf("--%s", m.Confx("git_log_form")))
+							args = append(args, m.Confx("git_log_skip", arg, 1, "--skip=%s"))
+							args = append(args, m.Confx("git_log_line", arg, 2, "-n %s"))
 						default:
 							args = append(args, arg[1:]...)
 						}
 
-						m.Log("fuck", nil, "cmd %p", m.Trans("-C", p, c, args))
 						cmd := exec.Command("git", m.Trans("-C", p, c, args)...)
 						if out, e := cmd.CombinedOutput(); e != nil {
 							m.Echo("error: ")
@@ -1044,24 +1070,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					}
 				} // }}}
 			}},
-
-		"copy": &ctx.Command{Name: "copy name [begin [end]]", Help: "复制文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && len(nfs.history) > 0 { // {{{
-				begin, end := 0, len(nfs.history)
-				if len(arg) > 1 {
-					i, e := strconv.Atoi(arg[1])
-					m.Assert(e)
-					begin = i
-				}
-				if len(arg) > 2 {
-					i, e := strconv.Atoi(arg[2])
-					m.Assert(e)
-					end = i
-				}
-				m.Put("option", "buf", nfs.history[begin:end])
-				m.Start(arg[0], "扫描文件", key)
-			} // }}}
-		}},
 
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
