@@ -191,14 +191,16 @@ func (yac *YAC) parse(m *ctx.Message, page int, void int, line string, level int
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
 		//解析空白
-		lex := m.Sesss("lex").Cmd("scan", line, yac.name(void))
+		lex := m.Sesss("lex")
+		lex.Cmd("scan", line, yac.name(void))
 		if lex.Result(0) == "-1" {
 			break
 		}
 
 		//解析单词
 		line = lex.Result(1)
-		lex = m.Sesss("lex").Cmd("scan", line, yac.name(s))
+		lex = m.Sesss("lex")
+		lex.Cmd("scan", line, yac.name(s))
 		if lex.Result(0) == "-1" {
 			break
 		}
@@ -216,7 +218,7 @@ func (yac *YAC) parse(m *ctx.Message, page int, void int, line string, level int
 		}
 
 		if state == nil { //嵌套语法递归解析
-			for i := 0; i < yac.Capi("ncell"); i++ {
+			for i := 0; i < m.Capi("ncell"); i++ {
 				if x := yac.mat[s][byte(i)]; i < m.Capi("nlang") && x != nil {
 					if l, w := yac.parse(m, i, void, line, level+1); len(w) > 0 {
 						line, word = l, append(word, w...)
@@ -298,7 +300,7 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 }
 
 // }}}
-func (yac *YAC) Start(m *ctx.Message, arg ...string) bool { // {{{
+func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
 	yac.Message = m
 
 	if len(arg) > 0 && arg[0] == "parse" {
@@ -311,6 +313,7 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) bool { // {{{
 		data := make(chan string, 1)
 		next := make(chan bool, 1)
 
+		close = true
 		defer func() {
 			if e := recover(); e != nil {
 				// m.Option("scan_end", true)
@@ -330,7 +333,9 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		//解析循环
 		for m.Cap("stream", nfs.Target().Name); !m.Options("scan_end"); next <- true {
-			_, word := yac.parse(m, m.Optioni("page"), m.Optioni("void"), <-data, 1)
+			line := <-data
+			_, word := yac.parse(m, m.Optioni("page"), m.Optioni("void"), line, 1)
+
 			if len(word) > 0 {
 				word = word[:len(word)-1]
 				if last := len(word) - 1; last >= 0 && len(word[last]) > 0 && word[last][len(word[last])-1] != '\n' {

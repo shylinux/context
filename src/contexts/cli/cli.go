@@ -268,16 +268,11 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Option("target", m.Target().Name)
 		yac = m.Sesss("yac")
 		yac.Call(func(cmd *ctx.Message) *ctx.Message {
-			if cmd.Detail(0) == "scan_end" {
-				m.Target().Close(m.Spawn())
-				return nil
-			}
-
 			cmd.Cmd()
 			m.Option("target", cli.target.Name)
 			if cmd.Has("return") {
-				m.Target().Close(m.Spawn())
 				m.Options("scan_end", true)
+				m.Target().Close(m.Spawn())
 			}
 			return nil
 		}, "parse", arg[1])
@@ -348,6 +343,7 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 				return false
 			}
 		}
+		return false
 	}
 	return true
 }

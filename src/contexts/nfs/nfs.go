@@ -125,36 +125,41 @@ func (nfs *NFS) insert(rest []rune, letters []rune) []rune { // {{{
 
 // }}}
 
-func (nfs *NFS) escape(key ...string) *NFS { // {{{
-	for _, k := range key {
-		fmt.Fprintf(nfs.out, "\033[%s", k)
-	}
+func (nfs *NFS) escape(form string, args ...interface{}) *NFS { // {{{
+	fmt.Fprintf(nfs.out, "\033[%s", fmt.Sprintf(form, args...))
 	return nfs
 }
 
 // }}}
 func (nfs *NFS) color(str string, attr ...int) *NFS { // {{{
-	fg := nfs.Confi("color")
+	if !nfs.Confs("color") {
+		fmt.Fprintf(nfs.out, "%s", str)
+		return nfs
+	}
+
+	fg := nfs.Confi("fgcolor")
 	if len(attr) > 0 {
 		fg = attr[0]
 	}
 
-	bg := nfs.Confi("backcolor")
+	bg := nfs.Confi("bgcolor")
 	if len(attr) > 1 {
 		bg = attr[1]
 	}
 
 	for i := 2; i < len(attr); i++ {
-		fmt.Fprintf(nfs.out, "\033[%dm", attr[i])
+		nfs.escape("%dm", attr[i])
 	}
 
-	fmt.Fprintf(nfs.out, "\033[4%dm\033[3%dm%s\033[0m", bg, fg, str)
+	nfs.escape("4%dm", bg).escape("3%dm", fg)
+	fmt.Fprintf(nfs.out, "%s", str)
+	nfs.escape("0m")
 	return nfs
 }
 
 // }}}
-func (nfs *NFS) prompt(arg ...string) { // {{{
-	nfs.escape("2K", "G", "?25h")
+func (nfs *NFS) prompt(arg ...string) string { // {{{
+	nfs.escape("2K").escape("G").escape("?25h")
 
 	line, rest := "", ""
 	if len(arg) > 0 {
@@ -164,46 +169,45 @@ func (nfs *NFS) prompt(arg ...string) { // {{{
 		rest = arg[1]
 	}
 
-	if nfs.color(fmt.Sprintf("[%s]%s> ", time.Now().Format("15:04:05"), nfs.Option("target")), nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
-		fmt.Fprintf(nfs.out, "\033[%dD", len(rest))
+	ps := fmt.Sprintf("[%s]%s> ", time.Now().Format("15:04:05"), nfs.Option("target"))
+	if nfs.color(ps, nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
+		nfs.escape("%dD", len(rest))
 	}
+	return ps
 }
 
 // }}}
 func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
-	switch {
-	case nfs.out != nil:
-		str := fmt.Sprintf(str, arg...)
-		nfs.color(str)
-
-		ls := strings.Split(str, "\n")
-		for i, l := range ls {
-			rest := ""
-
-			if len(nfs.pages) > 0 && !strings.HasSuffix(nfs.pages[len(nfs.pages)-1], "\n") {
-				rest = nfs.pages[len(nfs.pages)-1]
-				nfs.pages = nfs.pages[:len(nfs.pages)-1]
-			}
-
-			if i == len(ls)-1 {
-				nfs.pages = append(nfs.pages, rest+l)
-			} else {
-				nfs.pages = append(nfs.pages, rest+l+"\n")
-			}
+	str := fmt.Sprintf(str, arg...)
+	ls := strings.Split(str, "\n")
+	for i, l := range ls {
+		rest := ""
+		if len(nfs.pages) > 0 && !strings.HasSuffix(nfs.pages[len(nfs.pages)-1], "\n") {
+			rest = nfs.pages[len(nfs.pages)-1]
+			nfs.pages = nfs.pages[:len(nfs.pages)-1]
 		}
 
+		if rest += l; i < len(ls)-1 {
+			rest += "\n"
+		}
+		nfs.pages = append(nfs.pages, rest)
+	}
+
+	switch {
+	case nfs.out != nil:
+		nfs.color(str)
 	case nfs.io != nil:
-		str := fmt.Sprintf(str, arg...)
-		fmt.Fprintf(nfs.in, "%s", str)
+		fmt.Fprint(nfs.io, str)
 	default:
 		return false
 	}
+
 	return true
 }
 
 // }}}
 func (nfs *NFS) page(buf []string, pos int, top int, height int) int { // {{{
-	nfs.escape("2J", "H")
+	nfs.escape("2J").escape("H")
 	begin := pos
 
 	for i := 0; i < height; i++ {
@@ -234,6 +238,7 @@ func (nfs *NFS) View(buf []string, top int, height int) { // {{{
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
+			nfs.width, nfs.height = termbox.Size()
 			switch ev.Key {
 			case termbox.KeyCtrlC:
 				return
@@ -266,11 +271,9 @@ func (nfs *NFS) View(buf []string, top int, height int) { // {{{
 
 // }}}
 func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
-	if nfs.Cap("stream") != "stdio" {
+	if !nfs.Caps("termbox") {
 		return nfs.in.Read(p)
 	}
-
-	nfs.width, nfs.height = termbox.Size()
 
 	buf := make([]rune, 0, 1024)
 	rest := make([]rune, 0, 1024)
@@ -285,6 +288,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
+			nfs.width, nfs.height = termbox.Size()
 			switch ev.Key {
 			case termbox.KeyCtrlC:
 				termbox.Close()
@@ -295,7 +299,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				nfs.page(nfs.pages, len(nfs.pages)-nfs.height, 0, nfs.height)
 
 			case termbox.KeyCtrlL:
-				nfs.escape("2J", "H")
+				nfs.escape("2J").escape("H")
 
 			case termbox.KeyCtrlJ, termbox.KeyCtrlM:
 				buf = append(buf, rest...)
@@ -496,6 +500,13 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	nfs.Message = m
 	if len(arg) > 0 && arg[0] == "scan" {
+		nfs.Caches["termbox"] = &ctx.Cache{Name: "termbox", Value: "false", Help: "termbox"}
+
+		nfs.Configs["color"] = &ctx.Config{Name: "color", Value: "false", Help: "color"}
+		nfs.Configs["fgcolor"] = &ctx.Config{Name: "fgcolor", Value: "9", Help: "fgcolor"}
+		nfs.Configs["bgcolor"] = &ctx.Config{Name: "bgcolor", Value: "9", Help: "bgcolor"}
+		nfs.Configs["pscolor"] = &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"}
+
 		nfs.in = m.Optionv("in").(*os.File)
 		bio := bufio.NewScanner(nfs)
 		s, e := nfs.in.Stat()
@@ -505,6 +516,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		if m.Cap("stream", arg[1]) == "stdio" {
 			termbox.Init()
 			defer termbox.Close()
+			nfs.Cap("termbox", "true")
+			nfs.Conf("color", "true")
 			nfs.out = m.Optionv("out").(*os.File)
 		}
 
@@ -735,15 +748,13 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
 		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
 
-		"git_status": &ctx.Config{Name: "git_status", Value: "-sb", Help: "版本控制状态参数"},
-		"git_diff":   &ctx.Config{Name: "git_diff", Value: "--stat", Help: "版本控制状态参数"},
-		// "git_log":    &ctx.Config{Name: "git_log", Value: "--pretty='%h %an %ad %s'  --date='format:%m/%d %H:%M'  --graph  --stat", Help: "版本控制状态参数"},
+		"git_status":   &ctx.Config{Name: "git_status", Value: "-sb", Help: "版本控制状态参数"},
+		"git_diff":     &ctx.Config{Name: "git_diff", Value: "--stat", Help: "版本控制状态参数"},
 		"git_log":      &ctx.Config{Name: "git_log", Value: "--pretty=%h %an(%ad) %s  --date=format:%m/%d %H:%M  --graph", Help: "版本控制状态参数"},
 		"git_log_form": &ctx.Config{Name: "git_log", Value: "stat", Help: "版本控制状态参数"},
 		"git_log_skip": &ctx.Config{Name: "git_log", Value: "0", Help: "版本控制状态参数"},
 		"git_log_line": &ctx.Config{Name: "git_log", Value: "3", Help: "版本控制状态参数"},
-		// "git_log":  &ctx.Config{Name: "git_log", Value: "--pretty=oneline --graph --stat", Help: "版本控制状态参数"},
-		"git_path": &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
+		"git_path":     &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"scan": &ctx.Command{
