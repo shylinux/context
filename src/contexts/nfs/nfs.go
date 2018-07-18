@@ -23,20 +23,18 @@ import ( // {{{
 // }}}
 
 type NFS struct {
-	in      *os.File
-	out     *os.File
-	history []string
+	in            *os.File
+	out           *os.File
+	history       []string
+	pages         []string
+	width, height int
 
 	io io.ReadWriteCloser
 	*bufio.Reader
 	*bufio.Writer
 	send   map[int]*ctx.Message
 	target *ctx.Context
-
-	cli   *ctx.Message
-	pages []string
-
-	width, height int
+	cli    *ctx.Message
 
 	*ctx.Message
 	*ctx.Context
@@ -798,13 +796,15 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
 		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
 
+		"git_branch":   &ctx.Config{Name: "git_branch", Value: "--list", Help: "版本控制状态参数"},
 		"git_status":   &ctx.Config{Name: "git_status", Value: "-sb", Help: "版本控制状态参数"},
 		"git_diff":     &ctx.Config{Name: "git_diff", Value: "--stat", Help: "版本控制状态参数"},
 		"git_log":      &ctx.Config{Name: "git_log", Value: "--pretty=%h %an(%ad) %s  --date=format:%m/%d %H:%M  --graph", Help: "版本控制状态参数"},
 		"git_log_form": &ctx.Config{Name: "git_log", Value: "stat", Help: "版本控制状态参数"},
 		"git_log_skip": &ctx.Config{Name: "git_log", Value: "0", Help: "版本控制状态参数"},
-		"git_log_line": &ctx.Config{Name: "git_log", Value: "3", Help: "版本控制状态参数"},
+		"git_log_line": &ctx.Config{Name: "git_log", Value: "5", Help: "版本控制状态参数"},
 		"git_path":     &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
+		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff", Help: "命令集合"},
 	},
 	Commands: map[string]*ctx.Command{
 		"scan": &ctx.Command{
@@ -1078,7 +1078,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"git": &ctx.Command{
 			Name: "git branch|status|diff|log|info arg... [git_path path]...",
 			Help: "版本控制, branch: 分支管理, status: 查看状态, info: 查看分支与状态, git_path: 指定路径",
-			Form: map[string]int{"git_path": 1, "git_log": 1, "git_log_form": 1},
+			Form: map[string]int{"git_path": 1, "git_info": 1, "git_log": 1, "git_log_form": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if len(arg) == 0 { // {{{
 					arg = []string{"info"}
@@ -1093,7 +1093,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					arg[0] = "diff"
 				}
 				if arg[0] == "info" {
-					cmds = []string{"branch", "status", "diff"}
+					cmds = strings.Split(m.Confx("git_info"), " ")
 				}
 				wd, e := os.Getwd()
 				m.Assert(e)
@@ -1108,11 +1108,28 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					for _, c := range cmds {
 						args := []string{}
 						switch c {
-						case "status":
-							args = append(args, m.Confx("git_status", arg, 1))
-						case "diff":
-							args = append(args, m.Confx("git_diff", arg, 1))
+						case "branch", "status", "diff":
+							if c != "status" {
+								args = append(args, "--color")
+							}
+							args = append(args, strings.Split(m.Confx("git_"+c, arg, 1), "  ")...)
+							if len(arg) > 2 {
+								args = append(args, arg[2:]...)
+							}
+						case "difftool":
+							cmd := exec.Command("git", "difftool", "-y")
+							m.Log("info", nil, "cmd: %s %v", "git", "difftool", "-y")
+							cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+							if e := cmd.Start(); e != nil {
+								m.Echo("error: ")
+								m.Echo("%s\n", e)
+							} else if e := cmd.Wait(); e != nil {
+								m.Echo("error: ")
+								m.Echo("%s\n", e)
+							}
+							continue
 						case "log":
+							args = append(args, "--color")
 							args = append(args, strings.Split(m.Confx("git_log"), "  ")...)
 							args = append(args, fmt.Sprintf("--%s", m.Confx("git_log_form")))
 							args = append(args, m.Confx("git_log_skip", arg, 1, "--skip=%s"))
@@ -1121,12 +1138,15 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							args = append(args, arg[1:]...)
 						}
 
+						m.Log("info", nil, "cmd: %s %v", "git", m.Trans("-C", p, c, args))
 						cmd := exec.Command("git", m.Trans("-C", p, c, args)...)
 						if out, e := cmd.CombinedOutput(); e != nil {
 							m.Echo("error: ")
 							m.Echo("%s\n", e)
 						} else {
-							m.Echo(string(out))
+							if m.Echo(string(out)); len(out) > 0 {
+								m.Echo("\n")
+							}
 						}
 					}
 				} // }}}
