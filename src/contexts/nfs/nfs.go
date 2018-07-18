@@ -126,7 +126,9 @@ func (nfs *NFS) insert(rest []rune, letters []rune) []rune { // {{{
 // }}}
 
 func (nfs *NFS) escape(form string, args ...interface{}) *NFS { // {{{
-	fmt.Fprintf(nfs.out, "\033[%s", fmt.Sprintf(form, args...))
+	if !nfs.Caps("windows") {
+		fmt.Fprintf(nfs.out, "\033[%s", fmt.Sprintf(form, args...))
+	}
 	return nfs
 }
 
@@ -158,27 +160,8 @@ func (nfs *NFS) color(str string, attr ...int) *NFS { // {{{
 }
 
 // }}}
-func (nfs *NFS) prompt(arg ...string) string { // {{{
-	nfs.escape("2K").escape("G").escape("?25h")
-
-	line, rest := "", ""
-	if len(arg) > 0 {
-		line = arg[0]
-	}
-	if len(arg) > 1 {
-		rest = arg[1]
-	}
-
-	ps := fmt.Sprintf("[%s]%s> ", time.Now().Format("15:04:05"), nfs.Option("target"))
-	if nfs.color(ps, nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
-		nfs.escape("%dD", len(rest))
-	}
-	return ps
-}
-
-// }}}
 func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
-	str := fmt.Sprintf(str, arg...)
+	str = fmt.Sprintf(str, arg...)
 	ls := strings.Split(str, "\n")
 	for i, l := range ls {
 		rest := ""
@@ -191,6 +174,9 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 			rest += "\n"
 		}
 		nfs.pages = append(nfs.pages, rest)
+		if nfs.Capi("cursor_pos") < nfs.height {
+			nfs.Capi("cursor_pos", 1)
+		}
 	}
 
 	switch {
@@ -206,64 +192,128 @@ func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
 }
 
 // }}}
-func (nfs *NFS) page(buf []string, pos int, top int, height int) int { // {{{
-	nfs.escape("2J").escape("H")
-	begin := pos
-
-	for i := 0; i < height; i++ {
-		if pos < len(buf) && pos >= 0 {
-			if len(buf[pos]) > nfs.width {
-				nfs.color(fmt.Sprintf("%s", buf[pos][:nfs.width]))
-			} else {
-				nfs.color(fmt.Sprintf("%s", buf[pos]))
-			}
-			pos++
-		} else {
-			nfs.color("\n")
-		}
+func (nfs *NFS) prompt(arg ...string) string { // {{{
+	line, rest := "", ""
+	if len(arg) > 0 {
+		line = arg[0]
+	}
+	if len(arg) > 1 {
+		rest = arg[1]
 	}
 
-	nfs.escape("E").color(fmt.Sprintf("%d/%d", begin, len(nfs.pages)), nfs.Confi("statuscolor"), nfs.Confi("statusbackcolor"))
-	return pos
+	if !nfs.Caps("windows") && len(nfs.pages) > 0 {
+		for i := (len(nfs.pages[len(nfs.pages)-1]) - 1) / (nfs.width); i > 0; i-- {
+			nfs.escape("2K").escape("A")
+		}
+		nfs.escape("2K").escape("G").escape("?25h")
+	}
+
+	ps := fmt.Sprintf("[%s]%s> ", time.Now().Format("15:04:05"), nfs.Option("target"))
+	if len(nfs.pages) > 0 {
+		nfs.pages = nfs.pages[:len(nfs.pages)-1]
+	}
+	nfs.pages = append(nfs.pages, ps+line+rest+"\n")
+
+	if nfs.color(ps, nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
+		nfs.escape("%dD", len(rest))
+	}
+	return ps
+}
+
+// }}}
+
+func (nfs *NFS) zone(buf []string, top, height int) (row, col int) { // {{{
+	row, col = len(buf)-1, 0
+	for i := nfs.Capi("cursor_pos"); i > top-1; {
+		if i -= len(buf[row]) / nfs.width; len(buf[row])%nfs.width > 0 {
+			i--
+		}
+		if i < top-1 {
+			col -= (i - (top - 1)) * nfs.width
+		} else if i > (top-1) && row > 0 {
+			row--
+		}
+	}
+	return
+}
+
+// }}}
+func (nfs *NFS) page(buf []string, row, col, top, height int, status bool) { // {{{
+	nfs.escape("2J").escape("H")
+	begin := row
+
+	for i := 0; i < height-1; i++ {
+		if row >= len(buf) {
+			nfs.color("~\n")
+			continue
+		}
+
+		if len(buf[row])-col > nfs.width {
+			nfs.color(buf[row][col : col+nfs.width])
+			col += nfs.width
+			continue
+		}
+
+		nfs.color(buf[row][col:])
+		col = 0
+		row++
+	}
+
+	if status {
+		nfs.escape("E").color(fmt.Sprintf("pages: %d/%d", begin, len(nfs.pages)), nfs.Confi("statusfgcolor"), nfs.Confi("statusbgcolor"))
+	}
 }
 
 // }}}
 func (nfs *NFS) View(buf []string, top int, height int) { // {{{
-	pos := len(buf) - height
-	if pos < 0 {
-		pos = 0
-	}
 
-	nfs.page(buf, pos, top, height)
+	row, col := nfs.zone(buf, top, height)
+	nfs.page(buf, row, col, top, height, true)
+
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
-			nfs.width, nfs.height = termbox.Size()
 			switch ev.Key {
 			case termbox.KeyCtrlC:
 				return
 			default:
 				switch ev.Ch {
 				case 'f':
-					if pos+height < len(buf) {
-						pos += height - 1
+					for i := 0; i < height; i++ {
+						if len(buf[row][col:]) > nfs.width {
+							col += nfs.width
+						} else {
+							if col = 0; row < len(buf)-nfs.height {
+								row++
+							}
+						}
 					}
 				case 'b':
-					if pos -= height - 1; pos < 0 {
-						pos = 0
+					for i := 0; i < height; i++ {
+						if col -= nfs.width; col < 0 {
+							if col = 0; row > 0 {
+								row--
+							}
+						}
 					}
 				case 'j':
-					if pos+1 < len(buf) {
-						pos += 1
+					if len(buf[row][col:]) > nfs.width {
+						col += nfs.width
+					} else {
+						if col = 0; row < len(buf)-nfs.height {
+							row++
+						}
 					}
 				case 'k':
-					if pos -= 1; pos < 0 {
-						pos = 0
+					if col -= nfs.width; col < 0 {
+						if col = 0; row > 0 {
+							row--
+						}
 					}
 				case 'q':
 					return
 				}
-				nfs.page(buf, pos, top, height)
+				nfs.page(buf, row, col, top, height, true)
 			}
 		}
 	}
@@ -271,7 +321,7 @@ func (nfs *NFS) View(buf []string, top int, height int) { // {{{
 
 // }}}
 func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
-	if !nfs.Caps("termbox") {
+	if nfs.Caps("windows") || !nfs.Caps("termbox") {
 		return nfs.in.Read(p)
 	}
 
@@ -288,23 +338,24 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
-			nfs.width, nfs.height = termbox.Size()
 			switch ev.Key {
 			case termbox.KeyCtrlC:
 				termbox.Close()
 				os.Exit(1)
 
 			case termbox.KeyCtrlV:
-				nfs.View(nfs.pages, 0, nfs.height)
-				nfs.page(nfs.pages, len(nfs.pages)-nfs.height, 0, nfs.height)
+				nfs.View(nfs.pages, 1, nfs.height)
+				row, col := nfs.zone(nfs.pages, 1, nfs.height)
+				nfs.page(nfs.pages, row, col, 1, nfs.Capi("cursor_pos"), false)
 
 			case termbox.KeyCtrlL:
 				nfs.escape("2J").escape("H")
+				nfs.Cap("cursor_pos", "1")
 
 			case termbox.KeyCtrlJ, termbox.KeyCtrlM:
 				buf = append(buf, rest...)
 				buf = append(buf, '\n')
-				nfs.print("\n")
+				nfs.color("\n")
 
 				b := []byte(string(buf))
 				n = len(b)
@@ -442,7 +493,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				buf = append(buf, ' ')
 
 				if len(rest) == 0 {
-					nfs.print(" ")
+					nfs.color(" ")
 					continue
 				}
 
@@ -450,7 +501,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				tab = tab[:0]
 				buf = append(buf, ev.Ch)
 				if len(rest) == 0 {
-					nfs.print(string(ev.Ch))
+					nfs.color(string(ev.Ch))
 				}
 			}
 			nfs.prompt(string(buf), string(rest))
@@ -500,12 +551,16 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	nfs.Message = m
 	if len(arg) > 0 && arg[0] == "scan" {
+		nfs.Caches["windows"] = &ctx.Cache{Name: "windows", Value: "false", Help: "termbox"}
 		nfs.Caches["termbox"] = &ctx.Cache{Name: "termbox", Value: "false", Help: "termbox"}
+		nfs.Caches["cursor_pos"] = &ctx.Cache{Name: "cursor_pos", Value: "1", Help: "termbox"}
 
 		nfs.Configs["color"] = &ctx.Config{Name: "color", Value: "false", Help: "color"}
 		nfs.Configs["fgcolor"] = &ctx.Config{Name: "fgcolor", Value: "9", Help: "fgcolor"}
 		nfs.Configs["bgcolor"] = &ctx.Config{Name: "bgcolor", Value: "9", Help: "bgcolor"}
 		nfs.Configs["pscolor"] = &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"}
+		nfs.Configs["statusfgcolor"] = &ctx.Config{Name: "statusfgcolor", Value: "1", Help: "pscolor"}
+		nfs.Configs["statusbgcolor"] = &ctx.Config{Name: "statusbgcolor", Value: "2", Help: "pscolor"}
 
 		nfs.in = m.Optionv("in").(*os.File)
 		bio := bufio.NewScanner(nfs)
@@ -522,6 +577,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		}
 
 		line := ""
+		nfs.width, nfs.height = termbox.Size()
 		for nfs.prompt(); !m.Options("scan_end") && bio.Scan(); nfs.prompt() {
 			text := bio.Text()
 			m.Capi("nread", len(text)+1)
@@ -724,12 +780,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"nfile": &ctx.Cache{Name: "nfile", Value: "-1", Help: "已经打开的文件数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"color":           &ctx.Config{Name: "color", Value: "9", Help: "读取文件的默认大小值"},
-		"backcolor":       &ctx.Config{Name: "backcolor", Value: "9", Help: "读取文件的默认大小值"},
-		"pscolor":         &ctx.Config{Name: "pscolor", Value: "2", Help: "读取文件的默认大小值"},
-		"statuscolor":     &ctx.Config{Name: "statuspscolor", Value: "1", Help: "读取文件的默认大小值"},
-		"statusbackcolor": &ctx.Config{Name: "statusbackcolor", Value: "2", Help: "读取文件的默认大小值"},
-
 		"nfs_name": &ctx.Config{Name: "nfs_name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				return arg[0]

@@ -343,6 +343,7 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool { // {{{
 				return false
 			}
 		}
+		return true
 		return false
 	}
 	return true
