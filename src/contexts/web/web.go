@@ -161,6 +161,7 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 	s := new(WEB)
 	s.Context = c
+	s.cookie = web.cookie
 	return s
 }
 
@@ -306,7 +307,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				} // }}}
 			}},
 		"cookie": &ctx.Command{
-			Name: "cookie [name [value]]",
+			Name: "cookie [create]|[name [value]]",
 			Help: "读写请求的Cookie, name: 变量名, value: 变量值",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
@@ -316,6 +317,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							m.Echo("%s: %v\n", k, v.Value)
 						}
 					case 1:
+						if arg[0] == "create" {
+							web.cookie = make(map[string]*http.Cookie)
+							break
+						}
 						if v, ok := web.cookie[arg[0]]; ok {
 							m.Echo("%s", v.Value)
 						}

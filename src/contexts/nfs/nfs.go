@@ -791,7 +791,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"qr_size":  &ctx.Config{Name: "qr_size", Value: "256", Help: "生成二维码的图片的大小"},
 
 		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
-		"dir_info":   &ctx.Config{Name: "dir_info(info)", Value: "info", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
+		"dir_info":   &ctx.Config{Name: "dir_info(sizes/lines/files/dirs)", Value: "sizes lines files dirs", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir)", Value: "file", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
 		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
 		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
@@ -1043,12 +1043,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					trip = len(wd) + 1
 				}
 
-				if m.Confx("dir_info") == "info" {
-					m.Option("sizes", 0)
-					m.Option("lines", 0)
-					m.Option("files", 0)
-					m.Option("dirs", 0)
+				info := strings.Split(m.Confx("dir_info"), " ")
+				for _, v := range info {
+					m.Option(v, 0)
 				}
+
 				dir(m, d, 0)
 				m.Sort(m.Confx("sort_field"), m.Confx("sort_order"))
 				m.Table(func(maps map[string]string, list []string, line int) bool {
@@ -1067,11 +1066,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Echo("\n")
 					return true
 				})
-				if m.Confx("dir_info") == "info" {
-					m.Echo("sizes: %s\n", m.Option("sizes"))
-					m.Echo("lines: %s\n", m.Option("lines"))
-					m.Echo("files: %s\n", m.Option("files"))
-					m.Echo("dirs: %s\n", m.Option("dirs"))
+				for _, v := range info {
+					m.Echo("%s: %s\n", v, m.Option(v))
 				}
 				// }}}
 			}},
@@ -1128,6 +1124,65 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								m.Echo("%s\n", e)
 							}
 							continue
+						case "csv":
+							cmd := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d")
+							if out, e := cmd.CombinedOutput(); e != nil {
+								m.Echo("error: ")
+								m.Echo("%s\n", e)
+							} else {
+								f, e := os.Create(arg[1])
+								m.Assert(e)
+								defer f.Close()
+
+								type stat struct {
+									date string
+									adds int
+									dels int
+								}
+								stats := []*stat{}
+								list := strings.Split(string(out), "commit: ")
+								for _, v := range list {
+									l := strings.Split(v, "\n")
+									if len(l) > 2 {
+										fs := strings.Split(strings.Trim(l[2], " "), ", ")
+										stat := &stat{date: l[0]}
+										if len(fs) > 2 {
+											adds := strings.Split(fs[1], " ")
+											dels := strings.Split(fs[2], " ")
+											a, e := strconv.Atoi(adds[0])
+											m.Assert(e)
+											stat.adds = a
+											d, e := strconv.Atoi(dels[0])
+											m.Assert(e)
+											stat.dels = d
+										} else {
+											adds := strings.Split(fs[1], " ")
+											a, e := strconv.Atoi(adds[0])
+											m.Assert(e)
+											if adds[1] == "insertions(+)" {
+												stat.adds = a
+											} else {
+												stat.dels = a
+											}
+										}
+
+										stats = append(stats, stat)
+									}
+								}
+
+								fmt.Fprintf(f, "order,date,adds,dels,sum,top,bottom,last\n")
+								l := len(stats)
+								for i := 0; i < l/2; i++ {
+									stats[i], stats[l-i-1] = stats[l-i-1], stats[i]
+								}
+								sum := 0
+								for i, v := range stats {
+									fmt.Fprintf(f, "%d,%s,%d,%d,%d,%d,%d,%d\n", i, v.date, v.adds, v.dels, sum, sum+v.adds, sum-v.dels, sum+v.adds-v.dels)
+									sum += v.adds - v.dels
+								}
+							}
+							continue
+
 						case "log":
 							args = append(args, "--color")
 							args = append(args, strings.Split(m.Confx("git_log"), "  ")...)

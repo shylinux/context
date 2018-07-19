@@ -184,7 +184,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Option("target", m.Target().Name)
 		yac = m.Sesss("yac")
 		yac.Call(func(cmd *ctx.Message) *ctx.Message {
-			m.Log("fuck", nil, "skip: %s, level:%s %v", m.Cap("skip"), m.Cap("level"), cli.stack)
 			if m.Caps("skip") {
 				switch cmd.Detail(0) {
 				case "if":
@@ -609,7 +608,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				cli.stack = append(cli.stack, Frame{pos: m.Optioni("nline") - 1, key: key, run: arg[1]})
 				m.Capi("level", 1)
 				m.Caps("skip", !ctx.Right(arg[1]))
-				m.Log("fuck", nil, "if %v", cli.stack)
 			} // }}}
 		}},
 		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -636,7 +634,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				} else {
 					m.Caps("skip", false)
 				}
-				m.Log("fuck", nil, "if %v", cli.stack)
+			} // }}}
+		}},
+		"for": &ctx.Command{Name: "for exp", Help: "循环语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
+				cli.stack = append(cli.stack, Frame{pos: m.Optioni("nline") - 1, key: key, run: arg[1]})
+				m.Capi("level", 1)
+				m.Caps("skip", !ctx.Right(arg[1]))
 			} // }}}
 		}},
 
@@ -700,20 +704,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				m.Caps("else", m.Caps("skip", !ctx.Right(arg[1])))
-			} // }}}
-		}},
-		"for": &ctx.Command{Name: "for exp", Help: "循环语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
-				if m.Capi("loop") != -2 && m.Capi("loop") == m.Optioni("pos")-1 {
-					m.Caps("skip", !ctx.Right(arg[1]))
-					return
-				}
-
-				if m.Optioni("skip", 0); m.Caps("skip") || !ctx.Right(arg[1]) {
-					m.Optioni("skip", m.Capi("skip")+1)
-				}
-				m.Optioni("loop", m.Optioni("pos")-1)
-				m.Start(fmt.Sprintf("%s%d", key, m.Optioni("level", m.Capi("level")+1)), "循环语句")
 			} // }}}
 		}},
 		"function": &ctx.Command{Name: "function name", Help: "函数定义, name: 函数名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

@@ -1,23 +1,5 @@
-
-if 1 + 2
-	echo "hello"
-end
-
-if 1 + 2
-	echo "hello"
-else
-	echo "world"
-end
-
-if 0
-	echo "hello"
-end
-
-if 0
-	echo "hello"
-else
-	echo "word"
-end
+source etc/local.shy
+return
 
 return "hello" "world"
 source etc/demo.shy
@@ -27,7 +9,6 @@ scan_file etc/demo.shy
 echo "who"
 ~web
 	command add get "https://chat.shylinux.com"
-source etc/local.shy
 
 ~aaa
 	login root root
