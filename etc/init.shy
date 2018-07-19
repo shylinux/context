@@ -1,6 +1,26 @@
-config debug on
+
+if 1 + 2
+	echo "hello"
+end
+
+if 1 + 2
+	echo "hello"
+else
+	echo "world"
+end
+
+if 0
+	echo "hello"
+end
+
+if 0
+	echo "hello"
+else
+	echo "word"
+end
+
+return "hello" "world"
 source etc/demo.shy
-return
 ~file1
 	history load hi.cmd
 scan_file etc/demo.shy

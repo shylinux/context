@@ -178,7 +178,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 				msg.Cap("password", password)
 
-				m.Login(msg)
 				aaa.sessions[m.Cap("sessid")] = msg.Target()
 				m.Echo(msg.Cap("sessid"))
 

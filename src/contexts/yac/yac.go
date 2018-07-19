@@ -185,7 +185,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 }
 
 // }}}
-func (yac *YAC) parse(m *ctx.Message, page int, void int, line string, level int) (string, []string) { // {{{
+func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line string, level int) (string, []string) { // {{{
 	// m.Log("debug", nil, "%s\\%d %s(%d): %s", m.Conf("label")[0:level], level, yac.name(page), page, line)
 
 	hash, word := 0, []string{}
@@ -220,7 +220,7 @@ func (yac *YAC) parse(m *ctx.Message, page int, void int, line string, level int
 		if state == nil { //嵌套语法递归解析
 			for i := 0; i < m.Capi("ncell"); i++ {
 				if x := yac.mat[s][byte(i)]; i < m.Capi("nlang") && x != nil {
-					if l, w := yac.parse(m, i, void, line, level+1); len(w) > 0 {
+					if l, w := yac.parse(m, out, i, void, line, level+1); l != line {
 						line, word = l, append(word, w...)
 						state = x
 						break
@@ -242,7 +242,7 @@ func (yac *YAC) parse(m *ctx.Message, page int, void int, line string, level int
 	if hash == 0 {
 		word = word[:0]
 	} else { //执行命令
-		msg := m.Spawn(m.Source()).Add("detail", yac.hand[hash], word)
+		msg := out.Spawn(m.Source()).Add("detail", yac.hand[hash], word)
 		if m.Back(msg); msg.Hand { //命令替换
 			m.Assert(!msg.Has("return"))
 			word = msg.Meta["result"]
@@ -334,7 +334,10 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
 		//解析循环
 		for m.Cap("stream", nfs.Target().Name); !m.Options("scan_end"); next <- true {
 			line := <-data
-			_, word := yac.parse(m, m.Optioni("page"), m.Optioni("void"), line, 1)
+			if len(line) == 0 {
+				continue
+			}
+			_, word := yac.parse(m, out, m.Optioni("page"), m.Optioni("void"), line, 1)
 
 			if len(word) > 0 {
 				word = word[:len(word)-1]

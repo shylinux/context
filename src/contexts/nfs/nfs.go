@@ -579,7 +579,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		for nfs.prompt(); !m.Options("scan_end") && bio.Scan(); nfs.prompt() {
 			text := bio.Text()
 			m.Capi("nread", len(text)+1)
-			m.Capi("nline", 1)
 
 			if line += text; len(text) > 0 && text[len(text)-1] == '\\' {
 				line = line[:len(line)-1]
@@ -588,6 +587,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			nfs.history = append(nfs.history, line)
 
 			msg := m.Spawn(m.Source()).Set("detail", line)
+			msg.Option("nline", m.Capi("nline", 1))
 			m.Back(msg)
 
 			for _, v := range msg.Meta["result"] {
@@ -1138,8 +1138,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							args = append(args, arg[1:]...)
 						}
 
-						m.Log("info", nil, "cmd: %s %v", "git", m.Trans("-C", p, c, args))
-						cmd := exec.Command("git", m.Trans("-C", p, c, args)...)
+						m.Log("info", nil, "cmd: %s %v", "git", ctx.Trans("-C", p, c, args))
+						cmd := exec.Command("git", ctx.Trans("-C", p, c, args)...)
 						if out, e := cmd.CombinedOutput(); e != nil {
 							m.Echo("error: ")
 							m.Echo("%s\n", e)
