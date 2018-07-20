@@ -208,7 +208,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Cap("stream", yac.Target().Name)
 
 		if arg[1] == "stdio" {
-			msg := m.Spawn().Cmd("source", "etc/init.shy")
+			msg := m.Spawn().Cmd("source", m.Conf("init.shy"))
 			msg.Result(0, msg.Meta["return"])
 		}
 		return false

@@ -823,8 +823,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					if arg[0] == "stdio" {
 						m.Optionv("in", os.Stdin)
 						m.Optionv("out", os.Stdout)
-					} else if f, e := os.Open(arg[0]); m.Assert(e) {
-						m.Optionv("in", f)
+					} else {
+						p := arg[0]
+						if !path.IsAbs(arg[0]) {
+							p = path.Join(m.Conf("scan_path"), arg[0])
+						}
+						if f, e := os.Open(p); m.Assert(e) {
+							m.Optionv("in", f)
+						}
 					}
 
 					m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), key, arg[0])

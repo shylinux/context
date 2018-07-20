@@ -1,6 +1,6 @@
-source etc/demo.shy
-return
 source etc/local.shy
+~file1 history load etc/history.txt
+return
 
 return "hello" "world"
 source etc/demo.shy
