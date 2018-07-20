@@ -133,7 +133,7 @@ func (nfs *NFS) escape(form string, args ...interface{}) *NFS { // {{{
 // }}}
 func (nfs *NFS) color(str string, attr ...int) *NFS { // {{{
 	if !nfs.Confs("color") {
-		fmt.Fprintf(nfs.out, "%s", str)
+		fmt.Fprint(nfs.out, str)
 		return nfs
 	}
 
@@ -152,14 +152,13 @@ func (nfs *NFS) color(str string, attr ...int) *NFS { // {{{
 	}
 
 	nfs.escape("4%dm", bg).escape("3%dm", fg)
-	fmt.Fprintf(nfs.out, "%s", str)
+	fmt.Fprint(nfs.out, str)
 	nfs.escape("0m")
 	return nfs
 }
 
 // }}}
-func (nfs *NFS) print(str string, arg ...interface{}) bool { // {{{
-	str = fmt.Sprintf(str, arg...)
+func (nfs *NFS) print(str string) bool { // {{{
 	ls := strings.Split(str, "\n")
 	for i, l := range ls {
 		rest := ""
@@ -585,14 +584,23 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				continue
 			}
 			nfs.history = append(nfs.history, line)
+			m.Capi("nline", 1)
 
-			msg := m.Spawn(m.Source()).Set("detail", line)
-			msg.Option("nline", m.Capi("nline", 1))
-			m.Back(msg)
+			for i := len(nfs.history) - 1; i < len(nfs.history); i++ {
+				line = nfs.history[i]
 
-			for _, v := range msg.Meta["result"] {
-				m.Capi("nwrite", len(v))
-				nfs.print(v)
+				msg := m.Spawn(m.Source()).Set("detail", line)
+				msg.Option("file_pos", i)
+				m.Back(msg)
+
+				for _, v := range msg.Meta["result"] {
+					m.Capi("nwrite", len(v))
+					nfs.print(v)
+				}
+				if msg.Append("file_pos0") != "" {
+					i = msg.Appendi("file_pos0")
+					i--
+				}
 			}
 			line = ""
 		}

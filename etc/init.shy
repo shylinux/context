@@ -1,5 +1,6 @@
-source etc/local.shy
+source etc/demo.shy
 return
+source etc/local.shy
 
 return "hello" "world"
 source etc/demo.shy

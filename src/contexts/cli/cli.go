@@ -293,14 +293,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			Name: "source filename [async [cli_name [cli_help]]",
 			Help: "解析脚本, filename: 文件名, cli_name: 模块名, cli_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
+				if _, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 					m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
 					if len(arg) > 1 && arg[1] == "async" {
 						return
 					}
 					<-m.Target().Exit
-					sub := m.Target().Server.(*CLI)
-					cli.target = sub.target
+					m.Target(m.Source())
+					// sub := m.Target().Server.(*CLI)
+					// cli.target = sub.target
 				} // }}}
 			}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, rusult: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -605,7 +606,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"if": &ctx.Command{Name: "if exp", Help: "条件语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
-				cli.stack = append(cli.stack, Frame{pos: m.Optioni("nline") - 1, key: key, run: arg[1]})
+				cli.stack = append(cli.stack, Frame{pos: m.Optioni("file_pos"), key: key, run: arg[1]})
 				m.Capi("level", 1)
 				m.Caps("skip", !ctx.Right(arg[1]))
 			} // }}}
@@ -628,6 +629,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"end": &ctx.Command{Name: "end", Help: "结束语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
+				frame := cli.stack[len(cli.stack)-1]
+				if frame.key == "for" {
+					if ctx.Right(frame.run) {
+						m.Append("file_pos0", frame.pos)
+						return
+					}
+				}
+
 				if cli.stack = cli.stack[:len(cli.stack)-1]; m.Capi("level", -1) > 0 {
 					frame := cli.stack[len(cli.stack)-1]
 					m.Caps("skip", !ctx.Right(frame.run))
@@ -638,7 +647,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"for": &ctx.Command{Name: "for exp", Help: "循环语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
-				cli.stack = append(cli.stack, Frame{pos: m.Optioni("nline") - 1, key: key, run: arg[1]})
+				if len(cli.stack) > 0 {
+					// frame := cli.stack[len(cli.stack)-1]
+					// if frame.pos == m.Optioni("pos") {
+					// 	m.Caps("skip", !ctx.Right(arg[1]))
+					// 	return
+					// }
+				}
+				cli.stack = append(cli.stack, Frame{pos: m.Optioni("file_pos"), key: key, run: arg[1]})
 				m.Capi("level", 1)
 				m.Caps("skip", !ctx.Right(arg[1]))
 			} // }}}
