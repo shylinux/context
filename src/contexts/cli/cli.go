@@ -19,7 +19,7 @@ import ( // {{{
 type Frame struct {
 	pos int
 	key string
-	run string
+	run bool
 }
 
 type CLI struct {
@@ -27,7 +27,7 @@ type CLI struct {
 
 	alias  map[string][]string
 	target *ctx.Context
-	stack  []Frame
+	stack  []*Frame
 
 	*ctx.Context
 }
@@ -44,6 +44,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		s.target = c
 	}
 	s.target = cli.target
+	s.target = c
 	return s
 }
 
@@ -61,6 +62,37 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 		cli.Caches["target"] = &ctx.Cache{Name: "操作目标", Value: cli.Name, Help: "命令操作的目标"}
 		cli.Caches["level"] = &ctx.Cache{Name: "嵌套层级", Value: "0", Help: "嵌套层级"}
 		cli.Caches["skip"] = &ctx.Cache{Name: "跳过执行", Value: "false", Help: "命令只解析不执行"}
+		cli.Configs["ps_target"] = &ctx.Config{Name: "命令行提示符模块格式", Value: "name", Help: "命令行提示符时间格式"}
+		cli.Configs["ps_time"] = &ctx.Config{Name: "命令行提示符时间格式", Value: "[15:04:05]", Help: "命令行提示符时间格式"}
+		cli.Configs["prompt"] = &ctx.Config{Name: "命令行提示符(target/detail)", Value: "ps_time ps_target >", Help: "命令行提示符，target:显示当前模块，detail:显示详细信息", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				return arg[0]
+			}
+
+			ps := make([]string, 0, 3)
+			if cli, ok := m.Target().Server.(*CLI); ok && cli.target != nil {
+				for _, v := range strings.Split(x.Value, " ") {
+					switch v {
+					case "ps_time":
+						if m.Confs("ps_time") {
+							ps = append(ps, time.Now().Format(m.Conf("ps_time")))
+						}
+					case "ps_target":
+						switch m.Conf("ps_target") {
+						case "name":
+							ps = append(ps, m.Target().Name)
+						case "module":
+							ps = append(ps, m.Target().Name)
+						}
+					default:
+						ps = append(ps, v)
+					}
+				}
+			}
+			ps = append(ps, " ")
+			return strings.Join(ps, "")
+			// }}}
+		}}
 		return cli
 	}
 
@@ -181,7 +213,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		}
 
 		m.Options("scan_end", false)
-		m.Option("target", m.Target().Name)
+		m.Option("prompt", m.Conf("prompt"))
 		yac = m.Sesss("yac")
 		yac.Call(func(cmd *ctx.Message) *ctx.Message {
 			if m.Caps("skip") {
@@ -190,6 +222,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 					cmd.Set("detail", "if", "0")
 				case "else":
 				case "end":
+				case "for":
 				default:
 					cmd.Hand = true
 					return nil
@@ -197,7 +230,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 
 			cmd.Cmd()
-			m.Option("target", cli.target.Name)
+			m.Option("prompt", cmd.Conf("prompt"))
 			if cmd.Has("return") {
 				m.Options("scan_end", true)
 				m.Target().Close(m.Spawn())
@@ -308,7 +341,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Add("append", "return", arg[1:])
 		}},
 		"alias": &ctx.Command{
-			Name: "alias [short [long...]]|[delete short]",
+			Name: "alias [short [long...]]|[delete short]|[import module]",
 			Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
@@ -320,12 +353,28 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					case 1:
 						m.Echo("%s: %v\n", arg[0], cli.alias[arg[0]])
 					default:
-						if arg[0] == "delete" {
+						switch arg[0] {
+						case "delete":
 							m.Echo("delete: %s %v\n", arg[1], cli.alias[arg[1]])
 							delete(cli.alias, arg[1])
-						} else {
+						case "import":
+							msg := m.Find(arg[1], false)
+							if msg == nil {
+								msg = m.Find(arg[1], true)
+							}
+							if msg == nil {
+								m.Echo("%s not exist", arg[1])
+								return
+							}
+							m.Log("info", nil, "import %s", arg[1])
+							module := msg.Cap("module")
+							for k, _ := range msg.Target().Commands {
+								cli.alias[k] = []string{module + "." + k}
+							}
+						default:
 							cli.alias[arg[0]] = arg[1:]
 							m.Echo("%s: %v\n", arg[0], cli.alias[arg[0]])
+							m.Log("info", nil, "%s: %v", arg[0], cli.alias[arg[0]])
 						}
 					}
 				} // }}}
@@ -606,9 +655,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"if": &ctx.Command{Name: "if exp", Help: "条件语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
-				cli.stack = append(cli.stack, Frame{pos: m.Optioni("file_pos"), key: key, run: arg[1]})
+				run := !m.Caps("skip") && ctx.Right(arg[1])
+				cli.stack = append(cli.stack, &Frame{pos: m.Optioni("file_pos"), key: key, run: run})
 				m.Capi("level", 1)
-				m.Caps("skip", !ctx.Right(arg[1]))
+				m.Caps("skip", !run)
 			} // }}}
 		}},
 		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -620,7 +670,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						m.Caps("skip", true)
 					} else {
 						frame := cli.stack[len(cli.stack)-2]
-						if ctx.Right(frame.run) {
+						if frame.run {
 							m.Caps("skip", true)
 						}
 					}
@@ -631,7 +681,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 				frame := cli.stack[len(cli.stack)-1]
 				if frame.key == "for" {
-					if ctx.Right(frame.run) {
+					if frame.run {
 						m.Append("file_pos0", frame.pos)
 						return
 					}
@@ -639,7 +689,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				if cli.stack = cli.stack[:len(cli.stack)-1]; m.Capi("level", -1) > 0 {
 					frame := cli.stack[len(cli.stack)-1]
-					m.Caps("skip", !ctx.Right(frame.run))
+					m.Caps("skip", !frame.run)
 				} else {
 					m.Caps("skip", false)
 				}
@@ -647,16 +697,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"for": &ctx.Command{Name: "for exp", Help: "循环语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
+				run := !m.Caps("skip") && ctx.Right(arg[1])
 				if len(cli.stack) > 0 {
-					// frame := cli.stack[len(cli.stack)-1]
-					// if frame.pos == m.Optioni("pos") {
-					// 	m.Caps("skip", !ctx.Right(arg[1]))
-					// 	return
-					// }
+					frame := cli.stack[len(cli.stack)-1]
+					if frame.key == "for" && frame.pos == m.Optioni("file_pos") {
+						frame.run = !m.Caps("skip", !ctx.Right(arg[1]))
+						return
+					}
 				}
-				cli.stack = append(cli.stack, Frame{pos: m.Optioni("file_pos"), key: key, run: arg[1]})
+				cli.stack = append(cli.stack, &Frame{pos: m.Optioni("file_pos"), key: key, run: run})
 				m.Capi("level", 1)
-				m.Caps("skip", !ctx.Right(arg[1]))
+				m.Caps("skip", !run)
 			} // }}}
 		}},
 
@@ -671,10 +722,30 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					detail = append(detail, arg...)
 				}
 
-				msg := m.Spawn(cli.target).Cmd(detail)
-				if msg.Hand {
+				routes := strings.Split(detail[0], ".")
+				msg := m
+				if len(routes) > 1 {
+					target := cli.target
+					defer func() { cli.target = target }()
+
+					route := strings.Join(routes[:len(routes)-1], ".")
+					if msg = m.Find(route, false); msg == nil {
+						msg = m.Find(route, true)
+					}
+
+					if msg == nil {
+						m.Echo("%s not exist", route)
+						return
+					}
+					detail[0] = routes[len(routes)-1]
+				} else {
+					msg = m.Spawn(cli.target)
+
+				}
+
+				if msg.Cmd(detail); msg.Hand {
 					cli.target = msg.Target()
-					m.Cap("target", cli.target.Name)
+					m.Cap("target", msg.Cap("module"))
 				} else {
 					msg.Hand = true
 					msg.Log("system", nil, "%v", msg.Meta["detail"])
@@ -735,7 +806,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"target": &ctx.Command{Name: "taget", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				m.Put("append", "target", cli.target)
+				msg := m.Find(arg[0])
+				cli.target = msg.Target()
+				m.Cap("target", msg.Cap("module"))
 			}
 		}},
 		"seed": &ctx.Command{Name: "seed", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

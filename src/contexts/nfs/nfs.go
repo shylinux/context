@@ -16,7 +16,6 @@ import ( // {{{
 	"path"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -205,7 +204,7 @@ func (nfs *NFS) prompt(arg ...string) string { // {{{
 		nfs.escape("2K").escape("G").escape("?25h")
 	}
 
-	ps := fmt.Sprintf("[%s]%s> ", time.Now().Format("15:04:05"), nfs.Option("target"))
+	ps := nfs.Option("prompt")
 	if len(nfs.pages) > 0 {
 		nfs.pages = nfs.pages[:len(nfs.pages)-1]
 	}
