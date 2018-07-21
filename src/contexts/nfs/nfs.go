@@ -540,6 +540,7 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 // }}}
 func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	nfs.Message = m
+	nfs.width, nfs.height = 1, 1
 	return nfs
 }
 
@@ -567,13 +568,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		if m.Cap("stream", arg[1]) == "stdio" {
 			termbox.Init()
 			defer termbox.Close()
+			nfs.width, nfs.height = termbox.Size()
 			nfs.Cap("termbox", "true")
 			nfs.Conf("color", "true")
 			nfs.out = m.Optionv("out").(*os.File)
 		}
 
 		line := ""
-		nfs.width, nfs.height = termbox.Size()
 		for nfs.prompt(); !m.Options("scan_end") && bio.Scan(); nfs.prompt() {
 			text := bio.Text()
 			m.Capi("nread", len(text)+1)

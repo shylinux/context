@@ -1,7 +1,25 @@
 ~shell1
 	alias import nfs
-return
 source etc/local.shy
+return
+
+var msg <- $(demo)
+for index $msg append temp
+	for index $msg $temp h
+		echo $temp $h
+	end
+end
+
+for index $msg hi temp
+	echo $temp
+end
+
+var b = 1
+for b += 1; $b < 3
+	echo $msg
+end
+
+return
 
 return "hello" "world"
 source etc/demo.shy

@@ -329,13 +329,13 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	lex.Message = m
 
 	lex.Caches["ncell"] = &ctx.Cache{Name: "字符上限", Value: "128", Help: "字符集合的最大数量"}
-	lex.Caches["nlang"] = &ctx.Cache{Name: "词法上限", Value: "32", Help: "词法集合的最大数量"}
+	lex.Caches["nlang"] = &ctx.Cache{Name: "词法上限", Value: "64", Help: "词法集合的最大数量"}
 
 	lex.Caches["nseed"] = &ctx.Cache{Name: "种子数量", Value: "0", Help: "词法模板的数量"}
 	lex.Caches["npage"] = &ctx.Cache{Name: "集合数量", Value: "0", Help: "词法集合的数量"}
 	lex.Caches["nhash"] = &ctx.Cache{Name: "类型数量", Value: "0", Help: "单词类型的数量"}
 
-	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "32", Help: "状态机状态的数量"}
+	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "64", Help: "状态机状态的数量"}
 	lex.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "状态机连接的逻辑数量"}
 	lex.Caches["nreal"] = &ctx.Cache{Name: "实点数量", Value: "0", Help: "状态机连接的存储数量"}
 

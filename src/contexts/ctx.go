@@ -521,6 +521,18 @@ func (m *Message) Spawn(arg ...interface{}) *Message { // {{{
 }
 
 // }}}
+func (m *Message) Tree(code int) *Message { // {{{
+	ms := []*Message{m}
+	for i := 0; i < len(ms); i++ {
+		ms = append(ms, ms[i].messages...)
+		if ms[i].Code() == code {
+			return ms[i]
+		}
+	}
+	return nil
+}
+
+// }}}
 
 func (m *Message) BackTrace(hand func(m *Message) bool) { // {{{
 	target := m.target
@@ -1486,7 +1498,7 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 		return m.Conf(key, arg[1])
 	}
 
-	m.Log("error", nil, "%s 配置项不存在", key)
+	// m.Log("error", nil, "%s 配置项不存在", key)
 	return ""
 }
 
@@ -1608,7 +1620,7 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 		return m.Cap(key, arg[1])
 	}
 
-	m.Log("error", nil, "%s 缓存项不存在", key)
+	// m.Log("error", nil, "%s 缓存项不存在", key)
 	return ""
 }
 
