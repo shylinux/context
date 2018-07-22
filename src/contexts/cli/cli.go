@@ -313,6 +313,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					if i, e := strconv.Atoi(arg[0]); e == nil {
 						t = time.Unix(int64(i/m.Confi("time_unit")), 0)
 						arg = arg[1:]
+						m.Option("time_format", m.Conf("time_format"))
 					}
 				}
 
@@ -664,11 +665,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					detail = append(detail, arg...)
 				}
 
+				if detail[0] != "context" {
+					target := cli.target
+					defer func() {
+						cli.target = target
+						m.Cap("ps_target", cli.target.Name)
+					}()
+				}
+
 				routes := strings.Split(detail[0], ".")
 				msg := m
 				if len(routes) > 1 {
-					target := cli.target
-					defer func() { cli.target = target }()
 
 					route := strings.Join(routes[:len(routes)-1], ".")
 					if msg = m.Find(route, false); msg == nil {

@@ -1943,8 +1943,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"nmessage": &Cache{Name: "消息数量", Value: "0", Help: "显示模块启动时所创建消息的数量"},
 	},
 	Configs: map[string]*Config{
-		"scan_path": &Config{Name: "调试模式(true/false)", Value: "", Help: "是否打印错误信息，off:不打印，on:打印)"},
-
 		"debug":     &Config{Name: "调试模式(true/false)", Value: "true", Help: "是否打印错误信息，off:不打印，on:打印)"},
 		"default":   &Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
 		"start":     &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
@@ -3006,10 +3004,6 @@ func init() {
 }
 
 func Start(args ...string) {
-	if len(args) > 0 {
-		Pulse.Conf("scan_path", args[0])
-		args = args[1:]
-	}
 	if len(args) > 0 {
 		Pulse.Conf("init.shy", args[0])
 		args = args[1:]

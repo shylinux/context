@@ -1,6 +1,7 @@
 package mdb // {{{
 // }}}
 import ( // {{{
+	"bufio"
 	"contexts"
 	"database/sql"
 	"encoding/json"
@@ -395,10 +396,32 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 				// }}}
 			}},
-		"demo": &ctx.Command{Name: "get field offset table where [parse func field]", Help: "执行查询语句",
-			Form: map[string]int{"parse": 1},
+		"csv": &ctx.Command{Name: "csv scv_file sql_file sql", Help: "执行查询语句",
+			Form: map[string]int{"csv_col_sep": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Echo("%v", m.Meta)
+				f, e := os.Open(arg[0])
+				m.Assert(e)
+
+				s, e := os.Create(arg[1])
+				m.Assert(e)
+
+				head := false
+				bio := bufio.NewScanner(f)
+				for bio.Scan() {
+					line := bio.Text()
+					if !head {
+						head = true
+						continue
+					}
+
+					args := []interface{}{}
+					for _, v := range strings.Split(line, m.Confx("csv_col_sep")) {
+						args = append(args, v)
+					}
+
+					s.WriteString(fmt.Sprintf(arg[2], args...))
+					s.WriteString(";\n")
+				}
 			}},
 	},
 	Index: map[string]*ctx.Context{

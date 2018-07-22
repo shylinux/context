@@ -3,6 +3,7 @@ package nfs // {{{
 import ( // {{{
 	"contexts"
 	"encoding/json"
+	"errors"
 	"github.com/nsf/termbox-go"
 	"github.com/skip2/go-qrcode"
 
@@ -21,12 +22,16 @@ import ( // {{{
 
 // }}}
 
+var FileNotExist = errors.New("file not exist")
+
 type NFS struct {
 	in            *os.File
 	out           *os.File
 	history       []string
 	pages         []string
 	width, height int
+
+	paths []string
 
 	io io.ReadWriteCloser
 	*bufio.Reader
@@ -39,6 +44,22 @@ type NFS struct {
 	*ctx.Context
 }
 
+func (nfs *NFS) open(name string) (*os.File, error) { // {{{
+	if path.IsAbs(name) {
+		nfs.Log("info", nil, "open %s", name)
+		return os.Open(name)
+	}
+	for i := len(nfs.paths) - 1; i >= 0; i-- {
+		if f, e := os.Open(path.Join(nfs.paths[i], name)); e == nil {
+			nfs.Log("info", nil, "open %s", path.Join(nfs.paths[i], name))
+			return f, e
+		}
+	}
+	nfs.Log("info", nil, "open %s", name)
+	return os.Open(name)
+}
+
+// }}}
 func dir(m *ctx.Message, name string, level int) { // {{{
 	back, e := os.Getwd()
 	m.Assert(e)
@@ -815,20 +836,49 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff", Help: "命令集合"},
 	},
 	Commands: map[string]*ctx.Command{
+		"paths": &ctx.Command{
+			Name: "paths [add path]|[del index]|[set index path]|[index]",
+			Help: "设置文件搜索路径, add: 添加目录, del: 删除目录, set: 修改目录，index: 目录序号, path: 目录名",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
+					if len(arg) == 0 {
+						for i, v := range nfs.paths {
+							m.Echo("%d: %s\n", i, v)
+						}
+						return
+					}
+					switch arg[0] {
+					case "add":
+						nfs.paths = append(nfs.paths, arg[1])
+					case "del":
+						if i, e := strconv.Atoi(arg[1]); e == nil && i < len(nfs.paths) {
+							for ; i < len(nfs.paths)-1; i++ {
+								nfs.paths[i] = nfs.paths[i+1]
+							}
+							nfs.paths = nfs.paths[:len(nfs.paths)-1]
+						}
+					case "set":
+						if i, e := strconv.Atoi(arg[1]); e == nil && i < len(nfs.paths) {
+							nfs.paths[i] = arg[2]
+							m.Echo("%d: %s\n", i, nfs.paths[i])
+						}
+					default:
+						if i, e := strconv.Atoi(arg[0]); e == nil && i < len(nfs.paths) {
+							m.Echo("%d: %s\n", i, nfs.paths[i])
+						}
+					}
+				} // }}}
+			}},
 		"scan": &ctx.Command{
 			Name: "scan filename [nfs_name [nfs_help]]",
 			Help: "扫描文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
+				if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
 					if arg[0] == "stdio" {
 						m.Optionv("in", os.Stdin)
 						m.Optionv("out", os.Stdout)
 					} else {
-						p := arg[0]
-						if !path.IsAbs(arg[0]) {
-							p = path.Join(m.Conf("scan_path"), arg[0])
-						}
-						if f, e := os.Open(p); m.Assert(e) {
+						if f, e := nfs.open(arg[0]); m.Assert(e) {
 							m.Optionv("in", f)
 						}
 					}
@@ -849,7 +899,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					}
 					switch arg[0] {
 					case "load":
-						f, e := os.Open(arg[1])
+						f, e := nfs.open(arg[1])
 						m.Assert(e)
 						defer f.Close()
 
