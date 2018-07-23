@@ -140,6 +140,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	}
 
 	m.Options("scan_end", false)
+	m.Optionv("ps_target", cli.target)
 	m.Option("prompt", m.Conf("prompt"))
 	m.Cap("stream", m.Spawn(yac.Target()).Call(func(cmd *ctx.Message) *ctx.Message {
 		if !m.Caps("parse") {
@@ -160,6 +161,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			m.Options("scan_end", true)
 			m.Target().Close(m.Spawn())
 		}
+		m.Optionv("ps_target", cli.target)
 		return nil
 	}, "parse", arg[1]).Target().Name)
 
@@ -235,6 +237,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"target": &ctx.Command{Name: "target module", Help: "设置当前模块, module: 模块全名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
+				if len(arg) == 0 {
+					m.Echo("%s", m.Cap("ps_target"))
+					return
+				}
 				if msg := m.Find(arg[0]); msg != nil {
 					cli.target = msg.Target()
 					m.Cap("ps_target", cli.target.Name)
@@ -725,10 +731,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Copy(msg, "result").Copy(msg, "append")
 			}
 			// }}}
-		}},
-		"demo": &ctx.Command{Name: "demo word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Append("hi", "hello", "world")
-			m.Echo("nice")
 		}},
 	},
 }

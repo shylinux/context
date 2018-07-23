@@ -225,50 +225,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) int { // {{{
 }
 
 // }}}
-func (lex *LEX) parse(page int, line []byte) (hash int, rest []byte, word []byte) { // {{{
-
-	pos := 0
-	for star, s := 0, page; s != 0 && pos < len(line); pos++ {
-
-		c := line[pos]
-		if c == '\\' && pos < len(line)-1 { //跳过转义
-			pos++
-			c = lex.charset(line[pos])[0]
-		}
-		if c > 127 { //跳过中文
-			word = append(word, c)
-			continue
-		}
-
-		state := lex.mat[s][c]
-		lex.Log("debug", nil, "(%d,%d): %v", s, c, state)
-		if state == nil {
-			s, star, pos = star, 0, pos-1
-			continue
-		}
-
-		word = append(word, c)
-
-		if state.star {
-			star = s
-		} else if x, ok := lex.mat[star][c]; !ok || !x.star {
-			star = 0
-		}
-
-		if s, hash = state.next, state.hash; s == 0 {
-			s, star = star, 0
-		}
-	}
-
-	if hash == 0 {
-		pos, word = 0, word[:0]
-	}
-	rest = line[pos:]
-	return
-}
-
-// }}}
-func (lex *LEX) scan(m *ctx.Message, page int, line []byte) (hash int, rest []byte, word []byte) { // {{{
+func (lex *LEX) parse(m *ctx.Message, page int, line []byte) (hash int, rest []byte, word []byte) { // {{{
 
 	pos := 0
 	for star, s := 0, page; s != 0 && pos < len(line); pos++ {
@@ -378,7 +335,6 @@ func (lex *LEX) Close(m *ctx.Message, arg ...string) bool { // {{{
 	case m.Target():
 	case m.Source():
 	}
-	return false
 	return true
 }
 
@@ -415,19 +371,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 					page = lex.index("npage", arg[1])
 				}
 
-				hash, rest, word := lex.parse(page, []byte(arg[0]))
-				m.Result(0, hash, string(rest), string(word))
-				lex.Log("debug", nil, "\033[31m[%v]\033[0m %d [%v]", string(word), hash, string(rest))
-			} // }}}
-		}},
-		"scan": &ctx.Command{Name: "scan line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) { // {{{
-				page := 1
-				if len(arg) > 1 {
-					page = lex.index("npage", arg[1])
-				}
-
-				hash, rest, word := lex.scan(m, page, []byte(arg[0]))
+				hash, rest, word := lex.parse(m, page, []byte(arg[0]))
 				m.Result(0, hash, string(rest), string(word))
 			} // }}}
 		}},
@@ -449,9 +393,9 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 				}
 
 				rest := []byte(arg[0])
-				_, _, rest = lex.parse(help, []byte(rest))
-				_, _, rest = lex.parse(void, []byte(rest))
-				hash, word, rest := lex.parse(page, []byte(rest))
+				_, _, rest = lex.parse(m, help, []byte(rest))
+				_, _, rest = lex.parse(m, void, []byte(rest))
+				hash, word, rest := lex.parse(m, page, []byte(rest))
 				m.Add("result", fmt.Sprintf("%d", hash), string(word), string(rest))
 			} // }}}
 		}},
@@ -501,11 +445,6 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 				m.Log("fuck", nil, "node: %d real: %d", nnode, nreal)
 			} // }}}
 		}},
-	},
-	Index: map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void", Help: "void",
-			Commands: map[string]*ctx.Command{"parse": &ctx.Command{}},
-		},
 	},
 }
 

@@ -3,11 +3,11 @@ package nfs // {{{
 import ( // {{{
 	"contexts"
 	"encoding/json"
-	"errors"
 	"github.com/nsf/termbox-go"
 	"github.com/skip2/go-qrcode"
 
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,11 +25,12 @@ import ( // {{{
 var FileNotExist = errors.New("file not exist")
 
 type NFS struct {
-	in            *os.File
-	out           *os.File
-	history       []string
-	pages         []string
-	width, height int
+	in      *os.File
+	out     *os.File
+	history []string
+	pages   []string
+	width   int
+	height  int
 
 	paths []string
 
@@ -470,8 +471,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 
 			case termbox.KeyCtrlK:
 				if len(rest) > 0 {
-					back = back[:0]
-					back = append(back, rest...)
+					back = append([]rune{}, rest...)
 				}
 				rest = rest[:0]
 
@@ -487,16 +487,17 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				if len(tab) == 0 {
 					tabi = 0
 					prefix := string(buf)
-					msg := nfs.Message.Spawn(nfs.cli.Target())
-					target := msg.Cmd("target").Data["target"].(*ctx.Context)
-					msg.Spawn(target).BackTrace(func(msg *ctx.Message) bool {
-						for k, _ := range msg.Target().Commands {
+					target := nfs.Message.Target()
+					nfs.Message.Target(nfs.Optionv("ps_target").(*ctx.Context))
+					nfs.Message.BackTrace(func(m *ctx.Message) bool {
+						for k, _ := range m.Target().Commands {
 							if strings.HasPrefix(k, prefix) {
 								tab = append(tab, k[len(prefix):])
 							}
 						}
 						return true
 					})
+					nfs.Message.Target(target)
 				}
 
 				if tabi >= 0 && tabi < len(tab) {
@@ -619,8 +620,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 					nfs.print(v)
 				}
 				if msg.Append("file_pos0") != "" {
-					i = msg.Appendi("file_pos0")
-					i--
+					i = msg.Appendi("file_pos0") - 1
 				}
 			}
 			line = ""
@@ -1400,18 +1400,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				nfs.Writer.Flush()
 			} // }}}
 		}},
-	},
-	Index: map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void",
-			Commands: map[string]*ctx.Command{
-				"scan":  &ctx.Command{},
-				"open":  &ctx.Command{},
-				"save":  &ctx.Command{},
-				"load":  &ctx.Command{},
-				"genqr": &ctx.Command{},
-				"write": &ctx.Command{},
-			},
-		},
 	},
 }
 

@@ -192,7 +192,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 	for star, s := 0, page; s != 0 && len(line) > 0; {
 		//解析空白
 		lex := m.Sesss("lex")
-		lex.Cmd("scan", line, yac.name(void))
+		lex.Cmd("parse", line, yac.name(void))
 		if lex.Result(0) == "-1" {
 			break
 		}
@@ -200,7 +200,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 		//解析单词
 		line = lex.Result(1)
 		lex = m.Sesss("lex")
-		lex.Cmd("scan", line, yac.name(s))
+		lex.Cmd("parse", line, yac.name(s))
 		if lex.Result(0) == "-1" {
 			break
 		}
@@ -257,7 +257,6 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 
 func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	yac.Message = m
-
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -357,9 +356,7 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
 func (yac *YAC) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch yac.Context {
 	case m.Target():
-		return true
 	case m.Source():
-		return false
 	}
 	return true
 }
@@ -373,15 +370,15 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 	Configs: map[string]*ctx.Config{
 		"ncell": &ctx.Config{Name: "词法上限", Value: "128", Help: "词法集合的最大数量"},
 		"nlang": &ctx.Config{Name: "语法上限", Value: "32", Help: "语法集合的最大数量"},
-		"name": &ctx.Config{Name: "name", Value: "parse", Help: "模块名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+		"label": &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
+		"yac_name": &ctx.Config{Name: "yac_name", Value: "parse", Help: "模块名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				return arg[0]
 			}
 			return fmt.Sprintf("%s%d", x.Value, m.Capi("nparse", 1))
 			// }}}
 		}},
-		"help":  &ctx.Config{Name: "help", Value: "解析模块", Help: "模块帮助"},
-		"label": &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
+		"yac_help": &ctx.Config{Name: "yac_help", Value: "解析模块", Help: "模块帮助"},
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init [ncell [nlang]]", Help: "初始化语法矩阵", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -455,21 +452,16 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			// }}}
 		}},
 		"parse": &ctx.Command{
-			Name: "parse filename [name [help]] [line line] [void void]",
-			Help: "解析文件, filename: name:模块名, help:模块帮助, 文件名, line: 默认语法, void: 默认空白",
+			Name: "parse filename [yac_name [help]] [line line] [void void]",
+			Help: "解析文件, filename: yac_name:模块名, yac_help:模块帮助, 文件名, line: 默认语法, void: 默认空白",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
 					m.Optioni("page", yac.page["line"])
 					m.Optioni("void", yac.page["void"])
-					m.Start(m.Confx("name", arg, 1), m.Confx("help", arg, 2), key, arg[0])
+					m.Start(m.Confx("yac_name", arg, 1), m.Confx("yac_help", arg, 2), key, arg[0])
 				}
 				// }}}
 			}},
-	},
-	Index: map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void", Help: "void",
-			Commands: map[string]*ctx.Command{"parse": &ctx.Command{}},
-		},
 	},
 }
 
