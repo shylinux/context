@@ -69,13 +69,10 @@ type Config struct {
 type Command struct {
 	Name string
 	Help string
-
-	Shares  map[string][]string
-	Options map[string]string
-	Appends map[string]string
-
 	Form map[string]int
 	Hand func(m *Message, c *Context, key string, arg ...string)
+
+	Shares map[string][]string
 }
 
 type Server interface {
@@ -97,23 +94,22 @@ type Context struct {
 	context  *Context
 	contexts map[string]*Context
 
+	Requests []*Message
+	Sessions []*Message
+
+	//TODO: delete
 	master   *Context
 	messages chan *Message
-
 	Pulse    *Message
-	Requests []*Message
 	Historys []*Message
-	Sessions map[string]*Message
-	Exit     chan bool
-
 	Owner    *Context
 	Index    map[string]*Context
-	password string
 
+	Exit chan bool
 	Server
 }
 
-func (c *Context) Register(s *Context, x Server) (password string) { // {{{
+func (c *Context) Register(s *Context, x Server) { // {{{
 	if c.contexts == nil {
 		c.contexts = make(map[string]*Context)
 	}
@@ -124,7 +120,6 @@ func (c *Context) Register(s *Context, x Server) (password string) { // {{{
 	c.contexts[s.Name] = s
 	s.context = c
 	s.Server = x
-	return s.password
 }
 
 // }}}
@@ -137,10 +132,6 @@ func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
 		c.Register(s, nil)
 	}
 
-	if m.Template != nil {
-		m.Template.source = s
-	}
-
 	return s
 }
 
@@ -150,25 +141,24 @@ func (c *Context) Begin(m *Message, arg ...string) *Context { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	c.Caches["status"] = &Cache{Name: "服务状态(begin/start/close)", Value: "begin", Help: "服务状态，begin:初始完成，start:正在运行，close:未在运行"}
-	c.Caches["stream"] = &Cache{Name: "服务数据", Value: "", Help: "服务数据"}
-
 	item := []string{}
-	m.BackTrace(func(m *Message) bool {
-		item = append(item, m.target.Name)
-		return true
-	})
+	for s := c; s != nil; s = s.context {
+		item = append(item, s.Name)
+	}
 	for i := 0; i < len(item)/2; i++ {
 		item[i], item[len(item)-i-1] = item[len(item)-i-1], item[i]
 	}
-	c.Caches["module"] = &Cache{Name: "服务数据", Value: strings.Join(item, "."), Help: "服务数据"}
+	c.Caches["module"] = &Cache{Name: "module", Value: strings.Join(item, "."), Help: "模块域名"}
+	c.Caches["status"] = &Cache{Name: "status(begin/start/close)", Value: "begin", Help: "模块状态，begin:初始完成，start:正在运行，close:未在运行"}
+	c.Caches["stream"] = &Cache{Name: "stream", Value: "", Help: "模块数据"}
 
+	c.Requests = append(c.Requests, m)
+	m.source.Sessions = append(m.source.Sessions, m)
+
+	//TODO: delete
 	m.Index = 1
 	c.Pulse = m
-	c.Requests = []*Message{m}
 	c.Historys = []*Message{m}
-	c.Sessions = map[string]*Message{}
-
 	c.master = m.master.master
 	c.Owner = m.master.Owner
 
@@ -192,25 +182,21 @@ func (c *Context) Start(m *Message, arg ...string) bool { // {{{
 		m.Meta["detail"] = arg
 	}
 
-	m.Hand = true
-
-	if m != c.Requests[0] {
-		c.Requests, m.Index = append(c.Requests, m), len(c.Requests)+1
+	c.Requests = append(c.Requests, m)
+	if m.Hand = true; m.Cap("status") == "start" {
+		return true
 	}
 
-	if m.Cap("status") != "start" {
-		running := make(chan bool)
-		go m.TryCatch(m, true, func(m *Message) {
-			m.Log(m.Cap("status", "start"), nil, "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
-			c.Exit = make(chan bool, 1)
+	running := make(chan bool)
+	go m.TryCatch(m, true, func(m *Message) {
+		m.Log(m.Cap("status", "start"), nil, "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
+		c.Exit = make(chan bool, 1)
 
-			if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
-				c.Close(m, m.Meta["detail"]...)
-			}
-		})
-		<-running
-	}
-	return true
+		if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
+			c.Close(m, m.Meta["detail"]...)
+		}
+	})
+	return <-running
 }
 
 // }}}

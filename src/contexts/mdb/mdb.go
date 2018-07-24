@@ -118,7 +118,6 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Start(m.Confx("dbname"), m.Confx("dbhelp"), arg...)
 			}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 操作参数",
-			Appends: map[string]string{"last": "最后插入元组的标识", "nrow": "修改元组的数量"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 					which := make([]interface{}, 0, len(arg))
