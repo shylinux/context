@@ -186,7 +186,9 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 
 // }}}
 func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line string, level int) (string, []string) { // {{{
-	// m.Log("debug", nil, "%s\\%d %s(%d): %s", m.Conf("label")[0:level], level, yac.name(page), page, line)
+	if m.Confs("debug") {
+		m.Log("debug", nil, "%s\\%d %s(%d): %s", m.Conf("label")[0:level], level, yac.name(page), page, line)
+	}
 
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
@@ -249,7 +251,10 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 		}
 	}
 
-	// m.Log("debug", nil, "%s/%d %s(%d): %v", m.Conf("label")[0:level], level, yac.name(page), page, word)
+	if m.Confs("debug") {
+		m.Log("debug", nil, "%s/%d %s(%d): %v", m.Conf("label")[0:level], level, yac.name(page), page, word)
+	}
+
 	return line, word
 }
 
@@ -368,6 +373,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		"nparse": &ctx.Cache{Name: "nparse", Value: "0", Help: "解析器数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"debug": &ctx.Config{Name: "debug", Value: "true", Help: "词法集合的最大数量"},
 		"ncell": &ctx.Config{Name: "词法上限", Value: "128", Help: "词法集合的最大数量"},
 		"nlang": &ctx.Config{Name: "语法上限", Value: "32", Help: "语法集合的最大数量"},
 		"label": &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
