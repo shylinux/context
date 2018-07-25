@@ -99,6 +99,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		yac.Cmd("train", "num", "num", "mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
 		yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
 		yac.Cmd("train", "tran", "tran", "mul{", "@", "$", "}", "opt{", "[a-zA-Z0-9_]+", "}")
+		yac.Cmd("train", "tran", "tran", "$", "(", "cache", ")")
 
 		yac.Cmd("train", "op1", "op1", "mul{", "$", "@", "}")
 		yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
@@ -317,9 +318,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				if len(arg) > 0 {
 					if i, e := strconv.Atoi(arg[0]); e == nil {
+						m.Option("time_format", m.Conf("time_format"))
 						t = time.Unix(int64(i/m.Confi("time_unit")), 0)
 						arg = arg[1:]
-						m.Option("time_format", m.Conf("time_format"))
+					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
+						m.Option("parse", arg[0])
+						arg = arg[1:]
+						t = n
 					}
 				}
 
@@ -380,7 +385,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// }}}
 			}},
 		"echo": &ctx.Command{Name: "echo arg...", Help: "函数调用, name: 函数名, arg: 参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Echo("%s", strings.Join(arg[1:], ""))
+			m.Echo("%s", strings.Join(arg, ""))
 		}},
 
 		"tran": &ctx.Command{Name: "tran word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
