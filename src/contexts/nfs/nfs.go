@@ -47,16 +47,16 @@ type NFS struct {
 
 func (nfs *NFS) open(name string) (*os.File, error) { // {{{
 	if path.IsAbs(name) {
-		nfs.Log("info", nil, "open %s", name)
+		nfs.Log("info", "open %s", name)
 		return os.Open(name)
 	}
 	for i := len(nfs.paths) - 1; i >= 0; i-- {
 		if f, e := os.Open(path.Join(nfs.paths[i], name)); e == nil {
-			nfs.Log("info", nil, "open %s", path.Join(nfs.paths[i], name))
+			nfs.Log("info", "open %s", path.Join(nfs.paths[i], name))
 			return f, e
 		}
 	}
-	nfs.Log("info", nil, "open %s", name)
+	nfs.Log("info", "open %s", name)
 	return os.Open(name)
 }
 
@@ -487,8 +487,6 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				if len(tab) == 0 {
 					tabi = 0
 					prefix := string(buf)
-					target := nfs.Message.Target()
-					nfs.Message.Target(nfs.Optionv("ps_target").(*ctx.Context))
 					nfs.Message.BackTrace(func(m *ctx.Message) bool {
 						for k, _ := range m.Target().Commands {
 							if strings.HasPrefix(k, prefix) {
@@ -496,8 +494,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 							}
 						}
 						return true
-					})
-					nfs.Message.Target(target)
+					}, nfs.Optionv("ps_target").(*ctx.Context))
 				}
 
 				if tabi >= 0 && tabi < len(tab) {
@@ -642,8 +639,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return false
 	}
 
-	m.Target().Sessions["nfs"] = m
-	m.Sessions["nfs"] = m
+	m.Sesss("nfs", m)
 
 	nfs.Message = m
 	if socket, ok := m.Data["io"]; ok {
@@ -699,9 +695,9 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			}
 
 			if msg.Has("detail") {
-				msg.Log("info", nil, "%d recv", m.Capi("nrecv", 1))
-				msg.Log("info", nil, "detail: %v", msg.Meta["detail"])
-				msg.Log("info", nil, "option: %v", msg.Meta["option"])
+				msg.Log("info", "%d recv", m.Capi("nrecv", 1))
+				msg.Log("info", "detail: %v", msg.Meta["detail"])
+				msg.Log("info", "option: %v", msg.Meta["option"])
 				msg.Options("stdio", false)
 				msg.Option("nsend", nsend)
 
@@ -722,9 +718,9 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 							}
 						}
 
-						sub.Log("info", nil, "%d recv", sub.Optioni("nsend"))
-						sub.Log("info", nil, "result: %v", sub.Meta["result"])
-						sub.Log("info", nil, "append: %v", sub.Meta["append"])
+						sub.Log("info", "%d recv", sub.Optioni("nsend"))
+						sub.Log("info", "result: %v", sub.Meta["result"])
+						sub.Log("info", "append: %v", sub.Meta["append"])
 
 						_, e := fmt.Fprintf(nfs.Writer, "\n")
 						sub.Assert(e)
@@ -746,9 +742,9 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				msg.Meta["append"] = msg.Meta["option"]
 				delete(msg.Meta, "option")
 
-				msg.Log("info", nil, "%s send", nsend)
-				msg.Log("info", nil, "result: %v", msg.Meta["result"])
-				msg.Log("info", nil, "append: %v", msg.Meta["append"])
+				msg.Log("info", "%s send", nsend)
+				msg.Log("info", "result: %v", msg.Meta["result"])
+				msg.Log("info", "append: %v", msg.Meta["append"])
 
 				n, e := strconv.Atoi(nsend)
 				m.Assert(e)
@@ -1038,7 +1034,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				buf := make([]byte, s)
 
 				if l, e := f.ReadAt(buf, int64(pos)); e == io.EOF || m.Assert(e) {
-					m.Log("info", nil, "read %d", l)
+					m.Log("info", "read %d", l)
 					m.Echo(string(buf[:l]))
 				}
 			} // }}}
@@ -1178,7 +1174,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							}
 						case "difftool":
 							cmd := exec.Command("git", "difftool", "-y")
-							m.Log("info", nil, "cmd: %s %v", "git", "difftool", "-y")
+							m.Log("info", "cmd: %s %v", "git", "difftool", "-y")
 							cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 							if e := cmd.Start(); e != nil {
 								m.Echo("error: ")
@@ -1257,7 +1253,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							args = append(args, arg[1:]...)
 						}
 
-						m.Log("info", nil, "cmd: %s %v", "git", ctx.Trans("-C", p, c, args))
+						m.Log("info", "cmd: %s %v", "git", ctx.Trans("-C", p, c, args))
 						cmd := exec.Command("git", ctx.Trans("-C", p, c, args)...)
 						if out, e := cmd.CombinedOutput(); e != nil {
 							m.Echo("error: ")
@@ -1342,9 +1338,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							m.Assert(e)
 						}
 					}
-					m.Log("info", nil, "%d send", m.Optioni("nsend"))
-					m.Log("info", nil, "detail: %v", m.Meta["detail"])
-					m.Log("info", nil, "option: %v", m.Meta["option"])
+					m.Log("info", "%d send", m.Optioni("nsend"))
+					m.Log("info", "detail: %v", m.Meta["detail"])
+					m.Log("info", "option: %v", m.Meta["option"])
 
 					n, e := fmt.Fprintf(nfs.Writer, "\n")
 					m.Capi("nbytes", n)

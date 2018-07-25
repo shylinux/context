@@ -211,7 +211,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if _, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 					m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
 					if len(arg) < 2 || arg[1] != "async" {
-						<-m.Target().Exit
+						m.Target().Wait()
 					}
 				} // }}}
 			}},
@@ -274,7 +274,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 								m.Echo("%s not exist", arg[1])
 								return
 							}
-							m.Log("info", nil, "import %s", arg[1])
+							m.Log("info", "import %s", arg[1])
 							module := msg.Cap("module")
 							for k, _ := range msg.Target().Commands {
 								if len(arg) == 2 {
@@ -292,16 +292,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						default:
 							cli.alias[arg[0]] = arg[1:]
 							m.Echo("%s: %v\n", arg[0], cli.alias[arg[0]])
-							m.Log("info", nil, "%s: %v", arg[0], cli.alias[arg[0]])
+							m.Log("info", "%s: %v", arg[0], cli.alias[arg[0]])
 						}
 					}
 				} // }}}
 			}},
 		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if d, e := time.ParseDuration(arg[0]); m.Assert(e) { // {{{
-				m.Log("info", nil, "sleep %v", d)
+				m.Log("info", "sleep %v", d)
 				time.Sleep(d)
-				m.Log("info", nil, "sleep %v done", d)
+				m.Log("info", "sleep %v done", d)
 			} // }}}
 		}},
 		"time": &ctx.Command{
@@ -710,7 +710,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Cap("ps_target", cli.target.Name)
 				} else {
 					msg.Hand = true
-					msg.Log("system", nil, "%v", msg.Meta["detail"])
+					msg.Log("system", "%v", msg.Meta["detail"])
 
 					msg.Set("result").Set("append")
 					c := exec.Command(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)

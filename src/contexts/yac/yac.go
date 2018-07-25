@@ -79,7 +79,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 					if word[i] == "rep{" {
 						state.star = s
 						yac.mat[x.s][x.c] = state
-						yac.Log("debug", nil, "REP(%d, %d): %v", x.s, x.c, state)
+						yac.Log("debug", "REP(%d, %d): %v", x.s, x.c, state)
 					}
 				}
 			case "mul{":
@@ -106,7 +106,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 				} else {
 					yac.Capi("nnode", 1)
 				}
-				yac.Log("debug", nil, "GET(%d, %d): %v \033[31m(%s)\033[0m", s, c, state, word[i])
+				yac.Log("debug", "GET(%d, %d): %v \033[31m(%s)\033[0m", s, c, state, word[i])
 
 				if state.next == 0 {
 					state.next = yac.Capi("nline", 1) - 1
@@ -121,7 +121,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 
 				ends = append(ends, &Point{s, c})
 				points = append(points, &Point{s, c})
-				yac.Log("debug", nil, "SET(%d, %d): %v", s, c, state)
+				yac.Log("debug", "SET(%d, %d): %v", s, c, state)
 			}
 		}
 
@@ -150,7 +150,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 		}
 
 		if void {
-			yac.Log("debug", nil, "DEL: %d-%d", yac.Capi("nline")-1, yac.Capi("nline", 0, s))
+			yac.Log("debug", "DEL: %d-%d", yac.Capi("nline")-1, yac.Capi("nline", 0, s))
 			yac.mat = yac.mat[:s]
 		}
 	}
@@ -161,7 +161,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 			*state = *yac.mat[p.s][p.c]
 
 			if state.next == s {
-				yac.Log("debug", nil, "GET(%d, %d): %v", p.s, p.c, state)
+				yac.Log("debug", "GET(%d, %d): %v", p.s, p.c, state)
 				if state.next >= len(yac.mat) {
 					state.next = 0
 				}
@@ -169,7 +169,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 					state.hash = hash
 				}
 				yac.mat[p.s][p.c] = state
-				yac.Log("debug", nil, "SET(%d, %d): %v", p.s, p.c, state)
+				yac.Log("debug", "SET(%d, %d): %v", p.s, p.c, state)
 			}
 
 			if x, ok := yac.state[*state]; !ok {
@@ -187,7 +187,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 // }}}
 func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line string, level int) (string, []string) { // {{{
 	if m.Confs("debug") {
-		m.Log("debug", nil, "%s\\%d %s(%d): %s", m.Conf("label")[0:level], level, yac.name(page), page, line)
+		m.Log("debug", "%s\\%d %s(%d): %s", m.Conf("label")[0:level], level, yac.name(page), page, line)
 	}
 
 	hash, word := 0, []string{}
@@ -252,7 +252,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 	}
 
 	if m.Confs("debug") {
-		m.Log("debug", nil, "%s/%d %s(%d): %v", m.Conf("label")[0:level], level, yac.name(page), page, word)
+		m.Log("debug", "%s/%d %s(%d): %v", m.Conf("label")[0:level], level, yac.name(page), page, word)
 	}
 
 	return line, word
@@ -373,7 +373,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		"nparse": &ctx.Cache{Name: "nparse", Value: "0", Help: "解析器数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"debug": &ctx.Config{Name: "debug", Value: "true", Help: "词法集合的最大数量"},
+		"debug": &ctx.Config{Name: "debug", Value: "false", Help: "词法集合的最大数量"},
 		"ncell": &ctx.Config{Name: "词法上限", Value: "128", Help: "词法集合的最大数量"},
 		"nlang": &ctx.Config{Name: "语法上限", Value: "32", Help: "语法集合的最大数量"},
 		"label": &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},

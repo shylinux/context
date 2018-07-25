@@ -129,8 +129,8 @@ func (lex *LEX) train(page int, hash int, seed []byte) int { // {{{
 			cc = append(cc, seed[p])
 		}
 
-		lex.Log("debug", nil, "page: \033[31m%d %v\033[0m", len(ss), ss)
-		lex.Log("debug", nil, "cell: \033[32m%d %v\033[0m", len(cc), cc)
+		lex.Log("debug", "page: \033[31m%d %v\033[0m", len(ss), ss)
+		lex.Log("debug", "cell: \033[32m%d %v\033[0m", len(cc), cc)
 
 		flag := '\000'
 		if p+1 < len(seed) {
@@ -151,7 +151,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) int { // {{{
 				} else {
 					lex.Capi("nnode", 1)
 				}
-				lex.Log("debug", nil, "GET(%d,%d): %v", s, c, state)
+				lex.Log("debug", "GET(%d,%d): %v", s, c, state)
 
 				switch flag {
 				case '+':
@@ -175,7 +175,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) int { // {{{
 
 				lex.mat[s][c] = state
 				points = append(points, &Point{s, c})
-				lex.Log("debug", nil, "SET(%d,%d): %v(%s,%s)", s, c, state, lex.Cap("nnode"), lex.Cap("nreal"))
+				lex.Log("debug", "SET(%d,%d): %v(%s,%s)", s, c, state, lex.Cap("nnode"), lex.Cap("nreal"))
 			}
 		}
 
@@ -193,7 +193,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) int { // {{{
 		}
 
 		if len(lex.mat[s]) == 0 {
-			lex.Log("debug", nil, "DEL: %d-%d", lex.Capi("nline")-1, lex.Capi("nline", 0, s))
+			lex.Log("debug", "DEL: %d-%d", lex.Capi("nline")-1, lex.Capi("nline", 0, s))
 			lex.mat = lex.mat[:s]
 		}
 	}
@@ -204,12 +204,12 @@ func (lex *LEX) train(page int, hash int, seed []byte) int { // {{{
 			*state = *lex.mat[p.s][p.c]
 
 			if state.next == s {
-				lex.Log("debug", nil, "GET(%d, %d): %v", p.s, p.c, state)
+				lex.Log("debug", "GET(%d, %d): %v", p.s, p.c, state)
 				if state.hash = hash; state.next >= len(lex.mat) {
 					state.next = 0
 				}
 				lex.mat[p.s][p.c] = state
-				lex.Log("debug", nil, "SET(%d, %d): %v", p.s, p.c, state)
+				lex.Log("debug", "SET(%d, %d): %v", p.s, p.c, state)
 			}
 
 			if x, ok := lex.state[*state]; !ok {
@@ -241,7 +241,7 @@ func (lex *LEX) parse(m *ctx.Message, page int, line []byte) (hash int, rest []b
 		}
 
 		state := lex.mat[s][c]
-		lex.Log("debug", nil, "(%d,%d): %v", s, c, state)
+		lex.Log("debug", "(%d,%d): %v", s, c, state)
 		if state == nil {
 			s, star, pos = star, 0, pos-1
 			continue
@@ -438,11 +438,11 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 						nnode++
 
 						if _, ok := set[x]; !ok {
-							m.Log("fuck", nil, "not in %d %d %v %p", i, j, x, x)
+							m.Log("fuck", "not in %d %d %v %p", i, j, x, x)
 						}
 					}
 				}
-				m.Log("fuck", nil, "node: %d real: %d", nnode, nreal)
+				m.Log("fuck", "node: %d real: %d", nnode, nreal)
 			} // }}}
 		}},
 	},

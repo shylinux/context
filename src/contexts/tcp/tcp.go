@@ -32,7 +32,6 @@ func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	tcp.Context.Master(nil)
 	if tcp.Context == Index {
 		Pulse = m
 	}
@@ -67,7 +66,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 			tcp.Conn = c
 		}
 
-		m.Log("info", nil, "%s dial %s", Pulse.Cap("nclient"),
+		m.Log("info", "%s dial %s", Pulse.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
 		m.Put("append", "io", tcp.Conn).Back(m)
 		return false
@@ -76,7 +75,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Assert(e)
 		tcp.Conn = c
 
-		m.Log("info", nil, "%s accept %s", Pulse.Cap("nclient"),
+		m.Log("info", "%s accept %s", Pulse.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
 		m.Put("append", "io", tcp.Conn).Back(m)
 		return false
@@ -95,7 +94,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 			tcp.Listener = l
 		}
 
-		m.Log("info", nil, "%d listen %v", Pulse.Capi("nlisten"), m.Cap("stream", fmt.Sprintf("%s", tcp.Addr())))
+		m.Log("info", "%d listen %v", Pulse.Capi("nlisten"), m.Cap("stream", fmt.Sprintf("%s", tcp.Addr())))
 	}
 
 	for {
@@ -115,19 +114,19 @@ func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch tcp.Context {
 	case m.Target():
 		if tcp.Listener != nil {
-			m.Log("info", nil, "%d close %v", Pulse.Capi("nlisten", -1)+1, m.Cap("stream"))
+			m.Log("info", "%d close %v", Pulse.Capi("nlisten", -1)+1, m.Cap("stream"))
 			tcp.Listener.Close()
 			tcp.Listener = nil
 		}
 		if tcp.Conn != nil {
-			m.Log("info", nil, "%d close %v", Pulse.Capi("nclient", -1)+1, m.Cap("stream"))
+			m.Log("info", "%d close %v", Pulse.Capi("nclient", -1)+1, m.Cap("stream"))
 			tcp.Conn.Close()
 			tcp.Conn = nil
 		}
 	case m.Source():
 		if tcp.Conn != nil {
 			msg := m.Spawn(tcp.Context)
-			if msg.Master(tcp.Context); !tcp.Context.Close(msg, arg...) {
+			if !tcp.Context.Close(msg, arg...) {
 				return false
 			}
 		}

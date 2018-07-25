@@ -102,7 +102,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 			msg.Option(v.Name, v.Value)
 		}
 
-		msg.Log("cmd", nil, "%s [] %v", key, msg.Meta["option"])
+		msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
 		msg.Put("option", "request", r).Put("option", "response", w)
 
 		if hand(msg, msg.Target(), key); msg.Has("redirect") {
@@ -126,20 +126,20 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 // }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 	if web.Message != nil {
-		web.Log("cmd", nil, "%v %s %s", r.RemoteAddr, r.Method, r.URL)
+		web.Log("cmd", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
 		if web.Confs("logheaders") {
 			for k, v := range r.Header {
-				web.Log("info", nil, "%s: %v", k, v)
+				web.Log("info", "%s: %v", k, v)
 			}
-			web.Log("info", nil, "")
+			web.Log("info", "")
 		}
 
 		if r.ParseForm(); len(r.PostForm) > 0 {
 			for k, v := range r.PostForm {
-				web.Log("info", nil, "%s: %v", k, v)
+				web.Log("info", "%s: %v", k, v)
 			}
-			web.Log("info", nil, "")
+			web.Log("info", "")
 		}
 	}
 
@@ -147,9 +147,9 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 
 	if web.Message != nil && web.Confs("logheaders") {
 		for k, v := range w.Header() {
-			web.Log("info", nil, "%s: %v", k, v)
+			web.Log("info", "%s: %v", k, v)
 		}
-		web.Log("info", nil, "")
+		web.Log("info", "")
 	}
 }
 
@@ -167,7 +167,6 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	web.Context.Master(nil)
 	web.Caches["route"] = &ctx.Cache{Name: "请求路径", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
 	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已初始化"}
 	web.Caches["master"] = &ctx.Cache{Name: "服务入口(yes/no)", Value: "no", Help: "服务入口"}
@@ -193,7 +192,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Cap("directory", arg[0])
 	}
 
-	m.Travel(m.Target(), func(m *ctx.Message) bool {
+	m.Travel(func(m *ctx.Message, i int) bool {
 		if h, ok := m.Target().Server.(http.Handler); ok && m.Cap("register") == "no" {
 			m.Cap("register", "yes")
 			m.Capi("nroute", 1)
@@ -208,12 +207,12 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 			})
 
 			if s, ok := p.Server.(MUX); ok {
-				m.Log("info", p, "route %s -> %s", m.Cap("route"), m.Target().Name)
+				m.Log("info", "route %s -> %s", m.Cap("route"), m.Target().Name)
 				s.Handle(m.Cap("route"), http.StripPrefix(path.Dir(m.Cap("route")), h))
 			}
 
 			if s, ok := m.Target().Server.(MUX); ok && m.Cap("directory") != "" {
-				m.Log("info", nil, "dir / -> [%s]", m.Cap("directory"))
+				m.Log("info", "dir / -> [%s]", m.Cap("directory"))
 				s.Handle("/", http.FileServer(http.Dir(m.Cap("directory"))))
 			}
 		}
@@ -239,8 +238,8 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 	m.Cap("master", "yes")
 	m.Cap("stream", m.Cap("address"))
-	m.Log("info", nil, "address [%s]", m.Cap("address"))
-	m.Log("info", nil, "protocol [%s]", m.Cap("protocol"))
+	m.Log("info", "address [%s]", m.Cap("address"))
+	m.Log("info", "protocol [%s]", m.Cap("protocol"))
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
 
 	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "no", Help: "日志输出报文头"}
@@ -249,8 +248,8 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	if web.Message = m; m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
 		web.Caches["key"] = &ctx.Cache{Name: "服务密钥", Value: m.Conf("key"), Help: "服务密钥"}
-		m.Log("info", nil, "cert [%s]", m.Cap("cert"))
-		m.Log("info", nil, "key [%s]", m.Cap("key"))
+		m.Log("info", "cert [%s]", m.Cap("cert"))
+		m.Log("info", "key [%s]", m.Cap("key"))
 
 		web.Server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
 	} else {
@@ -348,7 +347,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					method := m.Confx("method")
 					uri := web.Merge(m, arg[0], arg[1:]...)
-					m.Log("info", nil, "GET %s", uri)
+					m.Log("info", "GET %s", uri)
 					m.Echo("%s: %s\n", method, uri)
 
 					var body io.Reader
@@ -414,7 +413,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					for k, v := range res.Header {
-						m.Log("info", nil, "%s: %v", k, v)
+						m.Log("info", "%s: %v", k, v)
 					}
 
 					if m.Confs("output") {

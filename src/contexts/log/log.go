@@ -18,6 +18,8 @@ type LOG struct {
 	color  map[string]int
 	*Log.Logger
 
+	nfs *ctx.Message
+
 	*ctx.Message
 	*ctx.Context
 }
@@ -44,9 +46,9 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 	log.Configs["bench.log"] = &ctx.Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 		if len(arg) > 0 {
-			if m.Sess("nfs") == nil {
+			if nfs := m.Sesss("nfs"); nfs != nil {
 				os.Create(arg[0])
-				m.Sess("nfs", "nfs").Cmd("open", arg[0], "", "日志文件")
+				log.nfs = nfs.Cmd("open", arg[0], "", "日志文件")
 			}
 			return arg[0]
 		}
@@ -159,19 +161,16 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 
 					if m.Confs("flag_name") {
 						action = fmt.Sprintf("%s(%s->%s)", action, msg.Source().Name, msg.Target().Name)
-						if msg.Name != "" {
-							action = fmt.Sprintf("%s(%s:%s->%s.%d)", action, msg.Source().Name, msg.Name, msg.Target().Name, m.Index)
-						}
 					}
 				}
 
 				cmd := strings.Join(arg[1:], "")
 
-				if nfs := m.Sess("nfs"); nfs != nil {
-					if nfs.Options("log", false); color > 0 {
-						nfs.Cmd("write", fmt.Sprintf("%s\033[%dm%s%s %s\033[0m\n", date, color, code, action, cmd))
+				if log.nfs != nil {
+					if log.nfs.Options("log", false); color > 0 {
+						log.nfs.Cmd("write", fmt.Sprintf("%s\033[%dm%s%s %s\033[0m\n", date, color, code, action, cmd))
 					} else {
-						nfs.Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, cmd))
+						log.nfs.Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, cmd))
 					}
 				}
 			} // }}}

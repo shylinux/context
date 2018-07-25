@@ -59,7 +59,6 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	aaa.Context.Master(nil)
 	aaa.Caches["group"] = &ctx.Cache{Name: "用户组", Value: "", Help: "用户组"}
 	aaa.Caches["username"] = &ctx.Cache{Name: "用户名", Value: "", Help: "用户名"}
 	aaa.Caches["password"] = &ctx.Cache{Name: "用户密码", Value: "", Help: "用户密码，加密存储", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
@@ -98,10 +97,9 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Cap("stream", m.Cap("username"))
 		m.Cap("sessid", aaa.Session(arg[1]))
 		Pulse.Capi("nuser", 1)
-		aaa.Owner = aaa.Context
 	}
 
-	m.Log("info", m.Source(), "%s login %s %s", Pulse.Cap("nuser"), m.Cap("group"), m.Cap("username"))
+	m.Log("info", "%s login %s %s", Pulse.Cap("nuser"), m.Cap("group"), m.Cap("username"))
 	return false
 }
 
@@ -111,7 +109,7 @@ func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
 	case m.Target():
 		root := Pulse.Target().Server.(*AAA)
 		delete(root.sessions, m.Cap("sessid"))
-		m.Log("info", nil, "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
+		m.Log("info", "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
 	case m.Source():
 	}
 
@@ -131,25 +129,25 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Target(c) // {{{
+			// m.Target(c) // {{{
 			aaa := c.Server.(*AAA)
 
 			switch len(arg) {
 			case 0:
-				m.Travel(c, func(m *ctx.Message) bool {
+				m.Travel(func(m *ctx.Message, i int) bool {
 					m.Echo("%s(%s): %s\n", m.Target().Name, m.Cap("group"), m.Cap("time"))
 					if int64(m.Capi("expire")) < time.Now().Unix() {
 						m.Target().Close(m)
 					}
 					return true
-				})
+				}, c)
 			case 1:
-				s, ok := aaa.sessions[arg[0]]
+				_, ok := aaa.sessions[arg[0]]
 				m.Assert(ok, "会话失败")
-				m.Target(s)
+				// m.Target(s)
 				m.Assert(int64(m.Capi("expire")) > time.Now().Unix(), "会话失败")
 
-				m.Log("info", m.Source(), "logon %s %s", m.Cap("username"), m.Cap("group"))
+				m.Log("info", "logon %s %s", m.Cap("username"), m.Cap("group"))
 				m.Echo(m.Cap("username"))
 
 				m.Append("username", m.Cap("username"))
@@ -165,16 +163,13 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				msg := m
 				if username == Pulse.Conf("rootname") {
 					msg = Pulse.Spawn(Pulse.Target())
-					ctx.Index.Sessions["aaa"] = msg
 					msg.Set("detail", group, username).Target().Start(msg)
 				} else if msg = Pulse.Find(username, false); msg == nil {
 					m.Start(username, "认证用户", group, username)
 					msg = m
 				} else {
-					m.Target(msg.Target())
+					// m.Target(msg.Target())
 				}
-
-				msg.Target().Sessions["aaa"] = msg
 
 				msg.Cap("password", password)
 
@@ -197,15 +192,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}
 
-			group := m.Sess("aaa").Cap("group")
-			m.Travel(c, func(msg *ctx.Message) bool {
+			group := m.Sesss("aaa").Cap("group")
+			m.Travel(func(msg *ctx.Message, i int) bool {
 				aaa := msg.Target().Server.(*AAA)
 				if aaa.share == nil {
 					aaa.share = make(map[string]*ctx.Context)
 				}
 				aaa.share[group] = m.Target()
 				return true
-			})
+			}, c)
 			// }}}
 		}},
 		"md5": &ctx.Command{Name: "md5 [file filename][content]", Help: "散列",

@@ -51,7 +51,6 @@ func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 
 func (mdb *MDB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	mdb.Context.Master(nil)
 	if mdb.Context == Index {
 		Pulse = m
 	}
@@ -64,7 +63,7 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Cap("username"), m.Cap("password"), m.Cap("protocol"), m.Cap("address"), m.Cap("database")))
 	m.Assert(e)
 	mdb.DB = db
-	m.Log("info", nil, "mdb open %s", m.Cap("database"))
+	m.Log("info", "mdb open %s", m.Cap("database"))
 	return false
 }
 
@@ -73,7 +72,7 @@ func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch mdb.Context {
 	case m.Target():
 		if mdb.DB != nil {
-			m.Log("info", nil, "mdb close %s", m.Cap("database"))
+			m.Log("info", "mdb close %s", m.Cap("database"))
 			mdb.DB.Close()
 			mdb.DB = nil
 		}
@@ -132,7 +131,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					n, e := ret.RowsAffected()
 					m.Assert(e)
 
-					m.Log("info", nil, "last(%s) nrow(%s)", m.Append("last", id), m.Append("nrow", n))
+					m.Log("info", "last(%s) nrow(%s)", m.Append("last", id), m.Append("nrow", n))
 					m.Echo("%d", id).Echo("%d", n)
 				}
 				// }}}
@@ -173,9 +172,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 
 				if len(m.Meta["append"]) > 0 {
-					m.Log("info", nil, "rows(%d) cols(%d)", len(m.Meta[m.Meta["append"][0]]), len(m.Meta["append"]))
+					m.Log("info", "rows(%d) cols(%d)", len(m.Meta[m.Meta["append"][0]]), len(m.Meta["append"]))
 				} else {
-					m.Log("info", nil, "rows(0) cols(0)")
+					m.Log("info", "rows(0) cols(0)")
 				}
 			}
 			// }}}
@@ -239,10 +238,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"show": &ctx.Command{
 			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename] [other rest...]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{
-				"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1,
-				"extras": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2,
-				"save": 1, "save_format": 1, "csv_col_sep": 1, "export": 1, "other": -1},
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2, "save": 1, "export": 1, "other": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 					table := m.Confx("table", arg, 0)
@@ -285,15 +281,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					}
 
 					m.Table(func(maps map[string]string, lists []string, line int) bool {
-						args := []interface{}{}
-
 						for i, v := range lists {
-							if m.Options("save_format") {
-								key := m.Meta["append"][i]
-								value := maps[key]
-								args = append(args, value)
-								continue
-							}
 							if m.Options("save") {
 								key := m.Meta["append"][i]
 								value := maps[key]
@@ -313,17 +301,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 								m.Echo(v)
 							}
 							if i < len(lists)-1 {
-								m.Echo(m.Confx("csv_col_sep"))
+								m.Echo(m.Conf("csv_col_sep"))
 							}
 						}
-						if m.Options("save_format") {
-							if line > -1 {
-								m.Echo(fmt.Sprintf(m.Option("save_format"), args...))
-							}
-							return true
-						}
-
-						m.Echo(m.Confx("csv_row_sep"))
+						m.Echo(m.Conf("csv_row_sep"))
 						return true
 					})
 

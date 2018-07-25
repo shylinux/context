@@ -30,7 +30,6 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	ssh.Context.Master(nil)
 	if ssh.Context == Index {
 		Pulse = m
 	}
@@ -69,20 +68,20 @@ func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool { // {{{
 // }}}
 
 func Done(m *ctx.Message, lock chan bool) { // {{{
-	m.Log("lock", nil, "done before %v", m.Meta["detail"])
+	m.Log("lock", "done before %v", m.Meta["detail"])
 	if m.Options("stdio") {
 		lock <- true
 	}
-	m.Log("lock", nil, "done after %v", m.Meta["detail"])
+	m.Log("lock", "done after %v", m.Meta["detail"])
 }
 
 // }}}
 func Wait(m *ctx.Message, lock chan bool) { // {{{
-	m.Log("lock", nil, "wait before %v", m.Meta["detail"])
+	m.Log("lock", "wait before %v", m.Meta["detail"])
 	if m.Options("stdio") {
 		<-lock
 	}
-	m.Log("lock", nil, "wait after %v", m.Meta["detail"])
+	m.Log("lock", "wait after %v", m.Meta["detail"])
 }
 
 // }}}
@@ -118,7 +117,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Find("nfs").Call(func(file *ctx.Message) *ctx.Message {
 					sub := file.Spawn(m.Target())
 					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "远程主机")
-					m.Sessions["ssh"] = sub
+					m.Sesss("ssh", sub)
 					return sub
 				}, m.Meta["detail"])
 				m.Spawn(m.Target()).Cmd("save")
@@ -131,7 +130,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					sub := file.Spawn(m.Target())
 					sub.Copy(m, "detail")
 					sub.Target().Start(sub)
-					m.Sessions["ssh"] = sub
+					m.Sesss("ssh", sub)
 
 					sub.Spawn(sub.Target()).Cmd("pwd", m.Conf("domain"))
 					return sub
@@ -179,7 +178,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 
 					miss := true
-					m.Travel(c, func(m *ctx.Message) bool { //向下搜索
+					m.Travel(func(m *ctx.Message, i int) bool { //向下搜索
 						if ssh, ok := m.Target().Server.(*SSH); ok && m.Conf("domains") == name {
 							msg := m.Spawn(ssh.nfs)
 							msg.Option("domain", strings.Join(rest, "."))
@@ -190,7 +189,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							miss = false
 						}
 						return miss
-					})
+					}, c)
 
 					if miss {
 						if name == m.Cap("domain") {
@@ -217,13 +216,13 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				if m.Options("nsend") {
 					domain := arg[0]
 
-					m.Travel(c, func(m *ctx.Message) bool {
+					m.Travel(func(m *ctx.Message, i int) bool {
 						if m.Conf("domains") == domain {
 							domain = domain + m.Cap("nhost")
 							return false
 						}
 						return true
-					})
+					}, c)
 					m.Conf("domains", domain)
 
 					mdb := m.Find(m.Conf("mdb"), true)
@@ -254,12 +253,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		}},
 		"list": &ctx.Command{Name: "list", Help: "连接断开", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			domain := m.Cap("domain")
-			m.Travel(c, func(m *ctx.Message) bool {
+			m.Travel(func(m *ctx.Message, i int) bool {
 				if m.Confs("domains") {
 					m.Echo("%s: %s.%s\n", m.Target().Name, domain, m.Conf("domains"))
 				}
 				return true
-			})
+			}, c)
 		}},
 		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			json := m.Sesss("nfs") // {{{
@@ -295,7 +294,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					cmds = arg[1]
 				}
 
-				m.Travel(ctx.Index, func(msg *ctx.Message) bool {
+				m.Travel(func(msg *ctx.Message, i int) bool {
 					current := msg.Target()
 					if _, ok := current.Index[cmds]; ok {
 
@@ -306,14 +305,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Add("append", "name", current.Name)
 					m.Add("append", "help", current.Help)
 					return true
-				})
+				}, ctx.Index)
 				return
 			}
 
 			if len(arg) > 2 {
 				cmds = arg[2]
 			}
-			current := m.Sess(arg[1], arg[1], "search").Target()
+			current := m.Sesss(arg[1], arg[1], "search").Target()
 			if x, ok := current.Index[cmds]; ok {
 				current = x
 			} else if cmds != "" && cmds != "root" {
