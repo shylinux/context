@@ -53,7 +53,7 @@ func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool { // {{{
 	if m.Target() == Index {
 		go func() {
 			m.Target().Begin(m)
-			m.Sesss("nfs", "nfs")
+			m.Sess("nfs", "nfs")
 			for !m.Caps("stream") {
 				time.Sleep(time.Second * time.Duration(m.Confi("interval")))
 				go ssh.Message.Spawn(m.Target()).Copy(ssh.Message, "detail").Cmd()
@@ -117,7 +117,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Find("nfs").Call(func(file *ctx.Message) *ctx.Message {
 					sub := file.Spawn(m.Target())
 					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "远程主机")
-					m.Sesss("ssh", sub)
+					m.Sess("ssh", sub)
 					return sub
 				}, m.Meta["detail"])
 				m.Spawn(m.Target()).Cmd("save")
@@ -130,7 +130,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					sub := file.Spawn(m.Target())
 					sub.Copy(m, "detail")
 					sub.Target().Start(sub)
-					m.Sesss("ssh", sub)
+					m.Sess("ssh", sub)
 
 					sub.Spawn(sub.Target()).Cmd("pwd", m.Conf("domain"))
 					return sub
@@ -169,7 +169,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							m.Copy(msg, "result").Copy(msg, "append")
 							m.Back(m)
 						} else { //发送命令
-							ssh.Message.Sesss("nfs").CallBack(m.Options("stdio"), func(host *ctx.Message) *ctx.Message {
+							ssh.Message.Sess("nfs").CallBack(m.Options("stdio"), func(host *ctx.Message) *ctx.Message {
 								m.Back(m.Copy(host, "result").Copy(host, "append"))
 								return nil
 							}, "send", "send", arg)
@@ -261,14 +261,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}, c)
 		}},
 		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			json := m.Sesss("nfs") // {{{
+			json := m.Sess("nfs") // {{{
 			json.Put("option", "data", map[string]string{"domain": m.Cap("domain")})
 			json.Cmd("json", m.Conf("domain.json"))
-			m.Sesss("nfs").Cmd("genqr", m.Conf("domain.png"), json.Result(0))
+			m.Sess("nfs").Cmd("genqr", m.Conf("domain.png"), json.Result(0))
 			// }}}
 		}},
 		"who": &ctx.Command{Name: "who", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			aaa := m.Sesss("aaa") // {{{
+			aaa := m.Sess("aaa") // {{{
 			if aaa != nil {
 				m.Echo(aaa.Cap("group"))
 			}
@@ -312,7 +312,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if len(arg) > 2 {
 				cmds = arg[2]
 			}
-			current := m.Sesss(arg[1], arg[1], "search").Target()
+			current := m.Sess(arg[1], arg[1], "search").Target()
 			if x, ok := current.Index[cmds]; ok {
 				current = x
 			} else if cmds != "" && cmds != "root" {

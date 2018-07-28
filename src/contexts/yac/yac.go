@@ -94,8 +94,8 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 			default:
 				x, ok := yac.page[word[i]]
 				if !ok {
-					if x = m.Sesss("lex").Cmd("parse", word[i], yac.name(s)).Resulti(0); x == 0 {
-						x = m.Sesss("lex").Cmd("train", word[i], len(yac.mat[s]), yac.name(s)).Resulti(0)
+					if x = m.Sess("lex").Cmd("parse", word[i], yac.name(s)).Resulti(0); x == 0 {
+						x = m.Sess("lex").Cmd("train", word[i], len(yac.mat[s]), yac.name(s)).Resulti(0)
 					}
 				}
 				c := byte(x)
@@ -193,7 +193,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
 		//解析空白
-		lex := m.Sesss("lex")
+		lex := m.Sess("lex")
 		lex.Cmd("parse", line, yac.name(void))
 		if lex.Result(0) == "-1" {
 			break
@@ -201,7 +201,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 
 		//解析单词
 		line = lex.Result(1)
-		lex = m.Sesss("lex")
+		lex = m.Sess("lex")
 		lex.Cmd("parse", line, yac.name(s))
 		if lex.Result(0) == "-1" {
 			break
@@ -212,7 +212,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 		state := yac.mat[s][c]
 
 		if state != nil { //全局语法检查
-			if key := m.Sesss("lex").Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(2)) <= len(lex.Result(2)) {
+			if key := m.Sess("lex").Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(2)) <= len(lex.Result(2)) {
 				line, word = lex.Result(1), append(word, lex.Result(2))
 			} else {
 				state = nil
@@ -308,7 +308,7 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
 	yac.Message = m
 
 	if len(arg) > 0 && arg[0] == "parse" {
-		lex := m.Sesss("lex")
+		lex := m.Sess("lex")
 		if lex.Cap("status") != "start" {
 			lex.Target().Start(lex)
 		}
@@ -326,7 +326,7 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
 		}()
 
 		//加载文件
-		nfs := m.Sesss("nfs").Call(func(buf *ctx.Message) *ctx.Message {
+		nfs := m.Sess("nfs").Call(func(buf *ctx.Message) *ctx.Message {
 			out = buf
 			data <- buf.Detail(0) + "; "
 			<-next
@@ -442,7 +442,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					yac.hand[hash] = arg[1]
 				}
 
-				// if m.Sesss("lex") == nil {
+				// if m.Sess("lex") == nil {
 				// 	lex := m.Sess("lex", "lex")
 				// 	if lex.Cap("status") == "start" {
 				// 		lex.Start(yac.Context.Name+"lex", "语法词法")

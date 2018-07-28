@@ -90,7 +90,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 // }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	cli.Message = m
-	yac := m.Sesss("yac")
+	yac := m.Sess("yac")
 	if yac.Cap("status") != "start" {
 		yac.Target().Start(yac)
 		yac.Cmd("train", "void", "void", "[\t ]+")
@@ -190,6 +190,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "终端数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"init.shy": &ctx.Config{Name: "init.shy", Value: "etc/init.shy", Help: "启动脚本"},
 		"cli_name": &ctx.Config{Name: "cli_name", Value: "shell", Help: "模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				return arg[0]
@@ -211,7 +212,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if _, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 					m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
 					if len(arg) < 2 || arg[1] != "async" {
-						m.Target().Wait()
+						m.Wait()
 					}
 				} // }}}
 			}},

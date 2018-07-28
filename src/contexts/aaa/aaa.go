@@ -126,6 +126,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	Configs: map[string]*ctx.Config{
 		"rootname": &ctx.Config{Name: "根用户名", Value: "root", Help: "根用户名"},
 		"expire":   &ctx.Config{Name: "会话超时(s)", Value: "7200", Help: "会话超时"},
+		"cert":     &ctx.Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
+		"key":      &ctx.Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
 		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -153,7 +155,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				m.Append("username", m.Cap("username"))
 				m.Append("userrole", m.Cap("group"))
 				m.Appendv("aaa", m)
-				m.Sesss("aaa", m)
+				m.Sess("aaa", m)
 			case 2, 3:
 				group, username, password := arg[0], arg[0], arg[1]
 				if len(arg) == 3 {
@@ -179,7 +181,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				m.Append("username", msg.Cap("username"))
 				m.Append("userrole", msg.Cap("group"))
 				m.Appendv("aaa", msg)
-				m.Sesss("aaa", msg)
+				m.Sess("aaa", msg)
 			}
 			// }}}
 		}},
@@ -192,7 +194,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}
 
-			group := m.Sesss("aaa").Cap("group")
+			group := m.Sess("aaa").Cap("group")
 			m.Travel(func(msg *ctx.Message, i int) bool {
 				aaa := msg.Target().Server.(*AAA)
 				if aaa.share == nil {

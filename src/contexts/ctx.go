@@ -7,8 +7,6 @@ import ( // {{{
 	"html/template"
 	"io"
 	"math/rand"
-	"os"
-	"path"
 	"regexp"
 	"runtime/debug"
 	"sort"
@@ -31,21 +29,26 @@ func Right(str string) bool { // {{{
 func Trans(arg ...interface{}) []string { // {{{
 	ls := []string{}
 	for _, v := range arg {
-		value := ""
 		switch val := v.(type) {
+		case string:
+			ls = append(ls, val)
+		case bool:
+			ls = append(ls, fmt.Sprintf("%t", val))
+		case int, int8, int16, int32, int64:
+			ls = append(ls, fmt.Sprintf("%d", val))
 		case []string:
 			ls = append(ls, val...)
-			continue
-		case string:
-			value = val
-		case bool:
-			value = fmt.Sprintf("%t", val)
-		case int, int8, int16, int32, int64:
-			value = fmt.Sprintf("%d", val)
+		case []bool:
+			for _, v := range val {
+				ls = append(ls, fmt.Sprintf("%t", v))
+			}
+		case []int:
+			for _, v := range val {
+				ls = append(ls, fmt.Sprintf("%d", v))
+			}
 		default:
-			value = fmt.Sprintf("%v", val)
+			ls = append(ls, fmt.Sprintf("%v", val))
 		}
-		ls = append(ls, value)
 	}
 	return ls
 }
@@ -188,7 +191,7 @@ func (c *Context) Start(m *Message, arg ...string) bool { // {{{
 
 // }}}
 func (c *Context) Close(m *Message, arg ...string) bool { // {{{
-	m.Log("close", "%d %v", len(c.requests), arg)
+	m.Log("close", "%d:%d %v", len(c.requests), len(c.sessions), arg)
 
 	if m.target == c {
 		for i := len(c.requests) - 1; i >= 0; i-- {
@@ -218,15 +221,7 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 	if c.context != nil {
 		m.Log("close", "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
 		delete(c.context.contexts, c.Name)
-		c.Wait()
-	}
-	return true
-}
-
-// }}}
-func (c *Context) Wait() bool { // {{{
-	if c.exit != nil {
-		return <-c.exit
+		m.Wait()
 	}
 	return true
 }
@@ -303,7 +298,136 @@ func (m *Message) Target() *Context { // {{{
 
 // }}}
 func (m *Message) Format() string { // {{{
-	return fmt.Sprintf("%d(%s->%s): %s %v", m.code, m.source.Name, m.target.Name, m.time.Format("15:04:05"), m.Meta["detail"], m.Meta["option"])
+	return fmt.Sprintf("%d(%s->%s): %s %v %v", m.code, m.source.Name, m.target.Name, m.time.Format("15:04:05"), m.Meta["detail"], m.Meta["option"])
+}
+
+// }}}
+func (m *Message) Tree(code int) *Message { // {{{
+	ms := []*Message{m}
+	for i := 0; i < len(ms); i++ {
+		if ms[i].Code() == code {
+			return ms[i]
+		}
+		ms = append(ms, ms[i].messages...)
+	}
+	return nil
+}
+
+// }}}
+func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {{{
+	switch meta {
+	case "target":
+		m.target = msg.target
+	case "callback":
+		m.callback = msg.callback
+	case "session":
+		if len(arg) == 0 {
+			for k, v := range msg.sessions {
+				m.sessions[k] = v
+			}
+		} else {
+			for _, k := range arg {
+				m.sessions[k] = msg.sessions[k]
+			}
+		}
+	case "detail", "result":
+		m.Set(meta, msg.Meta[meta]...)
+	case "option", "append":
+		if len(arg) == 0 {
+			arg = msg.Meta[meta]
+		}
+
+		for _, k := range arg {
+			if v, ok := msg.Data[k]; ok {
+				m.Put(meta, k, v)
+			}
+			if v, ok := msg.Meta[k]; ok {
+				m.Set(meta, k).Add(meta, k, v)
+			}
+		}
+	}
+
+	return m
+}
+
+// }}}
+
+func (m *Message) Log(action string, str string, arg ...interface{}) *Message { // {{{
+	if !m.Options("log") {
+		return m
+	}
+
+	if l := m.Sess("log"); l != nil {
+		l.Options("log", false)
+		l.Cmd("log", action, fmt.Sprintf(str, arg...))
+	}
+	return m
+}
+
+// }}}
+func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
+	switch v := e.(type) {
+	case nil:
+		return true
+	case bool:
+		if v {
+			return true
+		}
+	case string:
+		if Right(v) {
+			return true
+		}
+	case *Message:
+		if result, ok := v.Meta["result"]; ok && len(result) > 0 && result[0] == "error: " {
+			e = v.Result(1)
+			break
+		}
+		return true
+	}
+
+	if len(msg) > 1 {
+		arg := make([]interface{}, 0, len(msg)-1)
+		for _, m := range msg[1:] {
+			arg = append(arg, m)
+		}
+		e = errors.New(fmt.Sprintf(msg[0], arg...))
+	} else if len(msg) > 0 {
+		e = errors.New(msg[0])
+	}
+
+	panic(m.Set("result", "error: ", fmt.Sprintln(e), "\n"))
+}
+
+// }}}
+func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
+	defer func() {
+		if e := recover(); e != nil && e != io.EOF {
+			// switch v := e.(type) {
+			// case *Message:
+			// 	// msg.Log("error", "error: %v", strings.Join(v.Meta["result"][1:], ""))
+			// default:
+			// 	// msg.Log("error", "error: %v", e)
+			// }
+
+			if msg.root.Conf("debug") == "on" {
+				fmt.Printf("\n\033[31m%s error: %v\033[0m\n", msg.target.Name, e)
+				debug.PrintStack()
+				fmt.Printf("\033[31m%s error: %v\033[0m\n\n", msg.target.Name, e)
+			}
+
+			if len(hand) > 1 {
+				m.TryCatch(msg, safe, hand[1:]...)
+			} else if !safe {
+				msg.Assert(e)
+			}
+		}
+	}()
+
+	if len(hand) > 0 {
+		hand[0](msg)
+	}
+
+	return m
 }
 
 // }}}
@@ -418,7 +542,7 @@ func (m *Message) Search(key string, root ...bool) []*Message { // {{{
 }
 
 // }}}
-func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
+func (m *Message) Sess(key string, arg ...interface{}) *Message { // {{{
 	spawn := true
 	if _, ok := m.sessions[key]; !ok && len(arg) > 0 {
 		if m.sessions == nil {
@@ -435,12 +559,20 @@ func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
 		case string:
 			root := true
 			if len(arg) > 2 {
-				root = Right(arg[2].(string))
+				switch v := arg[2].(type) {
+				case string:
+					root = Right(v)
+				case bool:
+					root = v
+				}
 			}
 
 			method := "find"
 			if len(arg) > 1 {
-				method = arg[1].(string)
+				switch v := arg[1].(type) {
+				case string:
+					method = v
+				}
 			}
 
 			switch method {
@@ -468,106 +600,6 @@ func (m *Message) Sesss(key string, arg ...interface{}) *Message { // {{{
 }
 
 // }}}
-func (m *Message) Tree(code int) *Message { // {{{
-	ms := []*Message{m}
-	for i := 0; i < len(ms); i++ {
-		ms = append(ms, ms[i].messages...)
-		if ms[i].Code() == code {
-			return ms[i]
-		}
-	}
-	return nil
-}
-
-// }}}
-
-func (m *Message) Log(action string, str string, arg ...interface{}) *Message { // {{{
-	if !m.Options("log") {
-		return m
-	}
-
-	if l := m.Sesss("log"); l != nil {
-		l.Options("log", false)
-		l.Cmd("log", action, fmt.Sprintf(str, arg...))
-	}
-	return m
-}
-
-// }}}
-func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
-	switch e := e.(type) {
-	case error:
-	case bool:
-		if e {
-			return true
-		}
-	case string:
-		if e != "error: " {
-			return true
-		}
-	case *Context:
-		if len(msg) > 2 {
-			msg = msg[2:]
-		}
-	case *Message:
-		if result, ok := e.Meta["result"]; ok && len(result) > 0 && result[0] == "error: " {
-			panic(e)
-		}
-		return true
-	default:
-		return true
-	}
-
-	if len(msg) > 1 {
-		arg := make([]interface{}, 0, len(msg)-1)
-		for _, m := range msg[1:] {
-			arg = append(arg, m)
-		}
-		e = errors.New(fmt.Sprintf(msg[0], arg...))
-	} else if len(msg) > 0 {
-		e = errors.New(msg[0])
-	}
-	if _, ok := e.(error); !ok {
-		e = errors.New("error")
-	}
-
-	m.Set("result", "error: ", fmt.Sprintln(e), "\n")
-	panic(e)
-}
-
-// }}}
-func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
-	defer func() {
-		if e := recover(); e != nil {
-			switch v := e.(type) {
-			case *Message:
-				e = strings.Join(v.Meta["result"][1:], "")
-			}
-
-			msg.Log("error", "error: %v", e)
-			if msg.root.Conf("debug") == "on" && e != io.EOF {
-				fmt.Printf("\n\033[31m%s error: %v\033[0m\n", msg.target.Name, e)
-				debug.PrintStack()
-				fmt.Printf("\033[31m%s error: %v\033[0m\n\n", msg.target.Name, e)
-			}
-
-			if len(hand) > 1 {
-				m.TryCatch(msg, safe, hand[1:]...)
-			} else if !safe {
-				msg.Assert(e)
-			}
-		}
-	}()
-
-	if len(hand) > 0 {
-		hand[0](msg)
-	}
-
-	return m
-}
-
-// }}}
-
 func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
 	m.callback = cb
 	m.Cmd(arg...)
@@ -596,8 +628,7 @@ func (m *Message) Back(msg *Message) *Message { // {{{
 // }}}
 func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
 	if !sync {
-		m.Call(cb, arg...)
-		return m
+		return m.Call(cb, arg...)
 	}
 
 	wait := make(chan bool)
@@ -645,7 +676,8 @@ func (m *Message) Add(meta string, key string, value ...interface{}) *Message { 
 		m.Meta[meta] = append(m.Meta[meta], key)
 
 	default:
-		m.Log("error", "%s 消息参数错误", meta)
+		return m
+		m.Assert(true, "%s 消息参数错误", meta)
 	}
 
 	return m
@@ -653,10 +685,6 @@ func (m *Message) Add(meta string, key string, value ...interface{}) *Message { 
 
 // }}}
 func (m *Message) Set(meta string, arg ...string) *Message { // {{{
-	if m.Meta == nil {
-		m.Meta = make(map[string][]string)
-	}
-
 	switch meta {
 	case "detail", "result":
 		delete(m.Meta, meta)
@@ -665,58 +693,44 @@ func (m *Message) Set(meta string, arg ...string) *Message { // {{{
 			delete(m.Meta, arg[0])
 		} else {
 			for _, k := range m.Meta[meta] {
-				delete(m.Meta, k)
 				delete(m.Data, k)
+				delete(m.Meta, k)
 			}
 			delete(m.Meta, meta)
 		}
 	default:
-		m.Log("error", "%s 消息参数错误", meta)
+		return m
+		m.Assert(true, "%s 消息参数错误", meta)
 	}
 
 	if len(arg) > 0 {
 		m.Add(meta, arg[0], arg[1:])
 	}
-
 	return m
 }
 
 // }}}
 func (m *Message) Put(meta string, key string, value interface{}) *Message { // {{{
-	if m.Meta == nil {
-		m.Meta = make(map[string][]string)
-	}
-
 	switch meta {
 	case "option", "append":
-		if m.Data == nil {
+		if m.Set(meta, key); m.Data == nil {
 			m.Data = make(map[string]interface{})
 		}
 		m.Data[key] = value
 
-		if _, ok := m.Meta[meta]; !ok {
-			m.Meta[meta] = make([]string, 0, 3)
-		}
-		for _, v := range m.Meta[meta] {
-			if v == key {
-				return m
-			}
-		}
-		m.Meta[meta] = append(m.Meta[meta], key)
-
 	default:
-		m.Log("error", "%s 消息参数错误", meta)
+		return m
+		m.Assert(true, "%s 消息参数错误", meta)
 	}
-
 	return m
 }
 
 // }}}
 func (m *Message) Has(key string) bool { // {{{
-	if _, ok := m.Meta[key]; ok {
+	if _, ok := m.Data[key]; ok {
 		return true
 	}
-	if _, ok := m.Data[key]; ok {
+	if _, ok := m.Meta[key]; ok {
 		return true
 	}
 	return false
@@ -743,6 +757,7 @@ func (m *Message) Gets(key string) bool { // {{{
 }
 
 // }}}
+
 func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 	return m.Add("result", fmt.Sprintf(str, arg...))
 }
@@ -753,30 +768,6 @@ func (m *Message) Color(color int, str string, arg ...interface{}) *Message { //
 		str = fmt.Sprintf("\033[%dm%s\033[0m", color, str)
 	}
 	return m.Add("result", str)
-}
-
-// }}}
-func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {{{
-	switch meta {
-	case "session":
-	case "detail", "result":
-		m.Set(meta, msg.Meta[meta]...)
-	case "option", "append":
-		if len(arg) == 0 {
-			arg = msg.Meta[meta]
-		}
-
-		for _, k := range arg {
-			if v, ok := msg.Meta[k]; ok {
-				m.Set(meta, k).Add(meta, k, v)
-			}
-			if v, ok := msg.Data[k]; ok {
-				m.Put(meta, k, v)
-			}
-		}
-	}
-
-	return m
 }
 
 // }}}
@@ -994,25 +985,7 @@ func (m *Message) Insert(meta string, index int, arg ...interface{}) string { //
 		return ""
 	}
 
-	str := []string{}
-	for _, v := range arg {
-		switch s := v.(type) {
-		case string:
-			str = append(str, s)
-		case []string:
-			str = append(str, s...)
-		case []int:
-			for _, v := range s {
-				str = append(str, fmt.Sprintf("%d", v))
-			}
-		case []bool:
-			for _, v := range s {
-				str = append(str, fmt.Sprintf("%t", v))
-			}
-		default:
-			str = append(str, fmt.Sprintf("%v", s))
-		}
-	}
+	str := Trans(arg...)
 
 	if index == -1 {
 		index, m.Meta[meta] = 0, append(str, m.Meta[meta]...)
@@ -1041,83 +1014,108 @@ func (m *Message) Insert(meta string, index int, arg ...interface{}) string { //
 }
 
 // }}}
-func (m *Message) Detail(index int, arg ...interface{}) string { // {{{
+func (m *Message) Detail(arg ...interface{}) string { // {{{
+	noset, index := true, 0
+	if len(arg) > 0 {
+		switch v := arg[0].(type) {
+		case int:
+			noset, index, arg = false, v, arg[1:]
+		}
+	}
+	if noset && len(arg) > 0 {
+		index = -2
+	}
+
 	return m.Insert("detail", index, arg...)
 }
 
 // }}}
-func (m *Message) Detaili(index int, arg ...int) int { // {{{
-	i, e := strconv.Atoi(m.Insert("detail", index, arg))
+func (m *Message) Detaili(arg ...interface{}) int { // {{{
+	i, e := strconv.Atoi(m.Detail(arg...))
 	m.Assert(e)
 	return i
 }
 
 // }}}
-func (m *Message) Details(index int, arg ...bool) bool { // {{{
-	return Right(m.Insert("detail", index, arg))
+func (m *Message) Details(arg ...interface{}) bool { // {{{
+	return Right(m.Detail(arg...))
 }
 
 // }}}
-func (m *Message) Result(index int, arg ...interface{}) string { // {{{
+func (m *Message) Result(arg ...interface{}) string { // {{{
+	noset, index := true, 0
+	if len(arg) > 0 {
+		switch v := arg[0].(type) {
+		case int:
+			noset, index, arg = false, v, arg[1:]
+		}
+	}
+	if noset && len(arg) > 0 {
+		index = -2
+	}
+
 	return m.Insert("result", index, arg...)
 }
 
 // }}}
-func (m *Message) Resulti(index int, arg ...int) int { // {{{
-	i, e := strconv.Atoi(m.Insert("result", index, arg))
+func (m *Message) Resulti(arg ...interface{}) int { // {{{
+	i, e := strconv.Atoi(m.Result(arg...))
 	m.Assert(e)
 	return i
 }
 
 // }}}
-func (m *Message) Results(index int, arg ...bool) bool { // {{{
-	return Right(m.Insert("result", index, arg))
+func (m *Message) Results(arg ...interface{}) bool { // {{{
+	return Right(m.Result(arg...))
 }
 
 // }}}
 
 func (m *Message) Option(key string, arg ...interface{}) string { // {{{
-	m.Insert(key, 0, arg...)
-	if _, ok := m.Meta[key]; ok {
-		m.Add("option", key)
+	if len(arg) > 0 {
+		m.Insert(key, 0, arg...)
+		if _, ok := m.Meta[key]; ok {
+			m.Add("option", key)
+		}
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
-		if msg.Has(key) {
-			return msg.Get(key)
+		if !msg.Has(key) {
+			continue
+		}
+		for _, k := range msg.Meta["option"] {
+			if k == key {
+				return msg.Get(key)
+			}
 		}
 	}
 	return ""
 }
 
 // }}}
-func (m *Message) Optioni(key string, arg ...int) int { // {{{
-	i, e := strconv.Atoi(m.Option(key, arg))
+func (m *Message) Optioni(key string, arg ...interface{}) int { // {{{
+	i, e := strconv.Atoi(m.Option(key, arg...))
 	m.Assert(e)
 	return i
 }
 
 // }}}
-func (m *Message) Options(key string, arg ...bool) bool { // {{{
-	return Right(m.Option(key, arg))
+func (m *Message) Options(key string, arg ...interface{}) bool { // {{{
+	return Right(m.Option(key, arg...))
 }
 
 // }}}
 func (m *Message) Optionv(key string, arg ...interface{}) interface{} { // {{{
 	if len(arg) > 0 {
 		m.Put("option", key, arg[0])
-		return arg[0]
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
-		if msg.Data == nil || msg.Data[key] == nil {
+		if !msg.Has(key) {
 			continue
 		}
-		if msg.Meta["option"] == nil || len(msg.Meta["option"]) == 0 {
-			continue
-		}
-		for _, v := range msg.Meta["option"] {
-			if v == key {
+		for _, k := range msg.Meta["option"] {
+			if k == key {
 				return msg.Data[key]
 			}
 		}
@@ -1127,8 +1125,7 @@ func (m *Message) Optionv(key string, arg ...interface{}) interface{} { // {{{
 
 // }}}
 func (m *Message) Optionx(key string, format string) interface{} { // {{{
-	value := m.Option(key)
-	if value != "" {
+	if value := m.Option(key); value != "" {
 		return fmt.Sprintf(format, value)
 	}
 	return ""
@@ -1136,19 +1133,22 @@ func (m *Message) Optionx(key string, format string) interface{} { // {{{
 
 // }}}
 func (m *Message) Append(key string, arg ...interface{}) string { // {{{
-	m.Insert(key, 0, arg...)
-	if _, ok := m.Meta[key]; ok {
-		m.Add("append", key)
+	if len(arg) > 0 {
+		m.Insert(key, 0, arg...)
+		if _, ok := m.Meta[key]; ok {
+			m.Add("append", key)
+		}
 	}
 
 	ms := []*Message{m}
 	for i := 0; i < len(ms); i++ {
 		ms = append(ms, ms[i].messages...)
-		if ms[i].Has(key) {
-			for j := 0; j < len(ms[i].Meta["append"]); j++ {
-				if ms[i].Meta["append"][j] == key {
-					return ms[i].Get(key)
-				}
+		if !ms[i].Has(key) {
+			continue
+		}
+		for _, k := range ms[i].Meta["append"] {
+			if k == key {
+				return ms[i].Get(key)
 			}
 		}
 	}
@@ -1156,15 +1156,15 @@ func (m *Message) Append(key string, arg ...interface{}) string { // {{{
 }
 
 // }}}
-func (m *Message) Appendi(key string, arg ...int) int { // {{{
-	i, e := strconv.Atoi(m.Append(key, arg))
+func (m *Message) Appendi(key string, arg ...interface{}) int { // {{{
+	i, e := strconv.Atoi(m.Append(key, arg...))
 	m.Assert(e)
 	return i
 }
 
 // }}}
-func (m *Message) Appends(key string, arg ...bool) bool { // {{{
-	return Right(m.Append(key, arg))
+func (m *Message) Appends(key string, arg ...interface{}) bool { // {{{
+	return Right(m.Append(key, arg...))
 }
 
 // }}}
@@ -1176,14 +1176,11 @@ func (m *Message) Appendv(key string, arg ...interface{}) interface{} { // {{{
 	ms := []*Message{m}
 	for i := 0; i < len(ms); i++ {
 		ms = append(ms, ms[i].messages...)
-		if ms[i].Data == nil || ms[i].Data[key] == nil {
+		if !ms[i].Has(key) {
 			continue
 		}
-		if ms[i].Meta["append"] == nil || len(ms[i].Meta["append"]) == 0 {
-			continue
-		}
-		for _, v := range ms[i].Meta["append"] {
-			if v == key {
+		for _, k := range ms[i].Meta["append"] {
+			if k == key {
 				return ms[i].Data[key]
 			}
 		}
@@ -1193,6 +1190,14 @@ func (m *Message) Appendv(key string, arg ...interface{}) interface{} { // {{{
 
 // }}}
 
+func (m *Message) Wait() bool { // {{{
+	if m.target.exit != nil {
+		return <-m.target.exit
+	}
+	return true
+}
+
+// }}}
 func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
 	return m.Set("detail", arg...).target.Spawn(m, name, help).Begin(m).Start(m)
 }
@@ -1200,17 +1205,16 @@ func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
 // }}}
 func (m *Message) Cmd(args ...interface{}) *Message { // {{{
 	if len(args) > 0 {
-		m.Set("detail").Detail(0, args...)
+		m.Set("detail", Trans(args...)...)
 	}
-
-	key := m.Meta["detail"][0]
-	arg := m.Meta["detail"][1:]
+	key, arg := m.Meta["detail"][0], m.Meta["detail"][1:]
 
 	for _, c := range []*Context{m.target, m.source} {
 		for s := c; s != nil; s = s.context {
+
 			if x, ok := s.Commands[key]; ok && x.Hand != nil {
 				m.TryCatch(m, true, func(m *Message) {
-					m.Log("cmd", "%s %v %v", s.Name, m.Meta["detail"], m.Meta["option"])
+					m.Log("cmd", "%s:%s %v %v", s.Name, c.Name, m.Meta["detail"], m.Meta["option"])
 
 					if args := []string{}; x.Form != nil {
 						for i := 0; i < len(arg); i++ {
@@ -1254,30 +1258,27 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 	value := ""
 	switch v := arg[0].(type) {
 	case string:
-		value = v
+		value, arg = v, arg[1:]
 	case []string:
 		which := 0
 		if len(arg) > 1 {
 			if x, ok := arg[1].(int); ok {
-				which = x
-				arg = arg[1:]
+				which, arg = x, arg[2:]
 			}
 		}
 		if which < len(v) {
 			value = v[which]
 		}
 	default:
-		x := fmt.Sprintf("%v", v)
-		if v != nil && x != "" {
-			value = x
+		if x := fmt.Sprintf("%v", v); v != nil && x != "" {
+			value, arg = x, arg[1:]
 		}
 	}
 
 	force := false
-	if len(arg) > 1 {
-		if v, ok := arg[1].(bool); ok {
-			arg = arg[1:]
-			force = v
+	if len(arg) > 0 {
+		if v, ok := arg[0].(bool); ok {
+			force, arg = v, arg[1:]
 		}
 	}
 	if !force && value == "" {
@@ -1285,15 +1286,14 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 	}
 
 	format := "%s"
-	if len(arg) > 1 {
-		if v, ok := arg[1].(string); ok {
-			arg = arg[1:]
-			format = v
+	if len(arg) > 0 {
+		if v, ok := arg[0].(string); ok {
+			format, arg = v, arg[1:]
 		}
 	}
 	if value != "" {
 		args := []interface{}{value}
-		for _, v := range arg[1:] {
+		for _, v := range arg {
 			args = append(args, v)
 		}
 		value = fmt.Sprintf(format, args...)
@@ -1311,8 +1311,7 @@ func (m *Message) Confs(key string, arg ...bool) bool { // {{{
 		}
 	}
 
-	b := m.Conf(key)
-	return b != "" && b != "0" && b != "false"
+	return Right(m.Conf(key))
 }
 
 // }}}
@@ -1346,7 +1345,6 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 					} else {
 						x.Value = arg[0]
 					}
-					// m.Log("conf", "%s %v", x.Name, x.Value)
 					return x.Value
 				case 0:
 					if x.Hand != nil {
@@ -1368,54 +1366,6 @@ func (m *Message) Conf(key string, arg ...string) string { // {{{
 		return m.Conf(key, arg[1])
 	}
 
-	// m.Log("error", "%s 配置项不存在", key)
-	return ""
-}
-
-// }}}
-func (m *Message) Capx(key string, arg ...interface{}) string { // {{{
-	if len(arg) == 0 {
-		value := m.Option(key)
-		if value == "" {
-			value = m.Cap(key)
-		}
-		return value
-	}
-
-	skip := false
-	if len(arg) > 1 {
-		if v, ok := arg[1].(bool); ok && !v {
-			skip = true
-		}
-	}
-
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case string:
-			if skip || v == "" {
-				return m.Cap(key)
-			}
-			return v
-		case []string:
-			which := 0
-			if len(arg) > 1 {
-				if x, ok := arg[1].(int); ok {
-					which = x
-				}
-			}
-			if which < len(v) {
-				return v[which]
-			}
-			return m.Cap(key)
-		default:
-			x := fmt.Sprintf("%v", v)
-			if skip || v == nil || x == "" {
-				return m.Cap(key)
-			}
-			return x
-		}
-	}
-
 	return ""
 }
 
@@ -1429,8 +1379,7 @@ func (m *Message) Caps(key string, arg ...bool) bool { // {{{
 		}
 	}
 
-	b := m.Cap(key)
-	return b != "" && b != "0" && b != "false"
+	return Right(m.Cap(key))
 }
 
 // }}}
@@ -1467,10 +1416,8 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 					} else {
 						x.Value = arg[0]
 					}
-					// m.Log("debug", "%s %s", x.Name, x.Value)
 					return x.Value
 				case 0:
-					// m.Log("debug", "%s %s", x.Name, x.Value)
 					if x.Hand != nil {
 						return x.Hand(m, x)
 					}
@@ -1490,7 +1437,6 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 		return m.Cap(key, arg[1])
 	}
 
-	// m.Log("error", "%s 缓存项不存在", key)
 	return ""
 }
 
@@ -1559,7 +1505,7 @@ var CGI = template.FuncMap{
 
 			switch which := arg[1].(type) {
 			case string:
-				m.Sesss(which, arg[2:]...)
+				m.Sess(which, arg[2:]...)
 				return ""
 			}
 		}
@@ -1737,7 +1683,7 @@ var CGI = template.FuncMap{
 			if len(arg) == 1 {
 				return strings.Join(m.Meta["detail"], "")
 			}
-			return m.Detail(0, arg[1:]...)
+			return m.Detail(arg[1:]...)
 		}
 		return ""
 	}, // }}}
@@ -1770,7 +1716,7 @@ var CGI = template.FuncMap{
 			if len(arg) == 1 {
 				return strings.Join(m.Meta["result"], "")
 			}
-			return m.Result(0, arg[1:]...)
+			return m.Result(arg[1:]...)
 		}
 		return ""
 	}, // }}}
@@ -1796,65 +1742,26 @@ var CGI = template.FuncMap{
 	}, // }}}
 }
 
-var Pulse = &Message{
-	code:     0,
-	time:     time.Now(),
-	source:   Index,
-	target:   Index,
-	sessions: make(map[string]*Message),
-}
+var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
+
 var Index = &Context{Name: "ctx", Help: "模块中心",
 	Caches: map[string]*Cache{
-		"debug":    &Cache{Name: "服务数量", Value: "true", Help: "显示已经启动运行模块的数量"},
-		"nserver":  &Cache{Name: "服务数量", Value: "0", Help: "显示已经启动运行模块的数量"},
-		"ncontext": &Cache{Name: "模块数量", Value: "0", Help: "显示功能树已经注册模块的数量"},
-		"nmessage": &Cache{Name: "消息数量", Value: "0", Help: "显示模块启动时所创建消息的数量"},
+		"nserver":  &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
+		"ncontext": &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
+		"nmessage": &Cache{Name: "nmessage", Value: "0", Help: "消息数量"},
 	},
 	Configs: map[string]*Config{
-		"debug":     &Config{Name: "调试模式(true/false)", Value: "true", Help: "是否打印错误信息，off:不打印，on:打印)"},
-		"default":   &Config{Name: "默认的搜索起点(root/back/home)", Value: "root", Help: "模块搜索的默认起点，root:从根模块，back:从父模块，home:从当前模块"},
-		"start":     &Config{Name: "启动模块", Value: "cli", Help: "启动时自动运行的模块"},
-		"init.shy":  &Config{Name: "启动脚本", Value: "etc/init.shy", Help: "模块启动时自动运行的脚本"},
-		"bench.log": &Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件"},
-		"root": &Config{Name: "工作目录", Value: ".", Help: "所有模块的当前目录", Hand: func(m *Message, x *Config, arg ...string) string {
-			if len(arg) > 0 { // {{{
-				if !path.IsAbs(x.Value) {
-					wd, e := os.Getwd()
-					m.Assert(e)
-					x.Value = path.Join(wd, x.Value)
-				}
-
-				if e := os.MkdirAll(x.Value, os.ModePerm); e != nil {
-					fmt.Println(e)
-				}
-				if e := os.Chdir(x.Value); e != nil {
-					fmt.Println(e)
-				}
-				return arg[0]
-			}
-
-			return x.Value
-			// }}}
-		}},
-
-		"ContextRequestSize": &Config{Name: "请求队列长度", Value: "10", Help: "每个模块可以被其它模块引用的的数量"},
-		"ContextSessionSize": &Config{Name: "会话队列长度", Value: "10", Help: "每个模块可以启动其它模块的数量"},
-		"MessageQueueSize":   &Config{Name: "消息队列长度", Value: "10", Help: "每个模块接收消息的队列长度"},
-
-		"cert": &Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
-		"key":  &Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
+		"debug": &Config{Name: "debug(on/off)", Value: "on", Help: "调试模式，on:打印，off:不打印)"},
 
 		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
-		"search_choice": &Config{Name: "search_choice(first/last/rand/magic)", Value: "magic", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
-		"search_action": &Config{Name: "search_action(list/switch)", Value: "switch", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
-		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_choice": &Config{Name: "search_choice(first/last/rand/magic)", Value: "magic", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magic: 加权选择"},
+		"search_action": &Config{Name: "search_action(list/switch)", Value: "switch", Help: "搜索操作, list: 输出模块列表, switch: 模块切换"},
+		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索起点, true: 根模块, false: 当前模块"},
 
 		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
 		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
 
-		"list_help": &Config{Name: "list_help", Value: "list command", Help: "返回值的索引"},
-
-		"time_layout": &Config{Name: "time_layout", Value: "2006-01-02 15:04:05", Help: "返回值的索引"},
+		"list_help": &Config{Name: "list_help", Value: "list command", Help: "命令列表帮助"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -1887,7 +1794,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"message": &Command{Name: "message [code] [all]|[cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.Sesss("cli", false) // {{{
+			msg := m.Sess("cli", false) // {{{
 			if len(arg) > 0 {
 				if code, e := strconv.Atoi(arg[0]); e == nil {
 					ms := []*Message{m.root}
@@ -1931,8 +1838,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				}
 
-				m.Color(31, "message:\n")
-				m.Echo(" %s\n", msg.message.Format())
+				if msg.message != nil {
+					m.Color(31, "message:\n")
+					m.Echo(" %s\n", msg.message.Format())
+				}
 
 				if len(msg.messages) > 0 {
 					m.Color(31, "messages:\n")
@@ -2104,7 +2013,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		}},
 		"callback": &Command{Name: "callback index", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			index := 0
-			for msg := m.Sesss("cli", false); msg != nil; msg = msg.message { // {{{
+			for msg := m.Sess("cli", false); msg != nil; msg = msg.message { // {{{
 				index--
 				switch len(arg) {
 				case 0:
@@ -2592,7 +2501,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				current := m.Target()
-				aaa := m.Sesss("aaa")
+				aaa := m.Sess("aaa")
 				void := index["void"]
 				if aaa != nil && aaa.Cap("group") != aaa.Conf("rootname") {
 					if current = index[aaa.Cap("group")]; current == nil {
@@ -2819,72 +2728,37 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				} // }}}
 			}},
 	},
-	Index: map[string]*Context{
-		"void": &Context{Name: "void",
-			Caches: map[string]*Cache{
-				"nmessage": &Cache{},
-				"ncontext": &Cache{},
-				"nserver":  &Cache{},
-			},
-			Configs: map[string]*Config{
-				"debug":     &Config{},
-				"bench.log": &Config{},
-			},
-			Commands: map[string]*Command{
-				"help":     &Command{},
-				"message":  &Command{},
-				"detail":   &Command{},
-				"option":   &Command{},
-				"result":   &Command{},
-				"append":   &Command{},
-				"session":  &Command{},
-				"callback": &Command{},
-				"context":  &Command{},
-				"server":   &Command{},
-				"command":  &Command{},
-				"config":   &Command{},
-				"cache":    &Command{},
-				"right":    &Command{},
-			},
-		},
-	},
-}
-
-func init() {
-	Pulse.root = Pulse
-	Index.root = Index
 }
 
 func Start(args ...string) {
-	if len(args) > 0 {
-		Pulse.Conf("init.shy", args[0])
-		args = args[1:]
-	}
-	if len(args) > 0 {
-		Pulse.Conf("bench.log", args[0])
-		args = args[1:]
-	}
-	if len(args) > 0 {
-		Pulse.Conf("root", args[0])
-		args = args[1:]
-	}
-	if len(args) > 0 {
-		Pulse.Conf("start", args[0])
-		args = args[1:]
-	}
+	Index.root = Index
+	Pulse.root = Pulse
 
 	for _, m := range Pulse.Search("") {
 		m.target.root = Index
 		m.target.Begin(m)
 	}
 
-	Pulse.Sesss("nfs", "nfs")
-	Pulse.Sesss("lex", "lex")
-	Pulse.Sesss("yac", "yac")
-	Pulse.Sesss("log", "log").Conf("bench.log", Pulse.Conf("bench.log"))
+	Pulse.Sess("nfs", "nfs")
+	Pulse.Sess("lex", "lex")
+	Pulse.Sess("yac", "yac")
+	Pulse.Sess("cli", "cli")
+	Pulse.Sess("aaa", "aaa")
+	Pulse.Sess("log", "log")
+
+	if len(args) > 0 {
+		Pulse.Sess("cli", false).Conf("init.shy", args[0])
+		args = args[1:]
+	}
+	if len(args) > 0 {
+		Pulse.Sess("log", false).Conf("bench.log", args[0])
+		args = args[1:]
+	}
 
 	Pulse.Options("log", true)
+	log := Pulse.Sess("log", false)
+	log.target.Start(log)
+
 	Pulse.Options("terminal_color", true)
-	cli := Pulse.Find("cli").Cmd("source", "stdio", "async")
-	cli.target.Wait()
+	Pulse.Sess("cli", false).Cmd("source", "stdio", "async").Wait()
 }

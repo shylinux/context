@@ -4,7 +4,6 @@ import ( // {{{
 	"contexts"
 	"fmt"
 	Log "log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -44,16 +43,7 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	log.Configs["flag_action"] = &ctx.Config{Name: "输出类型", Value: "true", Help: "模块日志类型"}
 	log.Configs["flag_name"] = &ctx.Config{Name: "输出名称", Value: "true", Help: "模块日志输出消息源模块与消息目的模块"}
 
-	log.Configs["bench.log"] = &ctx.Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
-		if len(arg) > 0 {
-			if nfs := m.Sesss("nfs"); nfs != nil {
-				os.Create(arg[0])
-				log.nfs = nfs.Cmd("open", arg[0], "", "日志文件")
-			}
-			return arg[0]
-		}
-		return x.Value
-	}}
+	log.Configs["bench.log"] = &ctx.Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件"}
 
 	return log
 }
@@ -61,6 +51,7 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 // }}}
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool { // {{{
 	log.Message = m
+	log.nfs = m.Sess("nfs").Cmd("append", m.Confx("bench.log", arg, 0), "", "日志文件")
 	return false
 }
 
@@ -167,10 +158,10 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 				cmd := strings.Join(arg[1:], "")
 
 				if log.nfs != nil {
-					if log.nfs.Options("log", false); color > 0 {
-						log.nfs.Cmd("write", fmt.Sprintf("%s\033[%dm%s%s %s\033[0m\n", date, color, code, action, cmd))
+					if color > 0 {
+						m.Spawn(log.nfs.Target()).Cmd("write", fmt.Sprintf("%s\033[%dm%s%s %s\033[0m\n", date, color, code, action, cmd))
 					} else {
-						log.nfs.Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, cmd))
+						m.Spawn(log.nfs.Target()).Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, cmd))
 					}
 				}
 			} // }}}

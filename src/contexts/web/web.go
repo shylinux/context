@@ -603,7 +603,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					msg.Option("current_module", m.Option("dir"))
 					msg.Option("current_domain", m.Option("domain"))
 					m.Add("option", "tmpl", v)
-					m.Sesss(v, msg)
+					m.Sess(v, msg)
 				}
 			}
 			m.Append("template", m.Conf("travel_main"), m.Conf("travel_tmpl"))
@@ -632,7 +632,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			// 共享列表
-			share := m.Sesss("share", m.Target())
+			share := m.Sess("share", m.Target())
 			index := share.Target().Index
 			if index != nil && index[aaa.Append("userrole")] != nil {
 				for k, v := range index[aaa.Append("userrole")].Index {
@@ -656,7 +656,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			fs, e := ioutil.ReadDir(m.Option("dir"))
 			m.Assert(e)
 			fs = append(fs, s)
-			list := m.Sesss("list", m.Target())
+			list := m.Sess("list", m.Target())
 			list.Option("dir", m.Option("dir"))
 
 			for _, v := range fs {
@@ -712,7 +712,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 执行命令
 			switch m.Option("cmd") {
 			case "git":
-				git := m.Sesss("git", m.Target())
+				git := m.Sess("git", m.Target())
 
 				branch := m.Find("nfs").Cmd("git", "-C", m.Option("dir"), "branch")
 				git.Option("branch", branch.Result(0))

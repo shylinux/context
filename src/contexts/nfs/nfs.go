@@ -529,7 +529,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	nfs.Message = m
-	if len(arg) > 0 && (arg[0] == "scan" || arg[0] == "open") {
+	if len(arg) > 0 && (arg[0] == "scan" || arg[0] == "open" || arg[0] == "append") {
 		c.Caches = map[string]*ctx.Cache{
 			"pos":    &ctx.Cache{Name: "pos", Value: "0", Help: "pos"},
 			"size":   &ctx.Cache{Name: "size", Value: "0", Help: "size"},
@@ -629,22 +629,25 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return true
 	}
 
-	if len(arg) > 0 && arg[0] == "open" {
+	if len(arg) > 0 && (arg[0] == "open" || arg[0] == "append") {
 		nfs.out = m.Optionv("out").(*os.File)
 		nfs.in = m.Optionv("in").(*os.File)
 		s, e := nfs.in.Stat()
 		m.Assert(e)
 		m.Capi("size", int(s.Size()))
 		m.Cap("stream", arg[1])
+		if arg[0] == "append" {
+			m.Capi("pos", int(s.Size()))
+		}
 		return false
 	}
 
-	m.Sesss("nfs", m)
+	m.Sess("nfs", m)
 
 	nfs.Message = m
 	if socket, ok := m.Data["io"]; ok {
 		m.Cap("stream", m.Source().Name)
-		// m.Sesss("aaa", "aaa").Cmd("login", "demo", "demo")
+		// m.Sess("aaa", "aaa").Cmd("login", "demo", "demo")
 		m.Options("stdio", false)
 
 		nfs.io = socket.(io.ReadWriteCloser)
@@ -666,7 +669,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		for {
 			line, e := nfs.Reader.ReadString('\n')
 			if msg == nil {
-				msg = m.Sesss("ssh")
+				msg = m.Sess("ssh")
 				m.Cap("target", msg.Target().Name)
 			}
 
@@ -973,6 +976,18 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Put("option", "in", f).Put("option", "out", f)
 				}
 				m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), "open", arg[0])
+				m.Echo(m.Target().Name)
+				// }}}
+			}},
+		"append": &ctx.Command{
+			Name: "append filename [nfs_name [nfs_help]]",
+			Help: "打开文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if m.Has("io") { // {{{
+				} else if f, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE|os.O_APPEND, os.ModePerm); m.Assert(e) {
+					m.Put("option", "in", f).Put("option", "out", f)
+				}
+				m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), "append", arg[0])
 				m.Echo(m.Target().Name)
 				// }}}
 			}},
