@@ -167,6 +167,9 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 			msg.Result(0, msg.Meta["return"])
 		} else {
 			m.Spawn().Cmd("alias", "import", "nfs")
+			m.Spawn().Cmd("login", "root", "root")
+			m.Spawn().Cmd("context", "web", "serve", "usr", ":9094")
+			m.Spawn().Cmd("context", "web", "right", "add", "shy", "command", "/upload", "dir", "usr")
 		}
 	}
 	return false
