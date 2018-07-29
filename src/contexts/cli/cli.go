@@ -113,7 +113,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		yac.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
 		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "(", "exp", ")")
 
-		yac.Cmd("train", "stm", "var", "cache", "key", "opt{", "=", "exp", "}")
 		yac.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
 		yac.Cmd("train", "stm", "let", "let", "key", "opt{", "=", "exp", "}")
 		yac.Cmd("train", "stm", "var", "var", "key", "<-")
@@ -543,7 +542,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Echo(result)
 			// }}}
 		}},
-		"exp": &ctx.Command{Name: "exp word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"exp": &ctx.Command{Name: "exp word", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			pre := map[string]int{ // {{{
 				"=": 1,
 				"+": 2, "-": 2,
@@ -735,6 +734,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Copy(msg, "result").Copy(msg, "append")
 			}
 			// }}}
+		}},
+		"login": &ctx.Command{Name: "login username password", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Sess("aaa", false).Cmd("login", arg[0], arg[1])
 		}},
 		"clear": &ctx.Command{Name: "clear", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Log("fuck", strings.Repeat("\n", 20))

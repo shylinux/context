@@ -3,12 +3,14 @@ package aaa // {{{
 import ( // {{{
 	"contexts"
 
+	"bufio"
 	"io"
 	"io/ioutil"
 	"os"
 
 	"crypto"
 	"crypto/md5"
+	"strings"
 
 	crand "crypto/rand"
 	"crypto/rsa"
@@ -27,79 +29,57 @@ import ( // {{{
 // }}}
 
 type AAA struct {
-	share    map[string]*ctx.Context
-	sessions map[string]*ctx.Context
+	sessions map[string]*ctx.Message
 	*ctx.Context
 }
 
 func (aaa *AAA) Session(meta string) string { // {{{
 	bs := md5.Sum([]byte(fmt.Sprintln("%d%d%s", time.Now().Unix(), rand.Int(), meta)))
-	sessid := hex.EncodeToString(bs[:])
-	return sessid
+	return hex.EncodeToString(bs[:])
+}
+
+// }}}
+func (aaa *AAA) Password(pwd string) string { // {{{
+	bs := md5.Sum([]byte(fmt.Sprintln("用户密码:%s", pwd)))
+	return hex.EncodeToString(bs[:])
 }
 
 // }}}
 
 func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
-	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{}
+	c.Caches = map[string]*ctx.Cache{
+		"time": &ctx.Cache{Name: "time", Value: fmt.Sprintf("%d", time.Now().Unix()), Help: "登录时间", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				return arg[0]
+			}
 
-	c.Index = map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void", Help: "void",
-			Caches:   map[string]*ctx.Cache{"group": &ctx.Cache{}},
-			Configs:  map[string]*ctx.Config{"rootname": &ctx.Config{}},
-			Commands: map[string]*ctx.Command{"login": &ctx.Command{}},
-		},
+			n, e := strconv.Atoi(x.Value)
+			m.Assert(e)
+			return time.Unix(int64(n), 0).Format("15:03:04")
+			// }}}
+		}},
+		"username": &ctx.Cache{Name: "username", Value: arg[0], Help: "用户名"},
+		"password": &ctx.Cache{Name: "password", Value: arg[1], Help: "用户密码，加密存储"},
+		"sessid":   &ctx.Cache{Name: "sessid", Value: arg[2], Help: "会话令牌"},
+		"expire":   &ctx.Cache{Name: "expire", Value: fmt.Sprintf("%d", int64(m.Confi("expire"))+time.Now().Unix()), Help: "会话超时"},
 	}
+	c.Configs = map[string]*ctx.Config{}
 
 	s := new(AAA)
 	s.Context = c
+	s.sessions = aaa.sessions
 	return s
 }
 
 // }}}
 func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	aaa.Caches["group"] = &ctx.Cache{Name: "用户组", Value: "", Help: "用户组"}
-	aaa.Caches["username"] = &ctx.Cache{Name: "用户名", Value: "", Help: "用户名"}
-	aaa.Caches["password"] = &ctx.Cache{Name: "用户密码", Value: "", Help: "用户密码，加密存储", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-		if len(arg) > 0 {
-			bs := md5.Sum([]byte(fmt.Sprintln("用户密码:%s", arg[0])))
-			m.Assert(x.Value == "" || x.Value == hex.EncodeToString(bs[:]), "密码错误")
-			m.Cap("expire", fmt.Sprintf("%d", time.Now().Unix()+int64(Pulse.Confi("expire"))))
-			return hex.EncodeToString(bs[:])
-		}
-		return x.Value
-	}}
-
-	aaa.Caches["sessid"] = &ctx.Cache{Name: "会话令牌", Value: "", Help: "用户的会话标识"}
-	aaa.Caches["expire"] = &ctx.Cache{Name: "会话超时", Value: "", Help: "用户的会话标识"}
-	aaa.Caches["time"] = &ctx.Cache{Name: "登录时间", Value: fmt.Sprintf("%d", time.Now().Unix()), Help: "用户登录时间", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-		if len(arg) > 0 {
-			return arg[0]
-		}
-
-		n, e := strconv.Atoi(x.Value)
-		m.Assert(e)
-		return time.Unix(int64(n), 0).Format("15:03:04")
-	}}
-
-	if m.Target() == Index {
-		Pulse = m
-	}
 	return aaa
 }
 
 // }}}
 func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
-	if len(arg) > 1 && m.Cap("sessid") == "" {
-		m.Cap("group", arg[0])
-		m.Cap("username", arg[1])
-		m.Cap("stream", m.Cap("username"))
-		m.Cap("sessid", aaa.Session(arg[1]))
-		Pulse.Capi("nuser", 1)
-	}
-
-	m.Log("info", "%s login %s %s", Pulse.Cap("nuser"), m.Cap("group"), m.Cap("username"))
+	aaa.sessions[m.Cap("sessid")] = m
+	m.Log("info", "%d login %s", m.Capi("nuser", 1), m.Cap("stream", arg[0]))
 	return false
 }
 
@@ -107,12 +87,13 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
 	switch aaa.Context {
 	case m.Target():
-		root := Pulse.Target().Server.(*AAA)
-		delete(root.sessions, m.Cap("sessid"))
-		m.Log("info", "%d logout %s", Pulse.Capi("nuser", -1)+1, m.Cap("username"))
+		if int64(m.Capi("expire")) > time.Now().Unix() {
+			return false
+		}
+		delete(aaa.sessions, m.Cap("sessid"))
+		m.Log("info", "%d logout %s", m.Capi("nuser", -1), m.Cap("username"))
 	case m.Source():
 	}
-
 	return true
 }
 
@@ -121,90 +102,71 @@ func (aaa *AAA) Close(m *ctx.Message, arg ...string) bool { // {{{
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	Caches: map[string]*ctx.Cache{
-		"nuser": &ctx.Cache{Name: "用户数量", Value: "0", Help: "用户数量"},
+		"nuser": &ctx.Cache{Name: "nuser", Value: "0", Help: "用户数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"rootname": &ctx.Config{Name: "根用户名", Value: "root", Help: "根用户名"},
-		"expire":   &ctx.Config{Name: "会话超时(s)", Value: "7200", Help: "会话超时"},
-		"cert":     &ctx.Config{Name: "证书文件", Value: "etc/cert.pem", Help: "证书文件"},
-		"key":      &ctx.Config{Name: "私钥文件", Value: "etc/key.pem", Help: "私钥文件"},
+		"rootname": &ctx.Config{Name: "rootname", Value: "root", Help: "根用户名"},
+		"expire":   &ctx.Config{Name: "expire(s)", Value: "7200", Help: "会话超时"},
+		"cert":     &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "证书文件"},
+		"key":      &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
-		"login": &ctx.Command{Name: "login [sessid]|[[group] username password]]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			// m.Target(c) // {{{
-			aaa := c.Server.(*AAA)
-
-			switch len(arg) {
-			case 0:
-				m.Travel(func(m *ctx.Message, i int) bool {
-					m.Echo("%s(%s): %s\n", m.Target().Name, m.Cap("group"), m.Cap("time"))
-					if int64(m.Capi("expire")) < time.Now().Unix() {
-						m.Target().Close(m)
+		"login": &ctx.Command{
+			Name: "login [sessid]|[username password]|[load|save filename]",
+			Help: "用户登录, sessid: 会话ID, username: 用户名, password: 密码, load: 加载用户信息, save: 保存用户信息, filename: 文件名",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) { // {{{
+					switch len(arg) {
+					case 0:
+						m.Travel(func(m *ctx.Message, i int) bool {
+							if i > 0 {
+								m.Echo("%s: %s\n", m.Cap("username"), m.Cap("sessid"))
+							}
+							return true
+						})
+					case 1:
+						if msg, ok := aaa.sessions[arg[0]]; ok {
+							if int64(msg.Capi("expire")) > time.Now().Unix() {
+								m.Echo(msg.Cap("username"))
+								m.Copy(msg, "target")
+							} else {
+								delete(aaa.sessions, arg[0])
+								msg.Target().Close(msg)
+								m.Capi("nuser", -1)
+							}
+						}
+					default:
+						switch arg[0] {
+						case "load":
+							if f, e := os.Open(arg[1]); m.Assert(e) {
+								for bio := bufio.NewScanner(f); bio.Scan(); {
+									word := strings.SplitN(bio.Text(), ":", 3)
+									m.Spawn().Start(word[0], "用户", word[0], word[1], word[2])
+								}
+							}
+						case "save":
+							if f, e := os.Create(arg[1]); m.Assert(e) {
+								m.Travel(func(m *ctx.Message, i int) bool {
+									if i > 0 {
+										f.WriteString(fmt.Sprintf("%s:%s:%s\n", m.Cap("username"), m.Cap("password"), m.Cap("sessid")))
+									}
+									return true
+								})
+							}
+						default:
+							if msg := m.Find(arg[0], false); msg == nil {
+								m.Start(arg[0], "用户", arg[0], aaa.Password(arg[1]), aaa.Session(arg[0]))
+								m.Echo(m.Cap("sessid"))
+							} else if msg.Cap("password") != aaa.Password(arg[1]) {
+								return
+							} else {
+								m.Echo(msg.Cap("sessid"))
+								m.Copy(msg, "target")
+							}
+						}
 					}
-					return true
-				}, c)
-			case 1:
-				_, ok := aaa.sessions[arg[0]]
-				m.Assert(ok, "会话失败")
-				// m.Target(s)
-				m.Assert(int64(m.Capi("expire")) > time.Now().Unix(), "会话失败")
-
-				m.Log("info", "logon %s %s", m.Cap("username"), m.Cap("group"))
-				m.Echo(m.Cap("username"))
-
-				m.Append("username", m.Cap("username"))
-				m.Append("userrole", m.Cap("group"))
-				m.Appendv("aaa", m)
-				m.Sess("aaa", m)
-			case 2, 3:
-				group, username, password := arg[0], arg[0], arg[1]
-				if len(arg) == 3 {
-					username, password = arg[1], arg[2]
-				}
-
-				msg := m
-				if username == Pulse.Conf("rootname") {
-					msg = Pulse.Spawn(Pulse.Target())
-					msg.Set("detail", group, username).Target().Start(msg)
-				} else if msg = Pulse.Find(username, false); msg == nil {
-					m.Start(username, "认证用户", group, username)
-					msg = m
-				} else {
-					// m.Target(msg.Target())
-				}
-
-				msg.Cap("password", password)
-
-				aaa.sessions[m.Cap("sessid")] = msg.Target()
-				m.Echo(msg.Cap("sessid"))
-
-				m.Append("username", msg.Cap("username"))
-				m.Append("userrole", msg.Cap("group"))
-				m.Appendv("aaa", msg)
-				m.Sess("aaa", msg)
-			}
-			// }}}
-		}},
-		"share": &ctx.Command{Name: "share user", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if len(arg) == 0 { // {{{
-				aaa := m.Target().Server.(*AAA)
-				for k, v := range aaa.share {
-					m.Echo("%s: %s", k, v.Name)
-				}
-				return
-			}
-
-			group := m.Sess("aaa").Cap("group")
-			m.Travel(func(msg *ctx.Message, i int) bool {
-				aaa := msg.Target().Server.(*AAA)
-				if aaa.share == nil {
-					aaa.share = make(map[string]*ctx.Context)
-				}
-				aaa.share[group] = m.Target()
-				return true
-			}, c)
-			// }}}
-		}},
+				} // }}}
+			}},
 		"md5": &ctx.Command{Name: "md5 [file filename][content]", Help: "散列",
 			Form: map[string]int{"file": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -368,16 +330,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				// }}}
 			}},
 	},
-	Index: map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void", Help: "void",
-			Caches:  map[string]*ctx.Cache{"group": &ctx.Cache{}},
-			Configs: map[string]*ctx.Config{"rootname": &ctx.Config{}},
-			Commands: map[string]*ctx.Command{
-				"login": &ctx.Command{},
-				"check": &ctx.Command{},
-			},
-		},
-	},
 }
 
 func init() {
@@ -385,5 +337,5 @@ func init() {
 	aaa.Context = Index
 	ctx.Index.Register(Index, aaa)
 
-	aaa.sessions = make(map[string]*ctx.Context)
+	aaa.sessions = make(map[string]*ctx.Message)
 }

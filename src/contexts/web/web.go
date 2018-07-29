@@ -634,8 +634,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 共享列表
 			share := m.Sess("share", m.Target())
 			index := share.Target().Index
-			if index != nil && index[aaa.Append("userrole")] != nil {
-				for k, v := range index[aaa.Append("userrole")].Index {
+			if index != nil && index[aaa.Append("username")] != nil {
+				for k, v := range index[aaa.Append("username")].Index {
 					for _, j := range v.Commands {
 						for _, n := range j.Shares {
 							for _, nn := range n {
@@ -794,7 +794,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/check": &ctx.Command{Name: "/check cache|config|command name args", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			w := m.Optionv("response").(http.ResponseWriter) //{{{
 			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
-				if msg := m.Spawn().Cmd("right", "check", login.Append("userrole"), arg); msg.Results(0) {
+				aaa := m.Appendv("aaa").(*ctx.Message)
+				if msg := m.Spawn().Cmd("right", "check", aaa.Cap("username"), arg); msg.Results(0) {
 					m.Copy(login, "append").Echo(msg.Result(0))
 					return
 				}
@@ -813,6 +814,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if m.Options("sessid") {
 				if aaa := m.Find("aaa").Cmd("login", m.Option("sessid")); aaa.Results(0) {
 					m.Append("redirect", m.Option("referer"))
+					m.Appendv("aaa", aaa)
 					return
 				}
 			}
@@ -821,6 +823,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if aaa := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password")); aaa.Results(0) {
 					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: aaa.Result(0)})
 					m.Append("redirect", m.Option("referer"))
+					m.Appendv("aaa", aaa)
 					return
 				}
 			}

@@ -275,7 +275,7 @@ type Message struct {
 	Data map[string]interface{}
 
 	callback func(msg *Message) (sub *Message)
-	sessions map[string]*Message
+	Sessions map[string]*Message
 
 	messages []*Message
 	message  *Message
@@ -327,12 +327,12 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {
 		m.callback = msg.callback
 	case "session":
 		if len(arg) == 0 {
-			for k, v := range msg.sessions {
-				m.sessions[k] = v
+			for k, v := range msg.Sessions {
+				m.Sessions[k] = v
 			}
 		} else {
 			for _, k := range arg {
-				m.sessions[k] = msg.sessions[k]
+				m.Sessions[k] = msg.Sessions[k]
 			}
 		}
 	case "detail", "result":
@@ -567,18 +567,18 @@ func (m *Message) Search(key string, root ...bool) []*Message { // {{{
 // }}}
 func (m *Message) Sess(key string, arg ...interface{}) *Message { // {{{
 	spawn := true
-	if _, ok := m.sessions[key]; !ok && len(arg) > 0 {
-		if m.sessions == nil {
-			m.sessions = make(map[string]*Message)
+	if _, ok := m.Sessions[key]; !ok && len(arg) > 0 {
+		if m.Sessions == nil {
+			m.Sessions = make(map[string]*Message)
 		}
 
 		switch value := arg[0].(type) {
 		case *Message:
-			m.sessions[key] = value
-			return m.sessions[key]
+			m.Sessions[key] = value
+			return m.Sessions[key]
 		case *Context:
-			m.sessions[key] = m.Spawn(value)
-			return m.sessions[key]
+			m.Sessions[key] = m.Spawn(value)
+			return m.Sessions[key]
 		case string:
 			root := true
 			if len(arg) > 2 {
@@ -600,18 +600,18 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message { // {{{
 
 			switch method {
 			case "find":
-				m.sessions[key] = m.Find(value, root)
+				m.Sessions[key] = m.Find(value, root)
 			case "search":
-				m.sessions[key] = m.Search(value, root)[0]
+				m.Sessions[key] = m.Search(value, root)[0]
 			}
-			return m.sessions[key]
+			return m.Sessions[key]
 		case bool:
 			spawn = value
 		}
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
-		if x, ok := msg.sessions[key]; ok {
+		if x, ok := msg.Sessions[key]; ok {
 			if spawn {
 				x = m.Spawn(x.target)
 			}
@@ -1573,7 +1573,7 @@ var CGI = template.FuncMap{
 				case "messages":
 				case "sessions":
 					msg := []string{}
-					for k, _ := range m.sessions {
+					for k, _ := range m.Sessions {
 						msg = append(msg, fmt.Sprintf("%s", k))
 					}
 					return strings.Join(msg, " ")
@@ -1613,7 +1613,7 @@ var CGI = template.FuncMap{
 					return strings.Join(msg, " ")
 				case "sessions":
 					msg := []string{}
-					for k, _ := range m.sessions {
+					for k, _ := range m.Sessions {
 						msg = append(msg, fmt.Sprintf("%s", k))
 					}
 					return strings.Join(msg, " ")
@@ -2001,9 +2001,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				}
 
-				if len(msg.sessions) > 0 {
-					m.Color(31, "sessions(%d):\n", len(msg.sessions))
-					for k, v := range msg.sessions {
+				if len(msg.Sessions) > 0 {
+					m.Color(31, "sessions(%d):\n", len(msg.Sessions))
+					for k, v := range msg.Sessions {
 						m.Echo(" %s %s\n", k, v.Format())
 					}
 				}
@@ -2141,7 +2141,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				values := map[string]*Message{}
 
 				for msg = msg; msg != nil; msg = msg.message {
-					for k, v := range msg.sessions {
+					for k, v := range msg.Sessions {
 						if _, ok := values[k]; ok {
 							continue
 						}
@@ -2174,11 +2174,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			default:
 				sub = nil
 			}
-			if msg.sessions == nil {
-				msg.sessions = map[string]*Message{}
+			if msg.Sessions == nil {
+				msg.Sessions = map[string]*Message{}
 			}
 			if sub != nil {
-				msg.sessions[arg[0]] = sub
+				msg.Sessions[arg[0]] = sub
 			}
 			// }}}
 		}},
@@ -2627,10 +2627,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				current := m.Target()
-				aaa := m.Sess("aaa")
+				aaa := m.Sess("aaa", false)
 				void := index["void"]
-				if aaa != nil && aaa.Cap("group") != aaa.Conf("rootname") {
-					if current = index[aaa.Cap("group")]; current == nil {
+				if aaa != nil && aaa.Cap("username") != aaa.Conf("rootname") {
+					if current = index[aaa.Cap("username")]; current == nil {
 						if void != nil {
 							m.Echo("%s:caches\n", void.Name)
 							for k, c := range void.Caches {

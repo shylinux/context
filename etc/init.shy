@@ -1,19 +1,7 @@
+~shell1
+	login root root
 source etc/local.shy
-var a <-
-for index $a result hi
-	echo $hi
-end
-
 ~file1
 	history load etc/history.txt
 ~shell1
 	alias import nfs
-
-var b = 1
-
-label hi
-
-echo $b
-let b = $b + 1
-goto hi $b < 4
-
