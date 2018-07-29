@@ -591,6 +591,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			nfs.Cap("termbox", "true")
 			nfs.Conf("color", "true")
 			nfs.out = m.Optionv("out").(*os.File)
+			nfs.history = append(nfs.history, "open 'http://localhost:9094/upload'")
+			m.Capi("nline", 1)
 		}
 
 		line := ""
