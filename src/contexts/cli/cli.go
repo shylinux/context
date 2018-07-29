@@ -162,8 +162,12 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	}, "parse", arg[1]).Target().Name)
 
 	if arg[1] == "stdio" {
-		msg := m.Spawn().Cmd("source", m.Conf("init.shy"))
-		msg.Result(0, msg.Meta["return"])
+		if _, e := os.Stat(m.Conf("init.shy")); e == nil {
+			msg := m.Spawn().Cmd("source", m.Conf("init.shy"))
+			msg.Result(0, msg.Meta["return"])
+		} else {
+			m.Spawn().Cmd("alias", "import", "nfs")
+		}
 	}
 	return false
 }

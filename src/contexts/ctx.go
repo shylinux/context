@@ -1777,7 +1777,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"nmessage": &Cache{Name: "nmessage", Value: "0", Help: "消息数量"},
 	},
 	Configs: map[string]*Config{
-		"debug": &Config{Name: "debug(on/off)", Value: "on", Help: "调试模式，on:打印，off:不打印)"},
+		"debug": &Config{Name: "debug(on/off)", Value: "off", Help: "调试模式，on:打印，off:不打印)"},
 
 		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_choice": &Config{Name: "search_choice(first/last/rand/magic)", Value: "magic", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magic: 加权选择"},
