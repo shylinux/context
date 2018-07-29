@@ -90,6 +90,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 // }}}
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	cli.Message = m
+	m.Sess("cli", m)
 	yac := m.Sess("yac")
 	if yac.Cap("status") != "start" {
 		yac.Target().Start(yac)
@@ -106,7 +107,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		yac.Cmd("train", "op1", "op1", "mul{", "-e", "-f", "-d", "}")
 		yac.Cmd("train", "op1", "op1", "mul{", "-", "+", "}")
 		yac.Cmd("train", "op2", "op2", "mul{", "=", "+=", "}")
-		yac.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "}")
+		yac.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "%", "}")
 		yac.Cmd("train", "op2", "op2", "mul{", ">", ">=", "<", "<=", "==", "!=", "}")
 
 		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "tran", "}")

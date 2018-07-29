@@ -432,6 +432,21 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 
 // }}}
 
+func (m *Message) Instance(msg *Message, source ...bool) bool { // {{{
+	c := m.target
+	if len(source) > 0 && source[0] == true {
+		c = m.source
+	}
+
+	for s := c; s != nil; s = s.context {
+		if s == msg.target {
+			return true
+		}
+	}
+	return false
+}
+
+// }}}
 func (m *Message) BackTrace(hand func(m *Message) bool, c ...*Context) { // {{{
 	target := m.target
 	if len(c) > 0 {
@@ -536,6 +551,9 @@ func (m *Message) Search(key string, root ...bool) []*Message { // {{{
 	ms := make([]*Message, len(cs))
 	for i := 0; i < len(cs); i++ {
 		ms[i] = m.Spawn(cs[i])
+	}
+	if len(ms) == 0 {
+		ms = append(ms, nil)
 	}
 
 	return ms
@@ -986,6 +1004,9 @@ func (m *Message) Insert(meta string, index int, arg ...interface{}) string { //
 	}
 
 	str := Trans(arg...)
+	if m.Confs("insert_limit") {
+		index = (index+2)%(len(m.Meta[meta])+2) - 2
+	}
 
 	if index == -1 {
 		index, m.Meta[meta] = 0, append(str, m.Meta[meta]...)
@@ -1758,6 +1779,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"search_action": &Config{Name: "search_action(list/switch)", Value: "switch", Help: "搜索操作, list: 输出模块列表, switch: 模块切换"},
 		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索起点, true: 根模块, false: 当前模块"},
 
+		"insert_limit": &Config{Name: "insert_limit(true/false)", Value: "true", Help: "参数的索引"},
 		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
 		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
 
@@ -1766,18 +1788,23 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			if len(arg) == 0 { // {{{
+				m.Echo("usage: help context [module [command|config|cache name]]\n")
+				m.Echo("     : 查看模块信息, module: 模块名, command: 模块命令, config: 模块配置, cache: 模块缓存, name: 模块参数\n")
+				m.Echo("usage: help command [name]\n")
+				m.Echo("     : 查看当前环境下命令, name: 命令名\n")
+				m.Echo("usage: help config [name]\n")
+				m.Echo("     : 查看当前环境下配置, name: 配置名\n")
+				m.Echo("usage: help cache [name]\n")
+				m.Echo("     : 查看当前环境下缓存, name: 缓存名\n")
+				m.Echo("\n")
+
 				m.Echo("^_^  Welcome to context world  ^_^\n")
-				m.Echo("\n")
-				m.Echo("Context is to be a distributed operating system, try to simple everything in work and life. ")
-				m.Echo("In context you will find all kinds of tools, and you can also make new tool in a quick and easy way.\n")
-				m.Echo("Here is just a simple introduce, you can look github.com/shylinux/context/README.md for more information.\n")
-				m.Echo("\n")
+				m.Echo("Version: 1.0 A New Language, A New Framework\n")
+				m.Echo("More: github.com/shylinux/context/README.md\n")
 				m.Color(31, "       c\n")
 				m.Color(31, "     sh").Color(33, " go\n")
 				m.Color(31, "   vi").Color(32, " php").Color(32, " js\n")
 				m.Echo(" ARM Linux HTTP\n")
-				m.Echo("\n")
-
 				m.Color(31, "Context ").Color(32, "Message\n")
 				m.Color(32, "ctx ").Color(33, "cli ").Color(31, "aaa ").Color(33, "web\n")
 				m.Color(32, "lex ").Color(33, "yac ").Color(31, "log ").Color(33, "gdb\n")
@@ -1787,9 +1814,127 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 			switch arg[0] {
-			case "example":
 			case "context":
-			case "message":
+				switch len(arg) {
+				case 1:
+					keys := []string{}
+					values := map[string]*Context{}
+					m.Travel(func(m *Message, i int) bool {
+						if _, ok := values[m.Cap("module")]; !ok {
+							keys = append(keys, m.Cap("module"))
+							values[m.Cap("module")] = m.Target()
+						}
+						return true
+					}, m.Target().root)
+					sort.Strings(keys)
+					for _, k := range keys {
+						m.Echo("%s: %s %s\n", k, values[k].Name, values[k].Help)
+					}
+					break
+				case 2:
+					if msg := m.Find(arg[1]); msg != nil {
+						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
+						m.Echo("commands:\n")
+						for k, v := range msg.Target().Commands {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+						m.Echo("configs:\n")
+						for k, v := range msg.Target().Configs {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+						m.Echo("caches:\n")
+						for k, v := range msg.Target().Caches {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+					}
+				default:
+					if msg := m.Find(arg[1]); msg != nil {
+						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
+						switch arg[2] {
+						case "command":
+							for k, v := range msg.Target().Commands {
+								if k == arg[3] {
+									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+								}
+							}
+						case "config":
+							for k, v := range msg.Target().Configs {
+								if k == arg[3] {
+									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+								}
+							}
+						case "cache":
+							for k, v := range msg.Target().Caches {
+								if k == arg[3] {
+									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+								}
+							}
+						}
+					}
+				}
+			case "command":
+				keys := []string{}
+				values := map[string]*Command{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Commands {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+							for k, v := range v.Form {
+								m.Echo("  option: %s(%d)\n", k, v)
+							}
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s: %s\n", k, values[k].Name)
+				}
+			case "config":
+				keys := []string{}
+				values := map[string]*Config{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Configs {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
+				}
+			case "cache":
+				keys := []string{}
+				values := map[string]*Cache{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Caches {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
+				}
 			}
 			// }}}
 		}},
@@ -1797,13 +1942,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			msg := m.Sess("cli", false) // {{{
 			if len(arg) > 0 {
 				if code, e := strconv.Atoi(arg[0]); e == nil {
-					ms := []*Message{m.root}
-					for i := 0; i < len(ms); i++ {
-						ms = append(ms, ms[i].messages...)
-						if ms[i].code == code {
-							msg, arg = ms[i], arg[1:]
-							break
-						}
+					if msg = m.root.Tree(code); msg != nil {
+						arg = arg[1:]
 					}
 				}
 			}
@@ -1816,24 +1956,24 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			if len(arg) == 0 {
 				m.Echo("%s\n", msg.Format())
 				if len(msg.Meta["option"]) > 0 {
-					m.Color(31, "option: %v\n", msg.Meta["option"])
+					m.Color(31, "option(%d): %v\n", len(msg.Meta["option"]), msg.Meta["option"])
 					for _, k := range msg.Meta["option"] {
 						if v, ok := msg.Data[k]; ok {
 							m.Echo(" %s: %v\n", k, v)
 						} else {
-							m.Echo(" %s: %v\n", k, msg.Meta[k])
+							m.Echo(" %s(%d): %v\n", k, len(msg.Meta[k]), msg.Meta[k])
 						}
 					}
 				}
 
-				m.Color(31, "result: %v\n", msg.Meta["result"])
+				m.Color(31, "result(%d): %v\n", len(msg.Meta["result"]), msg.Meta["result"])
 				if len(msg.Meta["append"]) > 0 {
-					m.Color(31, "append: %v\n", msg.Meta["append"])
+					m.Color(31, "append(%d): %v\n", len(msg.Meta["append"]), msg.Meta["append"])
 					for _, k := range msg.Meta["append"] {
 						if v, ok := msg.Data[k]; ok {
 							m.Echo(" %s: %v\n", k, v)
 						} else {
-							m.Echo(" %s: %v\n", k, msg.Meta[k])
+							m.Echo(" %s(%d): %v\n", k, len(msg.Meta[k]), msg.Meta[k])
 						}
 					}
 				}
@@ -1844,11 +1984,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				if len(msg.messages) > 0 {
-					m.Color(31, "messages:\n")
+					m.Color(31, "messages(%d):\n", len(msg.messages))
 					for i, v := range msg.messages {
 						if !all {
 							switch v.target.Name {
-							case "log", "yac", "lex":
+							case "lex", "yac", "log", "gdb":
 								continue
 							}
 						}
@@ -1857,7 +1997,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 				if len(msg.sessions) > 0 {
-					m.Color(31, "sessions:\n")
+					m.Color(31, "sessions(%d):\n", len(msg.sessions))
 					for k, v := range msg.sessions {
 						m.Echo(" %s %s\n", k, v.Format())
 					}
@@ -1867,8 +2007,22 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 			switch arg[0] {
 			case "message":
-				for msg := m; msg != nil; msg = msg.message {
-					m.Echo("%d: %s\n", msg.code, msg.Format())
+				for msg := msg; msg != nil; msg = msg.message {
+					m.Echo("%s\n", msg.Format())
+				}
+			case "messages":
+				ms := []*Message{msg}
+				for i := 0; i < len(ms); i++ {
+					ms = append(ms, ms[i].messages...)
+					if ms[i].Instance(m.root.Sess("lex", false), true) ||
+						ms[i].Instance(m.root.Sess("yac", false), true) ||
+						ms[i].Instance(m.root.Sess("log", false), true) ||
+						ms[i].Instance(m.root.Sess("lex", false)) ||
+						ms[i].Instance(m.root.Sess("yac", false)) ||
+						ms[i].Instance(m.root.Sess("log", false)) {
+						continue
+					}
+					m.Echo("%s\n", ms[i].Format())
 				}
 			default:
 				sub := msg.Spawn().Cmd(arg)
@@ -1978,89 +2132,56 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"session": &Command{Name: "session [key [cmd...]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.message // {{{
 			if len(arg) == 0 {
+				keys := []string{}
+				values := map[string]*Message{}
+
 				for msg = msg; msg != nil; msg = msg.message {
 					for k, v := range msg.sessions {
-						m.Echo("%s: %d(%s->%s) %v %v\n", k, v.code, v.source.Name, v.target.Name, v.Meta["detail"], v.Meta["option"])
+						if _, ok := values[k]; ok {
+							continue
+						}
+						keys = append(keys, k)
+						values[k] = v
 					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s: %s\n", k, values[k].Format())
+
 				}
 				return
 			}
 
-			var sub *Message
-			for m := msg; m != nil; m = m.message {
-				for k, v := range m.sessions {
-					if k == arg[0] {
-						sub = v
-					}
-				}
-			}
-
 			if len(arg) == 1 {
-				if sub != nil {
+				if sub := msg.Sess(arg[0], false); sub != nil {
 					m.Echo("%d", sub.code)
 				}
 				return
 			}
 
-			if sub == nil {
-				sub = msg
+			sub := msg
+			root := m.Confx("search_root", arg, 3)
+			switch m.Confx("search_method", arg, 2) {
+			case "find":
+				sub = msg.Find(arg[1], Right(root))
+			case "search":
+				sub = msg.Search(arg[1], Right(root))[0]
+			default:
+				sub = nil
 			}
-
-			cmd := msg.Spawn(sub.target).Cmd(arg[1:])
-			m.Copy(cmd, "result").Copy(cmd, "append")
-			msg.sessions[arg[0]] = cmd
+			if msg.sessions == nil {
+				msg.sessions = map[string]*Message{}
+			}
+			if sub != nil {
+				msg.sessions[arg[0]] = sub
+			}
 			// }}}
 		}},
-		"callback": &Command{Name: "callback index", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			index := 0
-			for msg := m.Sess("cli", false); msg != nil; msg = msg.message { // {{{
-				index--
-				switch len(arg) {
-				case 0:
-					if msg.callback == nil {
-						return
-					}
-
-					m.Echo("%d: %v\n", index, msg.callback)
-				case 1:
-					if msg.callback == nil {
-						return
-					}
-
-					if i, e := strconv.Atoi(arg[0]); e == nil && i == index {
-						m.Echo("%v", msg.callback)
-					}
-				default:
-					if i, e := strconv.Atoi(arg[0]); e == nil && i == index {
-						msg.callback = func(msg *Message) *Message {
-							return msg
-						}
-						m.Echo("%v", msg.callback)
-					}
-					return
-				}
-				continue
-
-				if len(arg) == 0 {
-					m.Echo("msg(%s->%s): %d(%s) %v\n", msg.source.Name, msg.target.Name, msg.code, msg.time.Format("15:04:05"), msg.Meta["detail"])
-					if msg.callback != nil {
-						m.Echo("  hand: %v\n", msg.callback)
-					}
-				} else {
-					switch arg[0] {
-					case "del":
-						msg.message.callback = nil
-					case "add":
-						msg.message.callback = func(msg *Message) *Message {
-							msg.Log("info", "callback default")
-							return msg
-						}
-						return
-					default:
-						m.Result(0, arg)
-						msg.message.Back(m)
-						return
-					}
+		"callback": &Command{Name: "callback", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			msg := m.message // {{{
+			if len(arg) == 0 {
+				for msg := msg; msg != nil; msg = msg.message {
+					m.Echo("%d: %p\n", msg.code, msg.callback)
 				}
 			}
 			// }}}
@@ -2106,7 +2227,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							choice, arg = arg[0], arg[1:]
 						}
 
-						if s := m.Search(arg[0], root); len(s) > 0 {
+						if s := m.Search(arg[0], root); len(s) > 0 && s[0] != nil {
 							switch choice {
 							case "first":
 								ms = append(ms, s[0])
@@ -2227,7 +2348,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				case 0:
 					m.Travel(func(m *Message, i int) bool {
 						if m.Cap("status") == "start" {
-							m.Echo("%s(%s): %s\n", m.target.Name, m.Cap("stream"), m.target.Help)
+							m.Echo("%s(%s): %s\n", m.Cap("module"), m.Cap("stream"), m.target.Help)
 						}
 						return true
 					}, m.target.root)

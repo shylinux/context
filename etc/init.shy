@@ -1,8 +1,8 @@
+~file1
+	history load etc/history.txt
 ~shell1
 	alias import nfs
 return
-~file1
-	history load etc/history.txt
 
 source etc/local.shy
 config debug on
