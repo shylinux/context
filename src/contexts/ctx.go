@@ -2624,6 +2624,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				index := m.Target().Index // {{{
 				if index == nil {
 					m.Target().Index = map[string]*Context{}
+					index = m.Target().Index
 				}
 
 				current := m.Target()
