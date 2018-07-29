@@ -261,7 +261,7 @@ func (lex *LEX) parse(m *ctx.Message, page int, line []byte) (hash int, rest []b
 	}
 
 	if pos == len(line) {
-		hash, pos, word = -1, 0, word[:0]
+		// hash, pos, word = -1, 0, word[:0]
 	} else if hash == 0 {
 		pos, word = 0, word[:0]
 	}

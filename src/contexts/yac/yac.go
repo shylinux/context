@@ -3,6 +3,7 @@ package yac // {{{
 import ( // {{{
 	"contexts"
 	"fmt"
+	"strconv"
 )
 
 // }}}
@@ -398,23 +399,37 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		}},
 		"info": &ctx.Command{Name: "info", Help: "查看语法矩阵", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
-				for i, v := range yac.seed {
-					m.Echo("seed: %d %v\n", i, v)
-				}
-				for i, v := range yac.page {
-					m.Echo("page: %s %d\n", i, v)
-				}
-				for i, v := range yac.hash {
-					m.Echo("hash: %s %d\n", i, v)
-				}
-				for i, v := range yac.state {
-					m.Echo("node: %v %v\n", i, v)
-				}
-				for i, v := range yac.mat {
-					for k, v := range v {
-						if v != nil {
-							m.Echo("node: %s(%d,%d): %v\n", yac.name(i), i, k, v)
+				if len(arg) == 0 {
+					for i, v := range yac.seed {
+						m.Echo("seed: %d %v\n", i, v)
+					}
+					for i, v := range yac.page {
+						m.Echo("page: %s %d\n", i, v)
+					}
+					for i, v := range yac.hash {
+						m.Echo("hash: %s %d\n", i, v)
+					}
+					for i, v := range yac.state {
+						m.Echo("node: %v %v\n", i, v)
+					}
+					for i, v := range yac.mat {
+						for k, v := range v {
+							if v != nil {
+								m.Echo("node: %s(%d,%d): %v\n", yac.name(i), i, k, v)
+							}
 						}
+					}
+					return
+				}
+
+				line := yac.mat[yac.page[arg[0]]]
+				if i, e := strconv.Atoi(arg[0]); e == nil {
+					line = yac.mat[i]
+				}
+
+				for i := 0; i < len(line); i++ {
+					if v, ok := line[byte(i)]; ok && v != nil {
+						m.Echo("(%s, %d): %v\n", arg[0], i, v)
 					}
 				}
 			}

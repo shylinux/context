@@ -181,7 +181,7 @@ func (c *Context) Start(m *Message, arg ...string) bool { // {{{
 	go m.TryCatch(m, true, func(m *Message) {
 		m.Log(m.Cap("status", "start"), "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
 
-		c.exit = make(chan bool, 1)
+		c.exit = make(chan bool, 2)
 		if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
 			c.Close(m, m.Meta["detail"]...)
 		}
@@ -191,15 +191,20 @@ func (c *Context) Start(m *Message, arg ...string) bool { // {{{
 
 // }}}
 func (c *Context) Close(m *Message, arg ...string) bool { // {{{
+	if len(c.requests) == 0 {
+		return true
+	}
 	m.Log("close", "%d:%d %v", len(c.requests), len(c.sessions), arg)
 
 	if m.target == c {
 		for i := len(c.requests) - 1; i >= 0; i-- {
 			if msg := c.requests[i]; msg.code == m.code {
-				if msg.source == c || c.Server == nil || c.Server.Close(m, arg...) {
-					for j := i + 1; j < len(c.requests)-1; j++ {
+				if c.Server == nil || c.Server.Close(m, arg...) {
+					for j := i; j < len(c.requests)-1; j++ {
+						m.Log("close", "requests: %v %s", j, c.requests[j].Format())
 						c.requests[j] = c.requests[j+1]
 					}
+					c.requests = c.requests[:len(c.requests)-1]
 				}
 			}
 		}
@@ -212,7 +217,7 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 	if m.Cap("status") == "start" {
 		m.Log(m.Cap("status", "close"), "%d server %v", m.root.Capi("nserver", -1)+1, arg)
 		for _, msg := range c.sessions {
-			if msg.target != c {
+			if msg.Cap("status") == "start" {
 				msg.target.Close(msg, arg...)
 			}
 		}
@@ -221,7 +226,7 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 	if c.context != nil {
 		m.Log("close", "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
 		delete(c.context.contexts, c.Name)
-		m.Wait()
+		c.exit <- true
 	}
 	return true
 }
