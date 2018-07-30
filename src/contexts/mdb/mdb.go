@@ -69,6 +69,7 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool { // {{{
+	return false
 	switch mdb.Context {
 	case m.Target():
 		if mdb.DB != nil {

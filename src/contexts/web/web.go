@@ -338,7 +338,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"get": &ctx.Command{
 			Name: "get [method GET|POST] [file name filename] url arg...",
 			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "file": 2},
+			Form: map[string]int{"method": 1, "file": 2, "type": 1, "body": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
 					if web.client == nil {
@@ -347,7 +347,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					method := m.Confx("method")
 					uri := web.Merge(m, arg[0], arg[1:]...)
-					m.Log("info", "GET %s", uri)
+					m.Log("info", "%s %s", method, uri)
 					m.Echo("%s: %s\n", method, uri)
 
 					var body io.Reader
@@ -384,6 +384,30 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							contenttype = writer.FormDataContentType()
 							body = buf
 							writer.Close()
+						} else if m.Option("type") == "json" {
+							if m.Options("body") {
+								data := []interface{}{}
+								for _, v := range arg[1:] {
+									data = append(data, v)
+								}
+								m.Log("body", "%v", fmt.Sprintf(m.Option("body"), data...))
+								body = strings.NewReader(fmt.Sprintf(m.Option("body"), data...))
+							} else {
+								data := map[string]string{}
+								for i := 1; i < len(arg)-1; i++ {
+									data[arg[i]] = arg[i+1]
+								}
+
+								b, e := json.Marshal(data)
+								m.Assert(e)
+								body = bytes.NewReader(b)
+							}
+
+							contenttype = "application/json"
+							if index > -1 {
+								uri = uri[:index]
+							}
+
 						} else if index > 0 {
 							contenttype = "application/x-www-form-urlencoded"
 							body = strings.NewReader(uri[index+1:])
@@ -391,6 +415,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 					}
 
+					m.Log("info", "content-type: %s", contenttype)
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
 
