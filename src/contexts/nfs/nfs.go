@@ -591,8 +591,20 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 			nfs.Cap("termbox", "true")
 			nfs.Conf("color", "true")
 			nfs.out = m.Optionv("out").(*os.File)
-			nfs.history = append(nfs.history, "open 'http://localhost:9094/upload'")
+
+			for _, v := range []string{
+				"say you are so pretty",
+				"context web serve ./ :9094",
+				// "context web right add shy command /upload dir usr",
+				// "open 'http://localhost:9094/'",
+			} {
+				m.Back(m.Spawn(m.Source()).Set("detail", v))
+			}
+			nfs.history = append(nfs.history, "open 'http://localhost:9094'")
 			m.Capi("nline", 1)
+			nfs.print(fmt.Sprintf("your are so pretty\n"))
+			nfs.print(fmt.Sprintf("your can open 'http://localhost:9094'\n"))
+			nfs.print(fmt.Sprintf("press C-P then C-J\n"))
 		}
 
 		line := ""
