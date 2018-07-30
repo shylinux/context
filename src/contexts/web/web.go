@@ -3,6 +3,7 @@ package web // {{{
 import ( // {{{
 	"contexts"
 	"regexp"
+	"runtime"
 	"strconv"
 	"toolkit"
 
@@ -901,6 +902,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
+		}},
+		"brow": &ctx.Command{Name: "brow url", Help: "浏览器网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			url := fmt.Sprintf("http://localhost:9094")
+			if len(arg) > 0 {
+				url = arg[0]
+			}
+			m.Log("fucK", "os %v", runtime.GOOS)
+			switch runtime.GOOS {
+			case "windows":
+				m.Find("cli").Cmd("system", "explorer", url)
+			case "darwin":
+				m.Find("cli").Cmd("system", "open", url)
+			case "linux":
+				m.Spawn().Cmd("open", url)
+			}
 		}},
 	},
 }

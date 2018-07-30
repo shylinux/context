@@ -740,6 +740,27 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			// }}}
 		}},
+		"system": &ctx.Command{Name: "system word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			cmd := exec.Command(arg[0], arg[1:]...)
+
+			if false {
+				cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+				if e := cmd.Start(); e != nil {
+					m.Echo("error: ")
+					m.Echo("%s\n", e)
+				} else if e := cmd.Wait(); e != nil {
+					m.Echo("error: ")
+					m.Echo("%s\n", e)
+				}
+			} else {
+				if out, e := cmd.CombinedOutput(); e != nil {
+					m.Echo("error: ")
+					m.Echo("%s\n", e)
+				} else {
+					m.Echo(string(out))
+				}
+			}
+		}},
 		"login": &ctx.Command{Name: "login username password", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Sess("aaa", false).Cmd("login", arg[0], arg[1])
 		}},

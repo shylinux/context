@@ -15,6 +15,7 @@ import ( // {{{
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"unicode"
@@ -211,6 +212,11 @@ func (nfs *NFS) print(str string) bool { // {{{
 
 // }}}
 func (nfs *NFS) prompt(arg ...string) string { // {{{
+	ps := nfs.Option("prompt")
+	if nfs.Caps("windows") {
+		nfs.color(ps)
+		return ps
+	}
 	line, rest := "", ""
 	if len(arg) > 0 {
 		line = arg[0]
@@ -226,7 +232,6 @@ func (nfs *NFS) prompt(arg ...string) string { // {{{
 		nfs.escape("2K").escape("G").escape("?25h")
 	}
 
-	ps := nfs.Option("prompt")
 	if len(nfs.pages) > 0 {
 		nfs.pages = nfs.pages[:len(nfs.pages)-1]
 	}
@@ -585,26 +590,35 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Capi("size", int(s.Size()))
 
 		if m.Cap("stream", arg[1]) == "stdio" {
-			termbox.Init()
-			defer termbox.Close()
-			nfs.width, nfs.height = termbox.Size()
-			nfs.Cap("termbox", "true")
-			nfs.Conf("color", "true")
 			nfs.out = m.Optionv("out").(*os.File)
+			if !m.Caps("windows", runtime.GOOS == "windows") {
+				termbox.Init()
+				defer termbox.Close()
+				nfs.width, nfs.height = termbox.Size()
+				nfs.Cap("termbox", "true")
+				nfs.Conf("color", "true")
+			}
 
 			for _, v := range []string{
-				"say you are so pretty",
+				// "say you are so pretty",
 				"context web serve ./ :9094",
-				// "context web right add shy command /upload dir usr",
-				// "open 'http://localhost:9094/'",
 			} {
 				m.Back(m.Spawn(m.Source()).Set("detail", v))
 			}
-			nfs.history = append(nfs.history, "open 'http://localhost:9094'")
-			m.Capi("nline", 1)
-			nfs.print(fmt.Sprintf("your are so pretty\n"))
-			nfs.print(fmt.Sprintf("your can open 'http://localhost:9094'\n"))
-			nfs.print(fmt.Sprintf("press C-P then C-J\n"))
+			for _, v := range []string{
+				"say you are so pretty",
+				"context web brow 'http://localhost:9094'",
+			} {
+				nfs.history = append(nfs.history, v)
+				m.Capi("nline", 1)
+			}
+			for _, v := range []string{
+				"say you are so pretty\n",
+				"your can brow 'http://localhost:9094'\n",
+				"press \"brow\" then press Enter\n",
+			} {
+				nfs.print(fmt.Sprintf(v))
+			}
 		}
 
 		line := ""

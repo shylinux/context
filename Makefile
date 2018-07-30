@@ -14,3 +14,8 @@ install:
 
 build:
 	go build $(BENCH)
+
+win32:
+	GOARCH=386 GOOS=windows go build $(BENCH)
+win64:
+	GOARCH=amd64 GOOS=windows go build $(BENCH)
