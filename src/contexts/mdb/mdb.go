@@ -239,7 +239,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"show": &ctx.Command{
 			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename] [other rest...]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2, "save": 1, "export": 1, "other": -1},
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "extra_field": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2, "save": 1, "export": 1, "other": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 					table := m.Confx("table", arg, 0)
@@ -249,9 +249,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 					fields := []string{"*"}
 					if len(arg) > 1 {
-						if fields = arg[1:]; m.Options("extras") {
-							fields = append(fields, "extra")
-						}
+						fields = arg[1:]
 					} else if m.Confs("field") {
 						fields = []string{m.Conf("field")}
 					}

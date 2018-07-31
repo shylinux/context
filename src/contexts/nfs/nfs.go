@@ -598,26 +598,28 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 				nfs.Cap("termbox", "true")
 				nfs.Conf("color", "true")
 			}
+			if !m.Options("init.shy") {
 
-			for _, v := range []string{
-				// "say you are so pretty",
-				"context web serve ./ :9094",
-			} {
-				m.Back(m.Spawn(m.Source()).Set("detail", v))
-			}
-			for _, v := range []string{
-				"say you are so pretty",
-				"context web brow 'http://localhost:9094'",
-			} {
-				nfs.history = append(nfs.history, v)
-				m.Capi("nline", 1)
-			}
-			for _, v := range []string{
-				"say you are so pretty\n",
-				"your can brow 'http://localhost:9094'\n",
-				"press \"brow\" then press Enter\n",
-			} {
-				nfs.print(fmt.Sprintf(v))
+				for _, v := range []string{
+					// "say you are so pretty",
+					"context web serve ./ :9094",
+				} {
+					m.Back(m.Spawn(m.Source()).Set("detail", v))
+				}
+				for _, v := range []string{
+					"say you are so pretty",
+					"context web brow 'http://localhost:9094'",
+				} {
+					nfs.history = append(nfs.history, v)
+					m.Capi("nline", 1)
+				}
+				for _, v := range []string{
+					"say you are so pretty\n",
+					"your can brow 'http://localhost:9094'\n",
+					"press \"brow\" then press Enter\n",
+				} {
+					nfs.print(fmt.Sprintf(v))
+				}
 			}
 		}
 

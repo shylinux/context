@@ -138,6 +138,12 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 	m.Options("scan_end", false)
 	m.Optionv("ps_target", cli.target)
 	m.Option("prompt", m.Conf("prompt"))
+	m.Options("init.shy", false)
+	if arg[1] == "stdio" {
+		if _, e := os.Stat(m.Conf("init.shy")); e == nil {
+			m.Options("init.shy", true)
+		}
+	}
 	m.Cap("stream", m.Spawn(yac.Target()).Call(func(cmd *ctx.Message) *ctx.Message {
 		if !m.Caps("parse") {
 			switch cmd.Detail(0) {
@@ -161,14 +167,9 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return nil
 	}, "parse", arg[1]).Target().Name)
 
-	if arg[1] == "stdio" {
-		if _, e := os.Stat(m.Conf("init.shy")); e == nil {
-			msg := m.Spawn().Cmd("source", m.Conf("init.shy"))
-			msg.Result(0, msg.Meta["return"])
-		} else {
-			m.Spawn().Cmd("alias", "import", "nfs")
-			m.Spawn().Cmd("login", "root", "root")
-		}
+	if m.Options("init.shy") {
+		msg := m.Spawn().Cmd("source", m.Conf("init.shy"))
+		msg.Result(0, msg.Meta["return"])
 	}
 	return false
 }

@@ -2887,5 +2887,5 @@ func Start(args ...string) {
 	log.target.Start(log)
 
 	Pulse.Options("terminal_color", true)
-	Pulse.Sess("cli", false).Cmd("source", "stdio", "async").Wait()
+	Pulse.Sess("cli", false).Cmd("source", "stdio").Wait()
 }

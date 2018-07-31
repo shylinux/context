@@ -9,7 +9,7 @@ install:
 	@cp etc/shy.vim ~/.vim/syntax/
 	@touch etc/local.shy
 	go install $(BENCH)
-	@[ `uname` = "Darwin" ] && md5 `which bench`
+	# @[ `uname` = "Darwin" ] && md5 `which bench`
 	@date
 
 build:
