@@ -7,6 +7,7 @@ import ( // {{{
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 )
 
 // }}}
@@ -22,6 +23,8 @@ func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"protocol": &ctx.Cache{Name: "网络协议(tcp/tcp4/tcp6)", Value: m.Conf("protocol"), Help: "网络协议"},
 		"security": &ctx.Cache{Name: "加密通信(true/false)", Value: m.Conf("security"), Help: "加密通信"},
 		"address":  &ctx.Cache{Name: "网络地址", Value: "", Help: "网络地址"},
+		"nrecv":    &ctx.Cache{Name: "nrecv", Value: "0", Help: "网络地址"},
+		"nsend":    &ctx.Cache{Name: "nsend", Value: "0", Help: "网络地址"},
 	}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -32,23 +35,14 @@ func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	if tcp.Context == Index {
-		Pulse = m
-	}
 	return tcp
 }
 
 // }}}
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
-	if len(arg) > 1 {
-		m.Cap("address", arg[1])
-	}
-	if len(arg) > 2 {
-		m.Cap("security", arg[2])
-	}
-	if len(arg) > 3 {
-		m.Cap("protocol", arg[3])
-	}
+	m.Cap("address", m.Confx("address", arg, 1))
+	m.Cap("security", m.Confx("security", arg, 2))
+	m.Cap("protocol", m.Confx("protocol", arg, 3))
 
 	switch arg[0] {
 	case "dial":
@@ -66,7 +60,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 			tcp.Conn = c
 		}
 
-		m.Log("info", "%s dial %s", Pulse.Cap("nclient"),
+		m.Log("info", "%s dial %s", m.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
 		m.Put("append", "io", tcp.Conn).Back(m)
 		return false
@@ -75,7 +69,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Assert(e)
 		tcp.Conn = c
 
-		m.Log("info", "%s accept %s", Pulse.Cap("nclient"),
+		m.Log("info", "%s accept %s", m.Cap("nclient"),
 			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
 		m.Put("append", "io", tcp.Conn).Back(m)
 		return false
@@ -94,7 +88,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 			tcp.Listener = l
 		}
 
-		m.Log("info", "%d listen %v", Pulse.Capi("nlisten"), m.Cap("stream", fmt.Sprintf("%s", tcp.Addr())))
+		m.Log("info", "%d listen %v", m.Capi("nlisten"), m.Cap("stream", fmt.Sprintf("%s", tcp.Addr())))
 	}
 
 	for {
@@ -111,15 +105,16 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool { // {{{
+	return false
 	switch tcp.Context {
 	case m.Target():
 		if tcp.Listener != nil {
-			m.Log("info", "%d close %v", Pulse.Capi("nlisten", -1)+1, m.Cap("stream"))
+			m.Log("info", "%d close %v", m.Capi("nlisten", -1)+1, m.Cap("stream"))
 			tcp.Listener.Close()
 			tcp.Listener = nil
 		}
 		if tcp.Conn != nil {
-			m.Log("info", "%d close %v", Pulse.Capi("nclient", -1)+1, m.Cap("stream"))
+			m.Log("info", "%d close %v", m.Capi("nclient", -1)+1, m.Cap("stream"))
 			tcp.Conn.Close()
 			tcp.Conn = nil
 		}
@@ -139,45 +134,50 @@ func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 
-var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 	Caches: map[string]*ctx.Cache{
-		"nlisten": &ctx.Cache{Name: "监听数量", Value: "0", Help: "监听数量"},
-		"nclient": &ctx.Cache{Name: "连接数量", Value: "0", Help: "连接数量"},
+		"nlisten": &ctx.Cache{Name: "nlisten", Value: "0", Help: "监听数量"},
+		"nclient": &ctx.Cache{Name: "nclient", Value: "0", Help: "连接数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"security": &ctx.Config{Name: "加密通信(true/false)", Value: "false", Help: "加密通信"},
-		"protocol": &ctx.Config{Name: "网络协议(tcp/tcp4/tcp6)", Value: "tcp4", Help: "网络协议"},
+		"address":  &ctx.Config{Name: "address", Value: ":9090", Help: "加密通信"},
+		"security": &ctx.Config{Name: "security(true/false)", Value: "false", Help: "加密通信"},
+		"protocol": &ctx.Config{Name: "protocol(tcp/tcp4/tcp6)", Value: "tcp4", Help: "网络协议"},
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Start(fmt.Sprintf("pub%d", Pulse.Capi("nlisten", 1)), "网络监听", m.Meta["detail"]...)
+				m.Start(fmt.Sprintf("pub%d", m.Capi("nlisten", 1)), "网络监听", m.Meta["detail"]...)
 			}},
 		"accept": &ctx.Command{Name: "accept address [security [protocol]]", Help: "网络连接",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
+				m.Start(fmt.Sprintf("com%d", m.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
 			}},
 		"dial": &ctx.Command{Name: "dial address [security [protocol]]", Help: "网络连接",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Start(fmt.Sprintf("com%d", Pulse.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
+				m.Start(fmt.Sprintf("com%d", m.Capi("nclient", 1)), "网络连接", m.Meta["detail"]...)
 			}},
 		"send": &ctx.Command{Name: "send message", Help: "发送消息",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				tcp, ok := m.Target().Server.(*TCP)
-				m.Assert(ok && tcp.Conn != nil)
-				tcp.Conn.Write([]byte(arg[0]))
+				if tcp, ok := m.Target().Server.(*TCP); m.Assert(ok) && tcp.Conn != nil {
+					tcp.Conn.Write([]byte(arg[0]))
+					m.Capi("nsend", len(arg[0]))
+				}
 			}},
 		"recv": &ctx.Command{Name: "recv size", Help: "接收消息",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				tcp, ok := m.Target().Server.(*TCP)
-				m.Assert(ok && tcp.Conn != nil)
-				size, e := strconv.Atoi(arg[0])
-				m.Assert(e)
+				if tcp, ok := m.Target().Server.(*TCP); m.Assert(ok) && tcp.Conn != nil {
+					size, e := strconv.Atoi(arg[0])
+					m.Assert(e)
 
-				buf := make([]byte, size)
-				tcp.Conn.Read(buf)
-				m.Echo(string(buf))
+					buf := make([]byte, size)
+					n, e := tcp.Conn.Read(buf)
+					m.Assert(e)
+					buf = buf[:n]
+
+					m.Echo(string(buf))
+					m.Capi("nrecv", n)
+				}
 			}},
 		"ifconfig": &ctx.Command{Name: "ifconfig", Help: "接收消息",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -187,9 +187,26 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 					ips, e := v.Addrs()
 					m.Assert(e)
 					for _, x := range ips {
-						m.Echo("%d %s %v %v\n", v.Index, v.Name, v.HardwareAddr, x.String())
+						ip := x.String()
+						if !strings.Contains(ip, ":") && len(ip) > 0 && len(v.HardwareAddr) > 0 {
+							m.Add("append", "index", v.Index)
+							m.Add("append", "name", v.Name)
+							m.Add("append", "hard", v.HardwareAddr)
+							m.Add("append", "ip", ip)
+						}
 					}
 				}
+
+				m.Table(func(maps map[string]string, list []string, line int) bool {
+					for i, v := range list {
+						m.Echo("%s", v)
+						if i < len(list)-1 {
+							m.Echo("\t")
+						}
+					}
+					m.Echo("\n")
+					return true
+				})
 			}},
 	},
 	Index: map[string]*ctx.Context{

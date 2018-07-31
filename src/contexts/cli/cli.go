@@ -199,7 +199,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return fmt.Sprintf("%s%d", x.Value, m.Capi("nshell", 1))
 			// }}}
 		}},
-		"cli_help": &ctx.Config{Name: "cli_help", Value: "shell", Help: "模块文档"},
+		"cli_help":    &ctx.Config{Name: "cli_help", Value: "shell", Help: "模块文档"},
+		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "3s", Help: "系统命令超时"},
 
 		"time_format":   &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 		"time_unit":     &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
@@ -672,7 +673,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"cmd": &ctx.Command{Name: "cmd word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 				detail := []string{}
-
 				if a, ok := cli.alias[arg[0]]; ok {
 					detail = append(detail, a...)
 					detail = append(detail, arg[1:]...)
@@ -688,10 +688,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}()
 				}
 
-				routes := strings.Split(detail[0], ".")
 				msg := m
-				if len(routes) > 1 {
-
+				if routes := strings.Split(detail[0], "."); len(routes) > 1 {
 					route := strings.Join(routes[:len(routes)-1], ".")
 					if msg = m.Find(route, false); msg == nil {
 						msg = m.Find(route, true)
@@ -704,64 +702,62 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					detail[0] = routes[len(routes)-1]
 				} else {
 					msg = m.Spawn(cli.target)
-
 				}
 
-				m.Capi("ps_count", 1)
-				m.Capi("last_msg", 0, msg.Code())
 				if msg.Cmd(detail); msg.Hand {
 					cli.target = msg.Target()
 					m.Cap("ps_target", cli.target.Name)
 				} else {
-					msg.Hand = true
-					msg.Log("system", "%v", msg.Meta["detail"])
-
-					msg.Set("result").Set("append")
-					c := exec.Command(msg.Meta["detail"][0], msg.Meta["detail"][1:]...)
-
-					if false {
-						c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
-						if e := c.Start(); e != nil {
-							msg.Echo("error: ")
-							msg.Echo("%s\n", e)
-						} else if e := c.Wait(); e != nil {
-							msg.Echo("error: ")
-							m.Echo("%s\n", e)
-						}
-					} else {
-						if out, e := c.CombinedOutput(); e != nil {
-							msg.Echo("error: ")
-							msg.Echo("%s\n", e)
-						} else {
-							msg.Echo(string(out))
-						}
-					}
+					msg.Copy(m, "target").Detail(-1, "system")
+					msg.Cmd()
 				}
 				m.Copy(msg, "result").Copy(msg, "append")
+				m.Capi("last_msg", 0, msg.Code())
+				m.Capi("ps_count", 1)
 			}
 			// }}}
 		}},
-		"system": &ctx.Command{Name: "system word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			cmd := exec.Command(arg[0], arg[1:]...)
+		"system": &ctx.Command{
+			Name: "system [cmd_combine true|false] [cmd_timeout time] word...",
+			Help: "调用系统命令, cmd_combine: 非交互式命令, cmd_timeout: 命令超时, word: 命令",
+			Form: map[string]int{"cmd_combine": 1, "cmd_timeout": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				system := map[string]bool{"vi": true} // {{{
+				ui, ok := system[arg[0]]
+				if ui = ok && ui; m.Option("cmd_combine") != "" {
+					ui = !m.Options("cmd_combine")
+				}
 
-			if false {
-				cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-				if e := cmd.Start(); e != nil {
-					m.Echo("error: ")
-					m.Echo("%s\n", e)
-				} else if e := cmd.Wait(); e != nil {
-					m.Echo("error: ")
-					m.Echo("%s\n", e)
-				}
-			} else {
-				if out, e := cmd.CombinedOutput(); e != nil {
-					m.Echo("error: ")
-					m.Echo("%s\n", e)
+				if cmd := exec.Command(arg[0], arg[1:]...); ui {
+					cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+					if e := cmd.Start(); e != nil {
+						m.Echo("error: ").Echo("%s\n", e)
+					} else if e := cmd.Wait(); e != nil {
+						m.Echo("error: ").Echo("%s\n", e)
+					}
 				} else {
-					m.Echo(string(out))
+					wait := make(chan bool, 1)
+					go func() {
+						if out, e := cmd.CombinedOutput(); e != nil {
+							m.Echo("error: ").Echo("%s\n", e)
+						} else {
+							m.Echo(string(out))
+						}
+						wait <- true
+					}()
+
+					d, e := time.ParseDuration(m.Confx("cmd_timeout"))
+					m.Assert(e)
+
+					select {
+					case <-time.After(d):
+						cmd.Process.Kill()
+						m.Echo("%s: timeout", arg[0])
+					case <-wait:
+					}
 				}
-			}
-		}},
+				// }}}
+			}},
 		"login": &ctx.Command{Name: "login username password", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Sess("aaa", false).Cmd("login", arg[0], arg[1])
 		}},
