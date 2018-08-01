@@ -5,6 +5,7 @@ import ( // {{{
 	"encoding/json"
 	"github.com/nsf/termbox-go"
 	"github.com/skip2/go-qrcode"
+	"net"
 
 	"bufio"
 	"errors"
@@ -34,8 +35,8 @@ type NFS struct {
 	height  int
 
 	paths []string
+	io    net.Conn
 
-	io io.ReadWriteCloser
 	*bufio.Reader
 	*bufio.Writer
 	send   map[int]*ctx.Message
@@ -672,15 +673,22 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return false
 	}
 
+	nfs.io = m.Optionv("io").(net.Conn)
+	bio := bufio.NewScanner(nfs.io)
+	for bio.Scan() {
+		m.Log("info", "recv: %s", bio.Text())
+	}
+
+	return false
 	m.Sess("nfs", m)
 
 	nfs.Message = m
-	if socket, ok := m.Data["io"]; ok {
+	if _, ok := m.Data["io"]; ok {
 		m.Cap("stream", m.Source().Name)
 		// m.Sess("aaa", "aaa").Cmd("login", "demo", "demo")
 		m.Options("stdio", false)
 
-		nfs.io = socket.(io.ReadWriteCloser)
+		// nfs.io = socket.(io.ReadWriteCloser)
 		nfs.Reader = bufio.NewReader(nfs.io)
 		nfs.Writer = bufio.NewWriter(nfs.io)
 
@@ -806,6 +814,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool { // {{{
+	return false
 	switch nfs.Context {
 	case m.Target():
 		if nfs.in != nil {
@@ -1311,10 +1320,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Find("tcp").Call(func(com *ctx.Message) *ctx.Message {
-					sub := com.Spawn(m.Target())
-					sub.Put("option", "target", m.Source())
-					sub.Put("option", "io", com.Data["io"])
-					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "打开文件")
+					sub := com.Spawn(c)
+					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
 					return sub
 				}, m.Meta["detail"])
 			}
@@ -1323,10 +1330,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Find("tcp").Call(func(com *ctx.Message) *ctx.Message {
-					sub := com.Spawn(m.Target())
-					sub.Put("option", "target", m.Source())
-					sub.Put("option", "io", com.Data["io"])
-					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "打开文件")
+					sub := com.Spawn(c)
+					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
 					return sub
 				}, m.Meta["detail"])
 			}
@@ -1334,6 +1339,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) { // {{{
+				m.Log("fuck", "%v %v", arg, nfs.io)
+				nfs.io.Write([]byte(arg[0]))
+				return
 				if m.Has("nrecv") {
 					if len(arg) > 1 && arg[0] == "file" {
 						info, e := os.Stat(arg[1])

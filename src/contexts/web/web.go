@@ -643,13 +643,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Option("dir", m.Cap("directory"))
 			}
 
-			check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir"))
-			if !check.Results(0) {
-				m.Copy(check, "append")
-				return
-			}
-			aaa := check.Appendv("aaa").(*ctx.Message)
-
 			// 输出文件
 			s, e := os.Stat(m.Option("dir"))
 			if m.Assert(e); !s.IsDir() {
@@ -657,26 +650,35 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			// 共享列表
-			share := m.Sess("share", m.Target())
-			index := share.Target().Index
-			if index != nil && index[aaa.Append("username")] != nil {
-				for k, v := range index[aaa.Append("username")].Index {
-					for _, j := range v.Commands {
-						for _, n := range j.Shares {
-							for _, nn := range n {
-								if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
-									share.Add("append", "group", k)
-									share.Add("append", "value", nn)
-									share.Add("append", "delete", "delete")
+			if false {
+				check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir"))
+				if !check.Results(0) {
+					m.Copy(check, "append")
+					return
+				}
+				aaa := check.Appendv("aaa").(*ctx.Message)
+
+				// 共享列表
+				share := m.Sess("share", m.Target())
+				index := share.Target().Index
+				if index != nil && index[aaa.Append("username")] != nil {
+					for k, v := range index[aaa.Append("username")].Index {
+						for _, j := range v.Commands {
+							for _, n := range j.Shares {
+								for _, nn := range n {
+									if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
+										share.Add("append", "group", k)
+										share.Add("append", "value", nn)
+										share.Add("append", "delete", "delete")
+									}
 								}
 							}
 						}
 					}
 				}
+				share.Sort("value", "string")
+				share.Sort("argument", "string")
 			}
-			share.Sort("value", "string")
-			share.Sort("argument", "string")
 
 			// 输出目录
 			fs, e := ioutil.ReadDir(m.Option("dir"))
@@ -748,7 +750,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			m.Append("title", "upload")
-			m.Append("tmpl", "userinfo", "share", "list", "git", "upload", "create")
+			// m.Append("tmpl", "userinfo", "share", "list", "git", "upload", "create")
+			m.Append("tmpl", "list", "git", "upload", "create")
 			m.Append("template", m.Conf("upload_main"), m.Conf("upload_tmpl"))
 			// }}}
 		}},
@@ -908,7 +911,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if len(arg) > 0 {
 				url = arg[0]
 			}
-			m.Log("fucK", "os %v", runtime.GOOS)
 			switch runtime.GOOS {
 			case "windows":
 				m.Find("cli").Cmd("system", "explorer", url)

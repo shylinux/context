@@ -794,7 +794,28 @@ func (m *Message) Color(color int, str string, arg ...interface{}) *Message { //
 }
 
 // }}}
-func (m *Message) Table(cb func(maps map[string]string, list []string, line int) (goon bool)) *Message { // {{{
+func (m *Message) Table(cbs ...func(maps map[string]string, list []string, line int) (goon bool)) *Message { // {{{
+	var cb func(maps map[string]string, list []string, line int) (goon bool)
+	if len(cbs) > 0 {
+		cb = cbs[0]
+	} else {
+		row := m.Confx("table_row_sep")
+		col := m.Confx("table_col_sep")
+		compact := Right(m.Confx("table_compact"))
+		cb = func(maps map[string]string, lists []string, line int) bool {
+			for i, v := range lists {
+				if k := m.Meta["append"][i]; compact {
+					v = maps[k]
+				}
+
+				if m.Echo(v); i < len(lists)-1 {
+					m.Echo(col)
+				}
+			}
+			m.Echo(row)
+			return true
+		}
+	}
 	if len(m.Meta["append"]) == 0 {
 		return m
 	}
@@ -918,7 +939,7 @@ func (m *Message) Matrix(index int, arg ...interface{}) string { // {{{
 }
 
 // }}}
-func (m *Message) Sort(key string, arg ...string) { // {{{
+func (m *Message) Sort(key string, arg ...string) *Message { // {{{
 	table := []map[string]string{}
 	m.Table(func(line map[string]string, lists []string, index int) bool {
 		if index != -1 {
@@ -993,6 +1014,7 @@ func (m *Message) Sort(key string, arg ...string) { // {{{
 			m.Add("append", k, v[k])
 		}
 	}
+	return m
 }
 
 // }}}
@@ -1788,7 +1810,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
 		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
 
-		"list_help": &Config{Name: "list_help", Value: "list command", Help: "命令列表帮助"},
+		"list_help":     &Config{Name: "list_help", Value: "list command", Help: "命令列表帮助"},
+		"table_compact": &Config{Name: "table_compact", Value: "false", Help: "命令列表帮助"},
+		"table_col_sep": &Config{Name: "table_col_sep", Value: "\t", Help: "命令列表帮助"},
+		"table_row_sep": &Config{Name: "table_row_sep", Value: "\n", Help: "命令列表帮助"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2321,20 +2346,20 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							})
 						default:
 							msg.Travel(func(msg *Message, i int) bool {
-								target := msg.target
-								m.Echo("%s(", target.Name)
-
-								if target.context != nil {
-									m.Echo("%s", target.context.Name)
+								m.Add("append", "name", msg.target.Name)
+								if msg.target.context != nil {
+									m.Add("append", "context", msg.target.context.Name)
+								} else {
+									m.Add("append", "context", "")
 								}
-								m.Echo(":")
 
-								msg.target = target
-
-								m.Echo("%s(%s) ", msg.Cap("status"), msg.Cap("stream"))
-								m.Echo("%s\n", target.Help)
+								m.Add("append", "status", msg.Cap("status"))
+								m.Add("append", "stream", msg.Cap("stream"))
+								m.Add("append", "help", msg.target.Help)
 								return true
 							})
+
+							m.Table()
 						}
 					default:
 						msg.Cmd(arg)
@@ -2524,14 +2549,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				switch len(arg) { //{{{
 				case 0:
-					keys := []string{}
-					for k, _ := range m.target.Configs {
-						keys = append(keys, k)
+					for k, v := range m.target.Configs {
+						m.Add("append", "key", k)
+						m.Add("append", "value", m.Conf(k))
+						m.Add("append", "name", v.Name)
 					}
-					sort.Strings(keys)
-					for _, k := range keys {
-						m.Echo("%s(%s): %s\n", k, m.Conf(k), m.target.Configs[k].Name)
-					}
+					m.Sort("key", "string").Table()
 					return
 				case 1:
 					if arg[0] == "all" {
@@ -2573,14 +2596,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				switch len(arg) { //{{{
 				case 0:
-					keys := []string{}
-					for k, _ := range m.target.Caches {
-						keys = append(keys, k)
+					for k, v := range m.target.Caches {
+						m.Add("append", "key", k)
+						m.Add("append", "value", m.Cap(k))
+						m.Add("append", "name", v.Name)
 					}
-					sort.Strings(keys)
-					for _, k := range keys {
-						m.Echo("%s(%s): %s\n", k, m.Cap(k), m.target.Caches[k].Name)
-					}
+					m.Sort("key", "string").Table()
 					return
 				case 1:
 					if arg[0] == "all" {
