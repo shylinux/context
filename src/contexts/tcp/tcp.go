@@ -70,7 +70,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		tcp.Conn = c
 
 		m.Log("info", "%s accept %s", m.Cap("nclient"),
-			m.Append("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
+			m.Option("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
 		m.Put("option", "io", tcp.Conn).Back(m)
 		return false
 	default:

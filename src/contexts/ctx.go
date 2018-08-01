@@ -280,6 +280,8 @@ type Message struct {
 	messages []*Message
 	message  *Message
 	root     *Message
+
+	Remote chan bool
 }
 
 func (m *Message) Code() int { // {{{
@@ -654,20 +656,14 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 		return m.Call(cb, arg...)
 	}
 
-	wait := make(chan bool)
-
+	wait := make(chan *Message)
 	go m.Call(func(sub *Message) *Message {
 		msg := cb(sub)
-		m.Log("lock", "before done %v", arg)
-		wait <- true
-		m.Log("lock", "after done %v", arg)
+		wait <- m
 		return msg
 	}, arg...)
 
-	m.Log("lock", "before wait %v", arg)
-	<-wait
-	m.Log("lock", "after wait %v", arg)
-	return m
+	return <-wait
 }
 
 // }}}
@@ -2887,10 +2883,12 @@ func Start(args ...string) {
 		m.target.Begin(m)
 	}
 
+	Pulse.Sess("tcp", "tcp")
 	Pulse.Sess("nfs", "nfs")
 	Pulse.Sess("lex", "lex")
 	Pulse.Sess("yac", "yac")
 	Pulse.Sess("cli", "cli")
+
 	Pulse.Sess("aaa", "aaa")
 	Pulse.Sess("log", "log")
 
