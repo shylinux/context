@@ -2453,7 +2453,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							list := []string{}
 							j := 0
 							for i := 1; i < len(arg); i++ {
-								if arg[i] == "_" && j < len(args) {
+								if arg[i] == "_" && m.Assert(j < len(args)) {
 									list = append(list, args[j])
 									j++
 									continue
