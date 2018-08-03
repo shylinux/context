@@ -493,6 +493,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				}
 
 			case termbox.KeyCtrlI:
+				break
 				if len(tab) == 0 {
 					tabi = 0
 					prefix := string(buf)

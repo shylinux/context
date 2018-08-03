@@ -3,6 +3,5 @@ source etc/local.shy
 ~file1
 	history load etc/history.txt
 
-~shell1
 	alias import nfs
 	alias send send
