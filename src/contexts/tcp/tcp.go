@@ -62,7 +62,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		m.Log("info", "%s dial %s", m.Cap("nclient"),
 			m.Option("stream", m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
-		m.Put("option", "io", tcp.Conn).Back(m)
+		m.Put("option", "io", tcp.Conn).Back(m.Spawn(m.Source()))
 		return false
 	case "accept":
 		c, e := m.Data["io"].(net.Conn)
@@ -71,7 +71,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		m.Log("info", "%s accept %s", m.Cap("nclient"),
 			m.Option("stream", m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr()))))
-		m.Put("option", "io", tcp.Conn).Back(m)
+		m.Put("option", "io", tcp.Conn).Back(m.Spawn(m.Source()))
 		return false
 	default:
 		if m.Cap("security") != "false" {

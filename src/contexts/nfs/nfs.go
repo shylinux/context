@@ -720,7 +720,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	go func() {
 		bio := bufio.NewScanner(nfs.io)
 		var e error
-		for msg, head, body := m.Spawn(), "", ""; bio.Scan(); {
+		for msg, head, body := m.Sess("target"), "", ""; bio.Scan(); {
 			line := bio.Text()
 			m.Capi("nread", len(line)+1)
 			if len(line) == 0 {
@@ -735,7 +735,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 					h.Copy(msg, "result").Copy(msg, "append")
 					h.Remote <- true
 				}
-				msg = m.Spawn()
+				msg = m.Sess("target")
 				continue
 			}
 
@@ -1274,20 +1274,34 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
-				m.Sess("tcp").Call(func(com *ctx.Message) *ctx.Message {
-					sub := com.Spawn(c)
+				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
-					return sub
+					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
+						nfs, ok := sub.Target().Server.(*NFS)
+						m.Log("fuck", "why%v", sub.Format())
+						m.Log("fuck", "why%v", ok)
+						m.Remote = make(chan bool, 1)
+						nfs.send <- sub1
+						<-m.Remote
+						return nil
+					})
 				}, m.Meta["detail"])
 			}
 			// }}}
 		}},
 		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
-				m.Sess("tcp").Call(func(com *ctx.Message) *ctx.Message {
-					sub := com.Spawn(c)
+				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
-					return sub
+					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
+						nfs, ok := sub.Target().Server.(*NFS)
+						m.Log("fuck", "why%v", sub.Format())
+						m.Log("fuck", "why%v", ok)
+						m.Remote = make(chan bool, 1)
+						nfs.send <- sub1
+						<-m.Remote
+						return nil
+					})
 				}, m.Meta["detail"])
 			}
 			// }}}

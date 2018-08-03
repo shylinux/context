@@ -46,6 +46,7 @@ func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 // }}}
 func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool { // {{{
+	return false
 	switch ssh.Context {
 	case m.Target():
 	case m.Source():
@@ -114,10 +115,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address protocol", Help: "监听连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
-				m.Find("nfs").Call(func(file *ctx.Message) *ctx.Message {
-					sub := file.Spawn(m.Target())
+				m.Sess("nfs").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "远程主机")
-					m.Sess("ssh", sub)
 					return sub
 				}, m.Meta["detail"])
 				m.Spawn(m.Target()).Cmd("save")
@@ -126,13 +125,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		}},
 		"dial": &ctx.Command{Name: "dial address protocol", Help: "建立连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
-				m.Find("nfs").CallBack(true, func(file *ctx.Message) *ctx.Message {
-					sub := file.Spawn(m.Target())
-					sub.Copy(m, "detail")
+				m.Sess("nfs").CallBack(true, func(sub *ctx.Message) *ctx.Message {
 					sub.Target().Start(sub)
-					m.Sess("ssh", sub)
-
-					sub.Spawn(sub.Target()).Cmd("pwd", m.Conf("domain"))
+					// sub.Spawn().Cmd("pwd", m.Conf("domain"))
 					return sub
 				}, m.Meta["detail"])
 			}
@@ -142,6 +137,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			Form: map[string]int{"domain": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
+					msg := m.Spawn()
+					msg.Detail(arg)
+					ssh.Message.Back(msg)
+					return
 
 					if m.Option("domain") == m.Cap("domain") { //本地命令
 						msg := m.Spawn(m.Target())

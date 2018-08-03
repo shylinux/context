@@ -626,8 +626,9 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message { // {{{
 
 // }}}
 func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
-	m.callback = cb
-	m.Cmd(arg...)
+	if m.callback = cb; len(arg) > 0 || len(m.Meta["detail"]) > 0 {
+		m.Cmd(arg...)
+	}
 	return m
 }
 
