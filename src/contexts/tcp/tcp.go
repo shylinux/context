@@ -96,7 +96,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Assert(e)
 		msg := m.Spawn(Index).Put("option", "io", c).Put("option", "source", m.Source())
 		msg.Call(func(com *ctx.Message) *ctx.Message {
-			return com
+			return com.Spawn(m.Source())
 		}, "accept", c.RemoteAddr().String(), m.Cap("security"), m.Cap("protocol"))
 	}
 

@@ -2029,6 +2029,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						m.Echo(" %s %s\n", k, v.Format())
 					}
 				}
+				if msg.callback != nil {
+					m.Color(31, "callback(1): %p\n", msg.callback)
+				}
 				return
 			}
 

@@ -679,21 +679,26 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	nfs.io = m.Optionv("io").(net.Conn)
 	nfs.hand = map[int]*ctx.Message{}
 	nfs.send = make(chan *ctx.Message, 10)
+	m.Log("fuck", "send %p", nfs.send)
 	nfs.recv = make(chan *ctx.Message, 10)
 
 	go func() {
 		for {
 			select {
 			case msg := <-nfs.send:
+				m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
+				m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
 				head, body := "detail", "option"
 				if msg.Hand {
+					m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
 					head, body = "result", "append"
 					send_code := msg.Option("send_code")
-					msg.Append("send_code", send_code)
+					msg.Append("send_code1", send_code)
 					m.Log("info", "%s recv: %v %v", msg.Option("recv_code"), msg.Meta[head], msg.Meta[body])
 				} else {
+					m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
+					m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
 					m.Log("info", "%d send: %v %v", m.Capi("nsend", 1), msg.Meta[head], msg.Meta[body])
-					msg.Meta["detail"] = msg.Meta["detail"][1:]
 					nfs.hand[m.Capi("nsend")] = msg
 					msg.Option("send_code", m.Capi("nsend"))
 				}
@@ -723,16 +728,17 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		var e error
 		for msg, head, body := m.Sess("target"), "", ""; bio.Scan(); {
 			line := bio.Text()
+			m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
 			m.Capi("nread", len(line)+1)
 			if len(line) == 0 {
 
 				if head == "detail" {
-					m.Log("info", "%d recv: %v %v", m.Capi("nrecv", 1), msg.Meta[head], msg.Meta[body])
+					m.Log("info", "%d recv: %v %v %v", m.Capi("nrecv", 1), msg.Meta[head], msg.Meta[body], msg.Meta)
 					msg.Option("recv_code", m.Cap("nrecv"))
 					nfs.recv <- msg
 				} else {
-					m.Log("info", "%d send: %v %v", msg.Appendi("send_code"), msg.Meta[head], msg.Meta[body])
-					h := nfs.hand[msg.Appendi("send_code")]
+					m.Log("info", "%d send: %v %v %v", msg.Appendi("send_code1"), msg.Meta[head], msg.Meta[body], msg.Meta)
+					h := nfs.hand[msg.Appendi("send_code1")]
 					h.Copy(msg, "result").Copy(msg, "append")
 					h.Remote <- true
 				}
@@ -761,6 +767,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	for {
 		select {
 		case msg := <-nfs.recv:
+			m.Log("fuck", "why %s %v", msg.Format(), msg.Meta)
+
 			nfs.send <- msg.Cmd()
 		}
 	}
@@ -1278,12 +1286,16 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
 					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
+						sub.Log("fuck", "send")
 						nfs, ok := sub.Target().Server.(*NFS)
-						m.Log("fuck", "why%v", sub.Format())
-						m.Log("fuck", "why%v", ok)
-						m.Remote = make(chan bool, 1)
+						sub.Log("fuck", "send %v", ok)
+						m.Log("fuck", "send %p", nfs.send)
+						sub1.Remote = make(chan bool, 1)
+						sub.Log("info", "before send %d", len(nfs.send))
 						nfs.send <- sub1
-						<-m.Remote
+						sub.Log("info", "middle send %d", len(nfs.send))
+						<-sub1.Remote
+						sub.Log("info", "after send %d", len(nfs.send))
 						return nil
 					})
 				}, m.Meta["detail"])
@@ -1295,12 +1307,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
 					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
-						nfs, ok := sub.Target().Server.(*NFS)
-						m.Log("fuck", "why%v", sub.Format())
-						m.Log("fuck", "why%v", ok)
-						m.Remote = make(chan bool, 1)
+						nfs, _ := sub.Target().Server.(*NFS)
+						m.Log("fuck", "send %p", nfs.send)
+						sub1.Remote = make(chan bool, 1)
+						sub.Log("info", "before send %d", len(nfs.send))
 						nfs.send <- sub1
-						<-m.Remote
+						sub.Log("info", "middle send %d", len(nfs.send))
+						<-sub1.Remote
+						sub.Log("info", "after send %d", len(nfs.send))
 						return nil
 					})
 				}, m.Meta["detail"])

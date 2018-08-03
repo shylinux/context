@@ -920,6 +920,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Spawn().Cmd("open", url)
 			}
 		}},
+		"add_income": &ctx.Command{Name: "add_income", Help: "浏览器网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			// for _, uid := range []string{"98010402293", "96287507642", "98896063791", "98683626189", "95780886494", "95780886494", "98629824072"} {
+			for _, uid := range []string{"97661734361"} {
+				for t := 1530777074000; t < 1533268176000; t += 172800000 {
+					m.Spawn().Cmd("5", "teacher_uid", uid, "valid_time", t, "description_public", "hello")
+				}
+			}
+		}},
 	},
 }
 

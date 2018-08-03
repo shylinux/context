@@ -18,10 +18,10 @@ type SSH struct {
 }
 
 func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
-	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{
-		"domains": &ctx.Config{Name: "domains", Value: "", Help: "主机数量"},
+	c.Caches = map[string]*ctx.Cache{
+		"hostname": &ctx.Cache{Name: "hostname", Value: "com", Help: "主机数量"},
 	}
+	c.Configs = map[string]*ctx.Config{}
 
 	s := new(SSH)
 	s.Context = c
@@ -30,6 +30,8 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+	ssh.Message = m
+	ssh.Caches["hostname"] = &ctx.Cache{Name: "hostname", Value: "", Help: "主机数量"}
 	if ssh.Context == Index {
 		Pulse = m
 	}
@@ -100,7 +102,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"interval":    &ctx.Config{Name: "interval", Value: "3", Help: "主机数量"},
-		"domain":      &ctx.Config{Name: "domain", Value: "com", Help: "主机数量"},
+		"hostname":    &ctx.Config{Name: "hostname", Value: "host", Help: "主机数量"},
 		"domain.json": &ctx.Config{Name: "domain.json", Value: "var/domain.json", Help: "主机数量"},
 		"domain.png":  &ctx.Config{Name: "domain.png", Value: "var/domain.png", Help: "主机数量"},
 
@@ -127,7 +129,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
 				m.Sess("nfs").CallBack(true, func(sub *ctx.Message) *ctx.Message {
 					sub.Target().Start(sub)
-					// sub.Spawn().Cmd("pwd", m.Conf("domain"))
+					sub.Spawn().Cmd("pwd", m.Conf("hostname"))
 					return sub
 				}, m.Meta["detail"])
 			}
@@ -136,10 +138,54 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"send": &ctx.Command{Name: "send [domain str] cmd arg...", Help: "远程执行",
 			Form: map[string]int{"domain": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				m.Log("why", "send")
 				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
-					msg := m.Spawn()
+					if m.Options("domain") {
+						find := false
+						host := strings.SplitN(m.Option("domain"), ".", 2)
+						m.Travel(func(m *ctx.Message, i int) bool {
+							if i > 0 {
+								if m.Cap("hostname") == host[0] {
+									ssh, ok := m.Target().Server.(*SSH)
+									m.Assert(ok)
+									msg := m.Spawn(ssh.Message.Source())
+									if len(host) > 1 {
+										msg.Option("domain", host[1])
+										msg.Detail("send", arg)
+									} else {
+										msg.Detail(arg)
+									}
+									m.Log("why", "send")
+									m.Log("why", "send %s", ssh.Message.Format())
+									ssh.Message.Back(msg)
+									m.Copy(msg, "result").Copy(msg, "append")
+									find = true
+								}
+							}
+							return true
+						}, c)
+
+						if !find && m.Cap("domain") != "com" {
+							ssh, ok := c.Server.(*SSH)
+							m.Assert(ok)
+
+							msg := m.Spawn(ssh.Message.Source())
+							msg.Option("domain", m.Option("domain"))
+							m.Log("why", "send------ %s", c.Name)
+							msg.Detail("send", arg)
+							m.Log("why", "send %s", ssh.Message.Format())
+							ssh.Message.Back(msg)
+							m.Copy(msg, "result").Copy(msg, "append")
+							find = true
+						}
+						return
+					}
+					msg := m.Spawn(ssh.Message.Source())
+					m.Log("why", "send")
 					msg.Detail(arg)
+					m.Log("why", "send %s", ssh.Message.Format())
 					ssh.Message.Back(msg)
+					m.Copy(msg, "result").Copy(msg, "append")
 					return
 
 					if m.Option("domain") == m.Cap("domain") { //本地命令
@@ -208,6 +254,24 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				// }}}
 			}},
 		"pwd": &ctx.Command{Name: "pwd", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) == 0 {
+				if m.Target() == c {
+					m.Echo(m.Cap("domain"))
+				} else {
+					m.Echo("%s.%s", m.Cap("domain"), m.Cap("hostname"))
+				}
+				return
+			}
+
+			if m.Target() == c {
+				msg := m.Spawn().Cmd("send", "pwd", arg[0])
+				m.Copy(msg, "result").Copy(msg, "append")
+				m.Cap("domain", msg.Result(0))
+			} else if m.Options("send_code") {
+				m.Echo("%s.%s", m.Cap("domain"), m.Cap("hostname", arg[0]))
+			}
+			return
+
 			switch len(arg) { // {{{
 			case 0:
 				m.Echo(m.Cap("domain"))
