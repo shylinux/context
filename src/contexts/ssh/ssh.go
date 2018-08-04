@@ -11,9 +11,9 @@ import ( // {{{
 // }}}
 
 type SSH struct {
-	nfs *ctx.Context
+	nfs  *ctx.Context
+	peer map[string]*ctx.Message
 
-	*ctx.Message
 	*ctx.Context
 }
 
@@ -30,7 +30,6 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	ssh.Message = m
 	ssh.Caches["hostname"] = &ctx.Cache{Name: "hostname", Value: "", Help: "主机数量"}
 	if ssh.Context == Index {
 		Pulse = m
@@ -40,7 +39,6 @@ func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool { // {{{
-	ssh.Message = m
 	ssh.nfs = m.Source()
 	m.Cap("stream", m.Source().Name)
 	return false
@@ -59,7 +57,7 @@ func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool { // {{{
 			m.Sess("nfs", "nfs")
 			for !m.Caps("stream") {
 				time.Sleep(time.Second * time.Duration(m.Confi("interval")))
-				go ssh.Message.Spawn(m.Target()).Copy(ssh.Message, "detail").Cmd()
+				go ssh.Message().Spawn(m.Target()).Copy(ssh.Message(), "detail").Cmd()
 				time.Sleep(time.Second * time.Duration(m.Confi("interval")))
 			}
 		}()
@@ -102,7 +100,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"interval":    &ctx.Config{Name: "interval", Value: "3", Help: "主机数量"},
-		"hostname":    &ctx.Config{Name: "hostname", Value: "host", Help: "主机数量"},
+		"hostname":    &ctx.Config{Name: "hostname", Value: "com", Help: "主机数量"},
 		"domain.json": &ctx.Config{Name: "domain.json", Value: "var/domain.json", Help: "主机数量"},
 		"domain.png":  &ctx.Config{Name: "domain.png", Value: "var/domain.png", Help: "主机数量"},
 
@@ -136,125 +134,73 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			// }}}
 		}},
 		"send": &ctx.Command{Name: "send [domain str] cmd arg...", Help: "远程执行",
-			Form: map[string]int{"domain": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Log("why", "send")
 				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
-					if m.Options("domain") {
-						find := false
-						host := strings.SplitN(m.Option("domain"), ".", 2)
+					domain := ""
+					if len(arg) > 1 && arg[0] == "domain" {
+						domain, arg = arg[1], arg[2:]
+						domain = strings.TrimPrefix(strings.TrimPrefix(domain, m.Cap("domain")), ".")
+					}
+
+					if domain != "" {
+						domain_miss := true
+						host := strings.SplitN(domain, ".", 2)
 						m.Travel(func(m *ctx.Message, i int) bool {
 							if i > 0 {
 								if m.Cap("hostname") == host[0] {
 									ssh, ok := m.Target().Server.(*SSH)
 									m.Assert(ok)
-									msg := m.Spawn(ssh.Message.Source())
+
+									msg := m.Spawn(ssh.Message().Source()).Copy(m, "option")
 									if len(host) > 1 {
-										msg.Option("domain", host[1])
-										msg.Detail("send", arg)
+										msg.Options("downflow", true)
+										msg.Detail("send", "domain", host[1], arg)
 									} else {
 										msg.Detail(arg)
 									}
-									m.Log("why", "send")
-									m.Log("why", "send %s", ssh.Message.Format())
-									ssh.Message.Back(msg)
-									m.Copy(msg, "result").Copy(msg, "append")
-									find = true
+
+									if ssh.Message().Back(msg); !msg.Appends("domain_miss") {
+										m.Copy(msg, "result").Copy(msg, "append")
+										domain_miss = false
+										return false
+									}
 								}
+								return false
 							}
 							return true
 						}, c)
 
-						if !find && m.Cap("domain") != "com" {
+						if domain_miss && !m.Options("downflow") && m.Cap("domain") != m.Conf("domain") {
 							ssh, ok := c.Server.(*SSH)
 							m.Assert(ok)
 
-							msg := m.Spawn(ssh.Message.Source())
-							msg.Option("domain", m.Option("domain"))
-							m.Log("why", "send------ %s", c.Name)
-							msg.Detail("send", arg)
-							m.Log("why", "send %s", ssh.Message.Format())
-							ssh.Message.Back(msg)
-							m.Copy(msg, "result").Copy(msg, "append")
-							find = true
+							msg := m.Spawn(ssh.Message().Source()).Copy(m, "option")
+							msg.Detail("send", "domain", domain, arg)
+
+							if ssh.Message().Back(msg); !msg.Appends("domain_miss") {
+								m.Copy(msg, "result").Copy(msg, "append")
+								domain_miss = false
+							}
 						}
+
+						m.Appends("domain_miss", domain_miss)
 						return
 					}
-					msg := m.Spawn(ssh.Message.Source())
-					m.Log("why", "send")
-					msg.Detail(arg)
-					m.Log("why", "send %s", ssh.Message.Format())
-					ssh.Message.Back(msg)
-					m.Copy(msg, "result").Copy(msg, "append")
-					return
 
-					if m.Option("domain") == m.Cap("domain") { //本地命令
-						msg := m.Spawn(m.Target())
-						msg.Cmd(arg)
+					if m.Options("send_code") || m.Cap("status") != "start" {
+						msg := m.Spawn().Cmd(arg)
 						m.Copy(msg, "result").Copy(msg, "append")
-						m.Back(m)
-						return
+					} else {
+						msg := m.Spawn(ssh.Message().Source())
+						msg.Copy(m, "option").Detail(arg)
+						ssh.Message().Back(msg)
+						m.Copy(msg, "result").Copy(msg, "append")
 					}
-
-					target := strings.Split(m.Option("domain"), ".")
-					name, rest := target[0], target[1:]
-					if name == m.Conf("domain") {
-						if len(target) > 1 {
-							name = target[1]
-							rest = target[2:]
-						} else {
-							name = ""
-						}
-					}
-
-					if len(rest) == 0 && len(name) == 0 { //点对点通信
-						if m.Options("nsend") { //接收命令
-							msg := m.Spawn(m.Target())
-							msg.Cmd(arg)
-							m.Copy(msg, "result").Copy(msg, "append")
-							m.Back(m)
-						} else { //发送命令
-							ssh.Message.Sess("nfs").CallBack(m.Options("stdio"), func(host *ctx.Message) *ctx.Message {
-								m.Back(m.Copy(host, "result").Copy(host, "append"))
-								return nil
-							}, "send", "send", arg)
-						}
-						return
-					}
-
-					miss := true
-					m.Travel(func(m *ctx.Message, i int) bool { //向下搜索
-						if ssh, ok := m.Target().Server.(*SSH); ok && m.Conf("domains") == name {
-							msg := m.Spawn(ssh.nfs)
-							msg.Option("domain", strings.Join(rest, "."))
-							msg.CallBack(m.Options("stdio"), func(host *ctx.Message) *ctx.Message {
-								return m.Copy(host, "result").Copy(host, "append")
-							}, "send", "send", arg)
-
-							miss = false
-						}
-						return miss
-					}, c)
-
-					if miss {
-						if name == m.Cap("domain") {
-						}
-					}
-
-					if miss { //向上搜索
-						if ssh, ok := c.Server.(*SSH); m.Assert(ok) && ssh.nfs != nil {
-							msg := m.Spawn(ssh.nfs)
-							msg.Option("domain", m.Option("domain"))
-							msg.CallBack(m.Options("stdio"), func(host *ctx.Message) *ctx.Message {
-								return m.Copy(host, "result").Copy(host, "append")
-							}, "send", "send", arg)
-						}
-					}
-				}
-				// }}}
+					return
+				} // }}}
 			}},
 		"pwd": &ctx.Command{Name: "pwd", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if len(arg) == 0 {
+			if len(arg) == 0 { // {{{
 				if m.Target() == c {
 					m.Echo(m.Cap("domain"))
 				} else {
@@ -268,49 +214,98 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Copy(msg, "result").Copy(msg, "append")
 				m.Cap("domain", msg.Result(0))
 			} else if m.Options("send_code") {
-				m.Echo("%s.%s", m.Cap("domain"), m.Cap("hostname", arg[0]))
-			}
-			return
-
-			switch len(arg) { // {{{
-			case 0:
-				m.Echo(m.Cap("domain"))
-			case 1:
-				if m.Options("nsend") {
-					domain := arg[0]
-
-					m.Travel(func(m *ctx.Message, i int) bool {
-						if m.Conf("domains") == domain {
-							domain = domain + m.Cap("nhost")
-							return false
-						}
-						return true
-					}, c)
-					m.Conf("domains", domain)
-
-					mdb := m.Find(m.Conf("mdb"), true)
-					if mdb != nil {
-						domain := m.Cap("domain") + "." + m.Conf("domains")
-						mdb.Cmd("exec", "delete from goodship where value=?", domain)
-						mdb.Cmd("exec", "insert into goodship(uid, share, level, type, value, kind, name) value(?, 'root', 'root', 'terminal', ?, 'terminal', ?)", m.Conf("uid"), domain, domain)
+				hostname := arg[0]
+				m.Travel(func(m *ctx.Message, line int) bool {
+					if hostname == m.Cap("hostname") {
+						hostname += m.Cap("nhost")
+						return false
 					}
-
-					m.Echo(m.Cap("domain"))
-					m.Echo(".")
-					m.Echo(m.Conf("domains"))
-				} else {
-					m.Spawn(m.Target()).CallBack(m.Options("stdio"), func(msg *ctx.Message) *ctx.Message {
-						m.Conf("domain", msg.Result(2))
-						m.Echo(m.Cap("domain", strings.Join(msg.Meta["result"], "")))
-						m.Back(msg)
-
-						m.Spawn(m.Target()).Cmd("save")
-						return nil
-					}, "send", "pwd", arg[0])
+					return true
+				}, c)
+				m.Echo("%s.%s", m.Cap("domain"), m.Cap("hostname", hostname))
+			} // }}}
+		}},
+		"hello": &ctx.Command{Name: "hello request", Help: "加密请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			aaa := m.Target().Message().Sess("aaa", false) // {{{
+			for _, k := range m.Meta["seal"] {
+				for i, v := range m.Meta[k] {
+					m.Meta[k][i] = m.Spawn(aaa).Cmd("deal", v).Result(0)
 				}
 			}
+			for _, k := range m.Meta["encrypt"] {
+				for i, v := range m.Meta[k] {
+					m.Meta[k][i] = m.Spawn(aaa).Cmd("decrypt", v).Result(0)
+				}
+			}
+
+			if len(arg) == 0 {
+				if !m.Has("mi") {
+					cert := aaa.Spawn().Cmd("certificate")
+					m.Echo(cert.Result(0))
+				} else {
+					msg := m.Sess("aaa").Cmd("login", m.Option("mi"), m.Option("mi"))
+					m.Echo(msg.Result(0))
+					msg.Sess("aaa").Cmd("newcipher", m.Option("mi"))
+				}
+				return
+			}
+
+			msg := m.Spawn().Copy(m, "option").Cmd(arg)
+			m.Copy(msg, "result").Copy(msg, "append")
 			// }}}
 		}},
+		"shake": &ctx.Command{
+			Name: "shake [domain host] cmd... [seal option...][encrypt option...]",
+			Help: "加密通信",
+			Form: map[string]int{"seal": -1, "encrypt": -1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) { // {{{
+					if len(arg) == 0 {
+						for k, v := range ssh.peer {
+							m.Echo("%s: %s\n", k, v.Cap("stream"))
+						}
+						return
+					}
+
+					peer := "peer"
+					args := []string{}
+					if len(arg) > 1 && arg[0] == "domain" {
+						args = append(args, "domain", arg[1])
+						peer, arg = arg[1], arg[2:]
+					}
+					if ssh.peer == nil {
+						ssh.peer = map[string]*ctx.Message{}
+					}
+					user, ok := ssh.peer[peer]
+					if !ok {
+						user = m.Sess("aaa").Cmd("login", "cert", m.Spawn().Cmd("send", args, "hello"), peer)
+						ssh.peer[peer] = user
+						mi := user.Cap("sessid")
+
+						remote := m.Spawn().Add("option", mi, m.Spawn(user).Cmd("seal", mi)).Add("option", "seal", mi).Cmd("send", args, "hello")
+						m.Spawn(user).Cmd("newcipher", mi)
+						user.Cap("remote", "remote", remote.Result(0), "远程会话")
+						user.Cap("remote_mi", "remote_mi", mi, "远程密钥")
+					}
+
+					msg := m.Spawn(ssh.Message().Source()).Copy(m, "option")
+					msg.Option("hello", "world")
+					msg.Option("world", "hello")
+					for _, k := range msg.Meta["seal"] {
+						for i, v := range msg.Meta[k] {
+							msg.Meta[k][i] = msg.Spawn(user).Cmd("seal", v).Result(0)
+						}
+					}
+					for _, k := range msg.Meta["encrypt"] {
+						for i, v := range msg.Meta[k] {
+							msg.Meta[k][i] = msg.Spawn(user).Cmd("encrypt", v).Result(0)
+						}
+					}
+					msg.Detail("send", args, "hello", arg)
+					ssh.Message().Back(msg)
+					m.Copy(msg, "result").Copy(msg, "append")
+				} // }}}
+			}},
 		"close": &ctx.Command{Name: "close", Help: "连接断开", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Target().Close(m)
 		}},

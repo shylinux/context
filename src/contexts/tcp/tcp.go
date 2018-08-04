@@ -21,7 +21,8 @@ type TCP struct {
 func (tcp *TCP) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
 	c.Caches = map[string]*ctx.Cache{
 		"protocol": &ctx.Cache{Name: "网络协议(tcp/tcp4/tcp6)", Value: m.Conf("protocol"), Help: "网络协议"},
-		"security": &ctx.Cache{Name: "加密通信(true/false)", Value: m.Conf("security"), Help: "加密通信"},
+		"certfile": &ctx.Cache{Name: "certfile", Value: "", Help: "加密通信"},
+		"keyfile":  &ctx.Cache{Name: "keyfile", Value: "", Help: "加密通信"},
 		"address":  &ctx.Cache{Name: "网络地址", Value: "", Help: "网络地址"},
 		"nrecv":    &ctx.Cache{Name: "nrecv", Value: "0", Help: "网络地址"},
 		"nsend":    &ctx.Cache{Name: "nsend", Value: "0", Help: "网络地址"},
@@ -41,15 +42,17 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 // }}}
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 	m.Cap("address", m.Confx("address", arg, 1))
-	m.Cap("security", m.Confx("security", arg, 2))
-	m.Cap("protocol", m.Confx("protocol", arg, 3))
+	m.Cap("certfile", m.Confx("certfile", arg, 2))
+	m.Cap("keyfile", m.Confx("keyfile", arg, 3))
+	m.Cap("protocol", m.Confx("protocol", arg, 4))
 
 	switch arg[0] {
 	case "dial":
-		if m.Caps("security") {
-			cert, e := tls.LoadX509KeyPair(m.Conf("cert"), m.Conf("key"))
+		if m.Caps("certfile") {
+			m.Sess("aaa", m.Sess("aaa").Cmd("login", "cert", m.Cap("certfile"), "key", m.Cap("keyfile"), "tcp"))
+			cert, e := tls.LoadX509KeyPair(m.Cap("certfile"), m.Cap("keyfile"))
 			m.Assert(e)
-			conf := &tls.Config{Certificates: []tls.Certificate{cert}}
+			conf := &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
 
 			c, e := tls.Dial(m.Cap("protocol"), m.Cap("address"), conf)
 			m.Assert(e)
@@ -74,8 +77,9 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool { // {{{
 		m.Put("option", "io", tcp.Conn).Back(m.Spawn(m.Source()))
 		return false
 	default:
-		if m.Cap("security") != "false" {
-			cert, e := tls.LoadX509KeyPair(m.Conf("cert"), m.Conf("key"))
+		if m.Caps("certfile") {
+			m.Sess("aaa", m.Sess("aaa").Cmd("login", "cert", m.Cap("certfile"), "key", m.Cap("keyfile"), "tcp"))
+			cert, e := tls.LoadX509KeyPair(m.Cap("certfile"), m.Cap("keyfile"))
 			m.Assert(e)
 			conf := &tls.Config{Certificates: []tls.Certificate{cert}}
 

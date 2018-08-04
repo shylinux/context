@@ -30,6 +30,12 @@ func Trans(arg ...interface{}) []string { // {{{
 	ls := []string{}
 	for _, v := range arg {
 		switch val := v.(type) {
+		case *Message:
+			if val.Hand {
+				ls = append(ls, val.Meta["result"]...)
+			} else {
+				ls = append(ls, val.Meta["detail"]...)
+			}
 		case string:
 			ls = append(ls, val)
 		case bool:
@@ -96,6 +102,7 @@ type Context struct {
 
 	requests []*Message
 	sessions []*Message
+	message  *Message
 
 	contexts map[string]*Context
 	context  *Context
@@ -150,6 +157,7 @@ func (c *Context) Begin(m *Message, arg ...string) *Context { // {{{
 
 	c.requests = append(c.requests, m)
 	m.source.sessions = append(m.source.sessions, m)
+	c.message = m
 
 	m.Log("begin", "%d context %v %v", m.root.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
 	for k, x := range c.Configs {
@@ -181,6 +189,7 @@ func (c *Context) Start(m *Message, arg ...string) bool { // {{{
 	go m.TryCatch(m, true, func(m *Message) {
 		m.Log(m.Cap("status", "start"), "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
 
+		c.message = m
 		c.exit = make(chan bool, 2)
 		if running <- true; c.Server != nil && c.Server.Start(m, m.Meta["detail"]...) {
 			c.Close(m, m.Meta["detail"]...)
@@ -235,6 +244,11 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 
 func (c *Context) Context() *Context { // {{{
 	return c.context
+}
+
+// }}}
+func (c *Context) Message() *Message { // {{{
+	return c.message
 }
 
 // }}}
@@ -402,6 +416,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 		e = errors.New(msg[0])
 	}
 
+	m.Log("error", "%s", fmt.Sprintln(e))
 	panic(m.Set("result", "error: ", fmt.Sprintln(e), "\n"))
 }
 
@@ -495,10 +510,15 @@ func (m *Message) Travel(hand func(m *Message, i int) bool, c ...*Context) { // 
 
 // }}}
 
-func (m *Message) Spawn(arg ...*Context) *Message { // {{{
+func (m *Message) Spawn(arg ...interface{}) *Message { // {{{
 	c := m.target
 	if len(arg) > 0 {
-		c = arg[0]
+		switch v := arg[0].(type) {
+		case *Context:
+			c = v
+		case *Message:
+			c = v.target
+		}
 	}
 
 	msg := &Message{
@@ -1292,10 +1312,11 @@ func (m *Message) Cmd(args ...interface{}) *Message { // {{{
 // }}}
 
 func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
+	conf := m.Conf(key)
 	if len(arg) == 0 {
 		value := m.Option(key)
 		if value == "" {
-			value = m.Conf(key)
+			value = conf
 		}
 		return value
 	}
@@ -1327,7 +1348,7 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 		}
 	}
 	if !force && value == "" {
-		value = m.Conf(key)
+		value = conf
 	}
 
 	format := "%s"
@@ -2183,9 +2204,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 			if len(arg) == 1 {
-				if sub := msg.Sess(arg[0], false); sub != nil {
-					m.Echo("%d", sub.code)
+				m.Log("fuck", "%v", m.Meta)
+				for msg = msg; msg != nil; msg = msg.message {
+					for k, v := range msg.Sessions {
+						if k == arg[0] {
+							m.Echo("%d", v.code)
+							return
+						}
+					}
 				}
+				m.Log("fuck", "%v", m.Meta)
 				return
 			}
 
@@ -2351,6 +2379,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 									m.Add("append", "context", msg.target.context.Name)
 								} else {
 									m.Add("append", "context", "")
+								}
+								if msg.target.Message != nil {
+									m.Add("append", "message", msg.target.message.code)
+								} else {
+									m.Add("append", "message", "")
 								}
 
 								m.Add("append", "status", msg.Cap("status"))

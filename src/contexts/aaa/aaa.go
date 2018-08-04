@@ -2,6 +2,7 @@ package aaa // {{{
 // }}}
 import ( // {{{
 	"contexts"
+	"math/big"
 
 	"bufio"
 	"io"
@@ -12,6 +13,8 @@ import ( // {{{
 	"crypto/md5"
 	"strings"
 
+	"crypto/aes"
+	"crypto/cipher"
 	crand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -29,6 +32,12 @@ import ( // {{{
 // }}}
 
 type AAA struct {
+	public      *rsa.PublicKey
+	private     *rsa.PrivateKey
+	certificate *x509.Certificate
+	encrypt     cipher.BlockMode
+	decrypt     cipher.BlockMode
+
 	sessions map[string]*ctx.Message
 	*ctx.Context
 }
@@ -68,6 +77,21 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	s := new(AAA)
 	s.Context = c
 	s.sessions = aaa.sessions
+	if m.Has("cert") {
+		s.certificate = m.Optionv("certificate").(*x509.Certificate)
+		s.public = s.certificate.PublicKey.(*rsa.PublicKey)
+	}
+	if m.Has("pub") {
+		s.public = m.Optionv("public").(*rsa.PublicKey)
+		m.Log("fuck", "public %v", s.public)
+	}
+	if m.Has("key") {
+		s.private = m.Optionv("private").(*rsa.PrivateKey)
+		s.public = &s.private.PublicKey
+		m.Log("fuck", "public %v", s.public)
+
+	}
+
 	return s
 }
 
@@ -107,15 +131,76 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	Configs: map[string]*ctx.Config{
 		"rootname": &ctx.Config{Name: "rootname", Value: "root", Help: "根用户名"},
 		"expire":   &ctx.Config{Name: "expire(s)", Value: "7200", Help: "会话超时"},
-		"cert":     &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "证书文件"},
+		"pub":      &ctx.Config{Name: "pub", Value: "etc/pub.pem", Help: "公钥文件"},
 		"key":      &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "私钥文件"},
+
+		"aaa_name": &ctx.Config{Name: "aaa_name", Value: "user", Help: "默认模块名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				return arg[0]
+			}
+			return fmt.Sprintf("%s%d", x.Value, m.Capi("nuser", 1))
+			// }}}
+		}},
+		"aaa_help": &ctx.Config{Name: "aaa_help", Value: "登录用户", Help: "默认模块帮助"},
 	},
 	Commands: map[string]*ctx.Command{
 		"login": &ctx.Command{
-			Name: "login [sessid]|[username password]|[load|save filename]",
+			Name: "login [sessid]|[username password]|[cert certfile]|[pub pubfile]|[key keyfile]|[ip ipstr]|[load|save filename]",
 			Help: "用户登录, sessid: 会话ID, username: 用户名, password: 密码, load: 加载用户信息, save: 保存用户信息, filename: 文件名",
+			Form: map[string]int{"cert": 1, "pub": 1, "key": 1, "ip": 1, "load": 1, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) { // {{{
+					stream := ""
+					if m.Has("ip") {
+						stream = m.Option("ip")
+					}
+					if m.Has("pub") {
+						stream = m.Option("pub")
+						buf, e := ioutil.ReadFile(m.Option("pub"))
+						if e != nil {
+							buf = []byte(m.Option("pub"))
+							e = nil
+							stream = "RSA PUBLIC KEY"
+						}
+						block, _ := pem.Decode(buf)
+						public, e := x509.ParsePKIXPublicKey(block.Bytes)
+						m.Assert(e)
+						m.Optionv("public", public)
+					}
+					if m.Options("cert") {
+						stream = m.Option("cert")
+						buf, e := ioutil.ReadFile(m.Option("cert"))
+						if e != nil {
+							buf = []byte(m.Option("cert"))
+							e = nil
+							stream = "CERTIFICATE"
+						}
+						block, _ := pem.Decode(buf)
+						cert, e := x509.ParseCertificate(block.Bytes)
+						m.Assert(e)
+						m.Optionv("certificate", cert)
+					}
+					if m.Has("key") {
+						stream = m.Option("key")
+						buf, e := ioutil.ReadFile(m.Option("key"))
+						if e != nil {
+							buf = []byte(m.Option("key"))
+							e = nil
+							stream = "RSA PRIVATE KEY"
+						}
+						block, buf := pem.Decode(buf)
+						private, e := x509.ParsePKCS1PrivateKey(block.Bytes)
+						m.Assert(e)
+						m.Optionv("private", private)
+					}
+
+					m.Log("fuck", "stream %s", stream)
+					if stream != "" {
+						m.Start(m.Confx("aaa_name"), m.Confx("aaa_help"), arg[0], "", aaa.Session(arg[0]))
+						m.Cap("stream", stream)
+						return
+					}
+
 					switch len(arg) {
 					case 0:
 						m.Travel(func(m *ctx.Message, i int) bool {
@@ -154,18 +239,246 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								})
 							}
 						default:
-							if msg := m.Find(arg[0], false); msg == nil {
-								m.Start(arg[0], "用户", arg[0], aaa.Password(arg[1]), aaa.Session(arg[0]))
+							find := false
+							m.Travel(func(m *ctx.Message, line int) bool {
+								if line > 0 && m.Cap("username") == arg[0] {
+									if m.Cap("password") == aaa.Password(arg[1]) {
+										m.Log("fuck", "%v", m.Format())
+										m.Sess("aaa", m.Target())
+										m.Echo(m.Cap("sessid"))
+									} else {
+										m.Sess("aaa", c)
+									}
+									find = true
+									return false
+								}
+								return true
+							}, c)
+
+							if !find {
+								m.Start(m.Confx("aaa_name"), m.Confx("aaa_help"), arg[0], aaa.Password(arg[1]), aaa.Session(arg[0]))
+								m.Cap("stream", arg[0])
+								m.Sess("aaa", m)
 								m.Echo(m.Cap("sessid"))
-							} else if msg.Cap("password") != aaa.Password(arg[1]) {
-								return
-							} else {
-								m.Echo(msg.Cap("sessid"))
-								m.Copy(msg, "target")
 							}
 						}
 					}
 				} // }}}
+			}},
+		"certificate": &ctx.Command{Name: "certificate filename", Help: "散列",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.certificate != nil { // {{{
+					certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: aaa.certificate.Raw}))
+					if m.Echo(certificate); len(arg) > 0 {
+						m.Assert(ioutil.WriteFile(arg[0], []byte(certificate), 0666))
+					}
+				}
+				// }}}
+			}},
+		"public": &ctx.Command{Name: "public filename", Help: "散列",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil { // {{{
+					pub, e := x509.MarshalPKIXPublicKey(aaa.public)
+					m.Assert(e)
+					public := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: pub}))
+					if m.Echo(public); len(arg) > 0 {
+						m.Assert(ioutil.WriteFile(arg[0], []byte(public), 0666))
+					}
+				}
+				// }}}
+			}},
+		"private": &ctx.Command{Name: "private filename", Help: "散列",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil { // {{{
+					private := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(aaa.private)}))
+					if m.Echo(private); len(arg) > 0 {
+						m.Assert(ioutil.WriteFile(arg[0], []byte(private), 0666))
+					}
+				}
+				// }}}
+			}},
+		"sign": &ctx.Command{Name: "sign [file filename][content] [sign signfile]", Help: "散列",
+			Form: map[string]int{"file": 1, "sign": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil { // {{{
+					var content []byte
+					if m.Has("file") {
+						b, e := ioutil.ReadFile(m.Option("file"))
+						m.Assert(e)
+						content = b
+					} else if len(arg) > 0 {
+						content = []byte(arg[0])
+					}
+
+					h := md5.Sum(content)
+					b, e := rsa.SignPKCS1v15(crand.Reader, aaa.private, crypto.MD5, h[:])
+					m.Assert(e)
+
+					res := base64.StdEncoding.EncodeToString(b)
+					if m.Echo(res); m.Has("sign") {
+						m.Assert(ioutil.WriteFile(m.Option("sign"), []byte(res), 0666))
+					}
+				}
+				// }}}
+			}},
+		"verify": &ctx.Command{Name: "verify [file filename][content] [sign signfile][signature]", Help: "散列",
+			Form: map[string]int{"file": 1, "sign": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil { // {{{
+					var content []byte
+					if m.Has("file") {
+						b, e := ioutil.ReadFile(m.Option("file"))
+						m.Assert(e)
+						content = b
+					} else if len(arg) > 0 {
+						content, arg = []byte(arg[0]), arg[1:]
+					}
+
+					var sign []byte
+					if m.Has("sign") {
+						b, e := ioutil.ReadFile(m.Option("sign"))
+						m.Assert(e)
+						sign = b
+					} else if len(arg) > 0 {
+						sign, arg = []byte(arg[0]), arg[1:]
+					}
+
+					buf := make([]byte, 1024)
+					n, e := base64.StdEncoding.Decode(buf, sign)
+					m.Assert(e)
+					buf = buf[:n]
+
+					h := md5.Sum(content)
+					m.Echo("%t", rsa.VerifyPKCS1v15(aaa.public, crypto.MD5, h[:], buf) == nil)
+				}
+				// }}}
+			}},
+		"seal": &ctx.Command{Name: "seal [file filename][content] [seal sealfile]", Help: "散列",
+			Form: map[string]int{"file": 1, "seal": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil { // {{{
+					var content []byte
+					if m.Has("file") {
+						b, e := ioutil.ReadFile(m.Option("file"))
+						m.Assert(e)
+						content = b
+					} else if len(arg) > 0 {
+						content = []byte(arg[0])
+					}
+
+					b, e := rsa.EncryptPKCS1v15(crand.Reader, aaa.public, content)
+					m.Assert(e)
+
+					res := base64.StdEncoding.EncodeToString(b)
+					if m.Echo(res); m.Has("seal") {
+						m.Assert(ioutil.WriteFile(m.Option("seal"), []byte(res), 0666))
+					}
+				}
+				// }}}
+			}},
+		"deal": &ctx.Command{Name: "deal [file filename][content]", Help: "散列",
+			Form: map[string]int{"file": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil { // {{{
+					var content []byte
+					if m.Has("file") {
+						b, e := ioutil.ReadFile(m.Option("file"))
+						m.Assert(e)
+						content = b
+					} else if len(arg) > 0 {
+						content, arg = []byte(arg[0]), arg[1:]
+					}
+
+					buf := make([]byte, 1024)
+					n, e := base64.StdEncoding.Decode(buf, content)
+					m.Assert(e)
+					buf = buf[:n]
+
+					b, e := rsa.DecryptPKCS1v15(crand.Reader, aaa.private, buf)
+					m.Assert(e)
+					m.Echo(string(b))
+				}
+
+				// }}}
+			}},
+		"newcipher": &ctx.Command{Name: "newcipher", Help: "散列",
+			Form: map[string]int{"file": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) { // {{{
+					salt := md5.Sum([]byte(arg[0]))
+					block, e := aes.NewCipher(salt[:])
+					m.Assert(e)
+					aaa.encrypt = cipher.NewCBCEncrypter(block, salt[:])
+					aaa.decrypt = cipher.NewCBCDecrypter(block, salt[:])
+				}
+				// }}}
+			}},
+		"encrypt": &ctx.Command{Name: "encrypt [file filename][content] [enfile]", Help: "散列",
+			Form: map[string]int{"file": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.encrypt != nil { // {{{
+					var content []byte
+					if m.Has("file") {
+						b, e := ioutil.ReadFile(m.Option("file"))
+						m.Assert(e)
+						content = b
+					} else if len(arg) > 0 {
+						content, arg = []byte(arg[0]), arg[1:]
+					}
+
+					bsize := aaa.encrypt.BlockSize()
+					size := (len(content) / bsize) * bsize
+					if len(content)%bsize != 0 {
+						size += bsize
+					}
+					buf := make([]byte, size)
+					for pos := 0; pos < len(content); pos += bsize {
+						end := pos + bsize
+						if end > len(content) {
+							end = len(content)
+						}
+
+						b := make([]byte, bsize)
+						copy(b, content[pos:end])
+
+						m.Log("fuck", "pos: %d end: %d", pos, end)
+						aaa.encrypt.CryptBlocks(buf[pos:pos+bsize], b)
+					}
+
+					res := base64.StdEncoding.EncodeToString(buf)
+					if m.Echo(res); len(arg) > 0 {
+						m.Assert(ioutil.WriteFile(arg[0], []byte(res), 0666))
+					}
+				}
+				// }}}
+			}},
+		"decrypt": &ctx.Command{Name: "decrypt [file filename][content] [defile]", Help: "散列",
+			Form: map[string]int{"file": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.decrypt != nil { // {{{
+					var content []byte
+					if m.Has("file") {
+						b, e := ioutil.ReadFile(m.Option("file"))
+						m.Assert(e)
+						content = b
+					} else if len(arg) > 0 {
+						content, arg = []byte(arg[0]), arg[1:]
+					}
+
+					m.Log("fuck", "why %v", content)
+					buf := make([]byte, 1024)
+					n, e := base64.StdEncoding.Decode(buf, content)
+					m.Assert(e)
+					buf = buf[:n]
+
+					res := make([]byte, n)
+					aaa.decrypt.CryptBlocks(res, buf)
+
+					if m.Echo(string(res)); len(arg) > 0 {
+						m.Assert(ioutil.WriteFile(arg[0], res, 0666))
+					}
+				}
+				// }}}
 			}},
 		"md5": &ctx.Command{Name: "md5 [file filename][content]", Help: "散列",
 			Form: map[string]int{"file": 1},
@@ -210,9 +523,18 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Append("public", public)
 					m.Echo(public)
 
+					template := x509.Certificate{SerialNumber: big.NewInt(1)}
+					cert, e := x509.CreateCertificate(crand.Reader, &template, &template, &keys.PublicKey, keys)
+					m.Assert(e)
+
+					certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert}))
+					m.Append("certificate", certificate)
+					m.Echo(certificate)
+
 					if m.Options("keyfile") {
 						ioutil.WriteFile(m.Option("keyfile"), []byte(private), 0666)
 						ioutil.WriteFile("pub"+m.Option("keyfile"), []byte(public), 0666)
+						ioutil.WriteFile("cert"+m.Option("keyfile"), []byte(certificate), 0666)
 					}
 					return
 				}
@@ -309,23 +631,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					h := md5.Sum(content)
 					m.Echo("%t", rsa.VerifyPKCS1v15(public.(*rsa.PublicKey), crypto.MD5, h[:], buf) == nil)
-				}
-				// }}}
-			}},
-		"deal": &ctx.Command{Name: "deal init|sell|buy|done [keyfile name][key str]", Help: "散列",
-			Form: map[string]int{"file": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if m.Options("file") { // {{{
-					f, e := os.Open(m.Option("file"))
-					m.Assert(e)
-
-					h := md5.New()
-					io.Copy(h, f)
-
-					m.Echo(hex.EncodeToString(h.Sum([]byte{})[:]))
-				} else if len(arg) > 0 {
-					h := md5.Sum([]byte(arg[0]))
-					m.Echo(hex.EncodeToString(h[:]))
 				}
 				// }}}
 			}},

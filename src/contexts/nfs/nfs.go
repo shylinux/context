@@ -52,7 +52,7 @@ type NFS struct {
 
 func (nfs *NFS) open(name string) (*os.File, error) { // {{{
 	if path.IsAbs(name) {
-		nfs.Log("info", "open %s", name)
+		nfs.Message.Log("info", "open %s", name)
 		return os.Open(name)
 	}
 	for i := len(nfs.paths) - 1; i >= 0; i-- {
@@ -538,7 +538,6 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 // }}}
 
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
-	nfs.Message = m
 	if len(arg) > 0 && (arg[0] == "scan" || arg[0] == "open" || arg[0] == "append") {
 		c.Caches = map[string]*ctx.Cache{
 			"pos":    &ctx.Cache{Name: "pos", Value: "0", Help: "pos"},
@@ -679,28 +678,22 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	nfs.io = m.Optionv("io").(net.Conn)
 	nfs.hand = map[int]*ctx.Message{}
 	nfs.send = make(chan *ctx.Message, 10)
-	m.Log("fuck", "send %p", nfs.send)
 	nfs.recv = make(chan *ctx.Message, 10)
 
-	go func() {
+	go func() { //发送消息队列
 		for {
 			select {
 			case msg := <-nfs.send:
-				m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
-				m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
 				head, body := "detail", "option"
 				if msg.Hand {
-					m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
 					head, body = "result", "append"
 					send_code := msg.Option("send_code")
 					msg.Append("send_code1", send_code)
 					m.Log("info", "%s recv: %v %v", msg.Option("recv_code"), msg.Meta[head], msg.Meta[body])
 				} else {
-					m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
-					m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
-					m.Log("info", "%d send: %v %v", m.Capi("nsend", 1), msg.Meta[head], msg.Meta[body])
+					msg.Option("send_code", m.Capi("nsend", 1))
+					m.Log("info", "%d send: %v %v", m.Capi("nsend"), msg.Meta[head], msg.Meta[body])
 					nfs.hand[m.Capi("nsend")] = msg
-					msg.Option("send_code", m.Capi("nsend"))
 				}
 
 				for _, v := range msg.Meta[head] {
@@ -723,12 +716,18 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 		}
 	}()
 
-	go func() {
+	go func() { //接收消息队列
 		bio := bufio.NewScanner(nfs.io)
 		var e error
-		for msg, head, body := m.Sess("target"), "", ""; bio.Scan(); {
+		var msg *ctx.Message
+		for head, body := "", ""; bio.Scan(); {
+			if msg == nil {
+				msg = m.Sess("target")
+			}
+			if msg.Meta == nil {
+				msg.Meta = map[string][]string{}
+			}
 			line := bio.Text()
-			m.Log("fuck", "send %p %v", nfs.send, msg.Meta)
 			m.Capi("nread", len(line)+1)
 			if len(line) == 0 {
 
@@ -742,7 +741,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 					h.Copy(msg, "result").Copy(msg, "append")
 					h.Remote <- true
 				}
-				msg = m.Sess("target")
+				msg = nil
 				continue
 			}
 
@@ -767,8 +766,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool { // {{{
 	for {
 		select {
 		case msg := <-nfs.recv:
-			m.Log("fuck", "why %s %v", msg.Format(), msg.Meta)
-
 			nfs.send <- msg.Cmd()
 		}
 	}
@@ -1286,16 +1283,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
 					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
-						sub.Log("fuck", "send")
-						nfs, ok := sub.Target().Server.(*NFS)
-						sub.Log("fuck", "send %v", ok)
-						m.Log("fuck", "send %p", nfs.send)
+						nfs, _ := sub.Target().Server.(*NFS)
 						sub1.Remote = make(chan bool, 1)
-						sub.Log("info", "before send %d", len(nfs.send))
 						nfs.send <- sub1
-						sub.Log("info", "middle send %d", len(nfs.send))
 						<-sub1.Remote
-						sub.Log("info", "after send %d", len(nfs.send))
 						return nil
 					})
 				}, m.Meta["detail"])
@@ -1308,13 +1299,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
 					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
 						nfs, _ := sub.Target().Server.(*NFS)
-						m.Log("fuck", "send %p", nfs.send)
 						sub1.Remote = make(chan bool, 1)
-						sub.Log("info", "before send %d", len(nfs.send))
 						nfs.send <- sub1
-						sub.Log("info", "middle send %d", len(nfs.send))
 						<-sub1.Remote
-						sub.Log("info", "after send %d", len(nfs.send))
 						return nil
 					})
 				}, m.Meta["detail"])
