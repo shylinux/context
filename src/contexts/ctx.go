@@ -2675,15 +2675,56 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			Help: "用户组管理，查看、添加、删除用户组或是接口",
 			Form: map[string]int{"check": 0, "add": 0, "del": 0, "brow": 0, "cache": 0, "config": 0, "command": 0},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				index := m.Target().Index // {{{
+				index := m.target.Index
 				if index == nil {
-					m.Target().Index = map[string]*Context{}
-					index = m.Target().Index
+					m.target.Index = map[string]*Context{}
+					index = m.target.Index
 				}
 
-				current := m.Target()
+				current := m.target
 				aaa := m.Sess("aaa", false)
+				if aaa.Cap("username") != aaa.Conf("rootname") {
+					current = index[aaa.Cap("username")]
+				}
+				m.Echo("username:%s\n", aaa.Cap("username"))
+
+				if len(arg) == 0 {
+					if current != nil {
+						for k, x := range current.Caches {
+							m.Add("append", "ccc", "cache")
+							m.Add("append", "key", k)
+							m.Add("append", "name", x.Name)
+						}
+						for k, x := range current.Configs {
+							m.Add("append", "ccc", "config")
+							m.Add("append", "key", k)
+							m.Add("append", "name", x.Name)
+						}
+						for k, x := range current.Commands {
+							m.Add("append", "ccc", "command")
+							m.Add("append", "key", k)
+							m.Add("append", "name", x.Name)
+						}
+						for k, x := range current.Index {
+							m.Add("append", "ccc", "context")
+							m.Add("append", "key", k)
+							m.Add("append", "name", x.Name)
+						}
+						m.Table()
+					}
+					return
+				}
+
 				void := index["void"]
+
+				switch arg[0] {
+				case "show":
+				case "add":
+				case "del":
+				}
+				return
+				// {{{
+
 				if aaa != nil && aaa.Cap("username") != aaa.Conf("rootname") {
 					if current = index[aaa.Cap("username")]; current == nil {
 						if void != nil {

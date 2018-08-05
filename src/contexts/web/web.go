@@ -92,6 +92,7 @@ func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string { // {{{
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn().Set("detail", key)
+		msg.Sess("request", m.Spawn())
 		msg.Option("terminal_color", false)
 		msg.Option("method", r.Method)
 		msg.Option("referer", r.Header.Get("Referer"))
@@ -642,7 +643,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if !m.Options("dir") {
 				m.Option("dir", m.Cap("directory"))
 			}
-
 			// 输出文件
 			s, e := os.Stat(m.Option("dir"))
 			if m.Assert(e); !s.IsDir() {
@@ -651,6 +651,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			if false {
+
 				check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir"))
 				if !check.Results(0) {
 					m.Copy(check, "append")
@@ -756,11 +757,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
-				m.Copy(check, "append")
-				return
-			}
-
+			// if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
+			// 	m.Copy(check, "append")
+			// 	return
+			// }
+			//
 			r := m.Optionv("request").(*http.Request)
 			if m.Option("method") == "POST" {
 				if m.Options("filename") { //添加文件或目录
