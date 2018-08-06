@@ -211,12 +211,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			Name: "source filename [async [cli_name [cli_help]]",
 			Help: "解析脚本, filename: 文件名, async: 异步执行, cli_name: 模块名, cli_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if _, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
-					m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
-					if len(arg) < 2 || arg[1] != "async" {
-						m.Wait()
-					}
-				} // }}}
+				if _, ok := m.Source().Server.(*CLI); ok {
+					msg := m.Spawn(c)
+					m.Copy(msg, "target")
+				}
+
+				m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
+				if len(arg) < 2 || arg[1] != "async" {
+					m.Wait()
+				}
 			}},
 		"label": &ctx.Command{Name: "label name", Help: "记录当前脚本的位置, name: 位置名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
@@ -765,6 +768,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"clear": &ctx.Command{Name: "clear", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Log("fuck", strings.Repeat("\n", 20))
 		}},
+	},
+	Index: map[string]*ctx.Context{
+		"void": &ctx.Context{Caches: map[string]*ctx.Cache{"nshell": &ctx.Cache{}}},
 	},
 }
 

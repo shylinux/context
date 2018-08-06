@@ -643,42 +643,46 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if !m.Options("dir") {
 				m.Option("dir", m.Cap("directory"))
 			}
+
+			check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir"))
+			if !check.Results(0) {
+				m.Copy(check, "append")
+				return
+			}
+			aaa := check.Appendv("aaa").(*ctx.Message)
+
 			// 输出文件
 			s, e := os.Stat(m.Option("dir"))
 			if m.Assert(e); !s.IsDir() {
 				http.ServeFile(w, r, m.Option("dir"))
 				return
 			}
-
-			if false {
-
-				check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir"))
-				if !check.Results(0) {
-					m.Copy(check, "append")
-					return
-				}
-				aaa := check.Appendv("aaa").(*ctx.Message)
-
-				// 共享列表
-				share := m.Sess("share", m.Target())
-				index := share.Target().Index
-				if index != nil && index[aaa.Append("username")] != nil {
-					for k, v := range index[aaa.Append("username")].Index {
-						for _, j := range v.Commands {
-							for _, n := range j.Shares {
-								for _, nn := range n {
-									if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
-										share.Add("append", "group", k)
-										share.Add("append", "value", nn)
-										share.Add("append", "delete", "delete")
-									}
+			// 共享列表
+			share := m.Sess("share", m.Target())
+			index := share.Target().Index
+			m.Log("fuck", "%v", share.Target().Index)
+			m.Log("fuck", "%v", aaa.Format())
+			if index != nil && index[aaa.Cap("username")] != nil {
+				for k, v := range index[aaa.Cap("username")].Index {
+					m.Log("fuck", "%v", v.Commands)
+					for _, j := range v.Commands {
+						m.Log("fuck", "%v", j.Shares)
+						for _, n := range j.Shares {
+							for _, nn := range n {
+								if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
+									share.Add("append", "group", k)
+									share.Add("append", "value", nn)
+									share.Add("append", "delete", "delete")
 								}
 							}
 						}
 					}
 				}
-				share.Sort("value", "string")
-				share.Sort("argument", "string")
+			}
+			share.Sort("value", "string")
+			share.Sort("argument", "string")
+
+			if false {
 			}
 
 			// 输出目录
@@ -751,8 +755,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			m.Append("title", "upload")
-			// m.Append("tmpl", "userinfo", "share", "list", "git", "upload", "create")
-			m.Append("tmpl", "list", "git", "upload", "create")
+			m.Append("tmpl", "userinfo", "share", "list", "git", "upload", "create")
 			m.Append("template", m.Conf("upload_main"), m.Conf("upload_tmpl"))
 			// }}}
 		}},
@@ -813,10 +816,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg := check.Appendv("aaa").(*ctx.Message).Spawn(m.Target())
 			if m.Options("shareto") {
-				msg.Cmd("right", "add", m.Option("shareto"), "command", arg[0], arg[1], arg[2])
+				msg.Cmd("right", m.Option("shareto"), "add", "command", arg[0], arg[1], arg[2])
 			}
 			if m.Options("notshareto") {
-				msg.Cmd("right", "del", m.Option("notshareto"), "command", arg[0], arg[1], arg[2])
+				msg.Cmd("right", m.Option("notshareto"), "del", "command", arg[0], arg[1], arg[2])
 			}
 			m.Echo("ok")
 			// }}}
@@ -825,7 +828,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			w := m.Optionv("response").(http.ResponseWriter) //{{{
 			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
 				aaa := m.Appendv("aaa").(*ctx.Message)
-				if msg := m.Spawn().Cmd("right", "check", aaa.Cap("username"), arg); msg.Results(0) {
+				if msg := m.Spawn().Cmd("right", aaa.Cap("username"), "check", arg); msg.Results(0) {
 					m.Copy(login, "append").Echo(msg.Result(0))
 					return
 				}

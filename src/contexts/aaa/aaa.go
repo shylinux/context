@@ -214,6 +214,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							if int64(msg.Capi("expire")) > time.Now().Unix() {
 								m.Echo(msg.Cap("username"))
 								m.Copy(msg, "target")
+								m.Sess("aaa", msg)
 							} else {
 								delete(aaa.sessions, arg[0])
 								msg.Target().Close(msg)
