@@ -2407,7 +2407,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						msg.Cmd(arg)
 						m.Meta["result"] = append(m.Meta["result"], msg.Meta["result"]...)
 						m.Copy(msg, "append")
-						m.target = msg.target
+						// m.target = msg.target
 					}
 				}
 				// }}}

@@ -1265,15 +1265,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						}
 
 						m.Log("info", "cmd: %s %v", "git", ctx.Trans("-C", p, c, args))
-						cmd := exec.Command("git", ctx.Trans("-C", p, c, args)...)
-						if out, e := cmd.CombinedOutput(); e != nil {
-							m.Echo("error: ")
-							m.Echo("%s\n", e)
-						} else {
-							if m.Echo(string(out)); len(out) > 0 {
-								m.Echo("\n")
-							}
-						}
+						msg := m.Sess("cli").Cmd("system", "git", "-C", p, c, args)
+						m.Copy(msg, "result").Copy(msg, "append")
 					}
 				} // }}}
 			}},
