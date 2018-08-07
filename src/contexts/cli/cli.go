@@ -20,6 +20,7 @@ type Frame struct {
 	run   bool
 	pos   int
 	index int
+	list  []string
 }
 
 type CLI struct {
@@ -111,6 +112,8 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "exe", "}")
 		yac.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
+		yac.Cmd("train", "map", "map", "key", ":", "\\[", "rep{", "key", "}", "\\]")
+		yac.Cmd("train", "exp", "exp", "\\{", "rep{", "map", "}", "\\}")
 		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "(", "exp", ")")
 
 		yac.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
@@ -123,7 +126,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		yac.Cmd("train", "stm", "else", "else")
 		yac.Cmd("train", "stm", "end", "end")
 		yac.Cmd("train", "stm", "for", "for", "opt{", "exp", ";", "}", "exp")
-		yac.Cmd("train", "stm", "for", "for", "index", "exp", "exp", "exp")
+		yac.Cmd("train", "stm", "for", "for", "index", "exp", "opt{", "exp", "}", "exp")
 		yac.Cmd("train", "stm", "label", "label", "exp")
 		yac.Cmd("train", "stm", "goto", "goto", "exp", "opt{", "exp", "}", "exp")
 		yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
@@ -553,6 +556,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			// }}}
 		}},
 		"exp": &ctx.Command{Name: "exp word", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) > 0 && arg[0] == "{" {
+				msg := m.Spawn()
+				for i := 1; i < len(arg); i++ {
+					key := arg[i]
+					for i += 3; i < len(arg); i++ {
+						if arg[i] == "]" {
+							break
+						}
+						msg.Add("append", key, arg[i])
+					}
+				}
+				m.Echo("%d", msg.Code())
+				return
+			}
+
 			pre := map[string]int{ // {{{
 				"=": 1,
 				"+": 2, "-": 2,
@@ -637,42 +655,65 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			} // }}}
 		}},
-		"for": &ctx.Command{Name: "for [express ;] condition", Help: "循环语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
-				run := m.Caps("parse")
-				defer func() { m.Caps("parse", run) }()
+		"for": &ctx.Command{
+			Name: "for [[express ;] condition]|[index message meta value]",
+			Help: "循环语句, express: 每次循环运行的表达式, condition: 循环条件, index: 索引消息, message: 消息编号, meta: value: ",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
+					run := m.Caps("parse")
+					defer func() { m.Caps("parse", run) }()
 
-				msg := m
-				if run {
-					if arg[1] == "index" {
-						if code, e := strconv.Atoi(arg[2]); m.Assert(e) {
-							msg = cli.Message.Tree(code)
-							run = run && msg != nil && msg.Meta != nil && len(msg.Meta[arg[3]]) > 0
-						}
-					} else {
-						run = run && ctx.Right(arg[len(arg)-1])
-					}
-
-					if len(cli.stack) > 0 {
-						if frame := cli.stack[len(cli.stack)-1]; frame.key == "for" && frame.pos == m.Optioni("file_pos") {
-							if arg[1] == "index" {
-								frame.index++
-								if run = run && len(msg.Meta[arg[3]]) > frame.index; run {
-									m.Cap(arg[4], msg.Meta[arg[3]][frame.index])
+					msg := m
+					if run {
+						if arg[1] == "index" {
+							if code, e := strconv.Atoi(arg[2]); m.Assert(e) {
+								msg = cli.Message.Tree(code)
+								run = run && msg != nil && msg.Meta != nil
+								switch len(arg) {
+								case 4:
+									run = run && len(msg.Meta) > 0
+								case 5:
+									run = run && len(msg.Meta[arg[3]]) > 0
 								}
 							}
-							frame.run = run
-							return
+						} else {
+							run = run && ctx.Right(arg[len(arg)-1])
+						}
+
+						if len(cli.stack) > 0 {
+							if frame := cli.stack[len(cli.stack)-1]; frame.key == "for" && frame.pos == m.Optioni("file_pos") {
+								if arg[1] == "index" {
+									frame.index++
+									if run = run && len(frame.list) > frame.index; run {
+										if len(arg) == 5 {
+											arg[3] = arg[4]
+										}
+										m.Cap(arg[3], frame.list[frame.index])
+									}
+								}
+								frame.run = run
+								return
+							}
 						}
 					}
-				}
 
-				cli.stack = append(cli.stack, &Frame{pos: m.Optioni("file_pos"), key: key, run: run, index: 0})
-				if m.Capi("level", 1); run && arg[1] == "index" {
-					m.Cap(arg[4], arg[4], msg.Meta[arg[3]][0], "临时变量")
-				}
-			} // }}}
-		}},
+					cli.stack = append(cli.stack, &Frame{pos: m.Optioni("file_pos"), key: key, run: run, index: 0})
+					if m.Capi("level", 1); run && arg[1] == "index" {
+						frame := cli.stack[len(cli.stack)-1]
+						switch len(arg) {
+						case 4:
+							frame.list = []string{}
+							for k, _ := range msg.Meta {
+								frame.list = append(frame.list, k)
+							}
+						case 5:
+							frame.list = msg.Meta[arg[3]]
+							arg[3] = arg[4]
+						}
+						m.Cap(arg[3], arg[3], frame.list[0], "临时变量")
+					}
+				} // }}}
+			}},
 		"cmd": &ctx.Command{Name: "cmd word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) { // {{{
 				detail := []string{}

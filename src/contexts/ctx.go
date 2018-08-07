@@ -1987,6 +1987,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			// }}}
 		}},
 		"message": &Command{Name: "message [code] [all]|[cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			if len(arg) > 0 && arg[0] == "spawn" {
+				m.Echo("%d", m.Spawn().code)
+				return
+			}
 			msg := m.Sess("cli", false) // {{{
 			if len(arg) > 0 {
 				if code, e := strconv.Atoi(arg[0]); e == nil {
@@ -2119,7 +2123,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				return
 			}
 
-			m.Echo("%s", msg.Option(arg[0], arg[1:]))
+			if len(arg) > 1 {
+				m.Echo("%s", msg.Option(arg[0], arg[1:]))
+			} else {
+				m.Echo("%s", msg.Option(arg[0]))
+			}
+
 			// }}}
 		}},
 		"result": &Command{Name: "result [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) {
