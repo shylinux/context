@@ -6,7 +6,6 @@ import ( // {{{
 	"database/sql"
 	"encoding/json"
 	_ "github.com/go-sql-driver/mysql"
-	"path"
 
 	"fmt"
 	"os"
@@ -239,7 +238,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"show": &ctx.Command{
 			Name: "show table fields... [where conditions] [group fields] [order fields] [limit fields] [offset fields] [save filename] [other rest...]",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "extra_field": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2, "save": 1, "export": 1, "other": -1},
+			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "extras": 1, "extra_field": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2, "save": 1, "export": 2, "other": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) { // {{{
 					table := m.Confx("table", arg, 0)
@@ -312,35 +311,14 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						m.Assert(e)
 						defer f.Close()
 
-						table_name := path.Base(m.Option("export"))
-
 						m.Table(func(maps map[string]string, lists []string, line int) bool {
-							if line == -1 {
-								f.WriteString("insert into ")
-								f.WriteString(table_name)
-							}
-
-							f.WriteString("(")
-							for i, _ := range lists {
-								if line != -1 {
-									f.WriteString("'")
+							if line > -1 {
+								args := []interface{}{}
+								for i := 0; i < len(lists); i++ {
+									args = append(args, maps[m.Meta["append"][i]])
 								}
-								f.WriteString(maps[m.Meta["append"][i]])
-								if line != -1 {
-									f.WriteString("'")
-								}
-								if i < len(lists)-1 {
-									// f.WriteString(m.Conf("csv_col_sep"))
-									f.WriteString(",")
-								}
+								f.WriteString(fmt.Sprintf(m.Meta["export"][1], args...))
 							}
-							f.WriteString(")")
-							if line == -1 {
-								f.WriteString(" values")
-							} else {
-								f.WriteString(",")
-							}
-							f.WriteString("\n")
 							return true
 						})
 					}
