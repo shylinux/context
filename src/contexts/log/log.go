@@ -3,8 +3,7 @@ package log // {{{
 import ( // {{{
 	"contexts"
 	"fmt"
-	Log "log"
-	"strconv"
+	"os"
 	"strings"
 	"time"
 )
@@ -12,14 +11,9 @@ import ( // {{{
 // }}}
 
 type LOG struct {
-	module map[string]map[string]bool
-	silent map[string]bool
-	color  map[string]int
-	*Log.Logger
-
 	nfs *ctx.Message
+	out *os.File
 
-	*ctx.Message
 	*ctx.Context
 }
 
@@ -34,24 +28,16 @@ func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	log.Message = m
-
-	log.Configs["flag_date"] = &ctx.Config{Name: "输出日期", Value: "true", Help: "模块日志输出消息日期"}
-	log.Configs["flag_time"] = &ctx.Config{Name: "输出时间", Value: "true", Help: "模块日志输出消息时间"}
-	log.Configs["flag_color"] = &ctx.Config{Name: "输出颜色", Value: "true", Help: "模块日志输出颜色"}
-	log.Configs["flag_code"] = &ctx.Config{Name: "输出序号", Value: "true", Help: "模块日志输出消息的编号"}
-	log.Configs["flag_action"] = &ctx.Config{Name: "输出类型", Value: "true", Help: "模块日志类型"}
-	log.Configs["flag_name"] = &ctx.Config{Name: "输出名称", Value: "true", Help: "模块日志输出消息源模块与消息目的模块"}
-
-	log.Configs["bench.log"] = &ctx.Config{Name: "日志文件", Value: "var/bench.log", Help: "模块日志输出的文件"}
-
+	log.Configs["flag_color"] = &ctx.Config{Name: "flag_color", Value: "true", Help: "模块日志输出颜色"}
+	log.Configs["flag_time"] = &ctx.Config{Name: "flag_time", Value: "2006/01/02 15:04:05 ", Help: "模块日志输出颜色"}
+	log.Configs["bench.log"] = &ctx.Config{Name: "bench.log", Value: "var/bench.log", Help: "模块日志输出的文件"}
 	return log
 }
 
 // }}}
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool { // {{{
-	log.Message = m
 	log.nfs = m.Sess("nfs").Cmd("append", m.Confx("bench.log", arg, 0), "", "日志文件")
+	log.out = log.nfs.Optionv("out").(*os.File)
 	return false
 }
 
@@ -68,117 +54,53 @@ func (log *LOG) Close(m *ctx.Message, arg ...string) bool { // {{{
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "log", Help: "日志中心",
-	Caches:  map[string]*ctx.Cache{},
-	Configs: map[string]*ctx.Config{},
+	Caches: map[string]*ctx.Cache{},
+	Configs: map[string]*ctx.Config{
+		"module": &ctx.Config{Name: "module", Value: map[string]interface{}{
+			"shy": map[string]interface{}{"true": true, "false": false, "one": 1, "zero": 0, "yes": "yes", "no": "no"},
+			"log": map[string]interface{}{"cmd": true},
+			"lex": map[string]interface{}{"cmd": true, "debug": true},
+			"yac": map[string]interface{}{"cmd": true, "debug": true},
+		}, Help: "模块日志输出的文件"},
+		"silent": &ctx.Config{Name: "silent", Value: map[string]string{}, Help: "模块日志输出的文件"},
+		"color": &ctx.Config{Name: "color", Value: map[string]string{
+			"debug": "0", "error": "31", "check": "31",
+			"cmd": "32", "conf": "33",
+			"search": "35", "find": "35", "cb": "35", "lock": "35",
+			"begin": "36", "start": "36", "close": "36",
+		}, Help: "模块日志输出颜色"},
+	},
 	Commands: map[string]*ctx.Command{
-		"silent": &ctx.Command{Name: "silent [[module] level state]", Help: "查看或设置日志开关, module: 模块名, level: 日志类型, state(true/false): 是否打印日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
-				switch len(arg) {
-				case 2:
-					if len(arg) > 1 {
-						log.silent[arg[0]] = ctx.Right(arg[1])
-					}
-				case 3:
-					if log.module[arg[0]] == nil {
-						log.module[arg[0]] = map[string]bool{}
-					}
-					log.module[arg[0]][arg[1]] = ctx.Right(arg[2])
-				}
-
-				for k, v := range log.silent {
-					m.Echo("%s: %t\n", k, v)
-				}
-				for k, v := range log.module {
-					for i, x := range v {
-						m.Echo("%s(%s): %t\n", k, i, x)
-					}
-				}
-			} // }}}
-		}},
-		"color": &ctx.Command{Name: "color [level color]", Help: "查看或设置日志颜色, level: 日志类型, color: 文字颜色", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
-				if len(arg) > 1 {
-					c, e := strconv.Atoi(arg[1])
-					m.Assert(e)
-					log.color[arg[0]] = c
-				}
-
-				for k, v := range log.color {
-					m.Echo("\033[%dm%s: %d\033[0m\n", v, k, v)
-				}
-			} // }}}
-		}},
 		"log": &ctx.Command{Name: "log level string...", Help: "输出日志, level: 日志类型, string: 日志内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) { // {{{
-				if s, ok := log.silent[arg[0]]; ok && s == true {
+			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) && log.out != nil { // {{{
+				if m.Confs("silent", arg[0]) {
 					return
 				}
 
-				msg := m.Message()
-				if x, ok := m.Data["msg"]; ok {
-					if msg, ok = x.(*ctx.Message); !ok {
-						msg = m.Message()
-					}
+				msg, ok := m.Optionv("msg").(*ctx.Message)
+				if !ok {
+					msg = m
 				}
-				if s, ok := log.module[msg.Target().Name]; ok {
-					if x, ok := s[arg[0]]; ok && x {
-						return
-					}
-				}
-
-				date := ""
-				if m.Confs("flag_date") {
-					date += time.Now().Format("2006/01/02 ")
-				}
-				if m.Confs("flag_time") {
-					date += time.Now().Format("15:04:05 ")
+				if m.Confs("module", fmt.Sprintf("%s.%s", msg.Target().Name, arg[0])) {
+					return
 				}
 
 				color := 0
-				if m.Confs("flag_color") {
-					if c, ok := log.color[arg[0]]; ok {
-						color = c
-					}
+				if m.Confs("flag_color") && m.Confs("color", arg[0]) {
+					color = m.Confi("color", arg[0])
 				}
 
-				code := ""
-				if m.Confs("flag_code") {
-					code = fmt.Sprintf("%d ", msg.Code())
-				}
-
-				action := ""
-				if m.Confs("flag_action") {
-					action = fmt.Sprintf("%s", arg[0])
-
-					if m.Confs("flag_name") {
-						action = fmt.Sprintf("%s(%s->%s)", action, msg.Source().Name, msg.Target().Name)
-					}
-				}
-
+				date := time.Now().Format(m.Conf("flag_time"))
+				action := fmt.Sprintf("%d %s(%s->%s)", msg.Code(), arg[0], msg.Source().Name, msg.Target().Name)
 				cmd := strings.Join(arg[1:], "")
 
-				if log.nfs != nil {
-					if color > 0 {
-						m.Spawn(log.nfs.Target()).Cmd("write", fmt.Sprintf("%s\033[%dm%s%s %s\033[0m\n", date, color, code, action, cmd))
-					} else {
-						m.Spawn(log.nfs.Target()).Cmd("write", fmt.Sprintf("%s%s%s %s\n", date, code, action, cmd))
-					}
+				if color > 0 {
+					log.out.WriteString(fmt.Sprintf("%s\033[%dm%s %s\033[0m\n", date, color, action, cmd))
+				} else {
+					log.out.WriteString(fmt.Sprintf("%s%s %s\n", date, action, cmd))
 				}
 			} // }}}
 		}},
-	},
-	Index: map[string]*ctx.Context{
-		"void": &ctx.Context{Name: "void", Help: "void",
-			Configs: map[string]*ctx.Config{
-				"flag_code":   &ctx.Config{},
-				"flag_action": &ctx.Config{},
-				"flag_name":   &ctx.Config{},
-				"flag_color":  &ctx.Config{},
-				"flag_time":   &ctx.Config{},
-				"flag_date":   &ctx.Config{},
-			},
-			Commands: map[string]*ctx.Command{"log": &ctx.Command{}},
-		},
 	},
 }
 
@@ -186,28 +108,4 @@ func init() {
 	log := &LOG{}
 	log.Context = Index
 	ctx.Index.Register(Index, log)
-
-	log.color = map[string]int{
-		"error":  31,
-		"check":  31,
-		"cmd":    32,
-		"conf":   33,
-		"search": 35,
-		"find":   35,
-		"cb":     35,
-		"lock":   35,
-		"spawn":  35,
-		"begin":  36,
-		"start":  36,
-		"close":  36,
-		"debug":  0,
-	}
-	log.silent = map[string]bool{
-		// "lock": true,
-	}
-	log.module = map[string]map[string]bool{
-		"log": {"cmd": true},
-		"lex": {"cmd": true, "debug": true},
-		"yac": {"cmd": true, "debug": true},
-	}
 }

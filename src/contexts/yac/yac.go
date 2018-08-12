@@ -34,7 +34,6 @@ type YAC struct {
 	mat   []map[byte]*State
 	state map[State]*State
 
-	*ctx.Message
 	*ctx.Context
 }
 
@@ -49,7 +48,7 @@ func (yac *YAC) name(page int) string { // {{{
 func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Point, []*Point) { // {{{
 
 	ss := []int{page}
-	sn := make([]bool, yac.Capi("nline"))
+	sn := make([]bool, m.Capi("nline"))
 
 	points := []*Point{}
 	ends := []*Point{}
@@ -80,7 +79,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 					if word[i] == "rep{" {
 						state.star = s
 						yac.mat[x.s][x.c] = state
-						yac.Log("debug", "REP(%d, %d): %v", x.s, x.c, state)
+						m.Log("debug", "REP(%d, %d): %v", x.s, x.c, state)
 					}
 				}
 			case "mul{":
@@ -105,14 +104,14 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 				if yac.mat[s][c] != nil {
 					*state = *yac.mat[s][c]
 				} else {
-					yac.Capi("nnode", 1)
+					m.Capi("nnode", 1)
 				}
-				yac.Log("debug", "GET(%d, %d): %v \033[31m(%s)\033[0m", s, c, state, word[i])
+				m.Log("debug", "GET(%d, %d): %v \033[31m(%s)\033[0m", s, c, state, word[i])
 
 				if state.next == 0 {
-					state.next = yac.Capi("nline", 1) - 1
+					state.next = m.Capi("nline", 1) - 1
 					yac.mat = append(yac.mat, map[byte]*State{})
-					for i := 0; i < yac.Capi("nlang"); i++ {
+					for i := 0; i < m.Capi("nlang"); i++ {
 						yac.mat[state.next][byte(i)] = nil
 					}
 					sn = append(sn, false)
@@ -122,7 +121,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 
 				ends = append(ends, &Point{s, c})
 				points = append(points, &Point{s, c})
-				yac.Log("debug", "SET(%d, %d): %v", s, c, state)
+				m.Log("debug", "SET(%d, %d): %v", s, c, state)
 			}
 		}
 
@@ -138,7 +137,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 	}
 
 	for _, s := range ss {
-		if s < yac.Capi("nlang") || s >= len(yac.mat) {
+		if s < m.Capi("nlang") || s >= len(yac.mat) {
 			continue
 		}
 
@@ -151,7 +150,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 		}
 
 		if void {
-			yac.Log("debug", "DEL: %d-%d", yac.Capi("nline")-1, yac.Capi("nline", 0, s))
+			m.Log("debug", "DEL: %d-%d", m.Capi("nline")-1, m.Capi("nline", 0, s))
 			yac.mat = yac.mat[:s]
 		}
 	}
@@ -162,7 +161,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 			*state = *yac.mat[p.s][p.c]
 
 			if state.next == s {
-				yac.Log("debug", "GET(%d, %d): %v", p.s, p.c, state)
+				m.Log("debug", "GET(%d, %d): %v", p.s, p.c, state)
 				if state.next >= len(yac.mat) {
 					state.next = 0
 				}
@@ -170,12 +169,12 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 					state.hash = hash
 				}
 				yac.mat[p.s][p.c] = state
-				yac.Log("debug", "SET(%d, %d): %v", p.s, p.c, state)
+				m.Log("debug", "SET(%d, %d): %v", p.s, p.c, state)
 			}
 
 			if x, ok := yac.state[*state]; !ok {
 				yac.state[*state] = yac.mat[p.s][p.c]
-				yac.Capi("nreal", 1)
+				m.Capi("nreal", 1)
 			} else {
 				yac.mat[p.s][p.c] = x
 			}
@@ -191,30 +190,32 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 		m.Log("debug", "%s\\%d %s(%d): %s", m.Conf("label")[0:level], level, yac.name(page), page, line)
 	}
 
+	spawn := !m.Confs("compact_lex")
+
 	hash, word := 0, []string{}
 	for star, s := 0, page; s != 0 && len(line) > 0; {
 		//解析空白
-		lex := m.Sess("lex")
-		lex.Cmd("parse", line, yac.name(void))
-		if lex.Result(0) == "-1" {
+		lex := m.Sess("lex", spawn)
+		if lex.Cmd("parse", line, yac.name(void)); lex.Result(0) == "-1" {
 			break
 		}
 
 		//解析单词
 		line = lex.Result(1)
-		lex = m.Sess("lex")
-		lex.Cmd("parse", line, yac.name(s))
-		if lex.Result(0) == "-1" {
+		lex = m.Sess("lex", spawn)
+		if lex.Cmd("parse", line, yac.name(s)); lex.Result(0) == "-1" {
 			break
 		}
 
 		//解析状态
-		c := byte(lex.Resulti(0))
+		result := append([]string{}, lex.Meta["result"]...)
+		i, _ := strconv.Atoi(result[0])
+		c := byte(i)
 		state := yac.mat[s][c]
 
 		if state != nil { //全局语法检查
-			if key := m.Sess("lex").Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(2)) <= len(lex.Result(2)) {
-				line, word = lex.Result(1), append(word, lex.Result(2))
+			if key := m.Sess("lex", spawn).Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(2)) <= len(result[2]) {
+				line, word = result[1], append(word, result[2])
 			} else {
 				state = nil
 			}
@@ -262,7 +263,6 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 // }}}
 
 func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
-	yac.Message = m
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -277,8 +277,6 @@ func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	yac.Message = m
-
 	if len(arg) > 0 && arg[0] == "parse" {
 		return yac
 	}
@@ -306,8 +304,6 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
-	yac.Message = m
-
 	if len(arg) > 0 && arg[0] == "parse" {
 		lex := m.Sess("lex")
 		if lex.Cap("status") != "start" {
@@ -374,10 +370,11 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		"nparse": &ctx.Cache{Name: "nparse", Value: "0", Help: "解析器数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"debug": &ctx.Config{Name: "debug", Value: "false", Help: "词法集合的最大数量"},
-		"ncell": &ctx.Config{Name: "词法上限", Value: "128", Help: "词法集合的最大数量"},
-		"nlang": &ctx.Config{Name: "语法上限", Value: "32", Help: "语法集合的最大数量"},
-		"label": &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
+		"compact_lex": &ctx.Config{Name: "compact_lex(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
+		"debug":       &ctx.Config{Name: "debug", Value: "false", Help: "词法集合的最大数量"},
+		"ncell":       &ctx.Config{Name: "词法上限", Value: "128", Help: "词法集合的最大数量"},
+		"nlang":       &ctx.Config{Name: "语法上限", Value: "32", Help: "语法集合的最大数量"},
+		"label":       &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
 		"yac_name": &ctx.Config{Name: "yac_name", Value: "parse", Help: "模块名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				return arg[0]
@@ -445,7 +442,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 
 					m.Assert(page < m.Capi("nlang"), "语法集合过多")
 					yac.mat[page] = map[byte]*State{}
-					for i := 0; i < yac.Capi("nlang"); i++ {
+					for i := 0; i < m.Capi("nlang"); i++ {
 						yac.mat[page][byte(i)] = nil
 					}
 				}
@@ -468,7 +465,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				//
 				yac.train(m, page, hash, arg[2:])
 				yac.seed = append(yac.seed, &Seed{page, hash, arg[2:]})
-				yac.Cap("stream", fmt.Sprintf("%d,%s,%s", yac.Capi("nseed", 1), yac.Cap("npage"), yac.Cap("nhash")))
+				m.Cap("stream", fmt.Sprintf("%d,%s,%s", m.Capi("nseed", 1), m.Cap("npage"), m.Cap("nhash")))
 			}
 			// }}}
 		}},

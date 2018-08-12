@@ -493,7 +493,6 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				}
 
 			case termbox.KeyCtrlI:
-				break
 				if len(tab) == 0 {
 					tabi = 0
 					prefix := string(buf)
@@ -508,8 +507,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 				}
 
 				if tabi >= 0 && tabi < len(tab) {
-					rest = rest[:0]
-					rest = append(rest, []rune(tab[tabi])...)
+					rest = append(rest[:0], []rune(tab[tabi])...)
 					tabi = (tabi + 1) % len(tab)
 				}
 
@@ -802,6 +800,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"nfile": &ctx.Cache{Name: "nfile", Value: "-1", Help: "已经打开的文件数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"pscolor": &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"},
 		"nfs_name": &ctx.Config{Name: "nfs_name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				return arg[0]
@@ -1094,7 +1093,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			// }}}
 		}},
 		"pwd": &ctx.Command{Name: "pwd", Help: "查看当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			wd, e := os.Getwd() // {{{
+			if len(arg) > 0 { // {{{
+				os.Chdir(arg[0])
+			}
+			wd, e := os.Getwd()
 			m.Assert(e)
 			m.Echo(wd) // }}}
 		}},

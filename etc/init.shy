@@ -1,22 +1,12 @@
-var a = {\
-	context: [hello context world]\
-	message: [hello message world]\
-	hi: [\
-		hello\
-		world\
-	]\
-}
-for index $a key
-	echo $key
-	for index $a $key value
-		echo $key $value
-	end
-end
+login root root
 
 source etc/local.shy
 
 ~file1
 	history load etc/history.txt
+
+~shell1
 	alias import nfs
 	alias send send
 	alias dial dial
+config debug on

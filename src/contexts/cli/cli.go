@@ -46,7 +46,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 			if len(arg) > 0 { // {{{
 				return arg[0]
 			}
-			return time.Now().Format(x.Value)
+			return time.Now().Format(x.Value.(string))
 			// }}}
 		}},
 		"ps_end": &ctx.Config{Name: "ps_end", Value: "> ", Help: "命令行提示符结尾"},
@@ -56,7 +56,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 			}
 
 			ps := make([]string, 0, 3)
-			for _, v := range strings.Split(x.Value, " ") {
+			for _, v := range strings.Split(x.Value.(string), " ") {
 				if m.Conf(v) != "" {
 					ps = append(ps, m.Conf(v))
 				} else {
