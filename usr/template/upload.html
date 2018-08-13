@@ -85,6 +85,29 @@
 </fieldset>
 {{end}}
 
+{{define "tmux"}}
+<fieldset><legend>sessions</legend>
+	<pre>{{meta . "sessions"}}</pre>
+</fieldset>
+<fieldset><legend>buffer</legend>
+	<button onclick="copy_tmux_buffer('copy')">copy</button>
+	<button onclick="send_tmux_buffer('paste')">send</button>
+	<textarea rows="5" cols="60" name="tmux_buffer">{{meta . "buffer" 0}}</textarea>
+</fieldset>
+<script>
+	var buffer = document.getElementsByName("tmux_buffer")[0];
+	function copy_tmux_buffer(action) {
+		buffer.select();
+		console.log(document.execCommand(action));
+	}
+	function send_tmux_buffer(action) {
+		var xhr = new XMLHttpRequest();
+		xhr.open("POST", "/paste?content="+encodeURIComponent(buffer.value));
+		xhr.send()
+	}
+</script>
+{{end}}
+
 {{define "upload"}}
 <fieldset><legend>upload</legend>
 	<form method="POST" action="/create?dir={{option . "dir"}}" enctype="multipart/form-data">
@@ -117,6 +140,8 @@
 		{{template "share" $sess.share}}
 	{{else if eq . "list"}}
 		{{template "list" $msg.Sessions.list.Meta}}
+	{{else if eq . "tmux"}}
+		{{template "tmux" $msg.Sessions.tmux.Meta}}
 	{{else if eq . "git"}}
 		{{if $msg.Sessions.git}}
 			{{template "git" $msg.Sessions.git.Meta}}

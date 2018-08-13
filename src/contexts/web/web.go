@@ -277,7 +277,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nserve": &ctx.Cache{Name: "nserve", Value: "0", Help: "主机数量"},
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
-	Configs: map[string]*ctx.Config{},
+	Configs: map[string]*ctx.Config{
+		"cmd": &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+	},
 	Commands: map[string]*ctx.Command{
 		"client": &ctx.Command{
 			Name: "client address [output [editor]]",
@@ -743,7 +745,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			delete(list.Meta, "size_i")
 
 			// 执行命令
-			switch m.Option("cmd") {
+			switch m.Confx("cmd") {
 			case "git":
 				git := m.Sess("git", m.Target())
 
@@ -752,10 +754,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				status := m.Find("nfs").Cmd("git", "-C", m.Option("dir"), "status")
 				git.Option("status", status.Result(0))
+			case "tmux":
+				tmux := m.Sess("tmux", m.Target())
+
+				buffer := m.Sess("cli").Cmd("system", "tmux", "show-buffer", "-b", "0")
+				tmux.Option("buffer", buffer.Result(0))
+				sessions := m.Sess("cli").Cmd("system", "tmux", "list-sessions")
+				// sessions := m.Sess("cli").Cmd("system", "tmux", "list-sessions", "-F", "#S")
+				tmux.Option("sessions", sessions.Result(0))
 			}
 
 			m.Append("title", "upload")
-			m.Append("tmpl", "userinfo", "share", "list", "git", "upload", "create")
+			m.Append("tmpl", "userinfo", "share", "list", "git", "tmux", "upload", "create")
 			m.Append("template", m.Conf("upload_main"), m.Conf("upload_tmpl"))
 			// }}}
 		}},
@@ -898,6 +908,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				w.Write(b)
 			}
 			// }}}
+		}},
+		"/paste": &ctx.Command{Name: "/paste", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
+				m.Sess("cli").Cmd("system", "tmux", "set-buffer", "-b", "0", m.Option("content"))
+			}
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target())
