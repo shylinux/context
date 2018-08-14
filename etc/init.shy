@@ -1,5 +1,4 @@
 login root root
-
 source etc/local.shy
 
 ~file1

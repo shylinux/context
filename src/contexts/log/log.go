@@ -38,6 +38,7 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool { // {{{
 	log.nfs = m.Sess("nfs").Cmd("append", m.Confx("bench.log", arg, 0), "", "日志文件")
 	log.out = log.nfs.Optionv("out").(*os.File)
+	fmt.Fprintln(log.out, "\n\n")
 	return false
 }
 
@@ -58,7 +59,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 		"nlog": &ctx.Cache{Name: "nlog", Value: "0", Help: "日志屏蔽类型"},
 	},
 	Configs: map[string]*ctx.Config{
-		"silent": &ctx.Config{Name: "silent", Value: map[string]interface{}{}, Help: "日志屏蔽类型"},
+		"silent": &ctx.Config{Name: "silent", Value: map[string]interface{}{"cb": true}, Help: "日志屏蔽类型"},
 		"module": &ctx.Config{Name: "module", Value: map[string]interface{}{
 			"log": map[string]interface{}{"cmd": true},
 			"lex": map[string]interface{}{"cmd": true, "debug": true},

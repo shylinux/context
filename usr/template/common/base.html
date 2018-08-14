@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
-<title>{{meta .title}}</title>
+<title>{{option .Meta "title"}}</title>
 <style>
 	legend {
 		font-size:16px;
@@ -10,9 +10,11 @@
 	}
 	th {
 		cursor:pointer;
-		background-color:lightgray;
+		background-color:lightgreen;
+	}
+	td {
 		padding-left: 10px;
-		padding-right: 10px;
+		padding-right: 20px;
 	}
 	code {
 		font-size:14px;
@@ -22,9 +24,13 @@
 <body>
 {{end}}
 
+{{define "code"}}
+<pre><code>{{.}}</code></pre>
+{{end}}
+
 {{define "notice"}}
 <fieldset class="notice"><legend>notice</legend>
-	<pre>{{result .Meta}}</pre>
+	{{template "code" result .Meta}}
 </fieldset>
 <style>
 	.notice {color:red}
@@ -33,51 +39,28 @@
 
 {{define "detail"}}
 <fieldset><legend>{{append . "title"}}</legend>
-	<a onclick="return action('{{option .Meta "module"}}', '{{detail .Meta}}')" href="/"><code>{{detail .Meta}}</code></a>
-	<pre><code class="result"></code></pre>
-
+	<a onclick="return action('{{option .Meta "module"}}', '{{detail .Meta}}')" href="/">{{template "code" detail .Meta}}</a>
+	<pre><code class="{{append . "title"}}_result"></code></pre>
 </fieldset>
 <script>
-function action(module, detail, cb) {
-	var xhr = new XMLHttpRequest();
-	cb = function(msg) {
-		var result = document.getElementsByClassName("result")[0];
-		result.innerHTML = msg.result;
-	}
-	xhr.onreadystatechange = function() {
-		switch (xhr.readyState) {
-			case 4:
-				switch (xhr.status) {
-					case 200:
-						try {
-							var msg = JSON.parse(xhr.responseText||'{"result":[]}');
-						} catch (e) {
-							msg = {"result": [xhr.responseText]}
-						}
-
-						msg && console.log(msg)
-						msg.result && console.log(msg.result.join(""));
-						typeof cb == "function" && cb(msg)
-				}
-				break;
-		}
-	}
-
-	xhr.open("POST", "?module="+encodeURIComponent(module)+"&details="+encodeURIComponent(detail));
-	xhr.send()
+function action(module, details, cb) {
+	ctx.POST("", {module:module, details:details}, function(msg) {
+		var result = document.getElementsByClassName("{{append . "title"}}_result")[0];
+		result.innerHTML = msg.result || msg.message;
+	})
 	return false
 }
 </script>
 {{end}}
 
 {{define "result"}}
-<fieldset><legend>{{append . "title"}}</legend>
-	<pre><code>{{result .Meta|unscaped}}</code></pre>
+<fieldset><legend>{{option . "title"}}</legend>
+	{{template "code" result .Meta|unscaped}}
 </fieldset>
 {{end}}
 
 {{define "append_link"}}
-<td><a onclick="return jump('{{.}}')" href="{{.}}"><code>{{.}}</code></a></td>
+<a onclick="return jump('{{.}}')" href="{{.}}">{{.}}</a>
 <script>
 function jump(to) {
 	location.href = location.href + "/" +to;
@@ -88,30 +71,34 @@ function jump(to) {
 
 {{define "append"}}
 <fieldset><legend>{{append . "title"}}</legend>
-	<table class="append">
-		{{$msg := .}}
-		{{$ncol := append . |len}}
-		{{$nrow := append . 0|append .|len}}
-		<tr>{{range append .}}<th class="append_head">{{.}}</th>{{end}}</tr>
-		{{range $row, $val := append . 0|append .}}
-			<tr>
-				{{range append $msg}}
-				{{$value := append $msg . $row}}
-				{{if eq . "filename"}}
-					{{template "append_link" $value}}
-				{{else}}
-				<td><code>{{$value}}</code></td>
-				{{end}}
-				{{end}}
-			</tr>
+<table class="append">
+	{{$msg := .}}
+	{{$ncol := append . |len}}
+	{{$nrow := append . 0|append .|len}}
+	<tr>{{range append .}}<th><code onclick="sort_table('{{.}}')">{{.}}</code></th>{{end}}</tr>
+	{{range $row, $val := append . 0|append .}}
+	<tr>
+		{{range append $msg}}
+		{{$value := append $msg . $row}}
+		<td><code>
+		{{if eq . "filename"}}
+			{{template "append_link" $value}}
+		{{else}}
+			{{$value}}
 		{{end}}
-	</table>
+		</code></td>
+		{{end}}
+	</tr>
+	{{end}}
+</table>
 </fieldset>
-<style>
-	.append td {padding-right:20px}
-	.append th {background-color:lightgreen}
-	.append code {font-size:14px}
-</style>
+<script>
+var sort_field="";
+function sort_table(field) {
+	sort_field = field;
+	console.log(sort_field);
+}
+</script>
 {{end}}
 
 {{define "main"}}
@@ -119,6 +106,6 @@ welcome to context world!
 {{end}}
 
 {{define "tail"}}
-<script src="library/context.js"></script>
+<script src="/library/context.js"></script>
 </body>
 {{end}}

@@ -83,12 +83,10 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	}
 	if m.Has("pub") {
 		s.public = m.Optionv("public").(*rsa.PublicKey)
-		m.Log("fuck", "public %v", s.public)
 	}
 	if m.Has("key") {
 		s.private = m.Optionv("private").(*rsa.PrivateKey)
 		s.public = &s.private.PublicKey
-		m.Log("fuck", "public %v", s.public)
 
 	}
 
@@ -194,7 +192,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						m.Optionv("private", private)
 					}
 
-					m.Log("fuck", "stream %s", stream)
 					if stream != "" {
 						m.Start(m.Confx("aaa_name"), m.Confx("aaa_help"), arg[0], "", aaa.Session(arg[0]))
 						m.Cap("stream", stream)
@@ -244,7 +241,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							m.Travel(func(m *ctx.Message, line int) bool {
 								if line > 0 && m.Cap("username") == arg[0] {
 									if m.Cap("password") == aaa.Password(arg[1]) {
-										m.Log("fuck", "%v", m.Format())
 										m.Sess("aaa", m.Target())
 										m.Echo(m.Cap("sessid"))
 									} else {
@@ -442,7 +438,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						b := make([]byte, bsize)
 						copy(b, content[pos:end])
 
-						m.Log("fuck", "pos: %d end: %d", pos, end)
 						aaa.encrypt.CryptBlocks(buf[pos:pos+bsize], b)
 					}
 
@@ -466,7 +461,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						content, arg = []byte(arg[0]), arg[1:]
 					}
 
-					m.Log("fuck", "why %v", content)
 					buf := make([]byte, 1024)
 					n, e := base64.StdEncoding.Decode(buf, content)
 					m.Assert(e)

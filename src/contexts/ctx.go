@@ -1934,10 +1934,11 @@ var CGI = template.FuncMap{
 		}
 		return ""
 	}, // }}}
-	"msg": func(arg ...interface{}) string { // {{{
+	"msg": func(arg ...interface{}) interface{} { // {{{
 		if len(arg) == 0 {
 			return ""
 		}
+
 		if m, ok := arg[0].(*Message); ok {
 			if len(arg) == 1 {
 				return fmt.Sprintf("%v", m.Format())
@@ -1946,8 +1947,10 @@ var CGI = template.FuncMap{
 			switch which := arg[1].(type) {
 			case string:
 				switch which {
+				case "spawn":
+					return m.Spawn()
 				case "code":
-					return fmt.Sprintf("%d", m.code)
+					return m.code
 				case "time":
 					return m.time.Format("2006-01-02 15:04:05")
 				case "source":
@@ -1955,21 +1958,22 @@ var CGI = template.FuncMap{
 				case "target":
 					return m.target.Name
 				case "message":
-					return fmt.Sprintf("%d", m.message.code)
+					return m.message
 				case "messages":
-					msg := []string{}
-					for _, v := range m.messages {
-						msg = append(msg, fmt.Sprintf("%d", v.code))
-					}
-					return strings.Join(msg, " ")
+					return m.messages
 				case "sessions":
-					msg := []string{}
-					for k, _ := range m.Sessions {
-						msg = append(msg, fmt.Sprintf("%s", k))
-					}
-					return strings.Join(msg, " ")
+					return m.Sessions
+				default:
+					return m.Sess(which)
 				}
 			case int:
+				ms := []*Message{m}
+				for i := 0; i < len(ms); i++ {
+					if ms[i].code == which {
+						return ms[i]
+					}
+					ms = append(ms, ms[i].messages...)
+				}
 			}
 		}
 		return ""
@@ -2011,7 +2015,6 @@ var CGI = template.FuncMap{
 		}
 
 		if m, ok := arg[0].(*Message); ok {
-
 			if len(arg) == 1 {
 				list := []string{}
 				for k, _ := range m.target.Configs {
@@ -3175,14 +3178,18 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"right": &Command{
 			Name: "right [share|add|del group [cache|config|command item]]",
 			Help: "用户组管理，查看、添加、删除用户组或是接口",
+			Form: map[string]int{"target": 1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				index := m.target.Index // {{{
+				owner := m.target // {{{
+				if m.Has("target") {
+					owner = m.Find(m.Option("target")).target
+				}
+				index := owner.Index
 				if index == nil {
 					index = map[string]*Context{}
-					m.target.Index = index
+					owner.Index = index
 				}
 
-				owner := m.target
 				aaa := m.Sess("aaa", false)
 				if aaa.Cap("username") != aaa.Conf("rootname") {
 					owner = index[aaa.Cap("username")]
@@ -3268,7 +3275,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							return
 						}
 					case "command":
+						m.Log("fuck", "what %v %v", share.Name, arg[2])
 						if x, ok := share.Commands[arg[2]]; ok {
+							m.Log("fuck", "what")
 							if len(arg) == 3 {
 								m.Echo("ok")
 								break
@@ -3292,6 +3301,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							}
 							m.Echo("ok")
 						}
+						m.Log("fuck", "what")
 					}
 				case "add":
 					switch arg[1] {

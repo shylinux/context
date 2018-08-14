@@ -15,7 +15,6 @@ import ( // {{{
 	"path"
 
 	"bytes"
-	"mime"
 	"mime/multipart"
 	"path/filepath"
 
@@ -336,6 +335,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"template": "append", "title": "",
 				},
 			},
+			"notice": []interface{}{
+				map[string]interface{}{
+					"template": "notice", "title": "notice",
+				},
+			},
+			"login": []interface{}{
+				map[string]interface{}{
+					"template": "login", "title": "login",
+				},
+			},
 		}, Help: "资源列表"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -603,90 +612,41 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/index": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request)
+			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 
-			login := m.Spawn().Cmd("/login")
-			if login.Has("template") {
-				m.Copy(login, "append")
-				return
-			}
-
-			aaa := login.Appendv("aaa").(*ctx.Message)
-			list := m.Confv("index", aaa.Cap("username"))
-			if list == nil {
-				m.Echo("no right, please contact manager")
-				m.Append("template", "result")
-				return
-			}
+			//执行命令
 			if m.Options("details") {
-				if !ctx.Right(m.Find(m.Option("module")).Cmd("right", aaa.Cap("username"), "check", "command", m.Option("details")).Result(0)) {
-					m.Echo("no right, please contact manager")
-					m.Append("template", "result")
+				if check := m.Spawn().Cmd("/check", "target", m.Option("module"), "command", m.Option("details")); !check.Results(0) {
+					m.Copy(check, "append")
 					return
 				}
+
 				msg := m.Find(m.Option("module")).Cmd(m.Option("details"))
 				m.Copy(msg, "result").Copy(msg, "append")
 				return
 			}
 
+			//权限检查
 			dir := path.Join(m.Cap("directory"), m.Option("dir"))
+			check := m.Spawn(c).Cmd("/check", "command", "/index", "dir", dir)
+			if !check.Results(0) {
+				m.Copy(check, "append")
+				return
+			}
+
+			//下载文件
 			if s, e := os.Stat(dir); e == nil && m.Option("dir") != "" && !s.IsDir() {
-				w.Header().Set("Content-type", mime.TypeByExtension(dir))
 				http.ServeFile(w, r, dir)
 				return
 			}
 
-			if !ctx.Right(m.Spawn(c).Cmd("right", aaa.Cap("username"), "check", "command", "/index", "dir", dir).Result(0)) {
-				m.Echo("no right, please contact manager")
-				m.Append("template", "result")
-				return
-			}
-
+			//浏览目录
+			aaa := check.Appendv("aaa").(*ctx.Message)
+			m.Append("template", aaa.Cap("username"))
+			m.Option("title", "index")
 			m.Option("dir", dir)
-			w.Header().Add("Content-Type", "text/html")
-			tpl := template.New("render").Funcs(ctx.CGI)
-			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
-			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("upload_tmpl"))))
-
-			replace := [][]byte{
-				[]byte{27, 91, 51, 50, 109}, []byte("<span style='color:red'>"),
-				[]byte{27, 91, 51, 49, 109}, []byte("<span style='color:green'>"),
-				[]byte{27, 91, 109}, []byte("</span>"),
-			}
-
-			for _, v := range list.([]interface{}) {
-				val := v.(map[string]interface{})
-				if _, ok := val["detail"]; ok {
-					detail := val["detail"].([]interface{})
-					msg := m.Spawn().Add("detail", detail[0].(string), detail[1:])
-					msg.Option("title", val["title"])
-					msg.Option("module", val["module"])
-					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg))
-					continue
-				}
-				if _, ok := val["module"]; ok {
-					if _, ok := val["command"]; ok {
-						msg := m.Find(val["module"].(string)).Cmd(val["command"], val["argument"])
-						for i, v := range msg.Meta["result"] {
-							b := []byte(v)
-							for i := 0; i < len(replace)-1; i += 2 {
-								b = bytes.Replace(b, replace[i], replace[i+1], -1)
-							}
-							msg.Meta["result"][i] = string(b)
-						}
-						if msg.Option("title", val["title"]) == "" {
-							msg.Option("title", m.Option("dir"))
-						}
-						m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg))
-						continue
-					}
-				}
-
-				if _, ok := val["template"]; ok {
-					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), m))
-				}
-			}
+			// }}}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			// r := m.Optionv("request").(*http.Request) // {{{
@@ -975,15 +935,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/check": &ctx.Command{Name: "/check cache|config|command name args", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			w := m.Optionv("response").(http.ResponseWriter) //{{{
+			// w := m.Optionv("response").(http.ResponseWriter) //{{{
 			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
 				aaa := m.Appendv("aaa").(*ctx.Message)
 				if msg := m.Spawn().Cmd("right", aaa.Cap("username"), "check", arg); msg.Results(0) {
 					m.Copy(login, "append").Echo(msg.Result(0))
 					return
 				}
-				w.WriteHeader(http.StatusForbidden)
-				m.Append("message", "please contact manager")
+				// w.WriteHeader(http.StatusForbidden)
+				m.Append("message", "no right, please contact manager")
 				m.Echo("no")
 				return
 			} else {
@@ -1012,20 +972,58 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			w.WriteHeader(http.StatusUnauthorized)
-			m.Append("template", "login.html")
+			m.Append("template", "login")
 			// }}}
 		}},
-		"/render": &ctx.Command{Name: "/render [main [tmpl]]", Help: "模板响应, main: 模板入口, tmpl: 附加模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/render": &ctx.Command{Name: "/render index", Help: "模板响应, main: 模板入口, tmpl: 附加模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			w := m.Optionv("response").(http.ResponseWriter) // {{{
 			w.Header().Add("Content-Type", "text/html")
 
 			tpl := template.New("render").Funcs(ctx.CGI)
 			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
-			if len(arg) > 1 {
-				tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), arg[1])))
+			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("upload_tmpl"))))
+
+			replace := [][]byte{
+				[]byte{27, 91, 51, 50, 109}, []byte("<span style='color:red'>"),
+				[]byte{27, 91, 51, 49, 109}, []byte("<span style='color:green'>"),
+				[]byte{27, 91, 109}, []byte("</span>"),
 			}
 
-			m.Assert(tpl.ExecuteTemplate(w, m.Confx("common_main", arg, 0), m.Message()))
+			m.Assert(tpl.ExecuteTemplate(w, "head", m))
+			for _, v := range m.Confv("index", arg[0]).([]interface{}) {
+				val := v.(map[string]interface{})
+				//命令模板
+				if detail, ok := val["detail"].([]interface{}); ok {
+					msg := m.Spawn().Add("detail", detail[0].(string), detail[1:])
+					msg.Option("module", val["module"])
+					msg.Option("title", val["title"])
+					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg))
+					continue
+				}
+
+				//执行命令
+				if _, ok := val["command"]; ok {
+					msg := m.Find(val["module"].(string)).Cmd(val["command"], val["argument"])
+					for i, v := range msg.Meta["result"] {
+						b := []byte(v)
+						for i := 0; i < len(replace)-1; i += 2 {
+							b = bytes.Replace(b, replace[i], replace[i+1], -1)
+						}
+						msg.Meta["result"][i] = string(b)
+					}
+					if msg.Option("title", val["title"]) == "" {
+						msg.Option("title", m.Option("dir"))
+					}
+					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg))
+					continue
+				}
+
+				//解析模板
+				if _, ok := val["template"]; ok {
+					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), m))
+				}
+			}
+			m.Assert(tpl.ExecuteTemplate(w, "tail", m))
 			// }}}
 		}},
 		"/json": &ctx.Command{Name: "/json", Help: "json响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

@@ -203,7 +203,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			// }}}
 		}},
 		"cli_help":    &ctx.Config{Name: "cli_help", Value: "shell", Help: "模块文档"},
-		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "10s", Help: "系统命令超时"},
+		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "60s", Help: "系统命令超时"},
 
 		"time_format":   &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 		"time_unit":     &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
