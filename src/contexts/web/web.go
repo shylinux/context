@@ -279,6 +279,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"cmd": &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+		"index": &ctx.Config{Name: "index", Value: map[string]interface{}{
+			"shy": []interface{}{
+				map[string]interface{}{
+					"module": "cli", "command": "system",
+					"argument": []interface{}{"tmux", "list-clients"},
+					"template": "result", "title": "client",
+				},
+				map[string]interface{}{
+					"module": "cli", "command": "system",
+					"argument": []interface{}{"tmux", "list-sessions"},
+					"template": "result", "title": "session",
+				},
+				map[string]interface{}{
+					"module": "cli", "command": "system",
+					"argument": []interface{}{"tmux", "show-buffer"},
+					"template": "result", "title": "buffer",
+				},
+			},
+		}, Help: "资源列表"},
 	},
 	Commands: map[string]*ctx.Command{
 		"client": &ctx.Command{
@@ -543,6 +562,35 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			msg.Cmd("get", "/upload", "method", "POST", "file", "file", arg[0])
 			m.Copy(msg, "result")
 			// }}}
+		}},
+		"/index": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			w := m.Optionv("response").(http.ResponseWriter)
+			w.Header().Add("Content-Type", "text/html")
+
+			tpl := template.New("render").Funcs(ctx.CGI)
+			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
+			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("upload_tmpl"))))
+
+			replace := [][]byte{
+				[]byte{27, 91, 51, 50, 109}, []byte("<span style='color:red'>"),
+				[]byte{27, 91, 51, 49, 109}, []byte("<span style='color:green'>"),
+				[]byte{27, 91, 109}, []byte("</span>"),
+			}
+
+			list := m.Confv("index", "shy")
+			for _, v := range list.([]interface{}) {
+				val := v.(map[string]interface{})
+				msg := m.Find(val["module"].(string)).Cmd(val["command"], val["argument"])
+				for i, v := range msg.Meta["result"] {
+					b := []byte(v)
+					for i := 0; i < len(replace)-1; i += 2 {
+						b = bytes.Replace(b, replace[i], replace[i+1], -1)
+					}
+					msg.Meta["result"][i] = string(b)
+				}
+				msg.Option("title", val["title"])
+				m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg.Meta))
+			}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			// r := m.Optionv("request").(*http.Request) // {{{

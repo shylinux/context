@@ -208,6 +208,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"time_format":   &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 		"time_unit":     &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
 		"time_interval": &ctx.Config{Name: "time_interval(open/close)", Value: "open", Help: "时间区间"},
+
+		"tmux_default": &ctx.Config{Name: "tmux_default", Value: map[string]interface{}{
+			"session": []interface{}{"list-sessions"},
+			"buffer":  []interface{}{"show-buffer"},
+		}, Help: "时间区间"},
 	},
 	Commands: map[string]*ctx.Command{
 		"source": &ctx.Command{
@@ -808,6 +813,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"clear": &ctx.Command{Name: "clear", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Log("fuck", strings.Repeat("\n", 20))
+		}},
+		"tmux": &ctx.Command{Name: "tmux", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Copy(m.Spawn().Cmd("system", "tmux", arg), "result")
 		}},
 	},
 	Index: map[string]*ctx.Context{

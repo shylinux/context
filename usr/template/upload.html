@@ -78,34 +78,44 @@
 
 {{define "git"}}
 <fieldset><legend>branch</legend>
-	<pre>{{index . "branch"}}</pre>
+	<pre>{{index . "result"}}</pre>
 </fieldset>
 <fieldset><legend>status</legend>
-	<pre>{{index . "status"}}</pre>
+	<pre>{{index . "result"}}</pre>
 </fieldset>
 {{end}}
 
 {{define "tmux"}}
-<fieldset><legend>sessions</legend>
-	<pre>{{meta . "sessions"}}</pre>
+{{$meta := .}}
+{{range $index, $value := index $meta "append"}}
+<fieldset><legend>{{$value}}</legend>
+	{{if eq $value "buffer"}}
+		<button onclick="copy_tmux_buffer('copy')">copy</button>
+		<button onclick="send_tmux_buffer('paste')">send</button>
+		<textarea rows="5" cols="60" name="tmux_buffer">{{meta . "buffer" 0}}</textarea>
+		<script>
+			var buffer = document.getElementsByName("tmux_buffer")[0];
+			function copy_tmux_buffer(action) {
+				buffer.select();
+				document.execCommand(action);
+			}
+			function send_tmux_buffer(action) {
+				var xhr = new XMLHttpRequest();
+				xhr.open("POST", "/paste?content="+encodeURIComponent(buffer.value));
+				xhr.send()
+			}
+		</script>
+	{{else}}
+		<pre>{{meta $meta $value}}</pre>
+	{{end}}
 </fieldset>
-<fieldset><legend>buffer</legend>
-	<button onclick="copy_tmux_buffer('copy')">copy</button>
-	<button onclick="send_tmux_buffer('paste')">send</button>
-	<textarea rows="5" cols="60" name="tmux_buffer">{{meta . "buffer" 0}}</textarea>
+{{end}}
+{{end}}
+
+{{define "result"}}
+<fieldset><legend>{{meta . "title"}}</legend>
+	<pre><code>{{meta . "result"|unscaped}}</code></pre>
 </fieldset>
-<script>
-	var buffer = document.getElementsByName("tmux_buffer")[0];
-	function copy_tmux_buffer(action) {
-		buffer.select();
-		console.log(document.execCommand(action));
-	}
-	function send_tmux_buffer(action) {
-		var xhr = new XMLHttpRequest();
-		xhr.open("POST", "/paste?content="+encodeURIComponent(buffer.value));
-		xhr.send()
-	}
-</script>
 {{end}}
 
 {{define "upload"}}
@@ -132,6 +142,8 @@
 {{$meta := .Meta}}
 {{$sess := .Sessions}}
 {{range .Meta.tmpl}}
+	{{$tmpl := index $sess .}}
+
 	{{if eq . "login"}}
 		{{template "login" $meta}}
 	{{else if eq . "userinfo"}}
@@ -150,6 +162,7 @@
 		{{template "upload" $msg}}
 	{{else if eq . "create"}}
 		{{template "create" $msg}}
+	{{else}}
 	{{end}}
 {{end}}
 {{end}}

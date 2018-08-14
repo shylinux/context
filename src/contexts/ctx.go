@@ -43,6 +43,17 @@ func Trans(arg ...interface{}) []string { // {{{
 			ls = append(ls, fmt.Sprintf("%t", val))
 		case int, int8, int16, int32, int64:
 			ls = append(ls, fmt.Sprintf("%d", val))
+		case []interface{}:
+			for _, v := range val {
+				switch val := v.(type) {
+				case string:
+					ls = append(ls, val)
+				case bool:
+					ls = append(ls, fmt.Sprintf("%t", val))
+				case int, int8, int16, int32, int64:
+					ls = append(ls, fmt.Sprintf("%d", val))
+				}
+			}
 		case []string:
 			ls = append(ls, val...)
 		case []bool:
@@ -1573,6 +1584,73 @@ func (m *Message) Confi(key string, arg ...interface{}) int { // {{{
 }
 
 // }}}
+func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
+	var hand func(m *Message, x *Config, arg ...string) string
+	arg := Trans(args...)
+
+	for _, c := range []*Context{m.target, m.source} {
+		for s := c; s != nil; s = s.context {
+			if x, ok := s.Configs[key]; ok {
+				if len(args) == 0 {
+					return x.Value
+				}
+				if len(arg) == 3 {
+					hand = x.Hand
+				}
+
+				switch value := x.Value.(type) {
+				case string:
+					x.Value = fmt.Sprintf("%v", value)
+				case bool:
+					x.Value = Right(fmt.Sprintf("%v", value))
+				case int:
+					i, e := strconv.Atoi(fmt.Sprintf("%v", value))
+					m.Assert(e)
+					x.Value = i
+				case nil:
+					x.Value = args[0]
+				default:
+					for i := 0; i < len(args); i += 2 {
+						if i < len(args)-1 {
+							x.Value = Chain(x.Value, args[i], args[i+1])
+						}
+						if i == len(args)-2 {
+							return Chain(x.Value, args[len(args)-2])
+						}
+						if i == len(args)-1 {
+							return Chain(x.Value, args[len(args)-1])
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	m.Log("conf", "%s %v", key, args)
+	if m.target.Configs == nil {
+		m.target.Configs = make(map[string]*Config)
+	}
+	if len(arg) == 3 {
+		m.target.Configs[key] = &Config{Name: arg[0], Value: arg[1], Help: arg[2], Hand: hand}
+		return m.Conf(key, arg[1])
+	}
+	if !m.Confs("auto_make") {
+		return nil
+	}
+
+	if len(arg) == 1 {
+		m.target.Configs[key] = &Config{Name: key, Value: arg[0], Help: "auto make", Hand: hand}
+		return m.Conf(key, arg[0])
+	}
+	m.target.Configs[key] = &Config{Name: key, Value: Chain(nil, args), Help: "auto make", Hand: hand}
+	return Chain(key, args[len(args)-2+(len(args)%2)])
+}
+
+// }}}
 func (m *Message) Conf(key string, args ...interface{}) string { // {{{
 	var hand func(m *Message, x *Config, arg ...string) string
 
@@ -1610,6 +1688,8 @@ func (m *Message) Conf(key string, args ...interface{}) string { // {{{
 							hand = x.Hand
 						}
 					}
+				case bool:
+				case int:
 				default:
 					values := ""
 					for i := 0; i < len(args); i += 2 {
@@ -2036,6 +2116,9 @@ var CGI = template.FuncMap{
 			}
 		}
 		return ""
+	}, // }}}
+	"unscaped": func(str string) interface{} { // {{{
+		return template.HTML(str)
 	}, // }}}
 }
 
@@ -2868,8 +2951,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								save[k] = v.Value
 							}
 						case "load":
-							if len(have) == 0 || have[k] {
-								v.Value = save[k]
+							if x, ok := save[k]; ok && (len(have) == 0 || have[k]) {
+								v.Value = x
 							}
 						case "pop":
 							switch val := v.Value.(type) {

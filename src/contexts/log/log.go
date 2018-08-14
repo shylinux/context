@@ -54,23 +54,27 @@ func (log *LOG) Close(m *ctx.Message, arg ...string) bool { // {{{
 
 var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "log", Help: "日志中心",
-	Caches: map[string]*ctx.Cache{},
+	Caches: map[string]*ctx.Cache{
+		"nlog": &ctx.Cache{Name: "nlog", Value: "0", Help: "日志屏蔽类型"},
+	},
 	Configs: map[string]*ctx.Config{
+		"silent": &ctx.Config{Name: "silent", Value: map[string]interface{}{}, Help: "日志屏蔽类型"},
 		"module": &ctx.Config{Name: "module", Value: map[string]interface{}{
-			"shy": map[string]interface{}{"true": true, "false": false, "one": 1, "zero": 0, "yes": "yes", "no": "no"},
 			"log": map[string]interface{}{"cmd": true},
 			"lex": map[string]interface{}{"cmd": true, "debug": true},
 			"yac": map[string]interface{}{"cmd": true, "debug": true},
-		}, Help: "模块日志输出的文件"},
-		"silent": &ctx.Config{Name: "silent", Value: map[string]string{}, Help: "模块日志输出的文件"},
-		"color": &ctx.Config{Name: "color", Value: map[string]string{
-			"debug": "0", "error": "31", "check": "31",
-			"cmd": "32", "conf": "33",
-			"search": "35", "find": "35", "cb": "35", "lock": "35",
-			"begin": "36", "start": "36", "close": "36",
-		}, Help: "模块日志输出颜色"},
+		}, Help: "日志屏蔽模块"},
+		"color": &ctx.Config{Name: "color", Value: map[string]interface{}{
+			"debug": 0, "error": 31, "check": 31,
+			"cmd": 32, "conf": 33,
+			"search": 35, "find": 35, "cb": 35, "lock": 35,
+			"begin": 36, "start": 36, "close": 36,
+		}, Help: "日志输出颜色"},
+		"log_name": &ctx.Config{Name: "log_name", Value: "dump", Help: "日志屏蔽类型"},
 	},
 	Commands: map[string]*ctx.Command{
+		"open": &ctx.Command{Name: "open file", Help: "打开日志文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		}},
 		"log": &ctx.Command{Name: "log level string...", Help: "输出日志, level: 日志类型, string: 日志内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) && log.out != nil { // {{{
 				if m.Confs("silent", arg[0]) {

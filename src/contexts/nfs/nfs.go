@@ -1269,6 +1269,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						m.Log("info", "cmd: %s %v", "git", ctx.Trans("-C", p, c, args))
 						msg := m.Sess("cli").Cmd("system", "git", "-C", p, c, args)
 						m.Copy(msg, "result").Copy(msg, "append")
+						m.Echo("\n")
 					}
 				} // }}}
 			}},
