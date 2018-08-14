@@ -112,12 +112,6 @@
 {{end}}
 {{end}}
 
-{{define "result"}}
-<fieldset><legend>{{meta . "title"}}</legend>
-	<pre><code>{{meta . "result"|unscaped}}</code></pre>
-</fieldset>
-{{end}}
-
 {{define "upload"}}
 <fieldset><legend>upload</legend>
 	<form method="POST" action="/create?dir={{option . "dir"}}" enctype="multipart/form-data">

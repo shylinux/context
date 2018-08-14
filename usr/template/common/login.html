@@ -84,8 +84,8 @@
 {{$meta := .Meta}}
 
 {{template "head" $meta}}
-{{if meta $meta.message}}
-	{{template "message" $meta}}
+{{if meta $meta.notice}}
+	{{template "notice" $meta}}
 {{end}}
 {{template "login" $meta}}
 {{template "tail" $meta}}

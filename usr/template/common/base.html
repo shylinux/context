@@ -22,14 +22,95 @@
 <body>
 {{end}}
 
-{{define "message"}}
-<fieldset class="message"><legend>message</legend>
-	<pre>{{meta .message}}</pre>
+{{define "notice"}}
+<fieldset class="notice"><legend>notice</legend>
+	<pre>{{result .Meta}}</pre>
 </fieldset>
 <style>
-	.message {
-		color:red;
+	.notice {color:red}
+</style>
+{{end}}
+
+{{define "detail"}}
+<fieldset><legend>{{append . "title"}}</legend>
+	<a onclick="return action('{{option .Meta "module"}}', '{{detail .Meta}}')" href="/"><code>{{detail .Meta}}</code></a>
+	<pre><code class="result"></code></pre>
+
+</fieldset>
+<script>
+function action(module, detail, cb) {
+	var xhr = new XMLHttpRequest();
+	cb = function(msg) {
+		var result = document.getElementsByClassName("result")[0];
+		result.innerHTML = msg.result;
 	}
+	xhr.onreadystatechange = function() {
+		switch (xhr.readyState) {
+			case 4:
+				switch (xhr.status) {
+					case 200:
+						try {
+							var msg = JSON.parse(xhr.responseText||'{"result":[]}');
+						} catch (e) {
+							msg = {"result": [xhr.responseText]}
+						}
+
+						msg && console.log(msg)
+						msg.result && console.log(msg.result.join(""));
+						typeof cb == "function" && cb(msg)
+				}
+				break;
+		}
+	}
+
+	xhr.open("POST", "?module="+encodeURIComponent(module)+"&details="+encodeURIComponent(detail));
+	xhr.send()
+	return false
+}
+</script>
+{{end}}
+
+{{define "result"}}
+<fieldset><legend>{{append . "title"}}</legend>
+	<pre><code>{{result .Meta|unscaped}}</code></pre>
+</fieldset>
+{{end}}
+
+{{define "append_link"}}
+<td><a onclick="return jump('{{.}}')" href="{{.}}"><code>{{.}}</code></a></td>
+<script>
+function jump(to) {
+	location.href = location.href + "/" +to;
+	return false
+}
+</script>
+{{end}}
+
+{{define "append"}}
+<fieldset><legend>{{append . "title"}}</legend>
+	<table class="append">
+		{{$msg := .}}
+		{{$ncol := append . |len}}
+		{{$nrow := append . 0|append .|len}}
+		<tr>{{range append .}}<th class="append_head">{{.}}</th>{{end}}</tr>
+		{{range $row, $val := append . 0|append .}}
+			<tr>
+				{{range append $msg}}
+				{{$value := append $msg . $row}}
+				{{if eq . "filename"}}
+					{{template "append_link" $value}}
+				{{else}}
+				<td><code>{{$value}}</code></td>
+				{{end}}
+				{{end}}
+			</tr>
+		{{end}}
+	</table>
+</fieldset>
+<style>
+	.append td {padding-right:20px}
+	.append th {background-color:lightgreen}
+	.append code {font-size:14px}
 </style>
 {{end}}
 

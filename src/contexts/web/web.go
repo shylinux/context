@@ -15,6 +15,7 @@ import ( // {{{
 	"path"
 
 	"bytes"
+	"mime"
 	"mime/multipart"
 	"path/filepath"
 
@@ -111,6 +112,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 			http.Redirect(w, r, msg.Append("redirect"), http.StatusFound)
 			return
 		}
+
 		if msg.Has("template") {
 			msg.Spawn().Cmd("/render", msg.Meta["template"])
 			return
@@ -143,6 +145,12 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 			}
 			web.Log("info", "")
 		}
+	}
+
+	r.Form.Add("path", r.URL.Path)
+	if strings.HasPrefix(r.URL.Path, "/index") {
+		r.Form.Add("dir", strings.TrimPrefix(r.URL.Path, "/index"))
+		r.URL.Path = "/index"
 	}
 
 	web.ServeMux.ServeHTTP(w, r)
@@ -295,6 +303,37 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"module": "cli", "command": "system",
 					"argument": []interface{}{"tmux", "show-buffer"},
 					"template": "result", "title": "buffer",
+				},
+				map[string]interface{}{
+					"module": "nfs", "command": "git",
+					"argument": []interface{}{},
+					"template": "result", "title": "git",
+				},
+				map[string]interface{}{
+					"module": "nfs", "command": "dir",
+					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
+					"template": "append", "title": "",
+				},
+				map[string]interface{}{
+					"template": "upload", "title": "upload",
+				},
+				map[string]interface{}{
+					"template": "create", "title": "create",
+				},
+				map[string]interface{}{
+					"module": "nfs", "detail": []interface{}{"pwd"},
+					"template": "detail", "title": "detail",
+				},
+			},
+			"xujianing": []interface{}{
+				map[string]interface{}{
+					"module": "nfs", "detail": []interface{}{"pwd"},
+					"template": "detail", "title": "detail",
+				},
+				map[string]interface{}{
+					"module": "nfs", "command": "dir",
+					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
+					"template": "append", "title": "",
 				},
 			},
 		}, Help: "资源列表"},
@@ -564,9 +603,48 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/index": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
-			w.Header().Add("Content-Type", "text/html")
 
+			login := m.Spawn().Cmd("/login")
+			if login.Has("template") {
+				m.Copy(login, "append")
+				return
+			}
+
+			aaa := login.Appendv("aaa").(*ctx.Message)
+			list := m.Confv("index", aaa.Cap("username"))
+			if list == nil {
+				m.Echo("no right, please contact manager")
+				m.Append("template", "result")
+				return
+			}
+			if m.Options("details") {
+				if !ctx.Right(m.Find(m.Option("module")).Cmd("right", aaa.Cap("username"), "check", "command", m.Option("details")).Result(0)) {
+					m.Echo("no right, please contact manager")
+					m.Append("template", "result")
+					return
+				}
+				msg := m.Find(m.Option("module")).Cmd(m.Option("details"))
+				m.Copy(msg, "result").Copy(msg, "append")
+				return
+			}
+
+			dir := path.Join(m.Cap("directory"), m.Option("dir"))
+			if s, e := os.Stat(dir); e == nil && m.Option("dir") != "" && !s.IsDir() {
+				w.Header().Set("Content-type", mime.TypeByExtension(dir))
+				http.ServeFile(w, r, dir)
+				return
+			}
+
+			if !ctx.Right(m.Spawn(c).Cmd("right", aaa.Cap("username"), "check", "command", "/index", "dir", dir).Result(0)) {
+				m.Echo("no right, please contact manager")
+				m.Append("template", "result")
+				return
+			}
+
+			m.Option("dir", dir)
+			w.Header().Add("Content-Type", "text/html")
 			tpl := template.New("render").Funcs(ctx.CGI)
 			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
 			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("upload_tmpl"))))
@@ -577,19 +655,37 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				[]byte{27, 91, 109}, []byte("</span>"),
 			}
 
-			list := m.Confv("index", "shy")
 			for _, v := range list.([]interface{}) {
 				val := v.(map[string]interface{})
-				msg := m.Find(val["module"].(string)).Cmd(val["command"], val["argument"])
-				for i, v := range msg.Meta["result"] {
-					b := []byte(v)
-					for i := 0; i < len(replace)-1; i += 2 {
-						b = bytes.Replace(b, replace[i], replace[i+1], -1)
-					}
-					msg.Meta["result"][i] = string(b)
+				if _, ok := val["detail"]; ok {
+					detail := val["detail"].([]interface{})
+					msg := m.Spawn().Add("detail", detail[0].(string), detail[1:])
+					msg.Option("title", val["title"])
+					msg.Option("module", val["module"])
+					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg))
+					continue
 				}
-				msg.Option("title", val["title"])
-				m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg.Meta))
+				if _, ok := val["module"]; ok {
+					if _, ok := val["command"]; ok {
+						msg := m.Find(val["module"].(string)).Cmd(val["command"], val["argument"])
+						for i, v := range msg.Meta["result"] {
+							b := []byte(v)
+							for i := 0; i < len(replace)-1; i += 2 {
+								b = bytes.Replace(b, replace[i], replace[i+1], -1)
+							}
+							msg.Meta["result"][i] = string(b)
+						}
+						if msg.Option("title", val["title"]) == "" {
+							msg.Option("title", m.Option("dir"))
+						}
+						m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg))
+						continue
+					}
+				}
+
+				if _, ok := val["template"]; ok {
+					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), m))
+				}
 			}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -710,13 +806,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 共享列表
 			share := m.Sess("share", m.Target())
 			index := share.Target().Index
-			m.Log("fuck", "%v", share.Target().Index)
-			m.Log("fuck", "%v", aaa.Format())
 			if index != nil && index[aaa.Cap("username")] != nil {
 				for k, v := range index[aaa.Cap("username")].Index {
-					m.Log("fuck", "%v", v.Commands)
 					for _, j := range v.Commands {
-						m.Log("fuck", "%v", j.Shares)
 						for _, n := range j.Shares {
 							for _, nn := range n {
 								if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
@@ -925,19 +1017,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"/render": &ctx.Command{Name: "/render [main [tmpl]]", Help: "模板响应, main: 模板入口, tmpl: 附加模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			w := m.Optionv("response").(http.ResponseWriter) // {{{
+			w.Header().Add("Content-Type", "text/html")
 
-			tpl := template.Must(template.New("render").Funcs(ctx.CGI).ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
+			tpl := template.New("render").Funcs(ctx.CGI)
+			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
 			if len(arg) > 1 {
 				tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), arg[1])))
 			}
 
-			main := m.Conf("common_main")
-			if len(arg) > 0 {
-				main = arg[0]
-			}
-
-			w.Header().Add("Content-Type", "text/html")
-			m.Assert(tpl.ExecuteTemplate(w, main, m.Message()))
+			m.Assert(tpl.ExecuteTemplate(w, m.Confx("common_main", arg, 0), m.Message()))
 			// }}}
 		}},
 		"/json": &ctx.Command{Name: "/json", Help: "json响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

@@ -1162,17 +1162,17 @@ func (m *Message) Sort(key string, arg ...string) *Message { // {{{
 					result = true
 				}
 			case "time":
-				ti, e := time.ParseInLocation(m.Conf("time_layout"), table[i][key], time.Local)
+				ti, e := time.ParseInLocation(m.Confx("time_layout"), table[i][key], time.Local)
 				m.Assert(e)
-				tj, e := time.ParseInLocation(m.Conf("time_layout"), table[j][key], time.Local)
+				tj, e := time.ParseInLocation(m.Confx("time_layout"), table[j][key], time.Local)
 				m.Assert(e)
 				if tj.Before(ti) {
 					result = true
 				}
 			case "time_r":
-				ti, e := time.ParseInLocation(m.Conf("time_layout"), table[i][key], time.Local)
+				ti, e := time.ParseInLocation(m.Confx("time_layout"), table[i][key], time.Local)
 				m.Assert(e)
-				tj, e := time.ParseInLocation(m.Conf("time_layout"), table[j][key], time.Local)
+				tj, e := time.ParseInLocation(m.Confx("time_layout"), table[j][key], time.Local)
 				m.Assert(e)
 				if ti.Before(tj) {
 					result = true
@@ -1598,13 +1598,13 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
 					hand = x.Hand
 				}
 
-				switch value := x.Value.(type) {
+				switch x.Value.(type) {
 				case string:
-					x.Value = fmt.Sprintf("%v", value)
+					x.Value = fmt.Sprintf("%v", args[0])
 				case bool:
-					x.Value = Right(fmt.Sprintf("%v", value))
+					x.Value = Right(fmt.Sprintf("%v", args[0]))
 				case int:
-					i, e := strconv.Atoi(fmt.Sprintf("%v", value))
+					i, e := strconv.Atoi(fmt.Sprintf("%v", args[0]))
 					m.Assert(e)
 					x.Value = i
 				case nil:
@@ -1940,7 +1940,7 @@ var CGI = template.FuncMap{
 		}
 		if m, ok := arg[0].(*Message); ok {
 			if len(arg) == 1 {
-				return fmt.Sprintf("%v", m)
+				return fmt.Sprintf("%v", m.Format())
 			}
 
 			switch which := arg[1].(type) {
@@ -2005,32 +2005,27 @@ var CGI = template.FuncMap{
 		}
 		return ""
 	}, // }}}
-	"conf": func(arg ...interface{}) string { // {{{
+	"conf": func(arg ...interface{}) interface{} { // {{{
 		if len(arg) == 0 {
 			return ""
 		}
 
 		if m, ok := arg[0].(*Message); ok {
+
 			if len(arg) == 1 {
-				return fmt.Sprintf("%v", m)
+				list := []string{}
+				for k, _ := range m.target.Configs {
+					list = append(list, k)
+				}
+				return list
 			}
 
 			switch which := arg[1].(type) {
 			case string:
 				if len(arg) == 2 {
-					return m.Conf(which)
+					return m.Confv(which)
 				}
-
-				switch value := arg[2].(type) {
-				case string:
-					return m.Conf(which, value)
-				case int:
-					return fmt.Sprintf("%d", m.Confi(which, value))
-				case bool:
-					return fmt.Sprintf("%t", m.Confs(which, value))
-				default:
-					return m.Conf(which, fmt.Sprintf("%v", arg[2]))
-				}
+				return m.Confv(which, arg[2:]...)
 			}
 		}
 		return ""
@@ -2051,69 +2046,155 @@ var CGI = template.FuncMap{
 		return ""
 	}, // }}}
 
-	"detail": func(arg ...interface{}) string { // {{{
+	"detail": func(arg ...interface{}) interface{} { // {{{
 		if len(arg) == 0 {
 			return ""
 		}
 
-		if m, ok := arg[0].(*Message); ok {
+		switch m := arg[0].(type) {
+		case *Message:
 			if len(arg) == 1 {
-				return strings.Join(m.Meta["detail"], "")
+				return m.Meta["detail"]
 			}
-			return m.Detail(arg[1:]...)
+
+			index := 0
+			switch value := arg[1].(type) {
+			case int:
+				index = value
+			case string:
+				i, e := strconv.Atoi(value)
+				m.Assert(e)
+				index = i
+			}
+			if len(arg) == 2 {
+				return m.Detail(index)
+			}
+			return m.Detail(index, arg[2])
+		case map[string][]string:
+			return strings.Join(m["detail"], "")
+		case []string:
+			return strings.Join(m, "")
+		default:
+			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
 	}, // }}}
-	"option": func(arg ...interface{}) string { // {{{
+	"option": func(arg ...interface{}) interface{} { // {{{
 		if len(arg) == 0 {
 			return ""
 		}
 
-		if m, ok := arg[0].(*Message); ok {
+		switch m := arg[0].(type) {
+		case *Message:
 			if len(arg) == 1 {
-				return fmt.Sprintf("%v", m)
+				return m.Meta["option"]
 			}
-			switch which := arg[1].(type) {
+
+			switch value := arg[1].(type) {
+			case int:
+				if 0 <= value && value < len(m.Meta["option"]) {
+					return m.Meta["option"][value]
+				}
 			case string:
 				if len(arg) == 2 {
-					return m.Option(which)
+					return m.Meta[value]
 				}
 
-				return m.Option(which, arg[2:]...)
+				switch val := arg[2].(type) {
+				case int:
+					if 0 <= val && val < len(m.Meta[value]) {
+						return m.Meta[value][val]
+					}
+				}
 			}
+		case map[string][]string:
+			if len(arg) == 1 {
+				return strings.Join(m["option"], "")
+			}
+			switch value := arg[1].(type) {
+			case string:
+				return strings.Join(m[value], "")
+			}
+		case []string:
+			return strings.Join(m, "")
+		default:
+			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
 	}, // }}}
-	"result": func(arg ...interface{}) string { // {{{
+	"result": func(arg ...interface{}) interface{} { // {{{
 		if len(arg) == 0 {
 			return ""
 		}
 
-		if m, ok := arg[0].(*Message); ok {
+		switch m := arg[0].(type) {
+		case *Message:
 			if len(arg) == 1 {
-				return strings.Join(m.Meta["result"], "")
+				return m.Meta["result"]
 			}
-			return m.Result(arg[1:]...)
+
+			index := 0
+			switch value := arg[1].(type) {
+			case int:
+				index = value
+			case string:
+				i, e := strconv.Atoi(value)
+				m.Assert(e)
+				index = i
+			}
+			if len(arg) == 2 {
+				return m.Result(index)
+			}
+			return m.Result(index, arg[2])
+		case map[string][]string:
+			return strings.Join(m["result"], "")
+		case []string:
+			return strings.Join(m, "")
+		default:
+			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
 	}, // }}}
-	"append": func(arg ...interface{}) string { // {{{
+	"append": func(arg ...interface{}) interface{} { // {{{
 		if len(arg) == 0 {
 			return ""
 		}
 
-		if m, ok := arg[0].(*Message); ok {
+		switch m := arg[0].(type) {
+		case *Message:
 			if len(arg) == 1 {
-				return fmt.Sprintf("%v", m)
+				return m.Meta["append"]
 			}
-			switch which := arg[1].(type) {
+
+			switch value := arg[1].(type) {
+			case int:
+				if 0 <= value && value < len(m.Meta["append"]) {
+					return m.Meta["append"][value]
+				}
 			case string:
 				if len(arg) == 2 {
-					return m.Append(which)
+					return m.Meta[value]
 				}
 
-				return m.Append(which, arg[2:]...)
+				switch val := arg[2].(type) {
+				case int:
+					if 0 <= val && val < len(m.Meta[value]) {
+						return m.Meta[value][val]
+					}
+				}
 			}
+		case map[string][]string:
+			if len(arg) == 1 {
+				return strings.Join(m["append"], "")
+			}
+			switch value := arg[1].(type) {
+			case string:
+				return strings.Join(m[value], "")
+			}
+		case []string:
+			return strings.Join(m, "")
+		default:
+			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
 	}, // }}}

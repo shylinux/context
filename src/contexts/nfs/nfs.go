@@ -66,11 +66,26 @@ func (nfs *NFS) open(name string) (*os.File, error) { // {{{
 }
 
 // }}}
-func dir(m *ctx.Message, name string, level int) { // {{{
+func dir(m *ctx.Message, name string, level int, deep bool, fields []string) { // {{{
 	back, e := os.Getwd()
 	m.Assert(e)
 	os.Chdir(name)
 	defer os.Chdir(back)
+	s, e := os.Stat(".")
+	for _, k := range fields {
+		switch k {
+		case "filename":
+			m.Add("append", "filename", "..")
+		case "dir":
+			m.Add("append", "dir", "true")
+		case "size":
+			m.Add("append", "size", 0)
+		case "line":
+			m.Add("append", "line", 0)
+		case "time":
+			m.Add("append", "time", s.ModTime().Format("2006-01-02 15:04:05"))
+		}
+	}
 
 	if fs, e := ioutil.ReadDir("."); m.Assert(e) {
 		for _, f := range fs {
@@ -119,15 +134,23 @@ func dir(m *ctx.Message, name string, level int) { // {{{
 
 			if !(m.Confx("dir_type") == "file" && f.IsDir() ||
 				m.Confx("dir_type") == "dir" && !f.IsDir()) {
-				m.Add("append", "filename", filename)
-				m.Add("append", "dir", f.IsDir())
-				m.Add("append", "size", f.Size())
-				m.Add("append", "line", line)
-				m.Add("append", "time", f.ModTime().Format("2006-01-02 15:04:05"))
+				for _, k := range fields {
+					switch k {
+					case "filename":
+						m.Add("append", "filename", filename)
+					case "dir":
+						m.Add("append", "dir", f.IsDir())
+					case "size":
+						m.Add("append", "size", f.Size())
+					case "line":
+						m.Add("append", "line", line)
+					case "time":
+						m.Add("append", "time", f.ModTime().Format("2006-01-02 15:04:05"))
+					}
+				}
 			}
-
-			if f.IsDir() {
-				dir(m, f.Name(), level+1)
+			if f.IsDir() && deep {
+				dir(m, f.Name(), level+1, deep, fields)
 			}
 		}
 	}
@@ -815,7 +838,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 		"dir_info":   &ctx.Config{Name: "dir_info(sizes/lines/files/dirs)", Value: "sizes lines files dirs", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
+		"dir_deep":   &ctx.Config{Name: "dir_deep(yes/no)", Value: "yes", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir)", Value: "file", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
+		"dir_field":  &ctx.Config{Name: "dir_field", Value: "filename line size time", Help: "表格排序字段"},
 		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
 		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
 
@@ -1093,7 +1118,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			// }}}
 		}},
 		"pwd": &ctx.Command{Name: "pwd", Help: "查看当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if len(arg) > 0 { // {{{
+			if m.Options("dir") { // {{{
+				m.Echo(m.Option("dir"))
+				return
+			}
+			if len(arg) > 0 {
 				os.Chdir(arg[0])
 			}
 			wd, e := os.Getwd()
@@ -1101,14 +1130,19 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			m.Echo(wd) // }}}
 		}},
 		"dir": &ctx.Command{
-			Name: "dir dir [dir_info info] [dir_name name|tree|path|full] [dir_type file|dir] [sort_field name] [sort_order type]",
+			Name: "dir dir [dir_deep yes|no] [dir_info info] [dir_name name|tree|path|full] [dir_type file|dir] [sort_field name] [sort_order type]",
 			Help: "查看目录, dir: 目录名, dir_info: 显示统计信息, dir_name: 文件名类型, dir_type: 文件类型, sort_field: 排序字段, sort_order: 排序类型",
-			Form: map[string]int{"dir_info": 1, "dir_name": 1, "dir_type": 1, "sort_field": 1, "sort_order": 1},
+			Form: map[string]int{"dir_field": 1, "dir_deep": 1, "dir_info": 1, "dir_name": 1, "dir_type": 1, "sort_field": 1, "sort_order": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				d := "." // {{{
+				d := "./" + m.Option("dir") // {{{
 				if len(arg) > 0 {
 					d = arg[0]
 				}
+				if s, e := os.Stat(d); m.Assert(e) && !s.IsDir() {
+					d = path.Dir(d)
+				}
+				fields := strings.Split(m.Confx("dir_field"), " ")
+
 				trip := 0
 				if m.Confx("dir_name") == "path" {
 					wd, e := os.Getwd()
@@ -1121,7 +1155,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Option(v, 0)
 				}
 
-				dir(m, d, 0)
+				m.Option("time_layout", "2006-01-02 15:04:05")
+				dir(m, d, 0, ctx.Right(m.Confx("dir_deep")), fields)
 				m.Sort(m.Confx("sort_field"), m.Confx("sort_order"))
 				m.Table(func(maps map[string]string, list []string, line int) bool {
 					for i, v := range list {
@@ -1145,9 +1180,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				// }}}
 			}},
 		"git": &ctx.Command{
-			Name: "git branch|status|diff|log|info arg... [git_path path]...",
-			Help: "版本控制, branch: 分支管理, status: 查看状态, info: 查看分支与状态, git_path: 指定路径",
-			Form: map[string]int{"git_path": 1, "git_info": 1, "git_log": 1, "git_log_form": 1},
+			Name: "git branch|status|diff|log|info arg... [dir path]...",
+			Help: "版本控制, branch: 分支管理, status: 查看状态, info: 查看分支与状态, dir: 指定路径",
+			Form: map[string]int{"dir": 1, "git_info": 1, "git_log": 1, "git_log_form": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if len(arg) == 0 { // {{{
 					arg = []string{"info"}
@@ -1166,10 +1201,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 				wd, e := os.Getwd()
 				m.Assert(e)
-				if !m.Has("git_path") {
-					m.Option("git_path", m.Conf("git_path"))
+				if !m.Has("dir") {
+					m.Option("dir", m.Confx("dir"))
 				}
-				for _, p := range m.Meta["git_path"] {
+				for _, p := range m.Meta["dir"] {
 					if !path.IsAbs(p) {
 						p = path.Join(wd, p)
 					}
