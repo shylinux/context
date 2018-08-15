@@ -41,7 +41,6 @@ type WEB struct {
 	client *http.Client
 	cookie map[string]*http.Cookie
 
-	*ctx.Message
 	*ctx.Context
 }
 
@@ -91,74 +90,63 @@ func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string { // {{{
 // }}}
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
-		msg := m.Spawn().Set("detail", key)
-		msg.Sess("request", m.Spawn())
-		msg.Option("terminal_color", false)
+		msg := m.Spawn()
 		msg.Option("method", r.Method)
+		msg.Option("path", r.URL.Path)
 		msg.Option("referer", r.Header.Get("Referer"))
 
-		for k, v := range r.Form {
-			msg.Add("option", k, v)
-		}
 		for _, v := range r.Cookies() {
 			msg.Option(v.Name, v.Value)
+		}
+		for k, v := range r.Form {
+			msg.Add("option", k, v)
 		}
 
 		msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
 		msg.Put("option", "request", r).Put("option", "response", w)
+		hand(msg, msg.Target(), key)
 
-		if hand(msg, msg.Target(), key); msg.Has("redirect") {
+		switch {
+		case msg.Has("redirect"):
 			http.Redirect(w, r, msg.Append("redirect"), http.StatusFound)
-			return
-		}
-
-		if msg.Has("template") {
+		case msg.Has("template"):
 			msg.Spawn().Cmd("/render", msg.Meta["template"])
-			return
-		}
-		if msg.Has("append") {
+		case msg.Has("append"):
 			msg.Spawn().Copy(msg, "append").Cmd("/json")
-			return
-		}
-		for _, v := range msg.Meta["result"] {
-			w.Write([]byte(v))
+		default:
+			for _, v := range msg.Meta["result"] {
+				w.Write([]byte(v))
+			}
 		}
 	})
 }
 
 // }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
-	if web.Message != nil {
-		web.Log("cmd", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
+	m := web.Message()
+	m.Log("cmd", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
-		if web.Confs("logheaders") {
-			for k, v := range r.Header {
-				web.Log("info", "%s: %v", k, v)
-			}
-			web.Log("info", "")
+	if m.Confs("logheaders") {
+		for k, v := range r.Header {
+			m.Log("info", "%s: %v", k, v)
 		}
-
-		if r.ParseForm(); len(r.PostForm) > 0 {
-			for k, v := range r.PostForm {
-				web.Log("info", "%s: %v", k, v)
-			}
-			web.Log("info", "")
-		}
+		m.Log("info", "")
 	}
 
-	r.Form.Add("path", r.URL.Path)
-	if strings.HasPrefix(r.URL.Path, "/index") {
-		r.Form.Add("dir", strings.TrimPrefix(r.URL.Path, "/index"))
-		r.URL.Path = "/index"
+	if r.ParseForm(); len(r.PostForm) > 0 {
+		for k, v := range r.PostForm {
+			m.Log("info", "%s: %v", k, v)
+		}
+		m.Log("info", "")
 	}
 
 	web.ServeMux.ServeHTTP(w, r)
 
-	if web.Message != nil && web.Confs("logheaders") {
+	if m.Confs("logheaders") {
 		for k, v := range w.Header() {
-			web.Log("info", "%s: %v", k, v)
+			m.Log("info", "%s: %v", k, v)
 		}
-		web.Log("info", "")
+		m.Log("info", "")
 	}
 }
 
@@ -254,7 +242,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "no", Help: "日志输出报文头"}
 	m.Capi("nserve", 1)
 
-	if web.Message = m; m.Cap("protocol") == "https" {
+	if m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
 		web.Caches["key"] = &ctx.Cache{Name: "服务密钥", Value: m.Conf("key"), Help: "服务密钥"}
 		m.Log("info", "cert [%s]", m.Cap("cert"))
@@ -286,6 +274,33 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"cmd": &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+		"check": &ctx.Config{Name: "check", Value: map[string]interface{}{
+			"login": []interface{}{
+				map[string]interface{}{
+					"session": "aaa",
+					"module":  "aaa", "command": "login",
+					"variable": []interface{}{"$sessid"},
+					"template": "login", "title": "login",
+				},
+				map[string]interface{}{
+					"module": "aaa", "command": "login",
+					"variable": []interface{}{"$username", "$password"},
+					"template": "login", "title": "login",
+				},
+			},
+			"right": []interface{}{
+				map[string]interface{}{
+					"module": "web", "command": "right",
+					"variable": []interface{}{"$username", "check", "command", "/index", "dir", "$dir"},
+					"template": "notice", "title": "notice",
+				},
+				map[string]interface{}{
+					"module": "aaa", "command": "login",
+					"variable": []interface{}{"username", "password"},
+					"template": "login", "title": "login",
+				},
+			},
+		}, Help: "执行条件"},
 		"index": &ctx.Config{Name: "index", Value: map[string]interface{}{
 			"shy": []interface{}{
 				map[string]interface{}{
@@ -611,7 +626,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Copy(msg, "result")
 			// }}}
 		}},
-		"/index": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/index/": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 
@@ -628,8 +643,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			//权限检查
-			dir := path.Join(m.Cap("directory"), m.Option("dir"))
-			check := m.Spawn(c).Cmd("/check", "command", "/index", "dir", dir)
+			dir := path.Join(m.Cap("directory"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index")))
+			check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir)
 			if !check.Results(0) {
 				m.Copy(check, "append")
 				return
@@ -934,7 +949,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Echo("ok")
 			// }}}
 		}},
-		"/check": &ctx.Command{Name: "/check cache|config|command name args", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/check": &ctx.Command{Name: "/check check", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			// w := m.Optionv("response").(http.ResponseWriter) //{{{
 			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
 				aaa := m.Appendv("aaa").(*ctx.Message)

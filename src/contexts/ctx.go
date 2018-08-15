@@ -1694,13 +1694,10 @@ func (m *Message) Conf(key string, args ...interface{}) string { // {{{
 					values := ""
 					for i := 0; i < len(args); i += 2 {
 						if i < len(args)-1 {
-							m.Log("fuck", "why %v %v %v", x.Value, args[i], args[i+1])
 							x.Value = Chain(x.Value, args[i], args[i+1])
-							m.Log("fuck", "why %v %v %v", x.Value)
 						}
 
 						if val := Chain(x.Value, args[i]); val != nil {
-							m.Log("fuck", "why %v", val)
 							values = fmt.Sprintf("%v", val)
 						}
 					}
@@ -3275,9 +3272,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							return
 						}
 					case "command":
-						m.Log("fuck", "what %v %v", share.Name, arg[2])
 						if x, ok := share.Commands[arg[2]]; ok {
-							m.Log("fuck", "what")
 							if len(arg) == 3 {
 								m.Echo("ok")
 								break
@@ -3301,7 +3296,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							}
 							m.Echo("ok")
 						}
-						m.Log("fuck", "what")
 					}
 				case "add":
 					switch arg[1] {
