@@ -616,7 +616,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			w := m.Optionv("response").(http.ResponseWriter)
 
 			//执行命令
-			if m.Options("details") {
+			if m.Has("details") {
 				if check := m.Spawn().Cmd("/check", "target", m.Option("module"), "command", m.Option("details")); !check.Results(0) {
 					m.Copy(check, "append")
 					return
