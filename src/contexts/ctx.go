@@ -575,9 +575,6 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 	}
 
 	m.Log("error", "%s", fmt.Sprintln(e))
-	if m.Confs("debug") {
-		debug.PrintStack()
-	}
 	panic(m.Set("result", "error: ", fmt.Sprintln(e), "\n"))
 }
 

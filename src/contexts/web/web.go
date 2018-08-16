@@ -215,6 +215,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 		return true
 	})
 
+	web.Configs["library_dir"] = &ctx.Config{Name: "library_dir", Value: "usr", Help: "通用模板路径"}
 	web.Configs["template_dir"] = &ctx.Config{Name: "template_dir", Value: "usr/template/", Help: "通用模板路径"}
 	web.Configs["common_tmpl"] = &ctx.Config{Name: "common_tmpl", Value: "common/*.html", Help: "通用模板路径"}
 	web.Configs["common_main"] = &ctx.Config{Name: "common_main", Value: "main.html", Help: "通用模板框架"}
@@ -272,7 +273,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"cmd": &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+		"cmd":         &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+		"check_right": &ctx.Config{Name: "check_right(true/false)", Value: "false", Help: "路由数量"},
 		"check": &ctx.Config{Name: "check", Value: map[string]interface{}{
 			"login": []interface{}{
 				map[string]interface{}{
@@ -633,12 +635,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Copy(msg, "result")
 			// }}}
 		}},
+		"/library/": &ctx.Command{Name: "/library", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
+			dir := path.Join(m.Conf("library_dir"), m.Option("path"))
+			if s, e := os.Stat(dir); e == nil && !s.IsDir() {
+				http.ServeFile(w, r, dir)
+				return
+			}
+		}},
 		"/index/": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 
 			//权限检查
-			dir := path.Join(m.Cap("directory"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index")))
+			dir := m.Option("dir", path.Join(m.Cap("directory"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index"))))
 			if check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir); !check.Results(0) {
 				m.Copy(check, "append")
 				return
@@ -646,9 +657,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			//执行命令
 			if m.Has("details") {
-				if check := m.Spawn().Cmd("/check", "target", m.Option("module"), "command", m.Option("details")); !check.Results(0) {
-					m.Copy(check, "append")
-					return
+				if m.Confs("check_right") {
+					if check := m.Spawn().Cmd("/check", "target", m.Option("module"), "command", m.Option("details")); !check.Results(0) {
+						m.Copy(check, "append")
+						return
+					}
 				}
 
 				msg := m.Find(m.Option("module")).Cmd(m.Option("details"))

@@ -30,7 +30,7 @@
 
 {{define "share"}}
 <fieldset><legend>share</legend>
-	<form method="POST" onsubmit="return share(event, '{{cap . "directory"}}{{option . "dir"|meta}}')">
+	<form method="POST" onsubmit="return share(event, '{{option . "dir"|meta}}')">
 		<label>share to:</label><input type="text" name="shareto" required>
 		<input type="submit">
 	</form>
