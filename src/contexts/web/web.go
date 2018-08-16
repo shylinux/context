@@ -123,8 +123,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 
 // }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
-	m := web.Message()
-	m.Log("cmd", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
+	m := web.Message().Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
 	if m.Confs("logheaders") {
 		for k, v := range r.Header {
@@ -303,6 +302,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "执行条件"},
 		"index": &ctx.Config{Name: "index", Value: map[string]interface{}{
 			"shy": []interface{}{
+				map[string]interface{}{
+					"template": "userinfo", "title": "userinfo",
+				},
+				map[string]interface{}{
+					"module": "web", "command": "/share",
+					"argument": []interface{}{},
+					"template": "share", "title": "share",
+				},
 				map[string]interface{}{
 					"module": "cli", "command": "system",
 					"argument": []interface{}{"tmux", "list-clients"},
@@ -630,6 +637,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 
+			//权限检查
+			dir := path.Join(m.Cap("directory"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index")))
+			if check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir); !check.Results(0) {
+				m.Copy(check, "append")
+				return
+			}
+
 			//执行命令
 			if m.Has("details") {
 				if check := m.Spawn().Cmd("/check", "target", m.Option("module"), "command", m.Option("details")); !check.Results(0) {
@@ -642,25 +656,19 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			//权限检查
-			dir := path.Join(m.Cap("directory"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index")))
-			check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir)
-			if !check.Results(0) {
-				m.Copy(check, "append")
-				return
-			}
-
 			//下载文件
-			if s, e := os.Stat(dir); e == nil && m.Option("dir") != "" && !s.IsDir() {
+			if s, e := os.Stat(dir); e == nil && !s.IsDir() {
 				http.ServeFile(w, r, dir)
 				return
 			}
 
+			if !m.Options("module") {
+				m.Option("module", "web")
+			}
 			//浏览目录
-			aaa := check.Appendv("aaa").(*ctx.Message)
-			m.Append("template", aaa.Cap("username"))
+			m.Append("template", m.Append("username"))
 			m.Option("title", "index")
-			m.Option("dir", dir)
+			m.Option("username", m.Append("username"))
 			// }}}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -932,56 +940,52 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Append("redirect", m.Option("referer"))
 			// }}}
 		}},
-		"/share": &ctx.Command{Name: "/share", Help: "资源共享", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			check := m.Spawn().Cmd("/check", "command", arg[0], arg[1], arg[2]) // {{{
-			if !check.Results(0) {
+		"/share": &ctx.Command{Name: "/share arg...", Help: "资源共享", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if check := m.Spawn().Cmd("/check", "target", m.Option("module"), m.Optionv("share")); !check.Results(0) {
 				m.Copy(check, "append")
 				return
 			}
 
-			msg := check.Appendv("aaa").(*ctx.Message).Spawn(m.Target())
-			if m.Options("shareto") {
-				msg.Cmd("right", m.Option("shareto"), "add", "command", arg[0], arg[1], arg[2])
+			if m.Options("friend") && m.Options("module") {
+				m.Copy(m.Appendv("aaa").(*ctx.Message).Find(m.Option("module")).Cmd("right", m.Option("friend"), m.Option("action"), m.Optionv("share")), "result")
+				if m.Confv("index", m.Option("friend")) == nil {
+					m.Confv("index", m.Option("friend"), m.Confv("index", m.Append("username")))
+				}
+				return
 			}
-			if m.Options("notshareto") {
-				msg.Cmd("right", m.Option("notshareto"), "del", "command", arg[0], arg[1], arg[2])
+
+			msg := m.Spawn().Cmd("right", "target", m.Option("module"), m.Append("username"), "show", "context")
+			m.Copy(msg, "append")
+		}},
+		"/check": &ctx.Command{Name: "/check arg...", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if login := m.Spawn().Cmd("/login"); login.Has("template") { // {{{
+				m.Echo("no").Copy(login, "append")
+				return
 			}
+
+			if msg := m.Spawn().Cmd("right", m.Append("username"), "check", arg); !msg.Results(0) {
+				m.Echo("no").Append("message", "no right, please contact manager")
+				return
+			}
+
 			m.Echo("ok")
 			// }}}
 		}},
-		"/check": &ctx.Command{Name: "/check check", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			// w := m.Optionv("response").(http.ResponseWriter) //{{{
-			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
-				aaa := m.Appendv("aaa").(*ctx.Message)
-				if msg := m.Spawn().Cmd("right", aaa.Cap("username"), "check", arg); msg.Results(0) {
-					m.Copy(login, "append").Echo(msg.Result(0))
-					return
-				}
-				// w.WriteHeader(http.StatusForbidden)
-				m.Append("message", "no right, please contact manager")
-				m.Echo("no")
-				return
-			} else {
-				m.Copy(login, "append").Echo("no")
-			}
-			// }}}
-		}},
 		"/login": &ctx.Command{Name: "/login", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			w := m.Optionv("response").(http.ResponseWriter) // {{{
-
-			if m.Options("sessid") {
-				if aaa := m.Find("aaa").Cmd("login", m.Option("sessid")); aaa.Results(0) {
+			if m.Options("sessid") { // {{{
+				if aaa := m.Sess("aaa").Cmd("login", m.Option("sessid")); aaa.Results(0) {
 					m.Append("redirect", m.Option("referer"))
-					m.Appendv("aaa", aaa)
+					m.Append("username", aaa.Cap("username"))
 					return
 				}
 			}
 
+			w := m.Optionv("response").(http.ResponseWriter)
 			if m.Options("username") && m.Options("password") {
-				if aaa := m.Find("aaa").Cmd("login", m.Option("username"), m.Option("password")); aaa.Results(0) {
+				if aaa := m.Sess("aaa").Cmd("login", m.Option("username"), m.Option("password")); aaa.Results(0) {
 					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: aaa.Result(0)})
 					m.Append("redirect", m.Option("referer"))
-					m.Appendv("aaa", aaa)
+					m.Append("username", m.Option("username"))
 					return
 				}
 			}

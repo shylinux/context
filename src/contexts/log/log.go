@@ -59,7 +59,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 		"nlog": &ctx.Cache{Name: "nlog", Value: "0", Help: "日志屏蔽类型"},
 	},
 	Configs: map[string]*ctx.Config{
-		"silent": &ctx.Config{Name: "silent", Value: map[string]interface{}{"cb": true}, Help: "日志屏蔽类型"},
+		"silent": &ctx.Config{Name: "silent", Value: map[string]interface{}{"cb": true, "find": true}, Help: "日志屏蔽类型"},
 		"module": &ctx.Config{Name: "module", Value: map[string]interface{}{
 			"log": map[string]interface{}{"cmd": true},
 			"lex": map[string]interface{}{"cmd": true, "debug": true},

@@ -1234,6 +1234,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							continue
 						case "csv":
 							cmd := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d")
+							m.Log("fuck", "wh%v", cmd)
 							if out, e := cmd.CombinedOutput(); e != nil {
 								m.Echo("error: ")
 								m.Echo("%s\n", e)

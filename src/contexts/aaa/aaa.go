@@ -211,6 +211,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							if int64(msg.Capi("expire")) > time.Now().Unix() {
 								m.Echo(msg.Cap("username"))
 								m.Copy(msg, "target")
+								m.Appendv("aaa", msg)
 								m.Sess("aaa", msg)
 							} else {
 								delete(aaa.sessions, arg[0])
@@ -243,6 +244,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 									if m.Cap("password") == aaa.Password(arg[1]) {
 										m.Sess("aaa", m.Target())
 										m.Echo(m.Cap("sessid"))
+										m.Appendv("aaa", m)
+										m.Sess("aaa", m)
 									} else {
 										m.Sess("aaa", c)
 									}
@@ -255,8 +258,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							if !find {
 								m.Start(m.Confx("aaa_name"), m.Confx("aaa_help"), arg[0], aaa.Password(arg[1]), aaa.Session(arg[0]))
 								m.Cap("stream", arg[0])
-								m.Sess("aaa", m)
 								m.Echo(m.Cap("sessid"))
+								m.Appendv("aaa", m)
+								m.Sess("aaa", m)
 							}
 						}
 					}

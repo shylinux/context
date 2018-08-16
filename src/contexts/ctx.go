@@ -64,6 +64,7 @@ func Trans(arg ...interface{}) []string { // {{{
 			for _, v := range val {
 				ls = append(ls, fmt.Sprintf("%d", v))
 			}
+		case nil:
 		default:
 			ls = append(ls, fmt.Sprintf("%v", val))
 		}
@@ -574,6 +575,9 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 	}
 
 	m.Log("error", "%s", fmt.Sprintln(e))
+	if m.Confs("debug") {
+		debug.PrintStack()
+	}
 	panic(m.Set("result", "error: ", fmt.Sprintln(e), "\n"))
 }
 
@@ -1344,7 +1348,10 @@ func (m *Message) Optionv(key string, arg ...interface{}) interface{} { // {{{
 		}
 		for _, k := range msg.Meta["option"] {
 			if k == key {
-				return msg.Data[key]
+				if v, ok := msg.Data[key]; ok {
+					return v
+				}
+				return msg.Meta[key]
 			}
 		}
 	}
@@ -1409,7 +1416,10 @@ func (m *Message) Appendv(key string, arg ...interface{}) interface{} { // {{{
 		}
 		for _, k := range ms[i].Meta["append"] {
 			if k == key {
-				return ms[i].Data[key]
+				if v, ok := ms[i].Data[key]; ok {
+					return v
+				}
+				return ms[i].Meta[key]
 			}
 		}
 	}
@@ -2097,7 +2107,7 @@ var CGI = template.FuncMap{
 				}
 			case string:
 				if len(arg) == 2 {
-					return m.Meta[value]
+					return m.Optionv(value)
 				}
 
 				switch val := arg[2].(type) {
@@ -2215,7 +2225,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"chain":       &Config{Name: "chain", Value: map[string]interface{}{}, Help: "调试模式，on:打印，off:不打印)"},
 		"compact_log": &Config{Name: "compact_log(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
 		"auto_make":   &Config{Name: "auto_make(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
-		"debug":       &Config{Name: "debug(on/off)", Value: "off", Help: "调试模式，on:打印，off:不打印)"},
+		"debug":       &Config{Name: "debug(on/off)", Value: "on", Help: "调试模式，on:打印，off:不打印)"},
 
 		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_choice": &Config{Name: "search_choice(first/last/rand/magic)", Value: "magic", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magic: 加权选择"},
@@ -3358,9 +3368,35 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								delete(cs[i].Commands, arg[2])
 							} else if len(arg) == 4 {
 								delete(cs[i].Commands[arg[2]].Shares, arg[3])
+							} else if len(arg) == 5 {
+								delete(cs[i].Commands[arg[2]].Shares, arg[3])
 							}
 						}
 
+					}
+				case "show":
+					switch arg[1] {
+					case "cache":
+					case "config":
+					case "command":
+					case "context":
+						for friend, x := range share.Index {
+							for command, c := range x.Commands {
+								m.Add("append", "friend", friend)
+								m.Add("append", "key", command)
+								m.Add("append", "arg", "")
+								m.Add("append", "value", "")
+								for a, s := range c.Shares {
+									for _, v := range s {
+										m.Log("fuck", "fuck %v %v %v %v", friend, command, a, v)
+										m.Add("append", "friend", friend)
+										m.Add("append", "key", command)
+										m.Add("append", "arg", a)
+										m.Add("append", "value", v)
+									}
+								}
+							}
+						}
 					}
 				} // }}}
 			}},

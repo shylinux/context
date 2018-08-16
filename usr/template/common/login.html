@@ -10,7 +10,7 @@
 
 {{define "userinfo"}}
 <fieldset><legend>userinfo</legend>
-	welcome <span class="username">{{append . "username"}}</span> to context world
+	welcome <span class="username">{{option . "username"}}</span> to context world
 	<button onclick="return logout(event)">logout</button>
 </fieldset>
 <style>
@@ -21,7 +21,7 @@
 </style>
 <script>
 	function logout(event) {
-		ctx.Cookie("sessid", "");
+		ctx.Cookie("sessid", ";path=/");
 		ctx.Refresh();
 		return false;
 	}
@@ -30,49 +30,57 @@
 
 {{define "share"}}
 <fieldset><legend>share</legend>
-	<form method="POST">
-		<label>share to:</label><input type="text" name="shareto" value="{{msg . "option" "dir"}}" required>
+	<form method="POST" onsubmit="return share(event, '{{cap . "directory"}}{{option . "dir"|meta}}')">
+		<label>share to:</label><input type="text" name="shareto" required>
 		<input type="submit">
 	</form>
 	<table>
-		<colgroup>{{range .Meta.append}}<col class="{{.}}">{{end}}</colgroup>
-		<tr>{{range .Meta.append}}<th class="{{.}}">{{.}}</th>{{end}}</tr>
-
-		{{if .Meta.append}}
-		{{$meta := .Meta}}
-		{{$first := index .Meta.append 0}}
-		{{range $i, $k := index $meta $first}}
+		{{$msg := .}}
+		{{$ncol := append . |len}}
+		{{$nrow := append . 0|append .|len}}
+		<tr>{{range append .}}<th><code onclick="sort_table('{{.}}')">{{.}}</code></th>{{end}}</tr>
+		{{range $row, $val := append . 0|append .}}
 		<tr>
-			{{range $key := index $meta "append"}}
-			<td class="{{$key}}">
-				{{if eq $key "delete"}}
-					<button onclick="return deleteshare(event, '{{index $meta "value" $i}}', '{{index $meta "group" $i}}')">delete</button>
-				{{else}}
-					<code>{{index $meta $key $i}}</code>
-				{{end}}
-			</td>
+			{{range append $msg}}
+			{{$value := append $msg . $row}}
+			<td><code>
+			{{if eq . "value"}}
+				<code><a title="点击删除" href="/" onclick="deleteshare(event, '{{append $msg "friend" $row}}', '{{$value}}')">{{$value}}</a></code>
+			{{else}}
+				{{$value}}
+			{{end}}
+			</code></td>
 			{{end}}
 		</tr>
-		{{end}}
 		{{end}}
 	</table>
 </fieldset>
 <script>
 	function share(event, dir) {
+		if (dir.endsWith("/")) {
+			dir = dir.substr(0, dir.length-1)
+		}
 		var fields = event.target.elements;
 		var shareto = fields["shareto"].value
-		ctx.POST("/upload", {
-			shareto: shareto,
-			sharedir: dir,
+		ctx.POST("/share", {
+			module: "web",
+			friend: shareto,
+			action: "add",
+			share: ["command", "/index/", "dir", dir],
 		}, function(msg) {
 			ctx.Refresh();
 		})
 		return false;
 	}
-	function deleteshare(event, dir, group) {
+	function deleteshare(event, group, dir) {
+		if (!window.confirm("cancel share?")) {
+			return
+		}
 		ctx.POST("/share", {
-			notshareto: group,
-			sharedir: dir,
+			module: "web",
+			friend: group,
+			action: "del",
+			share: ["command", "/index/", "dir"],
 		}, function(msg) {
 			ctx.Refresh();
 		})

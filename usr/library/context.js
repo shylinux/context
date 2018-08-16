@@ -73,7 +73,11 @@ ctx = {
 
 		var args = [];
 		for (k in form) {
-			if (form[k] != undefined) {
+			if (form[k] instanceof Array) {
+				for (i in form[k]) {
+					args.push(k+"="+encodeURIComponent(form[k][i]));
+				}
+			} else if (form[k] != undefined) {
 				args.push(k+"="+encodeURIComponent(form[k]));
 			}
 		}
