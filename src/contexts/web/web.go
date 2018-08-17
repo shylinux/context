@@ -345,7 +345,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				},
 				map[string]interface{}{
 					"module": "nfs", "detail": []interface{}{"pwd"},
-					"template": "detail", "title": "detail",
+					"template": "detail", "title": "pwd",
+				},
+				map[string]interface{}{
+					"module": "cli", "detail": []interface{}{"time"},
+					"template": "detail", "title": "time",
+				},
+				map[string]interface{}{
+					"module": "nfs", "detail": []interface{}{"json"},
+					"template": "detail", "title": "json",
 				},
 			},
 			"xujianing": []interface{}{
@@ -664,7 +672,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 
-				msg := m.Find(m.Option("module")).Cmd(m.Option("details"))
+				msg := m.Find(m.Option("module")).Cmd(m.Optionv("details"))
 				m.Copy(msg, "result").Copy(msg, "append")
 				return
 			}
@@ -954,7 +962,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/share": &ctx.Command{Name: "/share arg...", Help: "资源共享", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if check := m.Spawn().Cmd("/check", "target", m.Option("module"), m.Optionv("share")); !check.Results(0) {
+			if check := m.Spawn().Cmd("/check", "target", m.Option("module"), m.Optionv("share")); !check.Results(0) { // {{{
 				m.Copy(check, "append")
 				return
 			}
@@ -969,6 +977,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg := m.Spawn().Cmd("right", "target", m.Option("module"), m.Append("username"), "show", "context")
 			m.Copy(msg, "append")
+			// }}}
 		}},
 		"/check": &ctx.Command{Name: "/check arg...", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if login := m.Spawn().Cmd("/login"); login.Has("template") { // {{{

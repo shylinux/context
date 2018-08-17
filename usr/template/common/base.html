@@ -38,17 +38,28 @@
 {{end}}
 
 {{define "detail"}}
-<fieldset><legend>{{append . "title"}}</legend>
-	<a onclick="return action('{{option .Meta "module"}}', '{{detail .Meta}}')" href="/">{{template "code" detail .Meta}}</a>
-	<pre><code class="{{append . "title"}}_result"></code></pre>
+{{$key := append . "title"|meta}}
+<fieldset><legend>{{append . "title"|meta}}</legend>
+	<input type="text" class="{{$key}}_input" value="" onkeyup="return input(event, '{{option .Meta "module"}}', '{{detail .Meta}}', '{{$key}}_input', '{{$key}}_result')"></input>
+	<a onclick="return action(event, '{{option .Meta "module"}}', '{{detail .Meta}}', '{{$key}}_input', '{{$key}}_result')" href="/">{{template "code" detail .Meta}}</a>
+	<pre><code class="{{$key}}_result"></code></pre>
 </fieldset>
 <script>
-function action(module, details, cb) {
+function input(event, module, details, input, results) {
+	if (event.code == "Enter") {
+		action(event, module, details, input, results);
+	}
+}
+function action(event, module, details, input, results) {
+	var input = document.getElementsByClassName(input)[0];
+	if (input.value != "") {
+		details = [details, input.value];
+	}
 	ctx.POST("", {module:module, details:details}, function(msg) {
-		var result = document.getElementsByClassName("{{append . "title"}}_result")[0];
-		result.innerHTML = msg.result || msg.message;
+		var result = document.getElementsByClassName(results)[0];
+		result.innerHTML = msg.result || msg.message || msg;
 	})
-	return false
+	return false;
 }
 </script>
 {{end}}
