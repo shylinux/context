@@ -73,7 +73,7 @@ func Trans(arg ...interface{}) []string { // {{{
 }
 
 // }}}
-func Chain(data interface{}, args ...interface{}) interface{} { // {{{
+func Chain(m *Message, data interface{}, args ...interface{}) interface{} { // {{{
 	if len(args) == 1 {
 		if arg, ok := args[0].([]string); ok {
 			args = args[:0]
@@ -87,7 +87,7 @@ func Chain(data interface{}, args ...interface{}) interface{} { // {{{
 	for i := 0; i < len(args); i += 2 {
 		var parent interface{}
 		parent_key, parent_index := "", 0
-		data = root
+		data, root = root, nil
 
 		keys := []string{}
 		switch arg := args[i].(type) {
@@ -200,8 +200,7 @@ func Chain(data interface{}, args ...interface{}) interface{} { // {{{
 						value[index] = args[i+1]
 					}
 				}
-
-				parent, data, parent_index = data, value[index], index
+				parent, data, parent_index = value, value[index], index
 			}
 
 			if root == nil {
@@ -330,7 +329,7 @@ func (c *Context) Begin(m *Message, arg ...string) *Context { // {{{
 // }}}
 func (c *Context) Start(m *Message, arg ...string) bool { // {{{
 	if len(arg) > 0 {
-		m.Meta["detail"] = arg
+		m.Set("detail", arg...)
 	}
 
 	c.requests = append(c.requests, m)
@@ -457,6 +456,11 @@ type Message struct {
 
 func (m *Message) Code() int { // {{{
 	return m.code
+}
+
+// }}}
+func (m *Message) Time() string { // {{{
+	return m.time.Format("2006-01-02 15:04:05")
 }
 
 // }}}
@@ -1607,7 +1611,7 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
 
 				switch x.Value.(type) {
 				case string:
-					x.Value = fmt.Sprintf("%v", args[0])
+					x.Value = fmt.Sprintf("%v", arg[0])
 				case bool:
 					x.Value = Right(fmt.Sprintf("%v", args[0]))
 				case int:
@@ -1619,13 +1623,13 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
 				default:
 					for i := 0; i < len(args); i += 2 {
 						if i < len(args)-1 {
-							x.Value = Chain(x.Value, args[i], args[i+1])
+							x.Value = Chain(m, x.Value, args[i], args[i+1])
 						}
 						if i == len(args)-2 {
-							return Chain(x.Value, args[len(args)-2])
+							return Chain(m, x.Value, args[len(args)-2])
 						}
 						if i == len(args)-1 {
-							return Chain(x.Value, args[len(args)-1])
+							return Chain(m, x.Value, args[len(args)-1])
 						}
 					}
 				}
@@ -1653,8 +1657,8 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
 		m.target.Configs[key] = &Config{Name: key, Value: arg[0], Help: "auto make", Hand: hand}
 		return m.Conf(key, arg[0])
 	}
-	m.target.Configs[key] = &Config{Name: key, Value: Chain(nil, args), Help: "auto make", Hand: hand}
-	return Chain(key, args[len(args)-2+(len(args)%2)])
+	m.target.Configs[key] = &Config{Name: key, Value: Chain(m, nil, args), Help: "auto make", Hand: hand}
+	return Chain(m, key, args[len(args)-2+(len(args)%2)])
 }
 
 // }}}
@@ -1701,10 +1705,10 @@ func (m *Message) Conf(key string, args ...interface{}) string { // {{{
 					values := ""
 					for i := 0; i < len(args); i += 2 {
 						if i < len(args)-1 {
-							x.Value = Chain(x.Value, args[i], args[i+1])
+							x.Value = Chain(m, x.Value, args[i], args[i+1])
 						}
 
-						if val := Chain(x.Value, args[i]); val != nil {
+						if val := Chain(m, x.Value, args[i]); val != nil {
 							values = fmt.Sprintf("%v", val)
 						}
 					}
@@ -1739,10 +1743,10 @@ func (m *Message) Conf(key string, args ...interface{}) string { // {{{
 
 		var value interface{}
 		for i := 0; i < len(args)-1; i += 2 {
-			value = Chain(value, args[i], args[i+1])
+			value = Chain(m, value, args[i], args[i+1])
 		}
 		m.target.Configs[key] = &Config{Name: key, Value: value, Help: "auto make", Hand: hand}
-		if val := Chain(key, args[len(args)-2]); val != nil {
+		if val := Chain(m, key, args[len(args)-2]); val != nil {
 			return fmt.Sprintf("%v", val)
 		}
 	}
@@ -2207,6 +2211,25 @@ var CGI = template.FuncMap{
 	}, // }}}
 	"unscaped": func(str string) interface{} { // {{{
 		return template.HTML(str)
+	}, // }}}
+
+	"list": func(arg interface{}) interface{} { // {{{
+		n := 0
+		switch v := arg.(type) {
+		case string:
+			i, e := strconv.Atoi(v)
+			if e == nil {
+				n = i
+			}
+		case int:
+			n = v
+		}
+
+		list := make([]int, n)
+		for i := 0; i < n; i++ {
+			list[i] = i
+		}
+		return list
 	}, // }}}
 }
 
@@ -3017,6 +3040,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						for _, v := range arg {
 							have[v] = true
 						}
+					case "export":
+						action, arg = arg[0], arg[1:]
+						for _, v := range arg {
+							have[v] = true
+						}
 					}
 				}
 
@@ -3034,7 +3062,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.BackTrace(func(m *Message) bool {
 					for k, v := range m.target.Configs {
 						switch action {
-						case "save":
+						case "save", "export":
 							if len(have) == 0 || have[k] {
 								save[k] = v.Value
 							}
@@ -3113,7 +3141,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 									m.Echo(m.Conf(arg[0]))
 								}
 							default:
-								m.Echo(m.Conf(arg[0], arg[1:]))
+								m.Echo("%v", m.Confv(arg[0], arg[1:]))
 								return false
 							}
 						}
@@ -3121,7 +3149,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					return all
 				}).Sort("key", sort).Table()
 
-				if action == "save" {
+				switch action {
+				case "save":
 					f, e := os.Create(which)
 					m.Assert(e)
 					defer f.Close()
@@ -3129,6 +3158,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					buf, e := json.MarshalIndent(save, "", "  ")
 					m.Assert(e)
 					f.Write(buf)
+				case "export":
+					buf, e := json.MarshalIndent(save, "", "  ")
+					m.Assert(e)
+					m.Echo("%s", string(buf))
 				}
 				// }}}
 			}},
@@ -3385,7 +3418,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								m.Add("append", "value", "")
 								for a, s := range c.Shares {
 									for _, v := range s {
-										m.Log("fuck", "fuck %v %v %v %v", friend, command, a, v)
 										m.Add("append", "friend", friend)
 										m.Add("append", "key", command)
 										m.Add("append", "arg", a)
@@ -3430,7 +3462,9 @@ func Start(args ...string) {
 	Pulse.Options("log", true)
 	log := Pulse.Sess("log", false)
 	log.target.Start(log)
+	aaa := Pulse.Sess("aaa", false)
+	aaa.target.Start(aaa, "lark")
 
 	Pulse.Options("terminal_color", true)
-	Pulse.Sess("cli", false).Cmd("source", "stdio").Wait()
+	Pulse.Sess("cli", false).Cmd("source", "stdio")
 }

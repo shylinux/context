@@ -391,6 +391,12 @@ func (nfs *NFS) Read(p []byte) (n int, err error) { // {{{
 			switch ev.Key {
 			case termbox.KeyCtrlC:
 				termbox.Close()
+				nfs.out = nil
+				b := []byte("return\n")
+				n = len(b)
+				copy(p, b)
+				return
+
 				os.Exit(1)
 
 			case termbox.KeyCtrlV:

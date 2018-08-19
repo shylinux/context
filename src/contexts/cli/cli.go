@@ -195,6 +195,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"init.shy": &ctx.Config{Name: "init.shy", Value: "etc/init.shy", Help: "启动脚本"},
+		"exit.shy": &ctx.Config{Name: "exit.shy", Value: "etc/exit.shy", Help: "启动脚本"},
 		"cli_name": &ctx.Config{Name: "cli_name", Value: "shell", Help: "模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 { // {{{
 				return arg[0]
@@ -227,6 +228,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Start(m.Confx("cli_name", arg, 2), m.Confx("cli_help", arg, 3), key, arg[0])
 				if len(arg) < 2 || arg[1] != "async" {
 					m.Wait()
+					m.Target().Close(m)
+					if arg[0] == "stdio" {
+						m.Spawn().Cmd("source", m.Conf("exit.shy"))
+					}
 				}
 			}},
 		"label": &ctx.Command{Name: "label name", Help: "记录当前脚本的位置, name: 位置名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -331,9 +336,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				if len(arg) > 0 {
-					if i, e := strconv.Atoi(arg[0]); e == nil {
+					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
 						m.Option("time_format", m.Conf("time_format"))
-						t = time.Unix(int64(i/m.Confi("time_unit")), 0)
+						t = time.Unix(int64(i/int64(m.Confi("time_unit"))), 0)
 						arg = arg[1:]
 					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
 						m.Option("parse", arg[0])

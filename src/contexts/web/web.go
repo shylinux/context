@@ -139,7 +139,11 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 		m.Log("info", "")
 	}
 
-	web.ServeMux.ServeHTTP(w, r)
+	if r.URL.Path == "/" && m.Confs("root_index") {
+		http.Redirect(w, r, "/index/", http.StatusFound)
+	} else {
+		web.ServeMux.ServeHTTP(w, r)
+	}
 
 	if m.Confs("logheaders") {
 		for k, v := range w.Header() {
@@ -273,8 +277,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"cmd":         &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
-		"check_right": &ctx.Config{Name: "check_right(true/false)", Value: "false", Help: "路由数量"},
+		"cmd":        &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+		"cert":       &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
+		"key":        &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"root_index": &ctx.Config{Name: "root_index(true/false)", Value: "true", Help: "路由数量"},
 		"check": &ctx.Config{Name: "check", Value: map[string]interface{}{
 			"login": []interface{}{
 				map[string]interface{}{
@@ -303,9 +309,39 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "执行条件"},
 		"index": &ctx.Config{Name: "index", Value: map[string]interface{}{
+			"duyu": []interface{}{
+				map[string]interface{}{
+					"template": "userinfo", "title": "userinfo",
+				},
+				map[string]interface{}{
+					"module": "aaa", "detail": []interface{}{"lark"},
+					"template": "detail", "title": "send_lark",
+					"option": map[string]interface{}{"ninput": 2},
+				},
+				map[string]interface{}{
+					"module": "aaa", "command": "lark",
+					"argument": []interface{}{"duyu"},
+					"template": "append", "title": "lark",
+				},
+			},
 			"shy": []interface{}{
 				map[string]interface{}{
 					"template": "userinfo", "title": "userinfo",
+				},
+				map[string]interface{}{
+					"module": "aaa", "command": "lark",
+					"argument": []interface{}{},
+					"template": "append", "title": "lark_friend",
+				},
+				map[string]interface{}{
+					"module": "aaa", "command": "lark",
+					"argument": []interface{}{"shy"},
+					"template": "append", "title": "lark",
+				},
+				map[string]interface{}{
+					"module": "aaa", "detail": []interface{}{"lark"},
+					"template": "detail", "title": "send_lark",
+					"option": map[string]interface{}{"ninput": 2},
 				},
 				map[string]interface{}{
 					"module": "web", "command": "/share",
@@ -350,10 +386,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				map[string]interface{}{
 					"module": "cli", "detail": []interface{}{"time"},
 					"template": "detail", "title": "time",
+					"option": map[string]interface{}{"ninput": 1},
 				},
 				map[string]interface{}{
 					"module": "nfs", "detail": []interface{}{"json"},
 					"template": "detail", "title": "json",
+					"option": map[string]interface{}{"ninput": 1},
 				},
 			},
 			"xujianing": []interface{}{
@@ -662,6 +700,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Copy(check, "append")
 				return
 			}
+			m.Option("username", m.Append("username"))
 
 			//执行命令
 			if m.Has("details") {
@@ -689,7 +728,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			//浏览目录
 			m.Append("template", m.Append("username"))
 			m.Option("title", "index")
-			m.Option("username", m.Append("username"))
 			// }}}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1019,6 +1057,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/render": &ctx.Command{Name: "/render index", Help: "模板响应, main: 模板入口, tmpl: 附加模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			w := m.Optionv("response").(http.ResponseWriter) // {{{
 			w.Header().Add("Content-Type", "text/html")
+			m.Optioni("ninput", 0)
 
 			tpl := template.New("render").Funcs(ctx.CGI)
 			tpl = template.Must(tpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("common_tmpl"))))
@@ -1038,6 +1077,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					msg := m.Spawn().Add("detail", detail[0].(string), detail[1:])
 					msg.Option("module", val["module"])
 					msg.Option("title", val["title"])
+					if option, ok := val["option"].(map[string]interface{}); ok {
+						for k, v := range option {
+							msg.Option(k, v)
+						}
+					}
+
 					m.Assert(tpl.ExecuteTemplate(w, val["template"].(string), msg))
 					continue
 				}
@@ -1112,14 +1157,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Find("cli").Cmd("system", "open", url)
 			case "linux":
 				m.Spawn().Cmd("open", url)
-			}
-		}},
-		"add_income": &ctx.Command{Name: "add_income", Help: "浏览器网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			// for _, uid := range []string{"98010402293", "96287507642", "98896063791", "98683626189", "95780886494", "95780886494", "98629824072"} {
-			for _, uid := range []string{"97661734361"} {
-				for t := 1530777074000; t < 1533268176000; t += 172800000 {
-					m.Spawn().Cmd("5", "teacher_uid", uid, "valid_time", t, "description_public", "hello")
-				}
 			}
 		}},
 	},

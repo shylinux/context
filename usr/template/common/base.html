@@ -39,9 +39,12 @@
 
 {{define "detail"}}
 {{$key := append . "title"|meta}}
+{{$msg := .}}
 <fieldset><legend>{{append . "title"|meta}}</legend>
-	<input type="text" class="{{$key}}_input" value="" onkeyup="return input(event, '{{option .Meta "module"}}', '{{detail .Meta}}', '{{$key}}_input', '{{$key}}_result')"></input>
-	<a onclick="return action(event, '{{option .Meta "module"}}', '{{detail .Meta}}', '{{$key}}_input', '{{$key}}_result')" href="/">{{template "code" detail .Meta}}</a>
+	{{range option . "ninput"|meta|list}}
+		<input type="text" class="{{$key}}_input" value="" onkeyup="return input(event, '{{option $msg.Meta "module"}}', ['{{detail $msg.Meta}}'], '{{$key}}_input', '{{$key}}_result')"></input>
+	{{end}}
+	<a onclick="return action(event, '{{option .Meta "module"}}', ['{{detail .Meta}}'], '{{$key}}_input', '{{$key}}_result')" href="/">{{template "code" detail .Meta}}</a>
 	<pre><code class="{{$key}}_result"></code></pre>
 </fieldset>
 <script>
@@ -51,9 +54,11 @@ function input(event, module, details, input, results) {
 	}
 }
 function action(event, module, details, input, results) {
-	var input = document.getElementsByClassName(input)[0];
-	if (input.value != "") {
-		details = [details, input.value];
+	var input = document.getElementsByClassName(input);
+	for (var i = 0; i < input.length; i++ ){
+		if (input[i].value != "") {
+			details.push(input[i].value)
+		}
 	}
 	ctx.POST("", {module:module, details:details}, function(msg) {
 		var result = document.getElementsByClassName(results)[0];

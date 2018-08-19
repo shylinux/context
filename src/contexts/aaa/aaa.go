@@ -38,6 +38,7 @@ type AAA struct {
 	encrypt     cipher.BlockMode
 	decrypt     cipher.BlockMode
 
+	lark     chan *ctx.Message
 	sessions map[string]*ctx.Message
 	*ctx.Context
 }
@@ -72,7 +73,9 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"sessid":   &ctx.Cache{Name: "sessid", Value: arg[2], Help: "会话令牌"},
 		"expire":   &ctx.Cache{Name: "expire", Value: fmt.Sprintf("%d", int64(m.Confi("expire"))+time.Now().Unix()), Help: "会话超时"},
 	}
-	c.Configs = map[string]*ctx.Config{}
+	c.Configs = map[string]*ctx.Config{
+		"lark": &ctx.Config{Name: "lark", Value: []interface{}{}, Help: "用户密码，加密存储"},
+	}
 
 	s := new(AAA)
 	s.Context = c
@@ -102,6 +105,24 @@ func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 	aaa.sessions[m.Cap("sessid")] = m
 	m.Log("info", "%d login %s", m.Capi("nuser", 1), m.Cap("stream", arg[0]))
+	if arg[0] == "lark" {
+		aaa.lark = make(chan *ctx.Message)
+
+		for {
+			msg := <-aaa.lark
+			m.Log("lark", "%v", msg.Meta["detail"])
+			m.Travel(func(m *ctx.Message, n int) bool {
+				if m.Cap("username") == msg.Detail(1) {
+					m.Confv("lark", -2, map[string]interface{}{
+						"from": msg.Option("username"),
+						"time": msg.Time(),
+						"text": msg.Detail(2)})
+				}
+				return true
+			})
+		}
+		return true
+	}
 	return false
 }
 
@@ -630,6 +651,37 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					h := md5.Sum(content)
 					m.Echo("%t", rsa.VerifyPKCS1v15(public.(*rsa.PublicKey), crypto.MD5, h[:], buf) == nil)
+				}
+				// }}}
+			}},
+		"lark": &ctx.Command{Name: "lark who message", Help: "散列",
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if aaa, ok := c.Server.(*AAA); m.Assert(ok) && aaa.lark != nil { // {{{
+					switch len(arg) {
+					case 0:
+						m.Travel(func(m *ctx.Message, n int) bool {
+							if n > 0 {
+								m.Add("append", "user", m.Cap("username"))
+							}
+							return true
+						}, c)
+					case 1:
+						m.Travel(func(m *ctx.Message, n int) bool {
+							if m.Cap("username") == arg[0] {
+								for _, v := range m.Confv("lark").([]interface{}) {
+									lark := v.(map[string]interface{})
+									m.Add("append", "time", lark["time"])
+									m.Add("append", "from", lark["from"])
+									m.Add("append", "text", lark["text"])
+								}
+								return false
+							}
+							return true
+						}, c)
+					case 2:
+						aaa.lark <- m
+						m.Echo("%s send done", m.Time())
+					}
 				}
 				// }}}
 			}},
