@@ -74,7 +74,7 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"expire":   &ctx.Cache{Name: "expire", Value: fmt.Sprintf("%d", int64(m.Confi("expire"))+time.Now().Unix()), Help: "会话超时"},
 	}
 	c.Configs = map[string]*ctx.Config{
-		"lark": &ctx.Config{Name: "lark", Value: []interface{}{}, Help: "用户密码，加密存储"},
+		"lark": &ctx.Config{Name: "lark", Value: map[string]interface{}{}, Help: "用户密码，加密存储"},
 	}
 
 	s := new(AAA)
@@ -110,13 +110,12 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 		for {
 			msg := <-aaa.lark
+			from := msg.Option("username")
 			m.Log("lark", "%v", msg.Meta["detail"])
 			m.Travel(func(m *ctx.Message, n int) bool {
 				if m.Cap("username") == msg.Detail(1) {
-					m.Confv("lark", -2, map[string]interface{}{
-						"from": msg.Option("username"),
-						"time": msg.Time(),
-						"text": msg.Detail(2)})
+					m.Confv("lark", strings.Join([]string{from, "-2"}, "."),
+						map[string]interface{}{"time": msg.Time(), "type": "recv", "text": msg.Detail(2)})
 				}
 				return true
 			})
@@ -657,31 +656,38 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"lark": &ctx.Command{Name: "lark who message", Help: "散列",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if aaa, ok := c.Server.(*AAA); m.Assert(ok) && aaa.lark != nil { // {{{
-					switch len(arg) {
-					case 0:
-						m.Travel(func(m *ctx.Message, n int) bool {
-							if n > 0 {
-								m.Add("append", "user", m.Cap("username"))
-							}
+					m.Travel(func(m *ctx.Message, n int) bool {
+						if n == 0 {
 							return true
-						}, c)
-					case 1:
-						m.Travel(func(m *ctx.Message, n int) bool {
-							if m.Cap("username") == arg[0] {
-								for _, v := range m.Confv("lark").([]interface{}) {
-									lark := v.(map[string]interface{})
-									m.Add("append", "time", lark["time"])
-									m.Add("append", "from", lark["from"])
-									m.Add("append", "text", lark["text"])
+						}
+						if m.Cap("username") == m.Option("username") {
+							switch len(arg) {
+							case 0:
+								for k, v := range m.Confv("lark").(map[string]interface{}) {
+									for _, x := range v.([]interface{}) {
+										val := x.(map[string]interface{})
+										m.Add("append", "friend", k)
+										m.Add("append", "time", val["time"])
+										m.Add("append", "type", val["type"])
+										m.Add("append", "text", val["text"])
+									}
 								}
-								return false
+							case 1:
+								for _, v := range m.Confv("lark", arg[0]).([]interface{}) {
+									val := v.(map[string]interface{})
+									m.Add("append", "time", val["time"])
+									m.Add("append", "text", val["text"])
+								}
+							case 2:
+								m.Confv("lark", strings.Join([]string{arg[0], "-2"}, "."),
+									map[string]interface{}{"time": m.Time(), "type": "send", "text": arg[1]})
+								aaa.lark <- m
+								m.Echo("%s send done", m.Time())
 							}
-							return true
-						}, c)
-					case 2:
-						aaa.lark <- m
-						m.Echo("%s send done", m.Time())
-					}
+							return false
+						}
+						return true
+					})
 				}
 				// }}}
 			}},

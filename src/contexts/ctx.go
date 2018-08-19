@@ -200,6 +200,12 @@ func Chain(m *Message, data interface{}, args ...interface{}) interface{} { // {
 						value[index] = args[i+1]
 					}
 				}
+				switch p := parent.(type) {
+				case map[string]interface{}:
+					p[parent_key] = value
+				case []interface{}:
+					p[parent_index] = value
+				}
 				parent, data, parent_index = value, value[index], index
 			}
 
@@ -1622,9 +1628,11 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
 					x.Value = args[0]
 				default:
 					for i := 0; i < len(args); i += 2 {
+						m.Log("fuck", "b %v", x.Value)
 						if i < len(args)-1 {
 							x.Value = Chain(m, x.Value, args[i], args[i+1])
 						}
+						m.Log("fuck", "b %v", x.Value)
 						if i == len(args)-2 {
 							return Chain(m, x.Value, args[len(args)-2])
 						}

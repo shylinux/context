@@ -30,10 +30,6 @@
 
 {{define "share"}}
 <fieldset><legend>share</legend>
-	<form method="POST" onsubmit="return share(event, '{{option . "dir"|meta}}')">
-		<label>share to:</label><input type="text" name="shareto" required>
-		<input type="submit">
-	</form>
 	<table>
 		{{$msg := .}}
 		{{$ncol := append . |len}}
@@ -44,7 +40,13 @@
 			{{range append $msg}}
 			{{$value := append $msg . $row}}
 			<td><code>
-			{{if eq . "value"}}
+			{{if eq . "to"}}
+				{{if eq $value ""}}
+					<input type="text" onkeyup="return share_input(event, '{{append $msg "template" $row}}', '{{append $msg "titles" $row}}', 'add')">
+				{{else}}
+					<code><a href="/" title="点击取消共享" onclick="return shareto('{{append $msg "template" $row}}', '{{append $msg "titles" $row}}', '{{$value}}','del')">{{$value}}</a></code>
+				{{end}}
+			{{else if eq . "value"}}
 				<code><a title="点击删除" href="/" onclick="deleteshare(event, '{{append $msg "friend" $row}}', '{{$value}}')">{{$value}}</a></code>
 			{{else}}
 				{{$value}}
@@ -56,34 +58,27 @@
 	</table>
 </fieldset>
 <script>
-	function share(event, dir) {
-		if (dir.endsWith("/")) {
-			dir = dir.substr(0, dir.length-1)
+	function share_input(event, template, title, action) {
+		if (event.code == "Enter") {
+			shareto(template, title, event.target.value, action);
 		}
-		var fields = event.target.elements;
-		var shareto = fields["shareto"].value
-		ctx.POST("/share", {
-			module: "web",
-			friend: shareto,
-			action: "add",
-			share: ["command", "/index/", "dir", dir],
-		}, function(msg) {
-			ctx.Refresh();
-		})
-		return false;
+		console.log(event.code)
+		console.log(event.key)
+		console.log(event)
 	}
-	function deleteshare(event, group, dir) {
-		if (!window.confirm("cancel share?")) {
-			return
-		}
+
+	function shareto(template, title, friend, action) {
 		ctx.POST("/share", {
 			module: "web",
-			friend: group,
-			action: "del",
-			share: ["command", "/index/", "dir"],
+			template: template,
+			title: title,
+			friend: friend,
+			action: action,
+			share: ["command", "/index/"],
 		}, function(msg) {
 			ctx.Refresh();
 		})
+		return false
 	}
 </script>
 {{end}}

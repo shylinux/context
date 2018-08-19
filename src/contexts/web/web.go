@@ -277,10 +277,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"cmd":        &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
-		"cert":       &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
-		"key":        &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
-		"root_index": &ctx.Config{Name: "root_index(true/false)", Value: "true", Help: "路由数量"},
+		"cmd":         &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+		"cert":        &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
+		"key":         &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"root_index":  &ctx.Config{Name: "root_index(true/false)", Value: "true", Help: "路由数量"},
+		"auto_create": &ctx.Config{Name: "auto_create(true/false)", Value: "true", Help: "路由数量"},
 		"check": &ctx.Config{Name: "check", Value: map[string]interface{}{
 			"login": []interface{}{
 				map[string]interface{}{
@@ -314,6 +315,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"template": "userinfo", "title": "userinfo",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "aaa", "command": "lark",
+					"argument": []interface{}{},
+					"template": "append", "title": "lark_friend",
+				},
+				map[string]interface{}{
 					"module": "aaa", "detail": []interface{}{"lark"},
 					"template": "detail", "title": "send_lark",
 					"option": map[string]interface{}{"ninput": 2},
@@ -328,82 +335,81 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
 					"template": "append", "title": "",
 				},
-				map[string]interface{}{
-					"template": "upload", "title": "upload",
-				},
-				map[string]interface{}{
-					"template": "create", "title": "create",
-				},
-				map[string]interface{}{
-					"module": "nfs", "detail": []interface{}{"pwd"},
-					"template": "detail", "title": "pwd",
-				},
 			},
 			"shy": []interface{}{
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{"duyu", "haojie"},
 					"template": "userinfo", "title": "userinfo",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "aaa", "command": "lark",
 					"argument": []interface{}{},
 					"template": "append", "title": "lark_friend",
 				},
 				map[string]interface{}{
-					"module": "aaa", "command": "lark",
-					"argument": []interface{}{"shy"},
-					"template": "append", "title": "lark",
-				},
-				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "aaa", "detail": []interface{}{"lark"},
 					"template": "detail", "title": "send_lark",
 					"option": map[string]interface{}{"ninput": 2},
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "web", "command": "/share",
 					"argument": []interface{}{},
 					"template": "share", "title": "share",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "cli", "command": "system",
 					"argument": []interface{}{"tmux", "list-clients"},
 					"template": "result", "title": "client",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "cli", "command": "system",
 					"argument": []interface{}{"tmux", "list-sessions"},
 					"template": "result", "title": "session",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "cli", "command": "system",
 					"argument": []interface{}{"tmux", "show-buffer"},
 					"template": "result", "title": "buffer",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "nfs", "command": "git",
 					"argument": []interface{}{},
 					"template": "result", "title": "git",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "nfs", "command": "dir",
 					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
 					"template": "append", "title": "",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"template": "upload", "title": "upload",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"template": "create", "title": "create",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "nfs", "detail": []interface{}{"pwd"},
 					"template": "detail", "title": "pwd",
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "cli", "detail": []interface{}{"time"},
 					"template": "detail", "title": "time",
 					"option": map[string]interface{}{"ninput": 1},
 				},
 				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "nfs", "detail": []interface{}{"json"},
 					"template": "detail", "title": "json",
 					"option": map[string]interface{}{"ninput": 1},
@@ -1024,17 +1030,91 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Copy(check, "append")
 				return
 			}
+			m.Option("username", m.Append("username"))
 
-			if m.Options("friend") && m.Options("module") {
-				m.Copy(m.Appendv("aaa").(*ctx.Message).Find(m.Option("module")).Cmd("right", m.Option("friend"), m.Option("action"), m.Optionv("share")), "result")
-				if m.Confv("index", m.Option("friend")) == nil {
-					m.Confv("index", m.Option("friend"), m.Confv("index", m.Append("username")))
+			// if m.Options("friend") && m.Options("module") {
+			// 	m.Copy(m.Appendv("aaa").(*ctx.Message).Find(m.Option("module")).Cmd("right", m.Option("friend"), m.Option("action"), m.Optionv("share")), "result")
+			// 	if m.Confv("index", m.Option("friend")) == nil {
+			// 		m.Confv("index", m.Option("friend"), m.Confv("index", m.Append("username")))
+			// 	}
+			// 	return
+			// }
+			//
+			// msg := m.Spawn().Cmd("right", "target", m.Option("module"), m.Append("username"), "show", "context")
+			// m.Copy(msg, "append")
+			if m.Options("friend") && m.Options("template") && m.Options("title") {
+				for i, v := range m.Confv("index", m.Option("username")).([]interface{}) {
+					if v == nil {
+						continue
+					}
+					val := v.(map[string]interface{})
+					if val["template"].(string) == m.Option("template") && val["title"].(string) == m.Option("title") {
+						if m.Option("action") == "del" {
+							friends := m.Confv("index", strings.Join([]string{m.Option("username"), fmt.Sprintf("%d", i), "to"}, ".")).([]interface{})
+							for j, x := range friends {
+								if x.(string) == m.Option("friend") {
+									m.Confv("index", strings.Join([]string{m.Option("username"), fmt.Sprintf("%d", i), "to", fmt.Sprintf("%d", j)}, "."), nil)
+								}
+							}
+
+							temps := m.Confv("index", strings.Join([]string{m.Option("friend")}, ".")).([]interface{})
+							for j, x := range temps {
+								if x == nil {
+									continue
+								}
+								val = x.(map[string]interface{})
+								if val["template"].(string) == m.Option("template") && val["title"].(string) == m.Option("title") {
+									m.Confv("index", strings.Join([]string{m.Option("friend"), fmt.Sprintf("%d", j)}, "."), nil)
+								}
+							}
+
+							break
+						}
+
+						if m.Confv("index", m.Option("friend")) == nil && !m.Confs("auto_create") {
+							break
+						}
+						m.Confv("index", strings.Join([]string{m.Option("username"), fmt.Sprintf("%d", i), "to", "-2"}, "."), m.Option("friend"))
+
+						item := map[string]interface{}{
+							"template": val["template"],
+							"title":    val["title"],
+							"from":     m.Option("username"),
+						}
+						if val["command"] != nil {
+							item["module"] = val["module"]
+							item["command"] = val["command"]
+							item["argument"] = val["argument"]
+						} else if val["detail"] != nil {
+							item["module"] = val["module"]
+							item["detail"] = val["detail"]
+							item["option"] = val["option"]
+						}
+
+						m.Confv("index", strings.Join([]string{m.Option("friend"), fmt.Sprintf("%d", -2)}, "."), item)
+						m.Appendv("aaa").(*ctx.Message).Spawn(c).Cmd("right", m.Option("friend"), "add", "command", "/index/", "dir", m.Cap("directory"))
+						os.Mkdir(path.Join(m.Cap("directory"), m.Option("friend")), 0666)
+						break
+					}
 				}
 				return
 			}
-
-			msg := m.Spawn().Cmd("right", "target", m.Option("module"), m.Append("username"), "show", "context")
-			m.Copy(msg, "append")
+			for _, v := range m.Confv("index", m.Option("username")).([]interface{}) {
+				val := v.(map[string]interface{})
+				m.Add("append", "template", val["template"])
+				m.Add("append", "titles", val["title"])
+				m.Add("append", "from", val["from"])
+				m.Add("append", "to", "")
+				if val["to"] == nil {
+					continue
+				}
+				for _, u := range val["to"].([]interface{}) {
+					m.Add("append", "template", val["template"])
+					m.Add("append", "titles", val["title"])
+					m.Add("append", "from", val["from"])
+					m.Add("append", "to", u)
+				}
+			}
 			// }}}
 		}},
 		"/check": &ctx.Command{Name: "/check arg...", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1089,8 +1169,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				[]byte{27, 91, 109}, []byte("</span>"),
 			}
 
+			if m.Confv("index", arg[0]) == nil {
+				arg[0] = "notice"
+			}
+
 			m.Assert(tpl.ExecuteTemplate(w, "head", m))
 			for _, v := range m.Confv("index", arg[0]).([]interface{}) {
+				if v == nil {
+					continue
+				}
 				val := v.(map[string]interface{})
 				//命令模板
 				if detail, ok := val["detail"].([]interface{}); ok {
