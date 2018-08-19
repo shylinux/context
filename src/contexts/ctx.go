@@ -1628,11 +1628,9 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
 					x.Value = args[0]
 				default:
 					for i := 0; i < len(args); i += 2 {
-						m.Log("fuck", "b %v", x.Value)
 						if i < len(args)-1 {
 							x.Value = Chain(m, x.Value, args[i], args[i+1])
 						}
-						m.Log("fuck", "b %v", x.Value)
 						if i == len(args)-2 {
 							return Chain(m, x.Value, args[len(args)-2])
 						}

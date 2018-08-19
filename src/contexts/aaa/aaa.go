@@ -113,12 +113,14 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 			from := msg.Option("username")
 			m.Log("lark", "%v", msg.Meta["detail"])
 			m.Travel(func(m *ctx.Message, n int) bool {
+				m.Log("fuck", "why-%v=%v", m.Cap("username"), msg.Detail(1))
 				if m.Cap("username") == msg.Detail(1) {
+					m.Log("fuck", "why-%v=%v", m.Cap("username"), msg.Detail(1))
 					m.Confv("lark", strings.Join([]string{from, "-2"}, "."),
 						map[string]interface{}{"time": msg.Time(), "type": "recv", "text": msg.Detail(2)})
 				}
 				return true
-			})
+			}, aaa.Context)
 		}
 		return true
 	}
@@ -165,7 +167,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"login": &ctx.Command{
 			Name: "login [sessid]|[username password]|[cert certfile]|[pub pubfile]|[key keyfile]|[ip ipstr]|[load|save filename]",
 			Help: "用户登录, sessid: 会话ID, username: 用户名, password: 密码, load: 加载用户信息, save: 保存用户信息, filename: 文件名",
-			Form: map[string]int{"cert": 1, "pub": 1, "key": 1, "ip": 1, "load": 1, "save": 1},
+			Form: map[string]int{"cert": 1, "pub": 1, "key": 1, "ip": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) { // {{{
 					stream := ""
@@ -213,7 +215,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 
 					if stream != "" {
-						m.Start(m.Confx("aaa_name"), m.Confx("aaa_help"), arg[0], "", aaa.Session(arg[0]))
+						m.Start(arg[0], m.Confx("aaa_help"), arg[0], "", aaa.Session(arg[0]))
 						m.Cap("stream", stream)
 						return
 					}
@@ -245,14 +247,17 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							if f, e := os.Open(arg[1]); m.Assert(e) {
 								for bio := bufio.NewScanner(f); bio.Scan(); {
 									word := strings.SplitN(bio.Text(), ":", 3)
-									m.Spawn().Start(word[0], "用户", word[0], word[1], word[2])
+									msg := m.Spawn()
+									msg.Start(word[0], "用户", word[0], word[1], word[2])
+									msg.Spawn().Cmd("config", "load", fmt.Sprintf("etc/%s.json", word[0]), "lark")
 								}
 							}
 						case "save":
 							if f, e := os.Create(arg[1]); m.Assert(e) {
 								m.Travel(func(m *ctx.Message, i int) bool {
-									if i > 0 {
+									if i > 0 && m.Cap("username") != "root" {
 										f.WriteString(fmt.Sprintf("%s:%s:%s\n", m.Cap("username"), m.Cap("password"), m.Cap("sessid")))
+										m.Spawn().Cmd("config", "save", fmt.Sprintf("etc/%s.json", m.Cap("username")), "lark")
 									}
 									return true
 								})
@@ -276,7 +281,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							}, c)
 
 							if !find {
-								m.Start(m.Confx("aaa_name"), m.Confx("aaa_help"), arg[0], aaa.Password(arg[1]), aaa.Session(arg[0]))
+								m.Start(arg[0], m.Confx("aaa_help"), arg[0], aaa.Password(arg[1]), aaa.Session(arg[0]))
 								m.Cap("stream", arg[0])
 								m.Echo(m.Cap("sessid"))
 								m.Appendv("aaa", m)
@@ -669,7 +674,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 										m.Add("append", "friend", k)
 										m.Add("append", "time", val["time"])
 										m.Add("append", "type", val["type"])
-										m.Add("append", "text", val["text"])
+										if val["type"].(string) == "send" {
+											m.Add("append", "text", fmt.Sprintf("<< %v", val["text"]))
+										} else {
+											m.Add("append", "text", fmt.Sprintf(">> %v", val["text"]))
+										}
 									}
 								}
 							case 1:
@@ -687,7 +696,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							return false
 						}
 						return true
-					})
+					}, c)
 				}
 				// }}}
 			}},

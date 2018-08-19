@@ -1,8 +1,10 @@
 login root root
-source etc/local.shy
-
+~aaa
+	login load etc/login.txt
 ~file1
 	history load etc/history.txt
+
+source etc/local.shy
 
 ~shell1
 	alias import nfs

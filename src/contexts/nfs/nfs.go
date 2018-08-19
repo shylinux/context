@@ -1105,8 +1105,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			} // }}}
 		}},
 		"json": &ctx.Command{Name: "json [key value]...", Help: "生成格式化内容, key: 参数名, value: 参数值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if len(arg) == 1 {
-				data := map[string]interface{}{}
+			if len(arg) == 1 { // {{{
+				var data interface{}
 				e := json.Unmarshal([]byte(arg[0]), &data)
 				m.Assert(e)
 
@@ -1119,7 +1119,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 
 			if len(arg) > 1 && arg[0] == "file" {
-				data := map[string]interface{}{}
+				var data interface{}
 				f, e := os.Open(arg[1])
 				m.Assert(e)
 				d := json.NewDecoder(f)
@@ -1130,7 +1130,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Echo(string(buf))
 				return
 			}
-			data := map[string]interface{}{} // {{{
+
+			data := map[string]interface{}{}
 			for _, k := range m.Meta["option"] {
 				if v, ok := m.Data[k]; ok {
 					data[k] = v
