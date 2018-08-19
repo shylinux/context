@@ -36,9 +36,11 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool { // {{{
-	log.nfs = m.Sess("nfs").Cmd("append", m.Confx("bench.log", arg, 0), "", "日志文件")
-	log.out = log.nfs.Optionv("out").(*os.File)
-	fmt.Fprintln(log.out, "\n\n")
+	if f, e := os.Stat(m.Confx("bench.log", arg, 0)); e == nil && !f.IsDir() {
+		log.nfs = m.Sess("nfs").Cmd("append", m.Confx("bench.log", arg, 0), "", "日志文件")
+		log.out = log.nfs.Optionv("out").(*os.File)
+		fmt.Fprintln(log.out, "\n\n")
+	}
 	return false
 }
 

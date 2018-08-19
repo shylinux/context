@@ -323,6 +323,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"argument": []interface{}{"duyu"},
 					"template": "append", "title": "lark",
 				},
+				map[string]interface{}{
+					"module": "nfs", "command": "dir",
+					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
+					"template": "append", "title": "",
+				},
+				map[string]interface{}{
+					"template": "upload", "title": "upload",
+				},
+				map[string]interface{}{
+					"template": "create", "title": "create",
+				},
+				map[string]interface{}{
+					"module": "nfs", "detail": []interface{}{"pwd"},
+					"template": "detail", "title": "pwd",
+				},
 			},
 			"shy": []interface{}{
 				map[string]interface{}{
@@ -694,13 +709,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 
+			if login := m.Spawn().Cmd("/login"); login.Has("template") {
+				m.Echo("no").Copy(login, "append")
+				return
+			}
+			m.Option("username", m.Append("username"))
+
 			//权限检查
-			dir := m.Option("dir", path.Join(m.Cap("directory"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index"))))
+			dir := m.Option("dir", path.Join(m.Cap("directory"), m.Option("username"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index"))))
 			if check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir); !check.Results(0) {
 				m.Copy(check, "append")
 				return
 			}
-			m.Option("username", m.Append("username"))
 
 			//执行命令
 			if m.Has("details") {

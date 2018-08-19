@@ -230,7 +230,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Wait()
 					m.Target().Close(m)
 					if arg[0] == "stdio" {
-						m.Spawn().Cmd("source", m.Conf("exit.shy"))
+						if f, e := os.Stat(m.Conf("exit.shy")); e == nil && !f.IsDir() {
+							m.Spawn().Cmd("source", m.Conf("exit.shy"))
+						}
 					}
 				}
 			}},

@@ -2950,14 +2950,23 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Capi("list_count", 1)
 					return
 				case "list":
+					if m.Cap("list_begin") == "" {
+						return
+					}
 					begin, end := m.Capi("list_begin"), m.Capi("list_count")
 					if len(arg) > 1 {
 						n, e := strconv.Atoi(arg[1])
+						if e != nil {
+							return
+						}
 						m.Assert(e)
 						begin = n
 					}
 					if len(arg) > 2 {
 						n, e := strconv.Atoi(arg[2])
+						if e != nil {
+							return
+						}
 						m.Assert(e)
 						end = n
 					}
