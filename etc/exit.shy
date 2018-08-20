@@ -1,0 +1,6 @@
+source etc/local_exit.shy
+~file1
+	history save etc/history.txt
+~aaa
+	login save etc/login.txt
+
