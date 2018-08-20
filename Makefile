@@ -8,6 +8,11 @@ install:
 	@cp etc/go.snippets ~/.vim/snippets/
 	@cp etc/shy.vim ~/.vim/syntax/
 	@touch etc/local.shy
+	@touch etc/local_exit.shy
+	@touch etc/init.shy
+	@touch etc/exit.shy
+	@touch etc/login.txt
+	@touch etc/history.txt
 	go install $(BENCH)
 	# @[ `uname` = "Darwin" ] && md5 `which bench`
 	@date

@@ -856,9 +856,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"git_log":      &ctx.Config{Name: "git_log", Value: "--pretty=%h %an(%ad) %s  --date=format:%m/%d %H:%M  --graph", Help: "版本控制状态参数"},
 		"git_log_form": &ctx.Config{Name: "git_log", Value: "stat", Help: "版本控制状态参数"},
 		"git_log_skip": &ctx.Config{Name: "git_log", Value: "0", Help: "版本控制状态参数"},
-		"git_log_line": &ctx.Config{Name: "git_log", Value: "5", Help: "版本控制状态参数"},
+		"git_log_line": &ctx.Config{Name: "git_log", Value: "3", Help: "版本控制状态参数"},
 		"git_path":     &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
-		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff", Help: "命令集合"},
+		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff log", Help: "命令集合"},
 	},
 	Commands: map[string]*ctx.Command{
 		"paths": &ctx.Command{
@@ -949,11 +949,20 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							if lines != -1 && (i-pos) >= lines {
 								break
 							}
-							nfs.history = append(nfs.history, bio.Text())
+							line := bio.Text()
+							for _, v := range nfs.history {
+								if line == v {
+									line = ""
+								}
+							}
+							if line != "" {
+								nfs.history = append(nfs.history, line)
+							}
 						}
 						m.Capi("nline", 0, len(nfs.history))
 					case "save":
 						f, e := os.Create(arg[1])
+						// f, e := os.OpenFile(arg[1], os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 						m.Assert(e)
 						defer f.Close()
 

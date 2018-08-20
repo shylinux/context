@@ -10,3 +10,4 @@ source etc/local.shy
 	alias import nfs
 	alias send send
 	alias dial dial
+
