@@ -660,42 +660,43 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}},
 		"lark": &ctx.Command{Name: "lark who message", Help: "散列",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if m.Option("username") == "" {
+					m.Option("username", m.Sess("aaa", false).Cap("username"))
+				}
 				if aaa, ok := c.Server.(*AAA); m.Assert(ok) && aaa.lark != nil { // {{{
 					m.Travel(func(m *ctx.Message, n int) bool {
-						if n == 0 {
+						if n == 0 || m.Cap("username") != m.Option("username") {
 							return true
 						}
-						if m.Cap("username") == m.Option("username") {
-							switch len(arg) {
-							case 0:
-								for k, v := range m.Confv("lark").(map[string]interface{}) {
-									for _, x := range v.([]interface{}) {
-										val := x.(map[string]interface{})
-										m.Add("append", "friend", k)
-										m.Add("append", "time", val["time"])
-										m.Add("append", "type", val["type"])
-										if val["type"].(string) == "send" {
-											m.Add("append", "text", fmt.Sprintf("<< %v", val["text"]))
-										} else {
-											m.Add("append", "text", fmt.Sprintf(">> %v", val["text"]))
-										}
+
+						switch len(arg) {
+						case 0:
+							for k, v := range m.Confv("lark").(map[string]interface{}) {
+								for _, x := range v.([]interface{}) {
+									val := x.(map[string]interface{})
+									m.Add("append", "friend", k)
+									m.Add("append", "time", val["time"])
+									m.Add("append", "type", val["type"])
+									if val["type"].(string) == "send" {
+										m.Add("append", "text", fmt.Sprintf("<< %v", val["text"]))
+									} else {
+										m.Add("append", "text", fmt.Sprintf(">> %v", val["text"]))
 									}
 								}
-							case 1:
-								for _, v := range m.Confv("lark", arg[0]).([]interface{}) {
-									val := v.(map[string]interface{})
-									m.Add("append", "time", val["time"])
-									m.Add("append", "text", val["text"])
-								}
-							case 2:
-								m.Confv("lark", strings.Join([]string{arg[0], "-2"}, "."),
-									map[string]interface{}{"time": m.Time(), "type": "send", "text": arg[1]})
-								aaa.lark <- m
-								m.Echo("%s send done", m.Time())
 							}
-							return false
+						case 1:
+							for _, v := range m.Confv("lark", arg[0]).([]interface{}) {
+								val := v.(map[string]interface{})
+								m.Add("append", "time", val["time"])
+								m.Add("append", "text", val["text"])
+							}
+						case 2:
+							m.Confv("lark", strings.Join([]string{arg[0], "-2"}, "."),
+								map[string]interface{}{"time": m.Time(), "type": "send", "text": arg[1]})
+							aaa.lark <- m
+							m.Echo("%s send done", m.Time())
 						}
-						return true
+						return false
 					}, c)
 				}
 				// }}}

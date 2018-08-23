@@ -2,11 +2,15 @@
 <!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
-<title>{{option .Meta "title"}}</title>
+<title>{{option .Meta "page_title"}}</title>
 <style>
+	fieldset {
+		margin-top:8px;
+	}
 	legend {
 		font-size:16px;
 		font-weight:bold;
+		font-family:monospace;
 	}
 	th {
 		cursor:pointer;
@@ -19,7 +23,72 @@
 	code {
 		font-size:14px;
 	}
+	.command {
+		font-size:14px;
+		font-family:monospace;
+	}
 </style>
+<script src="/library/context.js"></script>
+<script>
+function update(event, module, details, key) {
+	if (event) {
+		window[key+"timer"] = !window[key+"timer"];
+	}
+	if (!window[key+"timer"]) {
+		return
+	}
+	console.log("update "+key)
+	setTimeout(function() {
+		action(event, module, details, key);
+		update(null, module, details, key);
+	}, parseInt({{conf . "refresh_time"}}));
+}
+
+function input(event, module, details, key) {
+	if (event.code == "Enter") {
+		action(event, module, details, key);
+	}
+}
+function action(event, module, details, key) {
+	var input = document.getElementsByClassName(key+"_input");
+	for (var i = 0; i < input.length; i++ ){
+		if (input[i].value != "") {
+			details.push(input[i].value)
+		}
+	}
+	ctx.POST("", {module:module, details:details}, function(msg) {
+		if (msg && msg.result) {
+			var result = document.getElementsByClassName(key+"_result")[0];
+			result.innerHTML = msg.result;
+		}
+		if (!msg || !msg.append || msg.append.length < 1) {
+			return
+		}
+
+		var append = document.getElementsByClassName(key+"_append")[0];
+		if (append.rows.length == msg[msg.append[0]].length+1) {
+			return
+		}
+		append.innerHTML = '';
+		var tr = append.insertRow(0);
+		for (var i in msg.append) {
+			var th = tr.appendChild(document.createElement("th"));
+			th.appendChild(document.createTextNode(msg.append[i]));
+		}
+
+		for (var i = 0; i < msg[msg.append[0]].length; i++) {
+			var tr = append.insertRow(1);
+			for (var j in msg.append) {
+				var td = tr.appendChild(document.createElement("td"));
+				td.appendChild(document.createTextNode(msg[msg.append[j]][i]));
+			}
+		}
+		var div = append.parent;
+
+	})
+	return false;
+}
+</script>
 </head>
 <body>
 {{end}}
@@ -29,7 +98,7 @@
 {{end}}
 
 {{define "notice"}}
-<fieldset class="notice"><legend>notice</legend>
+<fieldset class="notice"><legend>[notice]</legend>
 	{{template "code" result .Meta}}
 </fieldset>
 <style>
@@ -38,34 +107,27 @@
 {{end}}
 
 {{define "detail"}}
-{{$key := append . "title"|meta}}
 {{$msg := .}}
-<fieldset><legend>{{append . "title"|meta}}</legend>
+{{$key := append . "title"|meta}}
+<fieldset><legend><a onclick="return action(event, '{{option .Meta "module"}}', ['{{detail .Meta}}'], '{{$key}}')" href="/">{{option . "title"}}</a></legend>
 	{{range option . "ninput"|meta|list}}
-		<input type="text" class="{{$key}}_input" value="" onkeyup="return input(event, '{{option $msg.Meta "module"}}', ['{{detail $msg.Meta}}'], '{{$key}}_input', '{{$key}}_result')"></input>
+		<input type="text" class="{{$key}}_input" value="" onkeyup="return input(event, '{{option $msg.Meta "module"}}', ['{{detail $msg.Meta}}'], '{{$key}}')"></input>
 	{{end}}
-	<a onclick="return action(event, '{{option .Meta "module"}}', ['{{detail .Meta}}'], '{{$key}}_input', '{{$key}}_result')" href="/">{{template "code" detail .Meta}}</a>
+	{{if option . "refresh"}}
+		<input type="button" class="{{$key}}_button" value="update" onclick="return update(event, '{{option $msg.Meta "module"}}', ['{{detail $msg.Meta}}'], '{{$key}}')"></input>
+		<input type="button" class="{{$key}}_button" value="cancel" onclick="return update(event, '{{option $msg.Meta "module"}}', ['{{detail $msg.Meta}}'], '{{$key}}')"></input>
+	{{end}}
 	<pre><code class="{{$key}}_result"></code></pre>
+	<div style="max-height:150px;overflow:auto">
+	<table class="{{$key}}_append"></table>
+	</div>
 </fieldset>
 <script>
-function input(event, module, details, input, results) {
-	if (event.code == "Enter") {
-		action(event, module, details, input, results);
-	}
-}
-function action(event, module, details, input, results) {
-	var input = document.getElementsByClassName(input);
-	for (var i = 0; i < input.length; i++ ){
-		if (input[i].value != "") {
-			details.push(input[i].value)
-		}
-	}
-	ctx.POST("", {module:module, details:details}, function(msg) {
-		var result = document.getElementsByClassName(results)[0];
-		result.innerHTML = msg.result || msg.message || msg;
-	})
-	return false;
-}
+{{if option . "auto_refresh"}}
+update(true, '{{option $msg.Meta "module"}}', ['{{detail $msg.Meta}}'], '{{$key}}');
+{{end}}
+
+
 </script>
 {{end}}
 
@@ -86,7 +148,7 @@ function jump(to) {
 {{end}}
 
 {{define "append"}}
-<fieldset><legend>{{append . "title"}}</legend>
+<fieldset><legend>{{option . "title"}}</legend>
 <table class="append">
 	{{$msg := .}}
 	{{$ncol := append . |len}}
@@ -122,6 +184,5 @@ welcome to context world!
 {{end}}
 
 {{define "tail"}}
-<script src="/library/context.js"></script>
 </body>
 {{end}}

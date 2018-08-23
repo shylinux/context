@@ -2,10 +2,7 @@ package web // {{{
 // }}}
 import ( // {{{
 	"contexts"
-	"regexp"
 	"runtime"
-	"strconv"
-	"toolkit"
 
 	"encoding/json"
 	"html/template"
@@ -112,7 +109,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 		case msg.Has("template"):
 			msg.Spawn().Cmd("/render", msg.Meta["template"])
 		case msg.Has("append"):
-			msg.Spawn().Copy(msg, "append").Cmd("/json")
+			msg.Spawn().Copy(msg, "result").Copy(msg, "append").Cmd("/json")
 		default:
 			for _, v := range msg.Meta["result"] {
 				w.Write([]byte(v))
@@ -277,11 +274,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"cmd":         &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
-		"cert":        &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
-		"key":         &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
-		"root_index":  &ctx.Config{Name: "root_index(true/false)", Value: "true", Help: "路由数量"},
-		"auto_create": &ctx.Config{Name: "auto_create(true/false)", Value: "true", Help: "路由数量"},
+		"cmd":          &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
+		"cert":         &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
+		"key":          &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"root_index":   &ctx.Config{Name: "root_index(true/false)", Value: "true", Help: "路由数量"},
+		"auto_create":  &ctx.Config{Name: "auto_create(true/false)", Value: "true", Help: "路由数量"},
+		"refresh_time": &ctx.Config{Name: "refresh_time(ms)", Value: "1000", Help: "路由数量"},
 		"check": &ctx.Config{Name: "check", Value: map[string]interface{}{
 			"login": []interface{}{
 				map[string]interface{}{
@@ -338,20 +336,61 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 			"shy": []interface{}{
 				map[string]interface{}{
-					"from": "root", "to": []interface{}{"duyu", "haojie"},
+					"from": "root", "to": []interface{}{},
 					"template": "userinfo", "title": "userinfo",
 				},
+				//聊天服务
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
-					"module": "aaa", "command": "lark",
-					"argument": []interface{}{},
-					"template": "append", "title": "lark_friend",
+					"module": "aaa", "detail": []interface{}{"lark"},
+					"template": "detail", "title": "list_lark",
+					// "option": map[string]interface{}{"auto_refresh": true},
 				},
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
 					"module": "aaa", "detail": []interface{}{"lark"},
 					"template": "detail", "title": "send_lark",
 					"option": map[string]interface{}{"ninput": 2},
+				},
+				//文件服务
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "nfs", "command": "dir",
+					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
+					"template": "append", "title": "",
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"template": "upload", "title": "upload",
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"template": "create", "title": "create",
+				},
+				//格式转换
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "cli", "detail": []interface{}{"time"},
+					"template": "detail", "title": "time",
+					"option": map[string]interface{}{"refresh": true, "ninput": 1},
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "nfs", "detail": []interface{}{"pwd"},
+					"template": "detail", "title": "pwd",
+					"option": map[string]interface{}{"refresh": true},
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "nfs", "detail": []interface{}{"json"},
+					"template": "detail", "title": "json",
+					"option": map[string]interface{}{"ninput": 1},
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "cli", "command": "system",
+					"argument": []interface{}{"tmux", "show-buffer"},
+					"template": "result", "title": "buffer",
 				},
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
@@ -373,60 +412,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				},
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
-					"module": "cli", "command": "system",
-					"argument": []interface{}{"tmux", "show-buffer"},
-					"template": "result", "title": "buffer",
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
 					"module": "nfs", "command": "git",
 					"argument": []interface{}{},
 					"template": "result", "title": "git",
 				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "nfs", "command": "dir",
-					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
-					"template": "append", "title": "",
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"template": "upload", "title": "upload",
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"template": "create", "title": "create",
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "nfs", "detail": []interface{}{"pwd"},
-					"template": "detail", "title": "pwd",
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "cli", "detail": []interface{}{"time"},
-					"template": "detail", "title": "time",
-					"option": map[string]interface{}{"ninput": 1},
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "nfs", "detail": []interface{}{"json"},
-					"template": "detail", "title": "json",
-					"option": map[string]interface{}{"ninput": 1},
-				},
-			},
-			"xujianing": []interface{}{
-				map[string]interface{}{
-					"module": "nfs", "detail": []interface{}{"pwd"},
-					"template": "detail", "title": "detail",
-				},
-				map[string]interface{}{
-					"module": "nfs", "command": "dir",
-					"argument": []interface{}{"dir_type", "all", "dir_deep", "false", "dir_field", "time size line filename", "sort_field", "time", "sort_order", "time_r"},
-					"template": "append", "title": "",
-				},
 			},
 			"notice": []interface{}{
+				map[string]interface{}{
+					"template": "userinfo", "title": "userinfo",
+				},
 				map[string]interface{}{
 					"template": "notice", "title": "notice",
 				},
@@ -650,6 +644,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				msg := m.Spawn().Cmd("get", "method", "POST", arg)
 				m.Copy(msg, "result").Copy(msg, "append")
 			}},
+		"brow": &ctx.Command{Name: "brow url", Help: "浏览器网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			url := fmt.Sprintf("http://localhost:9094") //{{{
+			if len(arg) > 0 {
+				url = arg[0]
+			}
+			switch runtime.GOOS {
+			case "windows":
+				m.Find("cli").Cmd("system", "explorer", url)
+			case "darwin":
+				m.Find("cli").Cmd("system", "open", url)
+			case "linux":
+				m.Spawn().Cmd("open", url)
+			}
+			// }}}
+		}},
 		"serve": &ctx.Command{
 			Name: "serve [directory [address [protocol]]]",
 			Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http)",
@@ -703,57 +712,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/library/": &ctx.Command{Name: "/library", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request)
+			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 			dir := path.Join(m.Conf("library_dir"), m.Option("path"))
 			if s, e := os.Stat(dir); e == nil && !s.IsDir() {
 				http.ServeFile(w, r, dir)
 				return
 			}
-		}},
-		"/index/": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request) // {{{
-			w := m.Optionv("response").(http.ResponseWriter)
-
-			if login := m.Spawn().Cmd("/login"); login.Has("template") {
-				m.Echo("no").Copy(login, "append")
-				return
-			}
-			m.Option("username", m.Append("username"))
-
-			//权限检查
-			dir := m.Option("dir", path.Join(m.Cap("directory"), m.Option("username"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index"))))
-			if check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir); !check.Results(0) {
-				m.Copy(check, "append")
-				return
-			}
-
-			//执行命令
-			if m.Has("details") {
-				if m.Confs("check_right") {
-					if check := m.Spawn().Cmd("/check", "target", m.Option("module"), "command", m.Option("details")); !check.Results(0) {
-						m.Copy(check, "append")
-						return
-					}
-				}
-
-				msg := m.Find(m.Option("module")).Cmd(m.Optionv("details"))
-				m.Copy(msg, "result").Copy(msg, "append")
-				return
-			}
-
-			//下载文件
-			if s, e := os.Stat(dir); e == nil && !s.IsDir() {
-				http.ServeFile(w, r, dir)
-				return
-			}
-
-			if !m.Options("module") {
-				m.Option("module", "web")
-			}
-			//浏览目录
-			m.Append("template", m.Append("username"))
-			m.Option("title", "index")
 			// }}}
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -850,131 +815,49 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Append("template", m.Conf("travel_main"), m.Conf("travel_tmpl"))
 			// }}}
 		}},
-		"/upload": &ctx.Command{Name: "/upload", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/index/": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Optionv("request").(*http.Request) // {{{
 			w := m.Optionv("response").(http.ResponseWriter)
 
-			if !m.Options("dir") {
-				m.Option("dir", m.Cap("directory"))
+			if login := m.Spawn().Cmd("/login"); login.Has("template") {
+				m.Echo("no").Copy(login, "append")
+				return
 			}
+			m.Option("username", m.Append("username"))
 
-			check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir"))
-			if !check.Results(0) {
+			//权限检查
+			dir := m.Option("dir", path.Join(m.Cap("directory"), m.Option("username"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index"))))
+			if check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir); !check.Results(0) {
 				m.Copy(check, "append")
 				return
 			}
-			aaa := check.Appendv("aaa").(*ctx.Message)
 
-			// 输出文件
-			s, e := os.Stat(m.Option("dir"))
-			if m.Assert(e); !s.IsDir() {
-				http.ServeFile(w, r, m.Option("dir"))
+			//执行命令
+			if m.Has("details") {
+				if m.Confs("check_right") {
+					if check := m.Spawn().Cmd("/check", "target", m.Option("module"), "command", m.Option("details")); !check.Results(0) {
+						m.Copy(check, "append")
+						return
+					}
+				}
+
+				msg := m.Find(m.Option("module")).Cmd(m.Optionv("details"))
+				m.Copy(msg, "result").Copy(msg, "append")
 				return
 			}
-			// 共享列表
-			share := m.Sess("share", m.Target())
-			index := share.Target().Index
-			if index != nil && index[aaa.Cap("username")] != nil {
-				for k, v := range index[aaa.Cap("username")].Index {
-					for _, j := range v.Commands {
-						for _, n := range j.Shares {
-							for _, nn := range n {
-								if match, e := regexp.MatchString(nn, m.Option("dir")); m.Assert(e) && match {
-									share.Add("append", "group", k)
-									share.Add("append", "value", nn)
-									share.Add("append", "delete", "delete")
-								}
-							}
-						}
-					}
-				}
-			}
-			share.Sort("value", "string")
-			share.Sort("argument", "string")
 
-			if false {
+			//下载文件
+			if s, e := os.Stat(dir); e == nil && !s.IsDir() {
+				http.ServeFile(w, r, dir)
+				return
 			}
 
-			// 输出目录
-			fs, e := ioutil.ReadDir(m.Option("dir"))
-			m.Assert(e)
-			fs = append(fs, s)
-			list := m.Sess("list", m.Target())
-			list.Option("dir", m.Option("dir"))
-
-			for _, v := range fs {
-				name := v.Name()
-				if v == s {
-					if name == m.Option("dir") {
-						continue
-					}
-					name = ".."
-				} else if name[0] == '.' {
-					continue
-				}
-
-				list.Add("append", "time_i", fmt.Sprintf("%d", v.ModTime().Unix()))
-				list.Add("append", "size_i", fmt.Sprintf("%d", v.Size()))
-				list.Add("append", "time", v.ModTime().Format("2006-01-02 15:04:05"))
-				list.Add("append", "size", kit.FmtSize(v.Size()))
-
-				if v.IsDir() {
-					name += "/"
-					list.Add("append", "type", "dir")
-				} else {
-					list.Add("append", "type", "file")
-				}
-
-				list.Add("append", "name", name)
-				list.Add("append", "path", path.Join(m.Option("dir"), name))
+			if !m.Options("module") {
+				m.Option("module", "web")
 			}
-
-			// 目录排序
-			max := true
-			if i, e := strconv.Atoi(m.Option("sort_order")); e == nil {
-				max = i%2 == 1
-			}
-			switch m.Option("list") {
-			case "name":
-				if max {
-					list.Sort(m.Option("list"), "string")
-				} else {
-					list.Sort(m.Option("list"), "string_r")
-				}
-			case "size", "time":
-				if max {
-					list.Sort(m.Option("list")+"_i", "int")
-				} else {
-					list.Sort(m.Option("list")+"_i", "int_r")
-				}
-			}
-			list.Meta["append"] = list.Meta["append"][2:]
-			delete(list.Meta, "time_i")
-			delete(list.Meta, "size_i")
-
-			// 执行命令
-			switch m.Confx("cmd") {
-			case "git":
-				git := m.Sess("git", m.Target())
-
-				branch := m.Find("nfs").Cmd("git", "-C", m.Option("dir"), "branch")
-				git.Option("branch", branch.Result(0))
-
-				status := m.Find("nfs").Cmd("git", "-C", m.Option("dir"), "status")
-				git.Option("status", status.Result(0))
-			case "tmux":
-				tmux := m.Sess("tmux", m.Target())
-
-				buffer := m.Sess("cli").Cmd("system", "tmux", "show-buffer", "-b", "0")
-				tmux.Option("buffer", buffer.Result(0))
-				sessions := m.Sess("cli").Cmd("system", "tmux", "list-sessions")
-				// sessions := m.Sess("cli").Cmd("system", "tmux", "list-sessions", "-F", "#S")
-				tmux.Option("sessions", sessions.Result(0))
-			}
-
-			m.Append("title", "upload")
-			m.Append("tmpl", "userinfo", "share", "list", "git", "tmux", "upload", "create")
-			m.Append("template", m.Conf("upload_main"), m.Conf("upload_tmpl"))
+			//浏览目录
+			m.Append("template", m.Append("username"))
+			m.Option("page_title", "index")
 			// }}}
 		}},
 		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1223,6 +1106,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			w := m.Optionv("response").(http.ResponseWriter) // {{{
 
 			meta := map[string][]string{}
+			if len(m.Meta["result"]) > 0 {
+				meta["result"] = m.Meta["result"]
+			}
 			if len(m.Meta["append"]) > 0 {
 				meta["append"] = m.Meta["append"]
 				for _, v := range m.Meta["append"] {
@@ -1251,20 +1137,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
-		}},
-		"brow": &ctx.Command{Name: "brow url", Help: "浏览器网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			url := fmt.Sprintf("http://localhost:9094")
-			if len(arg) > 0 {
-				url = arg[0]
-			}
-			switch runtime.GOOS {
-			case "windows":
-				m.Find("cli").Cmd("system", "explorer", url)
-			case "darwin":
-				m.Find("cli").Cmd("system", "open", url)
-			case "linux":
-				m.Spawn().Cmd("open", url)
-			}
 		}},
 	},
 }

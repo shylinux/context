@@ -1161,6 +1161,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"pwd": &ctx.Command{Name: "pwd", Help: "查看当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if m.Options("dir") { // {{{
 				m.Echo(m.Option("dir"))
+				m.Add("append", "hi", "hello")
+				m.Add("append", "he", "hello")
+				m.Add("append", "hi", "world")
+				m.Add("append", "he", "world")
 				return
 			}
 			if len(arg) > 0 {
@@ -1169,6 +1173,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			wd, e := os.Getwd()
 			m.Assert(e)
 			m.Echo(wd) // }}}
+			m.Append("hi", "hello")
 		}},
 		"dir": &ctx.Command{
 			Name: "dir dir [dir_deep yes|no] [dir_info info] [dir_name name|tree|path|full] [dir_type file|dir] [sort_field name] [sort_order type]",
