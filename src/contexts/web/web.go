@@ -430,6 +430,20 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"template": "login", "title": "login",
 				},
 			},
+			"wiki": []interface{}{
+				map[string]interface{}{
+					"template": "wiki_head", "title": "wiki_head",
+				},
+				map[string]interface{}{
+					"template": "wiki_menu", "title": "wiki_menu",
+				},
+				map[string]interface{}{
+					"template": "wiki_list", "title": "wiki_list",
+				},
+				map[string]interface{}{
+					"template": "wiki_body", "title": "wiki_body",
+				},
+			},
 		}, Help: "资源列表"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -635,7 +649,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					result := string(buf)
-					m.Echo(result)
+					m.Echo("%s", result)
 					m.Append("response", result)
 				} // }}}
 			}},
@@ -1062,6 +1076,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					continue
 				}
 				val := v.(map[string]interface{})
+				m.Log("fuck", "why %v", val)
 				//命令模板
 				if detail, ok := val["detail"].([]interface{}); ok {
 					msg := m.Spawn().Add("detail", detail[0].(string), detail[1:])
@@ -1126,6 +1141,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
 				m.Sess("cli").Cmd("system", "tmux", "set-buffer", "-b", "0", m.Option("content"))
 			}
+		}},
+		"/blog": &ctx.Command{Name: "/blog", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if m.Has("title") && m.Has("content") {
+			}
+
+			m.Echo("blog service")
+		}},
+		"/wiki": &ctx.Command{Name: "/wiki", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Append("template", "wiki")
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target())
