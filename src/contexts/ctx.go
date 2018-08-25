@@ -544,7 +544,7 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {
 
 func (m *Message) Log(action string, str string, arg ...interface{}) *Message { // {{{
 	l := m.Sess("log", !m.Confs("compact_log"))
-	if l == nil || m.Detail(0) == "log" || m.Detail(0) == "write" {
+	if l == nil || m.Detail(0) == "log" || m.Detail(0) == "write" || m.Options("silent") {
 		return m
 	}
 
@@ -973,7 +973,10 @@ func (m *Message) Gets(key string) bool { // {{{
 // }}}
 
 func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
-	return m.Add("result", fmt.Sprintf(str, arg...))
+	if len(arg) > 0 {
+		return m.Add("result", fmt.Sprintf(str, arg...))
+	}
+	return m.Add("result", str)
 }
 
 // }}}
@@ -2232,8 +2235,8 @@ var CGI = template.FuncMap{
 		}
 
 		list := make([]int, n)
-		for i := 0; i < n; i++ {
-			list[i] = i
+		for i := 1; i <= n; i++ {
+			list[i-1] = i
 		}
 		return list
 	}, // }}}

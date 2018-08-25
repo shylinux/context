@@ -1,12 +1,227 @@
 {{define "wiki_head"}}
-<div>hello wiki_head world!</div>
 {{end}}
+
 {{define "wiki_menu"}}
-<div>hello wiki_menu world!</div>
 {{end}}
+
 {{define "wiki_list"}}
-<div>hello wiki_list world!</div>
+<script>
+function jumpto(url) {
+	if (url == "..") {
+		var ps = locaiton.href.split();
+	}
+	location.href=url;
+}
+function keyup(event) {
+	console.log(event);
+	if (event.key == "z") {
+		var input = document.getElementsByClassName("query_input")[0];
+		if (!window.query_show) {
+			window.query_show = true;
+			var query = document.getElementsByClassName("query_menu")[0];
+			var input = query.getElementsByTagName("input")[0];
+			input.style.visibility = "visible";
+			input.style.width = "80px";
+			input.focus();
+		}
+	return true
+	}
+	return true
+}
+document.onkeyup = keyup;
+
+</script>
+<style>
+.container {
+	height:100%;
+	min-width:300px;
+}
+.head {
+	color:white;
+	font-size:20px;
+	font-weight:bold;
+	background-color:#222;
+	text-align:center;
+	vertical-align:middle;
+	padding:10px;
+	width:100%;
+	height:27px;
+}
+.title {
+	font-style:italic;
+}
+.toggle_menu {
+	cursor:pointer;
+	float:left;
+}
+.query_menu {
+	cursor:pointer;
+	margin-right:20px;
+	float:right;
+}
+.query_button {
+	cursor:pointer;
+	float:right;
+	margin-left:10px;
+}
+.query_input {
+	visibility:hidden;
+	width:0px;
+	position:absolute;
+	right:40px;
+	top:12px;
+}
+.list {
+	width:15%;
+	min-width:140px;
+	float:left;
+	max-height:1000px;
+	overflow:scroll;
+}
+.list_item {
+	padding-top:10px;
+	padding-left:30px;
+	min-height:30px;
+	margin-left:-30px;
+}
+.list_item:hover, .list_item:active {
+	background-color:green;
+}
+</style>
+<div class="container">
+<div class="head">
+	<div class="toggle_menu" onclick="toggle()">三</div>
+	<div class="query_menu">
+		<input class="query_input" type="text" onkeyup="return query(event)">
+		<div class="query_button" onclick="return query()"> Q</div>
+	</div>
+	<div class="title" onclick="return jumpto('/wiki/')">shylinux</div>
+</div>
+<div class="list">
+	{{$msg := .}}
+	{{$ncol := append . |len}}
+	{{$nrow := append . 0|append .|len}}
+	<ul>
+	<li>
+	<div class="list_item" onclick="return jumpto('/wiki/{{option $msg "parent"|meta}}')">返回上一层</div>
+	</li>
+	{{range $row, $val := append . 0|append .}}
+		<li>
+		<div class="list_item" onclick="return jumpto('/wiki/{{option $msg "dir"|meta}}/{{append $msg "name" $row}}')">
+		{{append $msg "name" $row}}
+		</div>
+		</li>
+	{{end}}
+	</ul>
+</div>
 {{end}}
+
 {{define "wiki_body"}}
-<div>hello wiki world!</div>
+<script>
+function toggle() {
+	window.list_hide = !window.list_hide;
+	var list = document.getElementsByClassName("list")[0];
+	var content = document.getElementsByClassName("content")[0];
+	if (list_hide) {
+		list.style.visibility = "hidden";
+		list.style.width="0px";
+		list.style.height="0px";
+		list.style["min-width"]="0px";
+		content.style.width="100%";
+	} else {
+		list.style.visibility = "visible";
+		list.style.width="15%";
+		list.style.height="100%";
+		list.style["min-width"]="180px";
+		content.style.width="85%";
+	}
+}
+function query(event) {
+	if (event) {
+		if (event.code == "Enter") {
+			jumpto("/wiki/?query="+encodeURIComponent(event.target.value));
+		}
+		console.log("what")
+		return true
+	}
+	window.query_show = !window.query_show;
+	var query = document.getElementsByClassName("query_menu")[0];
+	var input = query.getElementsByTagName("input")[0];
+	if (window.query_show) {
+		input.style.visibility = "visible";
+		input.style.width = "80px";
+
+	} else {
+		input.style.visibility = "hidden";
+		input.style.width = "0px";
+	}
+}
+var tags_list = {
+	{{range $key, $val := conf . "define"}}
+	"{{$key}}": true,
+	{{end}}
+};
+function tags(event) {
+	var tag = document.getSelection().toString();
+	console.log(tag);
+	if (tag && tag.length > 0 && tags_list[tag]) {
+		jumpto("/wiki/?query="+encodeURIComponent(tag));
+	}
+}
+toggle();
+</script>
+<style>
+.content {
+	width:85%;
+	height:100%;
+	float:left;
+	min-width:400px;
+}
+.toggle {
+	background-color:green;
+	width:2%;
+	height:100%;
+	float:left;
+}
+.text {
+	width:96%;
+	float:left;
+	margin-left:2%;
+}
+.link {
+	font-size:18px;
+}
+.number {
+	font-size:12px;
+	float:left;
+	position:relative;
+	left:-6px;
+	top:22px;
+	text-align:right;
+}
+</style>
+<div class="content">
+	<div class="toggle" title="点击，显示或隐藏目录" onclick="toggle()"></div>
+	<div class="text">
+		<div class="number">
+			{{range option . "nline"|meta|list}}
+			<div id="hash_{{.}}"><code>{{.}}</code></div>
+			{{end}}
+		</div>
+		{{$msg := .}}
+		{{if append . "name"}}
+			<ul>
+			{{range append . "name"}}
+			<li class="link">
+				<div><a href="/wiki/{{option $msg "dir"|meta}}/{{.}}">{{.}}</a></div>
+			</li>
+			{{end}}
+			<ul>
+		{{else}}
+			<p>{{append . "body"|meta|unscaped}}</p>
+			<p><pre><code onmouseup="return tags(event)">{{append . "code"|meta}}</code></pre><p>
+		{{end}}
+	</div>
+</div>
+</div>
 {{end}}

@@ -169,7 +169,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			Help: "用户登录, sessid: 会话ID, username: 用户名, password: 密码, load: 加载用户信息, save: 保存用户信息, filename: 文件名",
 			Form: map[string]int{"cert": 1, "pub": 1, "key": 1, "ip": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) { // {{{
+				if aaa, ok := c.Server.(*AAA); m.Assert(ok) { // {{{
 					stream := ""
 					if m.Has("ip") {
 						stream = m.Option("ip")

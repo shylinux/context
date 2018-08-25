@@ -1,7 +1,10 @@
 package web // {{{
 // }}}
 import ( // {{{
+	"bufio"
 	"contexts"
+	"github.com/gomarkdown/markdown"
+	"path/filepath"
 	"runtime"
 
 	"encoding/json"
@@ -13,7 +16,6 @@ import ( // {{{
 
 	"bytes"
 	"mime/multipart"
-	"path/filepath"
 
 	"fmt"
 	"io"
@@ -101,7 +103,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 
 		msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
 		msg.Put("option", "request", r).Put("option", "response", w)
-		hand(msg, msg.Target(), key)
+		hand(msg, msg.Target(), msg.Option("path"))
 
 		switch {
 		case msg.Has("redirect"):
@@ -243,6 +245,17 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "no", Help: "日志输出报文头"}
 	m.Capi("nserve", 1)
 
+	yac := m.Sess("tags", m.Sess("yac").Cmd("scan"))
+	yac.Cmd("train", "void", "void", "[\t ]+")
+	yac.Cmd("train", "other", "other", "[^\n]+")
+	yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
+	yac.Cmd("train", "code", "struct", "struct", "key", "\\{")
+	yac.Cmd("train", "code", "struct", "\\}", "key", ";")
+	yac.Cmd("train", "code", "struct", "typedef", "struct", "key", "key", ";")
+	yac.Cmd("train", "code", "function", "key", "\\*", "key", "(", "other")
+	yac.Cmd("train", "code", "function", "key", "key", "(", "other")
+	yac.Cmd("train", "code", "define", "#define", "key", "other")
+
 	if m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
 		web.Caches["key"] = &ctx.Cache{Name: "服务密钥", Value: m.Conf("key"), Help: "服务密钥"}
@@ -277,9 +290,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"cmd":          &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
 		"cert":         &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":          &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"wiki_dir":     &ctx.Config{Name: "wiki_dir", Value: "usr/wiki", Help: "路由数量"},
+		"which":        &ctx.Config{Name: "which", Value: "redis.note", Help: "路由数量"},
 		"root_index":   &ctx.Config{Name: "root_index(true/false)", Value: "true", Help: "路由数量"},
 		"auto_create":  &ctx.Config{Name: "auto_create(true/false)", Value: "true", Help: "路由数量"},
 		"refresh_time": &ctx.Config{Name: "refresh_time(ms)", Value: "1000", Help: "路由数量"},
+		"define": &ctx.Config{Name: "define", Value: map[string]interface{}{
+			"ngx_command_t": map[string]interface{}{
+				"position": map[string]interface{}{
+					"file": "nginx-1.15.2/src/core/ngx_core.h",
+					"line": "22",
+				},
+			},
+			"ngx_command_s": map[string]interface{}{
+				"position": map[string]interface{}{
+					"file": "nginx-1.15.2/src/core/ngx_conf_file.h",
+					"line": "77",
+				},
+			},
+		}, Help: "路由数量"},
 		"check": &ctx.Config{Name: "check", Value: map[string]interface{}{
 			"login": []interface{}{
 				map[string]interface{}{
@@ -438,9 +467,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"template": "wiki_menu", "title": "wiki_menu",
 				},
 				map[string]interface{}{
+					"module": "web", "command": "/wiki_list",
 					"template": "wiki_list", "title": "wiki_list",
 				},
 				map[string]interface{}{
+					"module": "web", "command": "/wiki_body",
 					"template": "wiki_body", "title": "wiki_body",
 				},
 			},
@@ -875,11 +906,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			// if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
-			// 	m.Copy(check, "append")
-			// 	return
-			// }
-			//
+			if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
+				m.Copy(check, "append")
+				return
+			}
+
 			r := m.Optionv("request").(*http.Request)
 			if m.Option("method") == "POST" {
 				if m.Options("filename") { //添加文件或目录
@@ -1076,7 +1107,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					continue
 				}
 				val := v.(map[string]interface{})
-				m.Log("fuck", "why %v", val)
 				//命令模板
 				if detail, ok := val["detail"].([]interface{}); ok {
 					msg := m.Spawn().Add("detail", detail[0].(string), detail[1:])
@@ -1148,7 +1178,150 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			m.Echo("blog service")
 		}},
-		"/wiki": &ctx.Command{Name: "/wiki", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/wiki_tags": &ctx.Command{Name: "/wiki_tags ", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) > 0 {
+				m.Option("dir", arg[0])
+			}
+
+			yac := m.Find("yac.parse4", true)
+
+			msg := m.Sess("nfs").Cmd("dir", path.Join(m.Conf("wiki_dir"), m.Option("dir")), "dir_name", "path")
+			for i, v := range msg.Meta["filename"] {
+				name := strings.TrimSpace(v)
+				es := strings.Split(name, ".")
+				switch es[len(es)-1] {
+				case "pyc", "o", "gz", "tar":
+					continue
+				case "c":
+					m.Log("fuck", "parse %s", name)
+				case "h":
+				default:
+					continue
+				}
+
+				f, e := os.Open(name)
+				m.Assert(e)
+				defer f.Close()
+
+				m.Log("fuck", "parse %d/%d %s", i, len(msg.Meta["filename"]), name)
+
+				bio := bufio.NewScanner(f)
+				for line := 1; bio.Scan(); line++ {
+					yac.Options("silent", true)
+					l := yac.Cmd("parse", "code", "void", bio.Text())
+
+					key := ""
+					switch l.Result(1) {
+					case "struct":
+						switch l.Result(2) {
+						case "struct", "}":
+							key = l.Result(3)
+						case "typedef":
+							if l.Result(3) == "struct" {
+								key = l.Result(5)
+							}
+						}
+					case "function":
+						switch l.Result(3) {
+						case "*":
+							key = l.Result(4)
+						default:
+							key = l.Result(3)
+						}
+					case "define":
+						key = l.Result(3)
+					}
+					if key != "" {
+						m.Confv("define", strings.Join([]string{key, "position"}, "."), map[string]interface{}{
+							"file": strings.TrimPrefix(name, m.Confx("wiki_dir")),
+							"line": line,
+							"type": l.Result(1),
+						})
+					}
+
+					yac.Meta = nil
+				}
+			}
+			m.Log("fuck", "parse %s", time.Now().Format("2006-01-02 15:04:05"))
+		}},
+		"/wiki_body": &ctx.Command{Name: "/wiki_body", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if ls, e := ioutil.ReadFile(path.Join(m.Conf("wiki_dir"), m.Confx("which"))); e == nil {
+				pre := false
+				es := strings.Split(m.Confx("which"), ".")
+				if len(es) > 0 {
+					switch es[len(es)-1] {
+					case "md":
+						ls = markdown.ToHTML(ls, nil, nil)
+					default:
+						pre = true
+					}
+				}
+
+				if pre {
+					m.Option("nline", bytes.Count(ls, []byte("\n")))
+					m.Option("nbyte", len(ls))
+					m.Add("append", "code", string(ls))
+					m.Add("append", "body", "")
+				} else {
+					m.Add("append", "body", string(ls))
+					m.Add("append", "code", "")
+				}
+				return
+			}
+
+			if m.Options("query") {
+				if v, ok := m.Confv("define", m.Option("query")).(map[string]interface{}); ok {
+					if val, ok := v["position"].(map[string]interface{}); ok {
+						m.Add("append", "name", fmt.Sprintf("%v#hash_%v", val["file"], val["line"]))
+						return
+					}
+				}
+				msg := m.Sess("nfs").Cmd("dir", path.Join(m.Conf("wiki_dir"), m.Option("dir")), "dir_name", "path")
+				for _, v := range msg.Meta["filename"] {
+					name := strings.TrimPrefix(strings.TrimSpace(v), m.Conf("wiki_dir"))
+					es := strings.Split(name, ".")
+					switch es[len(es)-1] {
+					case "pyc", "o", "gz", "tar":
+						continue
+					}
+					if strings.Contains(name, m.Option("query")) {
+						m.Add("append", "name", name)
+					}
+				}
+				return
+			}
+
+			msg := m.Spawn().Cmd("/wiki_list")
+			m.Copy(msg, "append").Copy(msg, "option")
+		}},
+		"/wiki_list": &ctx.Command{Name: "/wiki_list", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			ls, e := ioutil.ReadDir(path.Join(m.Conf("wiki_dir"), m.Option("which")))
+			m.Option("dir", m.Option("which"))
+			if e != nil {
+				dir, _ := path.Split(m.Option("which"))
+				m.Option("dir", dir)
+				ls, e = ioutil.ReadDir(path.Join(m.Conf("wiki_dir"), dir))
+			}
+
+			parent, _ := path.Split(strings.TrimSuffix(m.Option("dir"), "/"))
+			m.Option("parent", parent)
+			for _, l := range ls {
+				if l.Name()[0] == '.' {
+					continue
+				}
+				es := strings.Split(l.Name(), ".")
+				if len(es) > 0 {
+					switch es[len(es)-1] {
+					case "pyc", "o", "gz", "tar":
+						continue
+					}
+				}
+
+				m.Add("append", "name", l.Name())
+			}
+		}},
+		"/wiki/": &ctx.Command{Name: "/wiki", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Option("which", strings.TrimPrefix(key, "/wiki/"))
 			m.Append("template", "wiki")
 		}},
 		"temp": &ctx.Command{Name: "temp", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

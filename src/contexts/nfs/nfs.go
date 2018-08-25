@@ -1209,8 +1209,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						key := m.Meta["append"][i]
 						switch key {
 						case "filename":
-							if trip > 0 {
+							if line > -1 && trip > 0 && trip <= len(v) {
 								v = v[trip:]
+								m.Meta["filename"][line] = v
 							}
 						case "dir":
 							continue

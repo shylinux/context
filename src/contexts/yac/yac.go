@@ -185,7 +185,7 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string) (int, []*Po
 }
 
 // }}}
-func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line string, level int) (string, []string) { // {{{
+func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line string, level int) (string, []string, int) { // {{{
 	if m.Confs("debug") {
 		m.Log("debug", "%s\\%d %s(%d): %s", m.Conf("label")[0:level], level, yac.name(page), page, line)
 	}
@@ -224,7 +224,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 		if state == nil { //嵌套语法递归解析
 			for i := 0; i < m.Capi("ncell"); i++ {
 				if x := yac.mat[s][byte(i)]; i < m.Capi("nlang") && x != nil {
-					if l, w := yac.parse(m, out, i, void, line, level+1); l != line {
+					if l, w, _ := yac.parse(m, out, i, void, line, level+1); l != line {
 						line, word = l, append(word, w...)
 						state = x
 						break
@@ -245,7 +245,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 
 	if hash == 0 {
 		word = word[:0]
-	} else { //执行命令
+	} else if out != nil { //执行命令
 		msg := out.Spawn(m.Source()).Add("detail", yac.hand[hash], word)
 		if m.Back(msg); msg.Hand { //命令替换
 			m.Assert(!msg.Has("return"))
@@ -257,7 +257,7 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 		m.Log("debug", "%s/%d %s(%d): %v", m.Conf("label")[0:level], level, yac.name(page), page, word)
 	}
 
-	return line, word
+	return line, word, hash
 }
 
 // }}}
@@ -266,7 +266,7 @@ func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
-	if len(arg) > 0 && arg[0] == "parse" {
+	if len(arg) > 0 && arg[0] == "scan" {
 		return yac
 	}
 
@@ -277,7 +277,7 @@ func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 // }}}
 func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
-	if len(arg) > 0 && arg[0] == "parse" {
+	if len(arg) > 0 && arg[0] == "scan" {
 		return yac
 	}
 
@@ -304,7 +304,7 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 
 // }}}
 func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
-	if len(arg) > 0 && arg[0] == "parse" {
+	if len(arg) > 0 && arg[0] == "scan" {
 		lex := m.Sess("lex")
 		if lex.Cap("status") != "start" {
 			lex.Target().Start(lex)
@@ -338,7 +338,7 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) { // {{{
 			if len(line) == 0 {
 				continue
 			}
-			_, word := yac.parse(m, out, m.Optioni("page"), m.Optioni("void"), line, 1)
+			_, word, _ := yac.parse(m, out, m.Optioni("page"), m.Optioni("void"), line, 1)
 
 			if len(word) > 0 {
 				word = word[:len(word)-1]
@@ -469,14 +469,28 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 			// }}}
 		}},
-		"parse": &ctx.Command{
-			Name: "parse filename [yac_name [help]] [line line] [void void]",
+		"parse": &ctx.Command{Name: "parse page hash word...", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
+				m.Optioni("page", yac.page[arg[0]])
+				m.Optioni("void", yac.page[arg[1]])
+
+				str, word, hash := yac.parse(m, nil, m.Optioni("page"), m.Optioni("void"), arg[2], 1)
+				m.Result(str, yac.hand[hash], word)
+			}
+			// }}}
+		}},
+		"scan": &ctx.Command{
+			Name: "scan filename [yac_name [help]] [line line] [void void]",
 			Help: "解析文件, filename: yac_name:模块名, yac_help:模块帮助, 文件名, line: 默认语法, void: 默认空白",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) { // {{{
 					m.Optioni("page", yac.page["line"])
 					m.Optioni("void", yac.page["void"])
-					m.Start(m.Confx("yac_name", arg, 1), m.Confx("yac_help", arg, 2), key, arg[0])
+					if len(arg) > 0 {
+						m.Start(m.Confx("yac_name", arg, 1), m.Confx("yac_help", arg, 2), key, arg[0])
+					} else {
+						m.Start(m.Confx("yac_name", arg, 1), m.Confx("yac_help", arg, 2))
+					}
 				}
 				// }}}
 			}},

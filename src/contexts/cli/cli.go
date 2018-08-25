@@ -168,7 +168,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		}
 		m.Optionv("ps_target", cli.target)
 		return nil
-	}, "parse", arg[1]).Target().Name)
+	}, "scan", arg[1]).Target().Name)
 
 	if m.Options("init.shy") {
 		msg := m.Spawn().Cmd("source", m.Conf("init.shy"))

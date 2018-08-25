@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{option .Meta "page_title"}}</title>
 <style>
 	fieldset {
@@ -20,12 +21,23 @@
 		padding-left: 10px;
 		padding-right: 20px;
 	}
+	pre {
+		border:solid 1px green;
+		padding:5px;
+		border-left:solid 5px green;
+		overflow:scroll;
+	}
 	code {
 		font-size:14px;
 	}
 	.command {
 		font-size:14px;
 		font-family:monospace;
+	}
+	html, body {
+		height:100%;
+		width:100%;
+		margin:0px;
 	}
 </style>
 <script src="/library/context.js"></script>

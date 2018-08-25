@@ -5,6 +5,7 @@ install:
 	@go get github.com/go-sql-driver/mysql
 	@go get github.com/nsf/termbox-go
 	@go get github.com/skip2/go-qrcode
+	@go get github.com/gomarkdown/markdown
 	@cp etc/go.snippets ~/.vim/snippets/
 	@cp etc/shy.vim ~/.vim/syntax/
 	@touch etc/local.shy
