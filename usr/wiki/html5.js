@@ -75,9 +75,7 @@ var ctx3 = demo3.getContext("2d");
 demo3.onclick = draw3;
 draw3()
 
-var select_pan = document.getElementById("select_pan");
 var his = document.getElementById("draw_history");
-var show = document.getElementById("show");
 var item = document.getElementById("draw");
 var draw = item.getContext("2d");
 
@@ -108,17 +106,71 @@ function control(event) {//{{{
 //}}}
 
 var current_ctx = {//{{{
-	hide: 0,
-	scale: 1,
-	index_point: false,
-	shape: 'cycle',
-	stroke: 'stroke',
-	color: 'red',
-	font: '32px sans-serif',
 	big_scale: 1.25,
 	small_scale: 0.8,
+	font: '32px sans-serif',
+
+	index_point: false,
 	begin_point: null,
 	end_point: null,
+
+	config: {
+		shape: {value: "rect", list: [
+			{text: "心形", value: "heart"},
+			{text: "圆形", value: "cycle"},
+			{text: "矩形", value: "rect"},
+			{text: "直线", value: "line"},
+			{text: "文字", value: "text"},
+		]},
+		stroke: {value: "stroke", list: [
+			{text: "画笔", value: "stroke"},
+			{text: "画刷", value: "fill"},
+		]},
+		color: {value: "green", list: [
+			{text: "黑色", value: "black"},
+			{text: "红色", value: "red"},
+			{text: "黄色", value: "yellow"},
+			{text: "绿色", value: "green"},
+			{text: "蓝色", value: "blue"},
+			{text: "紫色", value: "purple"},
+			{text: "白色", value: "white"},
+		]},
+		scale: {label: "比例", value: 1, width: 40},
+		point: {label: "坐标", value: "0,0", width: 60},
+		begin: {label: "隐藏", value: 0, width: 40},
+	},
+	command: {
+		cmd_shape: {
+			heart: {text: "心形", key: "e",
+				conf:{"shape": "heart", "stroke": "fill"},
+				cmd:{"fill": "cmd_stroke"},
+			},
+			cycle: {text: "圆形", key: "c", conf:{"shape": "cycle"}},
+			rect: {text: "矩形", key: "r", conf:{"shape": "rect"}},
+			line: {text: "直线", key: "v",
+				conf:{"shape": "line", "stroke": "stroke"},
+				cmd:{"stroke": "cmd_stroke"},
+			},
+			text: {text: "文字", key: "t",
+				conf:{"shape": "text", "stroke": "fill"},
+				cmd:{"fill": "cmd_stroke"},
+			},
+		},
+		cmd_stroke: {
+			stroke: {text: "画笔", key: "s", conf:{"stroke": "stroke"}},
+			fill: {text: "画刷", key: "f", conf:{"stroke": "fill"}},
+		},
+		cmd_color: {
+			black: {text: "黑色", key: "", conf:{"color": "black"}},
+			red: {text: "红色", key: "", conf:{"color": "red"}},
+			yellow: {text: "黄色", key: "", conf:{"color": "yellow"}},
+			green: {text: "绿色", key: "", conf:{"color": "green"}},
+			purple: {text: "紫色", key: "", conf:{"color": "purple"}},
+			blue: {text: "蓝色", key: "", conf:{"color": "blue"}},
+			white: {text: "白色", key: "", conf:{"color": "white"}},
+		},
+	},
+
 	list: {
 		style: ["red", "green", "yellow", "blue"],
 		stroke: ["fill", "stroke"],
@@ -126,46 +178,147 @@ var current_ctx = {//{{{
 	}
 }
 //}}}
-function display(which, group) {//{{{
-	var cs = document.getElementsByClassName(group);
-	for (var i = 0; i < cs.length; i++) {
-		cs[i].style.backgroundColor = "white";
+function conf(group, which, value) {//{{{
+	if (value instanceof Event) {
+		var event = value;
+		switch (event.type) {
+			case "change":
+				current_ctx[group][which].value = event.target[event.target.selectedIndex].value;
+				break
+			case "keyup":
+				switch (event.key) {
+					case "Enter":
+						current_ctx[group][which].value = event.target.value;
+						break
+					case "Escape":
+						event.target.value = current_ctx[group][which].value;
+						break
+				}
+				break
+			case "blur":
+				if (current_ctx[group][which].value == event.target.value) {
+					break
+				}
+				if (confirm("save value?")) {
+					current_ctx[group][which].value = event.target.value;
+				} else {
+					event.target.value = current_ctx[group][which].value;
+				}
+				break
+		}
+		console.log("conf");
+		console.log(event);
+		return
 	}
 
-	var cs = document.getElementsByClassName(group+" "+which);
-	for (var i = 0; i < cs.length; i++) {
-		cs[i].style.backgroundColor = "lightblue";
+	var config = current_ctx[group][which];
+	if (value != undefined) {
+		var cs = document.getElementsByClassName(group+" "+which);
+		for (var i = 0; i < cs.length; i++) {
+			config.value = value;
+			if (cs[i].nodeName == "LABEL") {
+				cs[i].innerText = value;
+			} else {
+				cs[i].value = value;
+			}
+		}
 	}
-}
-//}}}
-function action(event, s) {//{{{
+	return config.value
+}//}}}
+function init(configs, commands) {//{{{
+	for (var k in configs) {
+		var config = configs[k];
+		var cs = document.getElementsByClassName("config "+k);
+
+		for (var i = 0; i < cs.length; i++) {
+			if (config.list) {
+				cs[i].innerHTML = "";
+				for (var j in config.list) {
+					var item = config.list[j];
+					var option = cs[i].appendChild(document.createElement("option"));
+					option.value = item.value
+					option.text = item.text
+					if (config.value == item.value) {
+						cs[i].selectedIndex = j
+					}
+				}
+				(function() {
+					var key = k;
+					cs[i].onchange = function(event) {
+						conf('config', key, event);
+					}
+				})();
+			} else {
+				cs[i].value = config.value;
+				(function() {
+					var key = k;
+					if (config.label) {
+						var label = cs[i].parentElement.insertBefore(document.createElement("label"), cs[i]);
+						label.appendChild(document.createTextNode(config.label+" "));
+					}
+					if (config.width) {
+						cs[i].style.width = config.width+"px";
+					}
+					cs[i].onkeyup = cs[i].onblur = function(event) {
+						conf('config', key, event);
+					}
+				})();
+			}
+		}
+	}
+
+	for (var group in commands) {
+		for (var which in commands[group]) {
+			var command = commands[group][which];
+			var cs = document.getElementsByClassName(group+" "+which);
+			for (var i = 0; i < cs.length; i++) {
+				if (command.key) {
+					cs[i].innerText = command.text+"("+command.key+")";
+				} else {
+					cs[i].innerText = command.text
+				}
+				(function() {
+					var key = which;
+					var key1 = group;
+					cs[i].onclick = function(event) {
+						action(event, key, key1);
+					}
+				})();
+			}
+		}
+	}
+}//}}}
+init(current_ctx.config, current_ctx.command);
+action(null, "heart", "cmd_shape");
+action(null, "red", "cmd_color");
+
+function action(event, which, group) {//{{{
 	console.log(event);
-	switch (s) {
+	switch (which) {
+		case "big":
+			conf("config", "scale", conf("config", "scale")*current_ctx.big_scale);
+			draw.scale(current_ctx.big_scale, current_ctx.big_scale);
+			refresh();
+			break
+		case "small":
+			conf("config", "scale", conf("config", "scale")*current_ctx.small_scale);
+			draw.scale(current_ctx.small_scale, current_ctx.small_scale);
+			refresh();
+			break
 		case "escape":
 			current_ctx.begin_point = null;
 			current_ctx.end_point = null;
 			refresh();
 			break
-		case "big":
-			current_ctx.scale *= current_ctx.big_scale;
-			draw.scale(current_ctx.big_scale, current_ctx.big_scale);
-			refresh();
-			break
-		case "small":
-			current_ctx.scale *= current_ctx.small_scale;
-			draw.scale(current_ctx.small_scale, current_ctx.small_scale);
-			refresh();
-			break
 		case "clear":
 			if (confirm("clear all?")) {
-				action(event, "clear");
 				his.innerHTML = "";
 				draw_history = [];
 				refresh();
 			}
 			break
 		case "hide":
-			current_ctx.hide = draw_history.length;
+			conf("config", "begin", draw_history.length);
 			refresh();
 			break
 		case "delete":
@@ -173,83 +326,32 @@ function action(event, s) {//{{{
 			refresh();
 			break
 		case "draw":
-			current_ctx.hide = 0;
+			conf("config", "begin", 0);
 			refresh();
 			break
-
-		case "fill":
-			current_ctx.stroke = "fill";
-			select_pan.selectedIndex=1;
-			break
-		case "stroke":
-			current_ctx.stroke = "stroke";
-			select_pan.selectedIndex=0;
-			break
-
-		case "heart":
-			current_ctx.shape = s;
-			current_ctx.stroke = "fill";
-			display("e", "control");
-			select_pan.selectedIndex=1;
-			break
-		case "cycle":
-			current_ctx.shape = s;
-			display("c", "control");
-			break
-		case "rect":
-			current_ctx.shape = s;
-			display("r", "control");
-			break
-		case "line":
-			current_ctx.shape = s;
-			current_ctx.stroke = "stroke";
-			select_pan.selectedIndex=0;
-			display("v", "control");
-			break
-		case "text":
-			current_ctx.shape = s;
-			current_ctx.stroke = "fill";
-			select_pan.selectedIndex=0;
-			display("t", "control");
-			break
-
 		case "play":
-			current_ctx.hide = 0;
+			conf("config", "begin", 0);
 			refresh(500, 0);
 			break
-	}
-}
-//}}}
-function select(event, config, val) {//{{{
-	var target = event.target;
-	var value = target[target.selectedIndex].value;
-	switch (config) {
-		case "color":
-			current_ctx.color = value;
-			break
-		case "stroke":
-			current_ctx.stroke = value;
-			break
-		case "shape":
-			display("r", "control");
-			switch (value) {
-				case "heart":
-					current_ctx.stroke = "fill";
-					display("h", "control");
-					break
-				case "cycle":
-					display("c", "control");
-					break
-				case "rect":
-					display("r", "control");
-					break
-				case "line":
-					current_ctx.stroke = "stroke";
-					display("v", "control");
-					break
+
+		default:
+      var cs = document.getElementsByClassName(group);
+      for (var i = 0; i < cs.length; i++) {
+        cs[i].style.backgroundColor = "white";
+      }
+
+      var cs = document.getElementsByClassName(group+" "+which);
+      for (var i = 0; i < cs.length; i++) {
+        cs[i].style.backgroundColor = "lightblue";
+      }
+
+			var command = current_ctx.command[group][which];
+			for (var k in command.conf) {
+				conf("config", k, command.conf[k]);
 			}
-			current_ctx.shape = value;
-			break
+			for (var k in command.cmd) {
+				action(event, k, command.cmd[k])
+			}
 	}
 }
 //}}}
@@ -288,10 +390,10 @@ function modify(event, row, col) {//{{{
 function refresh(time, i) {//{{{
 	if (time) {
 		if (0 == i) {
-			draw.clearRect(0, 0,400/current_ctx.scale, 400/current_ctx.scale);
+			draw.clearRect(0, 0,400/conf("config", "scale"), 400/conf("config", "scale"));
 		}
 
-		if (current_ctx.hide <= i && i < draw_history.length) {
+		if (conf("config", "begin") <= i && i < draw_history.length) {
 			var h = draw_history[i];
 			draws(draw, h.style, h.stroke, h.shape, h.begin_point, h.end_point);
 			i++;
@@ -302,10 +404,10 @@ function refresh(time, i) {//{{{
 		return
 	}
 
-	draw.clearRect(0, 0,400/current_ctx.scale, 400/current_ctx.scale);
+	draw.clearRect(0, 0,400/conf("config", "scale"), 400/conf("config", "scale"));
 
 	for (var i in draw_history) {
-		if (i <current_ctx.hide) {
+		if (i < conf("config", "begin")) {
 			continue
 		}
 		var h = draw_history[i];
@@ -413,8 +515,8 @@ function show_debug(log, clear) {//{{{
 //}}}
 
 function trans(point) {//{{{
-	point.x /= current_ctx.scale;
-	point.y /= current_ctx.scale;
+	point.x /= conf("config", "scale");
+	point.y /= conf("config", "scale");
 	return point;
 }
 //}}}
@@ -437,12 +539,12 @@ function draw_point(event) {//{{{
 	current_ctx.end_point = point;
 	console.log(current_ctx.end_point);
 	var text = "";
-	if (current_ctx.shape == "text") {
+	if (conf("config", "shape") == "text") {
 		text = prompt("请入文字", "");
 	}
 
-	draws(draw, current_ctx.color, current_ctx.stroke, current_ctx.shape, current_ctx.begin_point, current_ctx.end_point, text);
-	draw_history.push({style:current_ctx.color, stroke:current_ctx.stroke, shape:current_ctx.shape, begin_point:current_ctx.begin_point, end_point:current_ctx.end_point, text:text})
+	draws(draw, conf("config", "color"), conf("config", "stroke"), conf("config", "shape"), current_ctx.begin_point, current_ctx.end_point, text);
+	draw_history.push({style:conf("config", "color"), stroke:conf("config", "stroke"), shape:conf("config", "shape"), begin_point:current_ctx.begin_point, end_point:current_ctx.end_point, text:text})
 
 	var headers = ["style", "stroke", "shape", "x1", "y1", "x2", "y2", "text"]
 	if (his.rows.length == 0) {
@@ -454,7 +556,7 @@ function draw_point(event) {//{{{
 	}
 
 	var tr = his.insertRow(-1);
-	var fields = [current_ctx.color, current_ctx.stroke, current_ctx.shape,
+	var fields = [conf("config", "color"), conf("config", "stroke"), conf("config", "shape"),
 		parseInt(current_ctx.begin_point.x), parseInt(current_ctx.begin_point.y),
 		parseInt(current_ctx.end_point.x), parseInt(current_ctx.end_point.y), text]
 
@@ -498,10 +600,10 @@ function draw_point(event) {//{{{
 //}}}
 function draw_move(event) {//{{{
 	var point = trans({x:event.offsetX, y:event.offsetY});
-	show_debug("", true)
-	show.innerText="坐标: "+parseInt(point.x)+","+parseInt(point.y);
+	show_debug("", true);
+	conf("config", "point", parseInt(point.x)+","+parseInt(point.y));
 
-	if (current_ctx.shape == "move") {
+	if (conf("config", "shape") == "move") {
 	if (current_ctx.index_point) {
 		draw.beginPath();
 		draw.arc(point.x, point.y, 5, 0, 2*Math.PI);
@@ -511,7 +613,7 @@ function draw_move(event) {//{{{
 
 	if (current_ctx.begin_point) {
 		refresh();
-		draws(draw, current_ctx.color, current_ctx.stroke, current_ctx.shape, current_ctx.begin_point, point, "");
+		draws(draw, conf("config", "color"), conf("config", "stroke"), conf("config", "shape"), current_ctx.begin_point, point, "");
 	}
 	return false
 }

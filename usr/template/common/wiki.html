@@ -180,7 +180,9 @@ function tags(event) {
     }
 }
 document.onmouseup = tags;
-toggle();
+window.onload = function() {
+	toggle();
+}
 </script>
 <style>
 .content {
@@ -195,7 +197,7 @@ toggle();
 	height:100%;
 	float:left;
 }
-.text {
+.texts {
 	width:96%;
 	float:left;
 	margin-left:2%;
@@ -218,7 +220,7 @@ toggle();
 </style>
 <div class="content">
 	<div class="toggle" title="点击，显示或隐藏目录" onclick="toggle()"></div>
-	<div class="text">
+	<div class="texts">
 		<div class="number">
 			{{range option . "nline"|meta|list}}
 			<div id="hash_{{.}}" style="margin-top:-1px"><code>{{.}}</code></div>

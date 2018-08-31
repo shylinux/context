@@ -6,52 +6,49 @@
 - 文档: <https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/>
 
 ### miniCAD在线绘图
-<label>颜色: </label>
-<select onchange="select(event, 'color')">
-	<option>red</option>
-	<option>green</option>
-	<option>yellow</option>
-	<option>blue</option>
-	<option>black</option>
-	<option>white</option>
-	<option>purple</option>
-</select>
-<label>画笔: </label>
-<select id="select_pan" onchange="select(event, 'stroke')">
-	<option>stroke</option>
-	<option>fill</option>
-</select>
-<label>图形: </label>
-<select id="select_pan" onchange="select(event, 'shape')">
-	<option>heart</option>
-	<option>cycle</option>
-	<option>rect</option>
-	<option>line</option>
-</select>
-<label id="show">坐标: 0,0</label>
+<button class="cmd_shape heart"></button>
+<button class="cmd_shape cycle"></button>
+<button class="cmd_shape rect"></button>
+<button class="cmd_shape line"></button>
+<button class="cmd_shape text"></button>
 <br/>
-<button class="control e" onclick="action(event, 'heart')">画心(e)</button>
-<button class="control c" onclick="action(event, 'cycle')">画圆\(c\)</button>
-<button class="control r" onclick="action(event, 'rect')">矩形\(r\)</button>
-<button class="control v" onclick="action(event, 'line')">直线(v)</button>
-<button class="control t" onclick="action(event, 'text')">文字(t)</button>
-<button class="control a" onclick="action(event, 'play')">播放\(a\)</button>
+<button class="cmd_stroke stroke"></button>
+<button class="cmd_stroke fill"></button>
+<br/>
+<button class="cmd_color black"></button>
+<button class="cmd_color red"></button>
+<button class="cmd_color yellow"></button>
+<button class="cmd_color green"></button>
+<button class="cmd_color purple"></button>
+<button class="cmd_color blue"></button>
+<button class="cmd_color white"></button>
 <br/>
 <canvas id="draw" width="400" height="400"
 onmousemove="draw_move(event)"
 onmouseup="draw_point(event)"
 ></canvas>
 <br/>
-<button class="control" onclick="action(event, 'move')">追踪</button>
+<select class="config shape"></select>
+<select class="config stroke"></select>
+<select class="config color"></select>
+<input class="config scale">
+<label class="config point">
+<label class="config begin">
+<br/>
 <button class="control b" onclick="action(event, 'big')">放大(b)</button>
 <button class="control m" onclick="action(event, 'small')">缩小(m)</button>
+<button class="control" onclick="action(event, 'move')">追踪</button>
 <button class="control" onclick="action(event, 'hide')">隐藏</button>
 <button class="control" onclick="action(event, 'draw')">恢复</button>
 <button class="control d" onclick="action(event, 'delete')">删除\(d\)</button>
 <button class="control" onclick="action(event, 'clear')">清空\(q\)</button>
+<button class="control a" onclick="action(event, 'play')">播放\(a\)</button>
 <br/>
 <div id="fuck">
 </div>
+
+<input class="config scale">
+
 <div style="clear:both">
 </div>
 <br/>
