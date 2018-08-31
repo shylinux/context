@@ -1,8 +1,8 @@
 login root root
 ~aaa
-	login load etc/login.txt
+	login load var/login.txt
 ~file1
-	history load etc/history.txt
+	history load var/history.txt
 
 source etc/local.shy
 

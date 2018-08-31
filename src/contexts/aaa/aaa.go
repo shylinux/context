@@ -2,7 +2,12 @@ package aaa // {{{
 // }}}
 import ( // {{{
 	"contexts"
+	"crypto/sha1"
 	"math/big"
+	"net/http"
+	"sort"
+
+	"encoding/json"
 
 	"bufio"
 	"io"
@@ -147,8 +152,38 @@ var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	Caches: map[string]*ctx.Cache{
 		"nuser": &ctx.Cache{Name: "nuser", Value: "0", Help: "用户数量"},
+
+		"access_expire": &ctx.Cache{Name: "会话超时", Value: "0", Help: "会话超时"},
+		"access_token": &ctx.Cache{Name: "会话令牌", Value: "0", Help: "会话令牌", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
+			if len(arg) > 0 { // {{{
+				return arg[0]
+			}
+
+			if m.Capi("access_expire") < int(time.Now().Unix()) {
+				var data struct {
+					Errcode      int64
+					Errmsg       string
+					Access_token string
+					Expires_in   int64
+				}
+				res, e := http.Get(fmt.Sprintf(m.Conf("wx_api")+m.Conf("access_route"), m.Conf("appid"), m.Conf("appmm")))
+				m.Assert(e)
+				m.Assert(json.NewDecoder(res.Body).Decode(&data))
+				m.Cap("access_expire", fmt.Sprintf("%d", time.Now().Unix()+data.Expires_in))
+				x.Value = data.Access_token
+				m.Log("info", "access_token: %s(%s)", m.Cap("access_token"), m.Cap("access_expire"))
+				m.Cap("stream", m.Conf("appid"))
+			}
+			return x.Value // }}}
+		}},
 	},
 	Configs: map[string]*ctx.Config{
+		"wx_api":       &ctx.Config{Name: "微信接口", Value: "https://api.weixin.qq.com/cgi-bin/", Help: "微信登录"},
+		"access_route": &ctx.Config{Name: "微信登录", Value: "token?grant_type=client_credential&appid=%s&secret=%s", Help: "微信登录"},
+		"appid":        &ctx.Config{Name: "微信帐号", Value: "", Help: "微信帐号"},
+		"appmm":        &ctx.Config{Name: "微信密码", Value: "", Help: "微信密码"},
+		"token":        &ctx.Config{Name: "微信令牌", Value: "", Help: "微信密码"},
+
 		"rootname": &ctx.Config{Name: "rootname", Value: "root", Help: "根用户名"},
 		"expire":   &ctx.Config{Name: "expire(s)", Value: "7200", Help: "会话超时"},
 		"pub":      &ctx.Config{Name: "pub", Value: "etc/pub.pem", Help: "公钥文件"},
@@ -171,8 +206,23 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if aaa, ok := c.Server.(*AAA); m.Assert(ok) { // {{{
 					stream := ""
+					method := ""
+					username := ""
+					m.Log("fuck", "%s %s", method, username)
+					if len(arg) > 0 {
+						switch arg[0] {
+						case "openid":
+							method = arg[0]
+							username = arg[1]
+							stream = arg[1]
+						}
+					}
+
 					if m.Has("ip") {
 						stream = m.Option("ip")
+					}
+					if m.Has("openid") {
+						stream = m.Option("openid")
 					}
 					if m.Has("pub") {
 						stream = m.Option("pub")
@@ -249,7 +299,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 									word := strings.SplitN(bio.Text(), ":", 3)
 									msg := m.Spawn()
 									msg.Start(word[0], "用户", word[0], word[1], word[2])
-									msg.Spawn().Cmd("config", "load", fmt.Sprintf("etc/%s.json", word[0]), "lark")
+									msg.Spawn().Cmd("config", "load", fmt.Sprintf("var/%s.json", word[0]), "lark")
 								}
 							}
 						case "save":
@@ -257,7 +307,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								m.Travel(func(m *ctx.Message, i int) bool {
 									if i > 0 && m.Cap("username") != "root" {
 										f.WriteString(fmt.Sprintf("%s:%s:%s\n", m.Cap("username"), m.Cap("password"), m.Cap("sessid")))
-										m.Spawn().Cmd("config", "save", fmt.Sprintf("etc/%s.json", m.Cap("username")), "lark")
+										m.Spawn().Cmd("config", "save", fmt.Sprintf("var/%s.json", m.Cap("username")), "lark")
 									}
 									return true
 								})
@@ -701,6 +751,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 				// }}}
 			}},
+		"wx": &ctx.Command{Name: "wx check signature", Help: "微信", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			list := []string{m.Option("nonce"), m.Option("timestamp"), m.Conf("token")}
+			sort.Strings(list)
+			b := sha1.Sum([]byte(strings.Join(list, "")))
+
+			if m.Option("signature") == hex.EncodeToString(b[:]) {
+				m.Echo("ok")
+			}
+		}},
 	},
 }
 

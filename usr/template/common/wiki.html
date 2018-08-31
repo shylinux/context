@@ -14,6 +14,9 @@ function jumpto(url) {
 }
 function keyup(event) {
 	console.log(event);
+	if (typeof window.control == "function") {
+		control(event);
+	}
 	if (event.key == "z") {
 		var input = document.getElementsByClassName("query_input")[0];
 		if (!window.query_show) {
@@ -156,18 +159,27 @@ function query(event) {
 		input.style.width = "0px";
 	}
 }
-var tags_list = {
-	{{range $key, $val := conf . "define"}}
-	"{{$key}}": true,
-	{{end}}
-};
+var tags_list = {};
+ctx.GET("/wiki/define.json", undefined, function(msg){
+	tags_list = msg["define"];
+})
 function tags(event) {
-	var tag = document.getSelection().toString();
-	console.log(tag);
-	if (tag && tag.length > 0 && tags_list[tag]) {
-		jumpto("/wiki/?query="+encodeURIComponent(tag));
-	}
+	console.log(event);
+
+    if (event.srcElement.tagName == "CODE") {
+        var tag = document.getSelection().toString();
+        console.log(tag);
+        if (tag && tag.length > 0 && tags_list[tag]) {
+			var position = tags_list[tag].position;
+			if (position.length == 1) {
+				jumpto("/wiki"+position[0].file+"#hash_"+position[0].line);
+			} else {
+				jumpto("/wiki/?query="+encodeURIComponent(tag));
+			}
+        }
+    }
 }
+document.onmouseup = tags;
 toggle();
 </script>
 <style>
@@ -192,12 +204,16 @@ toggle();
 	font-size:18px;
 }
 .number {
-	font-size:12px;
 	float:left;
 	position:relative;
 	left:-6px;
-	top:22px;
+	top:18px;
 	text-align:right;
+}
+.number div {
+	margin:0px;
+	padding:0px;
+	height:16px;
 }
 </style>
 <div class="content">
@@ -205,23 +221,34 @@ toggle();
 	<div class="text">
 		<div class="number">
 			{{range option . "nline"|meta|list}}
-			<div id="hash_{{.}}"><code>{{.}}</code></div>
+			<div id="hash_{{.}}" style="margin-top:-1px"><code>{{.}}</code></div>
 			{{end}}
 		</div>
 		{{$msg := .}}
 		{{if append . "name"}}
-			<ul>
-			{{range append . "name"}}
-			<li class="link">
-				<div><a href="/wiki/{{option $msg "dir"|meta}}/{{.}}">{{.}}</a></div>
-			</li>
-			{{end}}
-			<ul>
+            {{$l := append . "name"|len}}
+            {{if eq $l 1}}
+                <script>
+                    location.replace("/wiki/{{option $msg "dir"|meta|unscaped}}/{{append . "name"|meta|unscaped}}");
+                </script>
+            {{else}}
+                <ul>
+                {{range $i, $v := append . "name"}}
+                <li class="link">
+				<div>
+					<code>{{option $msg "time" $i}}&nbsp;&nbsp;&nbsp;</code>
+					<a href="/wiki/{{option $msg "dir"|meta}}/{{$v}}{{option $msg "pend" $i}}">{{$v}}{{option $msg "pend" $i}}</a>
+				</div>
+                </li>
+                {{end}}
+                <ul>
+            {{end}}
 		{{else}}
 			<p>{{append . "body"|meta|unscaped}}</p>
-			<p><pre><code onmouseup="return tags(event)">{{append . "code"|meta}}</code></pre><p>
+			<p><pre><code>{{append . "code"|meta}}</code></pre><p>
 		{{end}}
 	</div>
 </div>
+
 </div>
 {{end}}

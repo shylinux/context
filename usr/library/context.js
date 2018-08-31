@@ -41,6 +41,52 @@ ctx = {
 		}
 		location.search = arg.join("&");
 	},//}}}
+	GET: function(url, form, cb) {//{{{
+		var xhr = new XMLHttpRequest();
+		xhr.onreadystatechange = function() {
+			switch (xhr.readyState) {
+				case 4:
+					switch (xhr.status) {
+						case 200:
+							try {
+								var msg = JSON.parse(xhr.responseText||'{"result":[]}');
+							} catch (e) {
+								msg = {"result": [xhr.responseText]}
+							}
+
+							msg && console.log(msg)
+							msg.result && console.log(msg.result.join(""));
+							typeof cb == "function" && cb(msg)
+					}
+					break;
+			}
+		}
+
+		form = form || {}
+		form["dir"] = form["dir"] || this.Search("dir") || undefined
+		form["module"] = form["module"] || this.Search("module") || undefined
+		form["domain"] = form["domain"] || this.Search("domain") || undefined
+
+		var args = [];
+		for (k in form) {
+			if (form[k] instanceof Array) {
+				for (i in form[k]) {
+					args.push(k+"="+encodeURIComponent(form[k][i]));
+				}
+			} else if (form[k] != undefined) {
+				args.push(k+"="+encodeURIComponent(form[k]));
+			}
+		}
+
+		var arg = args.join("&");
+        if (arg) {
+            url += "?"+arg
+        }
+
+		xhr.open("GET", url);
+		console.log("GET: "+url+"?"+arg);
+		xhr.send();
+	},//}}}
 	POST: function(url, form, cb) {//{{{
 		var xhr = new XMLHttpRequest();
 		xhr.onreadystatechange = function() {

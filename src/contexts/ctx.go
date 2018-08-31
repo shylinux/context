@@ -3466,6 +3466,7 @@ func Start(args ...string) {
 	Pulse.Sess("cli", "cli")
 
 	Pulse.Sess("aaa", "aaa")
+	Pulse.Sess("web", "web")
 	Pulse.Sess("log", "log")
 
 	if len(args) > 0 {
