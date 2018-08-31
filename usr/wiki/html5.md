@@ -26,9 +26,6 @@
 <canvas id="draw" width="400" height="400"
 onmousemove="draw_move(event)"
 onmouseup="draw_point(event)"
-onclick="draw_point(event)"
-ontouchstart="draw_point(event)"
-ontouchend="draw_point(event)"
 ></canvas>
 <br/>
 <select class="config shape"></select>

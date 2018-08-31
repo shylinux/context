@@ -348,7 +348,6 @@ function action(event, which, group) {//{{{
 			draw_history = JSON.parse(conf("config", "json"));
 			refresh();
 			break
-
 		default:
 			if (!which || !group) {
 				break
@@ -395,13 +394,10 @@ function draw_point(event) {//{{{
 	console.log("point");
 	console.log(event);
 	show_debug(event.type)
-	show_debug(event.clientX)
-	show_debug(event.clientY)
-	show_debug(JSON.stringify(event.touches[0]))
-	show_debug(JSON.stringify(event))
-
-
-	var point = trans({x:event.offsetX||event.clientX, y:event.offsetY||event.clientY});
+	var point = trans({x:event.offsetX, y:event.offsetY});
+	if (event.type == "touchstart") {
+		var point = trans({x:event.touches[0].clientX, y:event.touches[0].clientY});
+	}
 
 	if (current_ctx.index_point) {
 		draw.beginPath();
@@ -477,22 +473,12 @@ function draw_point(event) {//{{{
 //}}}
 function draw_move(event) {//{{{
 	var point = trans({x:event.offsetX, y:event.offsetY});
-	show_debug("", true);
 	conf("config", "point", parseInt(point.x)+","+parseInt(point.y));
-
-	if (conf("config", "shape") == "move") {
-	if (current_ctx.index_point) {
-		draw.beginPath();
-		draw.arc(point.x, point.y, 5, 0, 2*Math.PI);
-		draw.fill();
-	}
-	}
 
 	if (current_ctx.begin_point) {
 		refresh();
 		draws(draw, conf("config", "color"), conf("config", "stroke"), conf("config", "shape"), current_ctx.begin_point, point, "");
 	}
-	return false
 }
 //}}}
 

@@ -102,7 +102,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 			msg.Add("option", k, v)
 		}
 
-		msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
+		// msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
 		msg.Put("option", "request", r).Put("option", "response", w)
 		hand(msg, msg.Target(), msg.Option("path"))
 
@@ -125,8 +125,9 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 
 // }}}
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
-	m := web.Message().Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
-
+	m := web.Message()
+	// .Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
+	//
 	if m.Confs("logheaders") {
 		for k, v := range r.Header {
 			m.Log("info", "%s: %v", k, v)
