@@ -26,33 +26,33 @@
 <canvas id="draw" width="400" height="400"
 onmousemove="draw_move(event)"
 onmouseup="draw_point(event)"
+onclick="draw_point(event)"
+ontouchstart="draw_point(event)"
+ontouchend="draw_point(event)"
 ></canvas>
 <br/>
 <select class="config shape"></select>
 <select class="config stroke"></select>
 <select class="config color"></select>
-<input class="config scale">
-<label class="config point">
-<label class="config begin">
+<label class="config scale"></label>
+<label class="config begin"></label>
+<label class="config point"></label>
 <br/>
-<button class="control b" onclick="action(event, 'big')">放大(b)</button>
-<button class="control m" onclick="action(event, 'small')">缩小(m)</button>
-<button class="control" onclick="action(event, 'move')">追踪</button>
-<button class="control" onclick="action(event, 'hide')">隐藏</button>
-<button class="control" onclick="action(event, 'draw')">恢复</button>
-<button class="control d" onclick="action(event, 'delete')">删除\(d\)</button>
-<button class="control" onclick="action(event, 'clear')">清空\(q\)</button>
-<button class="control a" onclick="action(event, 'play')">播放\(a\)</button>
+<button class="control big"></button>
+<button class="control small"></button>
+<button class="control hide"></button>
+<button class="control draw"></button>
+<button class="control play"></button>
+<input class="config interval"></label>
 <br/>
-<div id="fuck">
-</div>
-
-<input class="config scale">
-
-<div style="clear:both">
-</div>
+<button class="control delete"></button>
+<button class="control clear"></button>
+<button class="control export"></button>
+<button class="control import"></button>
+<input class="config json"></label>
 <br/>
-<div><table id="draw_history"></table></div>
+<div id="fuck"></div>
+<table id="draw_history"></table>
 
 ### canvas绘图
 <canvas id="demo0" class="demo" width="120" height="120"></canvas>

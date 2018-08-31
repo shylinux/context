@@ -75,35 +75,6 @@ var ctx3 = demo3.getContext("2d");
 demo3.onclick = draw3;
 draw3()
 
-var his = document.getElementById("draw_history");
-var item = document.getElementById("draw");
-var draw = item.getContext("2d");
-
-var control_map = {//{{{
-	s: "stroke",
-	f: "fill",
-
-	e: "heart",
-	c: "cycle",
-	r: "rect",
-	v: "line",
-	t: "text",
-
-	d: "delete",
-
-	b: "big",
-	m: "small",
-	a: "play",
-
-	Escape: "escape",
-}
-//}}}
-function control(event) {//{{{
-	if (event.type == "keyup") {
-		action(event, control_map[event.key]);
-	}
-}
-//}}}
 
 var current_ctx = {//{{{
 	big_scale: 1.25,
@@ -138,6 +109,8 @@ var current_ctx = {//{{{
 		scale: {label: "比例", value: 1, width: 40},
 		point: {label: "坐标", value: "0,0", width: 60},
 		begin: {label: "隐藏", value: 0, width: 40},
+		interval: {label: "间隔", value: 100, width: 40},
+		json: {label: "数据", value: "", width: 100},
 	},
 	command: {
 		cmd_shape: {
@@ -169,6 +142,17 @@ var current_ctx = {//{{{
 			blue: {text: "蓝色", key: "", conf:{"color": "blue"}},
 			white: {text: "白色", key: "", conf:{"color": "white"}},
 		},
+		control: {
+			big: {text: "放大", key: "b"},
+			small: {text: "缩小", key: "m"},
+			hide: {text: "隐藏"},
+			draw: {text: "恢复"},
+			play: {text: "播放", key: "a"},
+			delete: {text: "删除", key: "d"},
+			clear: {text: "清空", key: "q"},
+			export: {text: "导出"},
+			import: {text: "导入"},
+		}
 	},
 
 	list: {
@@ -178,6 +162,70 @@ var current_ctx = {//{{{
 	}
 }
 //}}}
+function init(configs, commands) {//{{{
+	for (var k in configs) {
+		var config = configs[k];
+		var cs = document.getElementsByClassName("config "+k);
+
+		for (var i = 0; i < cs.length; i++) {
+			if (config.list) {
+				cs[i].innerHTML = "";
+				for (var j in config.list) {
+					var item = config.list[j];
+					var option = cs[i].appendChild(document.createElement("option"));
+					option.value = item.value
+					option.text = item.text
+					if (config.value == item.value) {
+						cs[i].selectedIndex = j
+					}
+				}
+				(function() {
+					var key = k;
+					cs[i].onchange = function(event) {
+						conf('config', key, event);
+					}
+				})();
+			} else {
+				cs[i].value = config.value;
+				(function() {
+					var key = k;
+					if (config.label) {
+						var label = cs[i].parentElement.insertBefore(document.createElement("label"), cs[i]);
+						label.appendChild(document.createTextNode(config.label+": "));
+					}
+					if (config.width) {
+						cs[i].style.width = config.width+"px";
+					}
+					cs[i].onkeyup = cs[i].onblur = function(event) {
+						conf('config', key, event);
+					}
+					conf('config', key, config.value);
+				})();
+			}
+		}
+	}
+
+	for (var group in commands) {
+		for (var which in commands[group]) {
+			var command = commands[group][which];
+			var cs = document.getElementsByClassName(group+" "+which);
+			for (var i = 0; i < cs.length; i++) {
+				if (command.key) {
+					cs[i].innerText = command.text+"("+command.key+")";
+				} else {
+					cs[i].innerText = command.text
+				}
+				(function() {
+					var key = which;
+					var key1 = group;
+					cs[i].onclick = function(event) {
+						action(event, key, key1);
+					}
+				})();
+			}
+		}
+	}
+}//}}}
 function conf(group, which, value) {//{{{
 	if (value instanceof Event) {
 		var event = value;
@@ -225,83 +273,43 @@ function conf(group, which, value) {//{{{
 	}
 	return config.value
 }//}}}
-function init(configs, commands) {//{{{
-	for (var k in configs) {
-		var config = configs[k];
-		var cs = document.getElementsByClassName("config "+k);
-
-		for (var i = 0; i < cs.length; i++) {
-			if (config.list) {
-				cs[i].innerHTML = "";
-				for (var j in config.list) {
-					var item = config.list[j];
-					var option = cs[i].appendChild(document.createElement("option"));
-					option.value = item.value
-					option.text = item.text
-					if (config.value == item.value) {
-						cs[i].selectedIndex = j
-					}
-				}
-				(function() {
-					var key = k;
-					cs[i].onchange = function(event) {
-						conf('config', key, event);
-					}
-				})();
-			} else {
-				cs[i].value = config.value;
-				(function() {
-					var key = k;
-					if (config.label) {
-						var label = cs[i].parentElement.insertBefore(document.createElement("label"), cs[i]);
-						label.appendChild(document.createTextNode(config.label+" "));
-					}
-					if (config.width) {
-						cs[i].style.width = config.width+"px";
-					}
-					cs[i].onkeyup = cs[i].onblur = function(event) {
-						conf('config', key, event);
-					}
-				})();
-			}
-		}
-	}
-
-	for (var group in commands) {
-		for (var which in commands[group]) {
-			var command = commands[group][which];
-			var cs = document.getElementsByClassName(group+" "+which);
-			for (var i = 0; i < cs.length; i++) {
-				if (command.key) {
-					cs[i].innerText = command.text+"("+command.key+")";
-				} else {
-					cs[i].innerText = command.text
-				}
-				(function() {
-					var key = which;
-					var key1 = group;
-					cs[i].onclick = function(event) {
-						action(event, key, key1);
-					}
-				})();
-			}
-		}
-	}
-}//}}}
 init(current_ctx.config, current_ctx.command);
-action(null, "heart", "cmd_shape");
-action(null, "red", "cmd_color");
 
+var control_map = {//{{{
+	s: "stroke",
+	f: "fill",
+
+	e: "heart",
+	c: "cycle",
+	r: "rect",
+	v: "line",
+	t: "text",
+
+	d: "delete",
+
+	b: "big",
+	m: "small",
+	a: "play",
+
+	Escape: "escape",
+}
+//}}}
+function control(event) {//{{{
+	if (event.type == "keyup") {
+		action(event, control_map[event.key]);
+	}
+}
+//}}}
 function action(event, which, group) {//{{{
 	console.log(event);
 	switch (which) {
 		case "big":
-			conf("config", "scale", conf("config", "scale")*current_ctx.big_scale);
+			conf("config", "scale", (conf("config", "scale")*current_ctx.big_scale).toFixed(3));
 			draw.scale(current_ctx.big_scale, current_ctx.big_scale);
 			refresh();
 			break
 		case "small":
-			conf("config", "scale", conf("config", "scale")*current_ctx.small_scale);
+			conf("config", "scale", (conf("config", "scale")*current_ctx.small_scale).toFixed(3));
 			draw.scale(current_ctx.small_scale, current_ctx.small_scale);
 			refresh();
 			break
@@ -331,19 +339,29 @@ function action(event, which, group) {//{{{
 			break
 		case "play":
 			conf("config", "begin", 0);
-			refresh(500, 0);
+			refresh(conf("config", "interval"), 0);
+			break
+		case "export":
+			conf("config", "json", JSON.stringify(draw_history));
+			break
+		case "import":
+			draw_history = JSON.parse(conf("config", "json"));
+			refresh();
 			break
 
 		default:
-      var cs = document.getElementsByClassName(group);
-      for (var i = 0; i < cs.length; i++) {
-        cs[i].style.backgroundColor = "white";
-      }
+			if (!which || !group) {
+				break
+			}
+			var cs = document.getElementsByClassName(group);
+			for (var i = 0; i < cs.length; i++) {
+				cs[i].style.backgroundColor = "white";
+			}
 
-      var cs = document.getElementsByClassName(group+" "+which);
-      for (var i = 0; i < cs.length; i++) {
-        cs[i].style.backgroundColor = "lightblue";
-      }
+			var cs = document.getElementsByClassName(group+" "+which);
+			for (var i = 0; i < cs.length; i++) {
+				cs[i].style.backgroundColor = "lightblue";
+			}
 
 			var command = current_ctx.command[group][which];
 			for (var k in command.conf) {
@@ -355,164 +373,8 @@ function action(event, which, group) {//{{{
 	}
 }
 //}}}
-
-var draw_history = [];
-function modify(event, row, col) {//{{{
-	if (event.key != "Enter") {
-		return
-	}
-	console.log("modify");
-	console.log(event);
-	console.log();
-	var data = event.target.dataset;
-	var row = draw_history[data.row];
-	var value = event.target.value;
-	switch (data.col) {
-		case "x1":
-			row.begin_point.x = value;
-			break
-		case "y1":
-			row.begin_point.y = value;
-			break
-		case "x2":
-			row.end_point.x = value;
-			break
-		case "y2":
-			row.end_point.y = value;
-			break
-		default:
-			row[data.col] = value;
-	}
-
-	refresh();
-}
-//}}}
-function refresh(time, i) {//{{{
-	if (time) {
-		if (0 == i) {
-			draw.clearRect(0, 0,400/conf("config", "scale"), 400/conf("config", "scale"));
-		}
-
-		if (conf("config", "begin") <= i && i < draw_history.length) {
-			var h = draw_history[i];
-			draws(draw, h.style, h.stroke, h.shape, h.begin_point, h.end_point);
-			i++;
-			setTimeout(function(){
-				refresh(time, i);
-			}, time);
-		}
-		return
-	}
-
-	draw.clearRect(0, 0,400/conf("config", "scale"), 400/conf("config", "scale"));
-
-	for (var i in draw_history) {
-		if (i < conf("config", "begin")) {
-			continue
-		}
-		var h = draw_history[i];
-		draws(draw, h.style, h.stroke, h.shape, h.begin_point, h.end_point, h.text);
-	}
-}
-//}}}
-function draws(draw, style, stroke, shape, begin_point, end_point, text) {//{{{
-	draw.save();
-	begin_x = begin_point.x;
-	begin_y = begin_point.y;
-	end_x = end_point.x;
-	end_y = end_point.y;
-
-	if (current_ctx.index_point) {
-	draw.beginPath();
-	draw.arc(begin_x, begin_y, 5, 0, 2*Math.PI)
-	draw.fill()
-	}
-
-	if (current_ctx.index_point) {
-	draw.beginPath();
-	draw.arc(end_x, end_y, 5, 0, 2*Math.PI)
-	draw.fill()
-	}
-
-	switch (shape) {
-		case 'heart':
-			r = Math.sqrt(Math.pow(begin_x-end_x, 2)+Math.pow(begin_y-end_y,2));
-			a = Math.atan((end_y-begin_y)/(end_x-begin_x))/Math.PI*180;
-			drawHeart(draw, begin_x, begin_y, r, a, style, stroke)
-			break
-		case 'cycle':
-			draw.beginPath();
-			r = Math.sqrt(Math.pow(begin_x-end_x, 2)+Math.pow(begin_y-end_y,2));
-			draw.arc(begin_x, begin_y, r, 0, 2*Math.PI)
-			if (stroke == "stroke") {
-				if (style) {
-					draw.strokeStyle = style;
-				}
-				draw.stroke()
-			} else {
-				if (style) {
-					draw.fillStyle = style;
-				}
-				draw.fill()
-			}
-			break
-		case 'line':
-			draw.beginPath();
-			draw.moveTo(begin_x, begin_y);
-			draw.lineTo(end_x, end_y);
-			if (stroke == "stroke") {
-				if (style) {
-					draw.strokeStyle = style;
-				}
-				draw.stroke()
-			} else {
-				if (style) {
-					draw.fillStyle = style;
-				}
-				draw.fill()
-			}
-			break
-		case 'rect':
-			if (stroke == "stroke") {
-				if (style) {
-					draw.strokeStyle = style;
-				}
-				draw.strokeRect(begin_x, begin_y, end_x-begin_x, end_y-begin_y);
-			} else {
-				if (style) {
-					draw.fillStyle = style;
-				}
-				draw.fillRect(begin_x, begin_y, end_x-begin_x, end_y-begin_y);
-			}
-			break
-		case 'text':
-			if (stroke == "stroke") {
-				if (style) {
-					draw.strokeStyle = style;
-				}
-				draw.font = current_ctx.font;
-				draw.strokeText(text, begin_x, begin_y, end_x-begin_x);
-			} else {
-				if (style) {
-					draw.fillStyle = style;
-				}
-				draw.font = current_ctx.font;
-				draw.fillText(text, begin_x, begin_y, end_x-begin_x);
-			}
-	}
-
-	draw.restore();
-}
-//}}}
-function show_debug(log, clear) {//{{{
-	var fuck = document.getElementById("fuck");
-	if (clear) {
-		fuck.innerHTML = "";
-	}
-	var div = fuck.appendChild(document.createElement("div"));
-	div.appendChild(document.createTextNode(log));
-}
-//}}}
+action(null, "heart", "cmd_shape");
+action(null, "red", "cmd_color");
 
 function trans(point) {//{{{
 	point.x /= conf("config", "scale");
@@ -520,11 +382,26 @@ function trans(point) {//{{{
 	return point;
 }
 //}}}
+function show_debug(log, clear) {//{{{
+	var fuck = document.getElementById("fuck");
+	// if (clear) {
+	// 	fuck.innerHTML = "";
+	// }
+	var div = fuck.appendChild(document.createElement("div"));
+	div.appendChild(document.createTextNode(log));
+}
+//}}}
 function draw_point(event) {//{{{
 	console.log("point");
 	console.log(event);
+	show_debug(event.type)
+	show_debug(event.clientX)
+	show_debug(event.clientY)
+	show_debug(JSON.stringify(event.touches[0]))
+	show_debug(JSON.stringify(event))
 
-	var point = trans({x:event.offsetX, y:event.offsetY});
+
+	var point = trans({x:event.offsetX||event.clientX, y:event.offsetY||event.clientY});
 
 	if (current_ctx.index_point) {
 		draw.beginPath();
@@ -616,6 +493,159 @@ function draw_move(event) {//{{{
 		draws(draw, conf("config", "color"), conf("config", "stroke"), conf("config", "shape"), current_ctx.begin_point, point, "");
 	}
 	return false
+}
+//}}}
+
+var draw_history = [];
+var his = document.getElementById("draw_history");
+function modify(event, row, col) {//{{{
+	if (event.key != "Enter") {
+		return
+	}
+	console.log("modify");
+	console.log(event);
+	console.log();
+	var data = event.target.dataset;
+	var row = draw_history[data.row];
+	var value = event.target.value;
+	switch (data.col) {
+		case "x1":
+			row.begin_point.x = value;
+			break
+		case "y1":
+			row.begin_point.y = value;
+			break
+		case "x2":
+			row.end_point.x = value;
+			break
+		case "y2":
+			row.end_point.y = value;
+			break
+		default:
+			row[data.col] = value;
+	}
+
+	refresh();
+}
+//}}}
+function refresh(time, i) {//{{{
+	if (time) {
+		if (0 == i) {
+			draw.clearRect(0, 0,400/conf("config", "scale"), 400/conf("config", "scale"));
+		}
+
+		if (conf("config", "begin") <= i && i < draw_history.length) {
+			var h = draw_history[i];
+			draws(draw, h.style, h.stroke, h.shape, h.begin_point, h.end_point);
+			i++;
+			setTimeout(function(){
+				refresh(time, i);
+			}, time);
+		}
+		return
+	}
+
+	draw.clearRect(0, 0,400/conf("config", "scale"), 400/conf("config", "scale"));
+
+	for (var i in draw_history) {
+		if (i < conf("config", "begin")) {
+			continue
+		}
+		var h = draw_history[i];
+		draws(draw, h.style, h.stroke, h.shape, h.begin_point, h.end_point, h.text);
+	}
+}
+//}}}
+
+var item = document.getElementById("draw");
+var draw = item.getContext("2d");
+function draws(draw, style, stroke, shape, begin_point, end_point, text) {//{{{
+	draw.save();
+	begin_x = begin_point.x;
+	begin_y = begin_point.y;
+	end_x = end_point.x;
+	end_y = end_point.y;
+
+	if (current_ctx.index_point) {
+	draw.beginPath();
+	draw.arc(begin_x, begin_y, 5, 0, 2*Math.PI)
+	draw.fill()
+	}
+
+	if (current_ctx.index_point) {
+	draw.beginPath();
+	draw.arc(end_x, end_y, 5, 0, 2*Math.PI)
+	draw.fill()
+	}
+
+	switch (shape) {
+		case 'heart':
+			r = Math.sqrt(Math.pow(begin_x-end_x, 2)+Math.pow(begin_y-end_y,2));
+			a = Math.atan((end_y-begin_y)/(end_x-begin_x))/Math.PI*180;
+			drawHeart(draw, begin_x, begin_y, r, a, style, stroke)
+			break
+		case 'cycle':
+			draw.beginPath();
+			r = Math.sqrt(Math.pow(begin_x-end_x, 2)+Math.pow(begin_y-end_y,2));
+			draw.arc(begin_x, begin_y, r, 0, 2*Math.PI)
+			if (stroke == "stroke") {
+				if (style) {
+					draw.strokeStyle = style;
+				}
+				draw.stroke()
+			} else {
+				if (style) {
+					draw.fillStyle = style;
+				}
+				draw.fill()
+			}
+			break
+		case 'line':
+			draw.beginPath();
+			draw.moveTo(begin_x, begin_y);
+			draw.lineTo(end_x, end_y);
+			if (stroke == "stroke") {
+				if (style) {
+					draw.strokeStyle = style;
+				}
+				draw.stroke()
+			} else {
+				if (style) {
+					draw.fillStyle = style;
+				}
+				draw.fill()
+			}
+			break
+		case 'rect':
+			if (stroke == "stroke") {
+				if (style) {
+					draw.strokeStyle = style;
+				}
+				draw.strokeRect(begin_x, begin_y, end_x-begin_x, end_y-begin_y);
+			} else {
+				if (style) {
+					draw.fillStyle = style;
+				}
+				draw.fillRect(begin_x, begin_y, end_x-begin_x, end_y-begin_y);
+			}
+			break
+		case 'text':
+			if (stroke == "stroke") {
+				if (style) {
+					draw.strokeStyle = style;
+				}
+				draw.font = current_ctx.font;
+				draw.strokeText(text, begin_x, begin_y, end_x-begin_x);
+			} else {
+				if (style) {
+					draw.fillStyle = style;
+				}
+				draw.font = current_ctx.font;
+				draw.fillText(text, begin_x, begin_y, end_x-begin_x);
+			}
+	}
+
+	draw.restore();
 }
 //}}}
 
