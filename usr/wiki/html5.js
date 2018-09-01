@@ -109,8 +109,8 @@ var current_ctx = {//{{{
 		scale: {label: "比例", value: 1, width: 40},
 		point: {label: "坐标", value: "0,0", width: 60},
 		begin: {label: "隐藏", value: 0, width: 40},
-		interval: {label: "间隔", value: 100, width: 40},
-		json: {label: "数据", value: "", width: 100},
+		interval: {label: "间隔", value: 100, width: 20},
+		json: {label: "数据", value: "", width: 80},
 	},
 	command: {
 		cmd_shape: {
@@ -393,7 +393,6 @@ function show_debug(log, clear) {//{{{
 function draw_point(event) {//{{{
 	console.log("point");
 	console.log(event);
-	show_debug(event.type)
 	var point = trans({x:event.offsetX, y:event.offsetY});
 	if (event.type == "touchstart") {
 		var point = trans({x:event.touches[0].clientX, y:event.touches[0].clientY});
