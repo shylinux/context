@@ -1,4 +1,4 @@
-var canvas = document.getElementById("heart");
+var canvas = document.getElementById("heart");//{{{
 var ctx = canvas.getContext('2d');
 
 var main_angle = 30;
@@ -74,7 +74,7 @@ var demo3 = document.getElementById("demo3");
 var ctx3 = demo3.getContext("2d");
 demo3.onclick = draw3;
 draw3()
-
+//}}}
 
 var current_ctx = {//{{{
 	big_scale: 1.25,
