@@ -6,49 +6,17 @@
 - 文档: <https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/>
 
 ### miniCAD在线绘图
-<button class="cmd_shape heart"></button>
-<button class="cmd_shape cycle"></button>
-<button class="cmd_shape rect"></button>
-<button class="cmd_shape line"></button>
-<button class="cmd_shape text"></button>
-<br/>
-<button class="cmd_stroke stroke"></button>
-<button class="cmd_stroke fill"></button>
-<br/>
-<button class="cmd_color black"></button>
-<button class="cmd_color red"></button>
-<button class="cmd_color yellow"></button>
-<button class="cmd_color green"></button>
-<button class="cmd_color purple"></button>
-<button class="cmd_color blue"></button>
-<button class="cmd_color white"></button>
-<br/>
+<div class="cmd_shape bar"></div>
+<div class="cmd_stroke bar"></div>
+<div class="cmd_color bar"></div>
+<div class="ctrl_show bar"></div>
 <canvas id="draw" width="400" height="400"
 onmousemove="draw_move(event)"
 onmouseup="draw_point(event)"
 ></canvas>
-<br/>
-<select class="config shape"></select>
-<select class="config stroke"></select>
-<select class="config color"></select>
-<label class="config scale"></label>
-<label class="config begin"></label>
-<label class="config point"></label>
-<br/>
-<button class="control big"></button>
-<button class="control small"></button>
-<button class="control hide"></button>
-<button class="control draw"></button>
-<button class="control play"></button>
-<input class="config interval"></label>
-<br/>
-<button class="control delete"></button>
-<button class="control clear"></button>
-<button class="control export"></button>
-<button class="control import"></button>
-<input class="config json"></label>
-<br/>
-<div id="fuck"></div>
+<div class="ctrl_status bar"></div>
+<div class="debug_info"></div>
+<div class="ctrl_data bar"></div>
 <table id="draw_history"></table>
 
 ### canvas绘图
