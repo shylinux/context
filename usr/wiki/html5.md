@@ -17,7 +17,22 @@ onmouseup="draw_point(event)"
 <div class="ctrl_status bar"></div>
 <div class="debug_info"></div>
 <div class="ctrl_data bar"></div>
-<table id="draw_history"></table>
+<table>
+<thead>
+<tr>
+<th>color</th>
+<th>stroke</th>
+<th>shape</th>
+<th>x1</th>
+<th>y1</th>
+<th>x2</th>
+<th>y2</th>
+<th>text</th>
+</tr>
+</thead>
+<tbody id="draw_history"></tbody>
+</table>
+
 
 ### canvas绘图
 <canvas id="demo0" class="demo" width="120" height="120"></canvas>

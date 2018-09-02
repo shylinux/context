@@ -76,7 +76,7 @@ demo3.onclick = draw3;
 draw3()
 //}}}
 
-var draw_history = [{shape:"clear"}];
+var draw_history = [{shape:"hide"}];
 var his = document.getElementById("draw_history");
 var draw = document.getElementById("draw").getContext("2d");
 
@@ -89,9 +89,13 @@ var current_ctx = {//{{{
 	index_point: false,
 	begin_point: null,
 	end_point: null,
+	last_point: null,
+	last_move: 0,
 
 	config: {
 		shape: {value: "rect", list: [
+			{text: "移动", value: "move"},
+			{text: "隐藏", value: "hide"},
 			{text: "心形", value: "heart"},
 			{text: "圆形", value: "cycle"},
 			{text: "矩形", value: "rect"},
@@ -112,13 +116,16 @@ var current_ctx = {//{{{
 			{text: "白色", value: "white"},
 		]},
 		scale: {text: "比例", value: 1},
+		offsetX: {text: "X偏移", value: 0},
+		offsetY: {text: "Y偏移", value: 0},
 		point: {text: "坐标", value: "0,0"},
-		begin: {text: "隐藏", value: 0},
 		interval: {text: "间隔", value: 100},
 		json: {text: "数据", value: ""},
 	},
 	command: {
 		cmd_shape: {
+			move: {text: "移动", key: "m", conf:{"shape": "move"}},
+			hide: {text: "隐藏", key: "h"},
 			heart: {text: "心形", key: "e",
 				conf:{"shape": "heart", "stroke": "fill"},
 				cmd:{"fill": "cmd_stroke"},
@@ -152,14 +159,11 @@ var current_ctx = {//{{{
 			stroke: {type: "config"},
 			color: {type: "config"},
 			scale: {type: "cache"},
-			begin: {type: "cache"},
 			point: {type: "cache"},
 		},
 		ctrl_show: {
-			big: {text: "放大", key: "b"},
-			small: {text: "缩小", key: "m"},
-			hide: {text: "隐藏"},
-			show: {text: "恢复"},
+			big: {text: "放大", key: "+"},
+			small: {text: "缩小", key: "-"},
 			play: {text: "播放", key: "a"},
 			interval: {type: "config", width: 30},
 		},
@@ -169,7 +173,8 @@ var current_ctx = {//{{{
 			export: {text: "导出"},
 			import: {text: "导入"},
 			json: {type: "config", width: 80},
-		}
+		},
+		"": {},
 	},
 }
 //}}}
@@ -207,9 +212,10 @@ function init(configs, commands) {//{{{
 						}
 
 						(function() {
+							var bar = group;
 							var key = which;
 							select.onchange = function(event) {
-								conf('config', key, event);
+								current_ctx.config[key].value = event.target[event.target.selectedIndex].value;
 							}
 						})();
 					} else {
@@ -223,8 +229,18 @@ function init(configs, commands) {//{{{
 
 						(function() {
 							var key = which;
-							input.onkeyup = input.onblur = function(event) {
-								conf('config', key, event);
+							input.onblur = function(event) {
+								current_ctx.config[key].value = event.target.value;
+							}
+							input.onkeyup = function(event) {
+								switch (event.key) {
+								case "Enter":
+									current_ctx.config[key].value = event.target.value;
+									break
+								case "Escape":
+									event.target.value = current_ctx.config[key].value;
+									break
+								}
 							}
 						})();
 					}
@@ -233,6 +249,7 @@ function init(configs, commands) {//{{{
 					cmd.className = group+" "+which;
 
 					if (command.key) {
+						control_map[command.key] = [group, which];
 						cmd.innerText = command.text+"("+command.key+")";
 					} else {
 						cmd.innerText = command.text
@@ -240,9 +257,9 @@ function init(configs, commands) {//{{{
 
 					(function() {
 						var key = which;
-						var key1 = group;
+						var bar = group;
 						cmd.onclick = function(event) {
-							action(event, key, key1);
+							action(event, key, bar);
 						}
 					})();
 				}
@@ -251,34 +268,11 @@ function init(configs, commands) {//{{{
 	}
 }//}}}
 function conf(group, which, value) {//{{{
-	if (value instanceof Event) {
-		var event = value;
-		switch (event.type) {
-			case "change":
-				current_ctx[group][which].value = event.target[event.target.selectedIndex].value;
-				break
-			case "keyup":
-				switch (event.key) {
-					case "Enter":
-						current_ctx[group][which].value = event.target.value;
-						break
-					case "Escape":
-						event.target.value = current_ctx[group][which].value;
-						break
-				}
-				break
-			case "blur":
-				current_ctx[group][which].value = event.target.value;
-				break
-		}
-		return
-	}
-
 	var config = current_ctx[group][which];
 	if (value != undefined) {
+		config.value = value;
 		var cs = document.getElementsByClassName(group+" "+which);
 		for (var i = 0; i < cs.length; i++) {
-			config.value = value;
 			if (cs[i].nodeName == "LABEL") {
 				cs[i].innerText = value;
 			} else {
@@ -302,7 +296,7 @@ function info() {//{{{
 		}
 	}
 
-	debug_info = document.getElementsByClassName("debug_info");
+	var debug_info = document.getElementsByClassName("debug_info");
 	for (var i = 0; i < debug_info.length; i++) {
 		var p = debug_info[i].appendChild(document.createElement("p"));
 		p.appendChild(document.createTextNode(list.join(" ")));
@@ -310,55 +304,49 @@ function info() {//{{{
 	}
 }
 //}}}
-init(current_ctx.config, current_ctx.command);
 
 var control_map = {//{{{
-	s: "stroke",
-	f: "fill",
-
-	e: "heart",
-	c: "cycle",
-	r: "rect",
-	v: "line",
-	t: "text",
-
-	d: "delete",
-
-	b: "big",
-	m: "small",
-	a: "play",
-
-	Escape: "escape",
+	Escape: ["", "escape"],
 
 	action: {
 		"escape": [function() {
 			current_ctx.begin_point = null;
 			current_ctx.end_point = null;
 		}],
+		"hide": [function() {
+			var s = {shape: "hide", time:1}
+			add_history(his, s);
+			draws(draw, s);
+		}],
 		"big": [function(){
-			conf("config", "scale", (conf("config", "scale")*current_ctx.big_scale).toFixed(3));
 			draw.scale(current_ctx.big_scale, current_ctx.big_scale);
+			var m = draw.getTransform();
+			conf("config", "scale", m.a);
 		}],
 		"small": [function(){
-			conf("config", "scale", (conf("config", "scale")*current_ctx.small_scale).toFixed(3));
 			draw.scale(current_ctx.small_scale, current_ctx.small_scale);
-		}],
-		"hide": [function() {
-			conf("config", "begin", draw_history.length);
-		}],
-		"show": [function() {
-			conf("config", "begin", 0);
+			var m = draw.getTransform();
+			conf("config", "scale", m.a);
 		}],
 		"play": [function() {
-			conf("config", "begin", 0);
-			refresh(conf("config", "interval"), 0);
+			draw.resetTransform();
+			conf("config", "scale", 1)
+			conf("config", "offsetX", 0)
+			conf("config", "offsetY", 0)
+
+			refresh(conf("config", "interval"), 0, "", function() {
+				var m = draw.getTransform();
+				conf("config", "scale", m.a);
+				conf("config", "offsetX", m.e)
+				conf("config", "offsetY", m.f)
+			});
 			return false
 		}],
 		"delete": [function() {
 			if (draw_history.length > 1) {
-				draw_history.pop();
 				var tr = his.rows[his.rows.length-1];
 				tr.parentElement.removeChild(tr)
+				draw_history.pop();
 			}
 		}],
 		"clear": [function() {
@@ -374,13 +362,13 @@ var control_map = {//{{{
 			return false
 		}],
 		"import": [function() {
-			draw_history = JSON.parse(conf("config", "json"));
+			var im = JSON.parse(conf("config", "json"));
+			for (var i in im) {
+				add_history(his, im[i]);
+				draws(draw, im[i]);
+			}
 		}],
 		"default": [function(event, which, group) {
-			if (!which || !group) {
-				return false
-			}
-
 			var cs = document.getElementsByClassName(group);
 			for (var i = 0; i < cs.length; i++) {
 				cs[i].style.backgroundColor = "white";
@@ -390,48 +378,41 @@ var control_map = {//{{{
 			for (var i = 0; i < cs.length; i++) {
 				cs[i].style.backgroundColor = "lightblue";
 			}
-
-			var command = current_ctx.command[group][which];
-			if (!command) {
-				return false
-			}
-			for (var k in command.conf) {
-				conf("config", k, command.conf[k]);
-			}
-			for (var k in command.cmd) {
-				action(event, k, command.cmd[k])
-			}
 		}],
 	}
 }
 //}}}
 function control(event) {//{{{
-	if (event.type == "keyup") {
-		action(event, control_map[event.key]);
+	if (event.type == "keyup" && control_map[event.key]) {
+		action(event, control_map[event.key][1], control_map[event.key][0]);
 	}
 }
 //}}}
 function action(event, which, group) {//{{{
 	var w = control_map.action[which]? which: "default";
 	while (control_map.action[w]) {
+		var command = current_ctx.command[group][which] || {};
+		for (var k in command.conf) {
+			conf("config", k, command.conf[k]);
+		}
 		for (var i in control_map.action[w]) {
 			var next = control_map.action[w][i](event, which, group);
 			w = next || w;
 		}
-		w = next;
-		if (next == undefined) {
-			refresh()
+		for (var k in command.cmd) {
+			action(event, k, command.cmd[k])
 		}
+		next == undefined && refresh()
+		w = next;
 	}
 }
 //}}}
-action(null, "heart", "cmd_shape");
-action(null, "red", "cmd_color");
 
 function trans(point) {//{{{
-	point.x /= conf("config", "scale");
-	point.y /= conf("config", "scale");
-	return point;
+	return {
+		x: point.x/conf("config", "scale")-conf("config","offsetX"),
+		y: point.y/conf("config", "scale")-conf("config","offsetY"),
+	}
 }
 //}}}
 function draw_point(event) {//{{{
@@ -439,69 +420,85 @@ function draw_point(event) {//{{{
 		x: event.type == "touchstart"? event.touches[0].clientX: event.offsetX,
 		y: event.type == "touchstart"? event.touches[0].clientY: event.offsetY,
 	});
+	conf("config", "point", parseInt(point.x)+","+parseInt(point.y));
 
 	if (!current_ctx.begin_point) {
 		current_ctx.begin_point = point;
-		info(event.type, "begin_point", current_ctx.begin_point)
+		info(event.type, "begin_point: ", current_ctx.begin_point)
 		return
 	}
 	current_ctx.end_point = point;
-	info(event.type, "end_point", current_ctx.end_point)
+	info(event.type, "end_point: ", current_ctx.end_point)
 
 	var s = {
-		color:conf("config", "color"),
-		stroke:conf("config", "stroke"),
-		shape:conf("config", "shape"),
-		begin_point:current_ctx.begin_point,
-		end_point:current_ctx.end_point,
-		text:conf("config", "shape") == "text"? prompt("请入文字", ""): "",
+		shape: conf("config", "shape"),
+		stroke: conf("config", "stroke"),
+		color: conf("config", "color"),
+		begin_point: current_ctx.begin_point,
+		end_point: current_ctx.end_point,
+		text: conf("config", "shape") == "text"? prompt("请入文字", ""): "",
 	};
 
-	draws(draw, s);
 	add_history(his, s);
+	draws(draw, s);
+	refresh();
+
 	current_ctx.begin_point = null;
 	current_ctx.end_point = null;
 }
 //}}}
 function draw_move(event) {//{{{
+	var point = trans({x:event.offsetX, y:event.offsetY});
+	conf("config", "point", parseInt(point.x)+","+parseInt(point.y));
+
 	if (current_ctx.agent.isMobile) {
 		return
 	}
 
-	if (current_ctx.begin_point) {
-		var point = trans({x:event.offsetX, y:event.offsetY});
-		conf("config", "point", parseInt(point.x)+","+parseInt(point.y));
-		info(event.type, "move_point", point)
+	var color = conf("config", "color");
+	var stroke = conf("config", "stroke");
+	var shape = conf("config", "shape");
 
-		refresh();
-		draws(draw, {
-			color:conf("config", "color"),
-			stroke:conf("config", "stroke"),
-			shape:conf("config", "shape"),
-			begin_point:current_ctx.begin_point,
-			end_point:point,
-			text:"",
-		});
+	if (current_ctx.begin_point) {
+		switch (conf("config", "shape")) {
+		case "move":
+			var m = draw.getTransform()
+			draw.translate(point.x-current_ctx.begin_point.x,point.y-current_ctx.begin_point.y);
+			refresh();
+			draw.setTransform(m)
+			break
+		default:
+			refresh();
+			draws(draw, {
+				shape: shape, stroke: stroke, color: color,
+				begin_point: current_ctx.begin_point,
+				end_point: point,
+				text: "",
+			});
+		}
 	}
 }
 //}}}
 
 function add_history(his, s) {//{{{
-	draw_history.push(s);
-
-	var headers = ["color", "stroke", "shape", "x1", "y1", "x2", "y2", "text"]
-	if (his.rows.length == 0) {
-		var tr = his.insertRow(-1);
-		for (var i in headers) {
-			var th = tr.appendChild(document.createElement("th"));
-			th.appendChild(document.createTextNode(headers[i]))
-		}
+	s.index = draw_history.length;
+	switch (s.shape) {
+		case "move":
+			s.type = "image"
 	}
 
-	var tr = his.insertRow(-1);
-	var fields = [s.color, s.stroke, s.shape,
-		parseInt(s.begin_point.x), parseInt(s.begin_point.y),
-		parseInt(s.end_point.x), parseInt(s.end_point.y), s.text]
+	draw_history.push(s);
+	if (s.begin_point) {
+		var begin_x = s.begin_point.x;
+		var begin_y = s.begin_point.y;
+		var end_x = s.end_point.x;
+		var end_y = s.end_point.y;
+	}
+
+	var tr = his.appendChild(document.createElement("tr"))
+	var headers = ["shape", "stroke", "color", "x1", "y1", "x2", "y2", "text"]
+	var fields = [s.shape, s.stroke, s.color,
+		parseInt(begin_x), parseInt(begin_y), parseInt(end_x), parseInt(end_y), s.text]
 
 	for (var i in fields) {
 		var td = tr.appendChild(document.createElement("td"));
@@ -531,7 +528,7 @@ function add_history(his, s) {//{{{
 			default:
 				var input = td.appendChild(document.createElement("input"));
 				input.value = fields[i];
-				input.style.width="40px";
+				input.style.width="46px";
 
 				(function() {
 					var row = draw_history[tr.rowIndex]
@@ -562,34 +559,59 @@ function add_history(his, s) {//{{{
 				})()
 		}
 	}
+
+	his.scrollTop+=100;
+	return s;
 }
 //}}}
-function refresh(time, i) {//{{{
+function refresh(time, i, last, done) {//{{{
+	i = i || 0
+	if (!last || last > draw_history.length) {
+		last = draw_history.length;
+	}
+
 	if (time) {
-		if (i < draw_history.length) {
-			draws(draw, draw_history[i++]);
-			setTimeout(function(){refresh(time, i)}, time);
+		if (i < last) {
+			draws(draw, draw_history[i]);
+			if (draw_history[i].type == "image") {
+				refresh(0, 0, i);
+			}
+
+			setTimeout(function(){refresh(time, i, last, done)}, draw_history[i].time||time);
+			i++
+			return
 		}
+
+		typeof done == "function" && done();
 		return
 	}
 
-	for (var i = conf("config", "begin"); i < draw_history.length; i++) {
-		draws(draw, draw_history[i]);
+	for (i = i || 0; i < last; i++) {
+		if (draw_history[i].type != "image") {
+			draws(draw, draw_history[i]);
+		}
 	}
 }
 //}}}
 function draws(draw, h) {//{{{
-	draw.save();
-	if (h.shape == "clear") {
-		draw.clearRect(0, 0,400/conf("config", "scale"), 400/conf("config", "scale"));
-		draw.restore();
+	if (h.begin_point) {
+		var begin_x = h.begin_point.x;
+		var begin_y = h.begin_point.y;
+		var end_x = h.end_point.x;
+		var end_y = h.end_point.y;
+	}
+
+	switch (h.shape) {
+	case "init":
+	case "move":
+		draw.translate(end_x-begin_x, end_y-begin_y);
+		var m = draw.getTransform();
+		conf("config", "offsetX", m.e)
+		conf("config", "offsetY", m.f)
 		return
 	}
 
-	var begin_x = h.begin_point.x;
-	var begin_y = h.begin_point.y;
-	var end_x = h.end_point.x;
-	var end_y = h.end_point.y;
+	draw.save();
 
 	if (h.color) {
 		if (h.stroke == "stroke") {
@@ -599,8 +621,10 @@ function draws(draw, h) {//{{{
 		}
 	}
 
-	info("draw", h)
 	switch (h.shape) {
+		case "hide":
+			draw.clearRect(-conf("config", "offsetX")/conf("config", "scale"), -conf("config", "offsetY")/conf("config", "scale"), 400/conf("config", "scale"), 400/conf("config", "scale"));
+			break
 		case 'heart':
 			r = Math.sqrt(Math.pow(begin_x-end_x, 2)+Math.pow(begin_y-end_y,2));
 			a = Math.atan((end_y-begin_y)/(end_x-begin_x))/Math.PI*180;
@@ -629,4 +653,8 @@ function draws(draw, h) {//{{{
 	draw.restore();
 }
 //}}}
+
+init(current_ctx.config, current_ctx.command);
+action(null, "heart", "cmd_shape");
+action(null, "red", "cmd_color");
 

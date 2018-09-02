@@ -9,9 +9,23 @@ canvas {
   width:380px;
   overflow:auto;
 }
-.debug_info p{
+.debug_info p {
   margin:0;
   padding:0;
+}
+thead {
+  display:block;
+  width:100%;
+}
+th,td {
+  width:60px;
+  padding:0;
+  margin:0;
+}
+#draw_history {
+  display:inline-block;
+  max-height:120px;
+  overflow-y:scroll;
 }
 .demo {
 	float:left;
