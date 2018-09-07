@@ -91,35 +91,67 @@ func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string { // {{{
 func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn()
-		msg.Option("method", r.Method)
-		msg.Option("path", r.URL.Path)
-		msg.Option("referer", r.Header.Get("Referer"))
+		msg.TryCatch(msg, true, func(msg *ctx.Message) {
+			msg.Option("method", r.Method)
+			msg.Option("path", r.URL.Path)
+			msg.Option("referer", r.Header.Get("Referer"))
 
-		for _, v := range r.Cookies() {
-			msg.Option(v.Name, v.Value)
-		}
-		for k, v := range r.Form {
-			msg.Add("option", k, v)
-		}
-
-		msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
-		msg.Put("option", "request", r).Put("option", "response", w)
-		hand(msg, msg.Target(), msg.Option("path"))
-
-		switch {
-		case msg.Has("directory"):
-			http.ServeFile(w, r, msg.Append("directory"))
-		case msg.Has("redirect"):
-			http.Redirect(w, r, msg.Append("redirect"), http.StatusFound)
-		case msg.Has("template"):
-			msg.Spawn().Cmd("/render", msg.Meta["template"])
-		case msg.Has("append"):
-			msg.Spawn().Copy(msg, "result").Copy(msg, "append").Cmd("/json")
-		default:
-			for _, v := range msg.Meta["result"] {
-				w.Write([]byte(v))
+			remote := r.RemoteAddr
+			if r.Header.Get("X-Real-Ip") != "" {
+				remote = r.Header.Get("X-Real-Ip")
 			}
-		}
+
+			count := 1
+			if m.Confv("record", []interface{}{r.URL.Path}) == nil {
+				m.Confv("record", []interface{}{r.URL.Path}, map[string]interface{}{
+					"remote": map[string]interface{}{remote: map[string]interface{}{"time": time.Now().Format("2006/01/02 15:04:05")}},
+					"count":  count,
+				})
+			} else {
+				switch v := m.Confv("record", []interface{}{r.URL.Path, "count"}).(type) {
+				case int:
+					count = v
+				case float64:
+					count = int(v)
+				default:
+					count = 0
+				}
+
+				if m.Confv("record", []interface{}{r.URL.Path, "remote", remote}) == nil {
+					m.Confv("record", []interface{}{r.URL.Path, "count"}, count+1)
+				} else {
+					msg.Option("last_record_time", m.Confv("record", []interface{}{r.URL.Path, "remote", remote, "time"}))
+				}
+				m.Confv("record", []interface{}{r.URL.Path, "remote", remote}, map[string]interface{}{"time": time.Now().Format("2006/01/02 15:04:05")})
+			}
+			msg.Option("record_count", count)
+
+			for _, v := range r.Cookies() {
+				msg.Option(v.Name, v.Value)
+			}
+			for k, v := range r.Form {
+				msg.Add("option", k, v)
+			}
+
+			msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
+			msg.Put("option", "request", r).Put("option", "response", w)
+			hand(msg, msg.Target(), msg.Option("path"))
+
+			switch {
+			case msg.Has("directory"):
+				http.ServeFile(w, r, msg.Append("directory"))
+			case msg.Has("redirect"):
+				http.Redirect(w, r, msg.Append("redirect"), http.StatusFound)
+			case msg.Has("template"):
+				msg.Spawn().Cmd("/render", msg.Meta["template"])
+			case msg.Has("append"):
+				msg.Spawn().Copy(msg, "result").Copy(msg, "append").Cmd("/json")
+			default:
+				for _, v := range msg.Meta["result"] {
+					w.Write([]byte(v))
+				}
+			}
+		})
 	})
 }
 
@@ -248,18 +280,20 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "no", Help: "日志输出报文头"}
 	m.Capi("nserve", 1)
 
-	// yac := m.Sess("tags", m.Sess("yac").Cmd("scan"))
-	// yac.Cmd("train", "void", "void", "[\t ]+")
-	// yac.Cmd("train", "other", "other", "[^\n]+")
-	// yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
-	// yac.Cmd("train", "code", "struct", "struct", "key", "\\{")
-	// yac.Cmd("train", "code", "struct", "\\}", "key", ";")
-	// yac.Cmd("train", "code", "struct", "typedef", "struct", "key", "key", ";")
-	// yac.Cmd("train", "code", "function", "key", "\\*", "key", "(", "other")
-	// yac.Cmd("train", "code", "function", "key", "key", "(", "other")
-	// yac.Cmd("train", "code", "variable", "struct", "key", "key", "other")
-	// yac.Cmd("train", "code", "define", "#define", "key", "other")
-	//
+	yac := m.Sess("tags", m.Sess("yac").Cmd("scan"))
+	yac.Cmd("train", "void", "void", "[\t ]+")
+	yac.Cmd("train", "other", "other", "[^\n]+")
+	yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
+	yac.Cmd("train", "code", "def", "def", "key", "(", "other")
+	yac.Cmd("train", "code", "def", "class", "key", "other")
+	yac.Cmd("train", "code", "struct", "struct", "key", "\\{")
+	yac.Cmd("train", "code", "struct", "\\}", "key", ";")
+	yac.Cmd("train", "code", "struct", "typedef", "struct", "key", "key", ";")
+	yac.Cmd("train", "code", "function", "key", "\\*", "key", "(", "other")
+	yac.Cmd("train", "code", "function", "key", "key", "(", "other")
+	yac.Cmd("train", "code", "variable", "struct", "key", "key", "other")
+	yac.Cmd("train", "code", "define", "#define", "key", "other")
+
 	if m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
 		web.Caches["key"] = &ctx.Cache{Name: "服务密钥", Value: m.Conf("key"), Help: "服务密钥"}
@@ -294,6 +328,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"cmd":      &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
 		"cert":     &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":      &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"record":   &ctx.Config{Name: "record", Value: map[string]interface{}{}, Help: "访问记录"},
 		"wiki_dir": &ctx.Config{Name: "wiki_dir", Value: "usr/wiki", Help: "路由数量"},
 		"wiki_list_show": &ctx.Config{Name: "wiki_list_show", Value: map[string]interface{}{
 			"md": true,
@@ -1197,7 +1232,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			yac := m.Find("yac.parse4", true)
 
-			msg := m.Sess("nfs").Cmd("dir", path.Join(m.Conf("wiki_dir"), m.Option("dir")), "dir_name", "path")
+			msg := m.Sess("nfs").Cmd("dir", path.Join(m.Conf("wiki_dir"), "src", m.Option("dir")), "dir_name", "path")
 			for i, v := range msg.Meta["filename"] {
 				name := strings.TrimSpace(v)
 				es := strings.Split(name, ".")
@@ -1205,6 +1240,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				case "pyc", "o", "gz", "tar":
 					continue
 				case "c":
+				case "py":
 				case "h":
 				default:
 					continue
@@ -1248,7 +1284,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 					if key != "" {
 						m.Confv("define", strings.Join([]string{key, "position", "-2"}, "."), map[string]interface{}{
-							"file": strings.TrimPrefix(name, m.Confx("wiki_dir")),
+							"file": strings.TrimPrefix(name, m.Confx("wiki_dir")+"/src"),
 							"line": line,
 							"type": l.Result(1),
 						})
@@ -1260,12 +1296,39 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Log("fuck", "parse %s", time.Now().Format("2006-01-02 15:04:05"))
 		}},
 		"/wiki_body": &ctx.Command{Name: "/wiki_body", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if ls, e := ioutil.ReadFile(path.Join(m.Conf("wiki_dir"), m.Confx("which"))); e == nil {
+			which := path.Join(m.Conf("wiki_dir"), m.Confx("which"))
+			st, _ := os.Stat(which)
+			if ls, e := ioutil.ReadFile(which); e == nil {
 				pre := false
 				es := strings.Split(m.Confx("which"), ".")
 				if len(es) > 0 {
 					switch es[len(es)-1] {
 					case "md":
+						m.Option("modify_count", 1)
+						m.Option("modify_time", st.ModTime().Format("2006/01/02 15:03:04"))
+
+						switch v := m.Confv("record", []interface{}{m.Option("path"), "local", "modify_count"}).(type) {
+						case int:
+							if m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}).(string) != m.Option("modify_time") {
+								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}, m.Option("modify_time"))
+								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_count"}, v+1)
+							}
+							m.Option("modify_count", v+1)
+						case float64:
+							if m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}).(string) != m.Option("modify_time") {
+								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}, m.Option("modify_time"))
+								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_count"}, v+1)
+							}
+							m.Option("modify_count", v+1)
+						case nil:
+							m.Confv("record", []interface{}{m.Option("path"), "local"}, map[string]interface{}{
+								"modify_count": m.Optioni("modify_count"),
+								"modify_time":  m.Option("modify_time"),
+							})
+						default:
+							m.Log("fuck", "5")
+						}
+
 						ls = markdown.ToHTML(ls, nil, nil)
 					default:
 						pre = true
@@ -1288,7 +1351,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if v, ok := m.Confv("define", m.Option("query")).(map[string]interface{}); ok {
 					for _, val := range v["position"].([]interface{}) {
 						value := val.(map[string]interface{})
-						m.Add("append", "name", fmt.Sprintf("%v#hash_%v", value["file"], value["line"]))
+						m.Add("append", "name", fmt.Sprintf("src/%v#hash_%v", value["file"], value["line"]))
 					}
 					return
 				}

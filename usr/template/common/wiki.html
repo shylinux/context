@@ -172,7 +172,7 @@ function tags(event) {
         if (tag && tag.length > 0 && tags_list[tag]) {
 			var position = tags_list[tag].position;
 			if (position.length == 1) {
-				jumpto("/wiki"+position[0].file+"#hash_"+position[0].line);
+				jumpto("/wiki/src/"+position[0].file+"#hash_"+position[0].line);
 			} else {
 				jumpto("/wiki/?query="+encodeURIComponent(tag));
 			}
@@ -217,9 +217,17 @@ window.onload = function() {
 	padding:0px;
 	height:16px;
 }
+.record {
+  margin: 10px 40px;
+  /* float:right; */
+}
 </style>
 <div class="content">
 	<div class="toggle" title="点击，显示或隐藏目录" onclick="toggle()"></div>
+  {{if option . "modify_time"|meta}}
+    <div class="record">上次修订时间: {{option . "modify_time"|meta}} 修订次数: {{option . "modify_count"|meta}}</div>
+  {{end}}
+  <div class="record">上次阅读时间: {{option . "last_record_time"|meta}} 总访问量: {{option . "record_count"|meta}}</div>
 	<div class="texts">
 		<div class="number">
 			{{range option . "nline"|meta|list}}
@@ -237,10 +245,10 @@ window.onload = function() {
                 <ul>
                 {{range $i, $v := append . "name"}}
                 <li class="link">
-				<div>
-					<code>{{option $msg "time" $i}}&nbsp;&nbsp;&nbsp;</code>
-					<a href="/wiki/{{option $msg "dir"|meta}}/{{$v}}{{option $msg "pend" $i}}">{{$v}}{{option $msg "pend" $i}}</a>
-				</div>
+                  <div>
+                    <code>{{option $msg "time" $i}}&nbsp;&nbsp;&nbsp;</code>
+                    <a href="/wiki/{{option $msg "dir"|meta}}/{{$v}}{{option $msg "pend" $i}}">{{$v}}{{option $msg "pend" $i}}</a>
+                  </div>
                 </li>
                 {{end}}
                 <ul>

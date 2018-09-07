@@ -98,6 +98,11 @@ func Chain(m *Message, data interface{}, args ...interface{}) interface{} { // {
 			}
 			i = -2
 			continue
+		case []interface{}:
+			keys = []string{}
+			for _, v := range arg {
+				keys = append(keys, fmt.Sprintf("%v", v))
+			}
 		case []string:
 			keys = arg
 			keys = strings.Split(strings.Join(arg, "."), ".")
