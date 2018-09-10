@@ -111,9 +111,12 @@ function menu() {
 
 			one.className = list[j].level;
 		}
+	}
 
+	var m = document.getElementsByClassName("link");
+	for (var i = 0; i < m.length; i++) {
 		var one = m[i].appendChild(document.createElement("div"));
-		var a = one.appendChild(document.createTextNode("相关链接"));
+		var a = one.appendChild(document.createTextNode("相关链接: "));
 
 		for (var j = 0; j < link.length; j++) {
 			var one = m[i].appendChild(document.createElement("div"));
@@ -167,5 +170,7 @@ function tags(event) {
 document.onmouseup = tags;
 window.onload = function() {
 	toggle();
-	menu();
+	if (location.href.endsWith(".md")) {
+		menu();
+	}
 }
