@@ -5,35 +5,6 @@
 {{end}}
 
 {{define "wiki_list"}}
-<script>
-function jumpto(url) {
-	if (url == "..") {
-		var ps = locaiton.href.split();
-	}
-	location.href=url;
-}
-function keyup(event) {
-	console.log(event);
-	if (typeof window.control == "function") {
-		control(event);
-	}
-	if (event.key == "z") {
-		var input = document.getElementsByClassName("query_input")[0];
-		if (!window.query_show) {
-			window.query_show = true;
-			var query = document.getElementsByClassName("query_menu")[0];
-			var input = query.getElementsByTagName("input")[0];
-			input.style.visibility = "visible";
-			input.style.width = "80px";
-			input.focus();
-		}
-	return true
-	}
-	return true
-}
-document.onkeyup = keyup;
-
-</script>
 <style>
 .container {
 	height:100%;
@@ -120,70 +91,6 @@ document.onkeyup = keyup;
 {{end}}
 
 {{define "wiki_body"}}
-<script>
-function toggle() {
-	window.list_hide = !window.list_hide;
-	var list = document.getElementsByClassName("list")[0];
-	var content = document.getElementsByClassName("content")[0];
-	if (list_hide) {
-		list.style.visibility = "hidden";
-		list.style.width="0px";
-		list.style.height="0px";
-		list.style["min-width"]="0px";
-		content.style.width="100%";
-	} else {
-		list.style.visibility = "visible";
-		list.style.width="15%";
-		list.style.height="100%";
-		list.style["min-width"]="180px";
-		content.style.width="85%";
-	}
-}
-function query(event) {
-	if (event) {
-		if (event.code == "Enter") {
-			jumpto("/wiki/?query="+encodeURIComponent(event.target.value));
-		}
-		console.log("what")
-		return true
-	}
-	window.query_show = !window.query_show;
-	var query = document.getElementsByClassName("query_menu")[0];
-	var input = query.getElementsByTagName("input")[0];
-	if (window.query_show) {
-		input.style.visibility = "visible";
-		input.style.width = "80px";
-
-	} else {
-		input.style.visibility = "hidden";
-		input.style.width = "0px";
-	}
-}
-var tags_list = {};
-ctx.GET("/wiki/define.json", undefined, function(msg){
-	tags_list = msg["define"];
-})
-function tags(event) {
-	console.log(event);
-
-    if (event.srcElement.tagName == "CODE") {
-        var tag = document.getSelection().toString();
-        console.log(tag);
-        if (tag && tag.length > 0 && tags_list[tag]) {
-			var position = tags_list[tag].position;
-			if (position.length == 1) {
-				jumpto("/wiki/src/"+position[0].file+"#hash_"+position[0].line);
-			} else {
-				jumpto("/wiki/?query="+encodeURIComponent(tag));
-			}
-        }
-    }
-}
-document.onmouseup = tags;
-window.onload = function() {
-	toggle();
-}
-</script>
 <style>
 .content {
 	width:85%;
@@ -218,17 +125,26 @@ window.onload = function() {
 	height:16px;
 }
 .record {
-  margin: 10px 40px;
-  /* float:right; */
+	margin: 10px 10px;
+	float:left;
+}
+.menu {
+}
+.menu a {
+	text-decoration:none;
+}
+.menu .h3 {
+	padding-left: 10px;
 }
 </style>
 <div class="content">
 	<div class="toggle" title="点击，显示或隐藏目录" onclick="toggle()"></div>
-  {{if option . "modify_time"|meta}}
-    <div class="record">上次修订时间: {{option . "modify_time"|meta}} 修订次数: {{option . "modify_count"|meta}}</div>
-  {{end}}
-  <div class="record">上次阅读时间: {{option . "last_record_time"|meta}} 总访问量: {{option . "record_count"|meta}}</div>
+	{{if option . "modify_time"|meta}}
+	<div class="record">上次修订时间: {{option . "modify_time"|meta}} 修订次数: {{option . "modify_count"|meta}}</div>
+	{{end}}
+	<div class="record">上次阅读时间: {{option . "last_record_time"|meta}} 总访问量: {{option . "record_count"|meta}}</div>
 	<div class="texts">
+		<div class="menu"></div>
 		<div class="number">
 			{{range option . "nline"|meta|list}}
 			<div id="hash_{{.}}" style="margin-top:-1px"><code>{{.}}</code></div>
@@ -254,12 +170,13 @@ window.onload = function() {
                 <ul>
             {{end}}
 		{{else if append . "code"|meta}}
-        <p><pre><code>{{append . "code"|meta}}</code></pre><p>
-    {{else}}
-        <p>{{append . "body"|meta|unscaped}}</p>
+			<p><pre><code>{{append . "code"|meta}}</code></pre><p>
+		{{else}}
+			<p>{{append . "body"|meta|unscaped}}</p>
 		{{end}}
 	</div>
 </div>
 
 </div>
+<script src="/library/wiki.js"></script>
 {{end}}

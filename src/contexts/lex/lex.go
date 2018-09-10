@@ -341,9 +341,16 @@ func (lex *LEX) Close(m *ctx.Message, arg ...string) bool { // {{{
 // }}}
 
 var Index = &ctx.Context{Name: "lex", Help: "词法中心",
-	Caches:  map[string]*ctx.Cache{},
+	Caches: map[string]*ctx.Cache{
+		"nmat": &ctx.Cache{Name: "nmat", Value: "0", Help: "nmat"},
+	},
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
+		"spawn": &ctx.Command{Name: "spawn", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*LEX); m.Assert(ok) { // {{{
+				m.Start(fmt.Sprintf("matrix%d", m.Capi("nmat", 1)), "matrix")
+			} // }}}
+		}},
 		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) { // {{{
 				page, hash := 1, 1

@@ -280,20 +280,20 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "no", Help: "日志输出报文头"}
 	m.Capi("nserve", 1)
 
-	yac := m.Sess("tags", m.Sess("yac").Cmd("scan"))
-	yac.Cmd("train", "void", "void", "[\t ]+")
-	yac.Cmd("train", "other", "other", "[^\n]+")
-	yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
-	yac.Cmd("train", "code", "def", "def", "key", "(", "other")
-	yac.Cmd("train", "code", "def", "class", "key", "other")
-	yac.Cmd("train", "code", "struct", "struct", "key", "\\{")
-	yac.Cmd("train", "code", "struct", "\\}", "key", ";")
-	yac.Cmd("train", "code", "struct", "typedef", "struct", "key", "key", ";")
-	yac.Cmd("train", "code", "function", "key", "\\*", "key", "(", "other")
-	yac.Cmd("train", "code", "function", "key", "key", "(", "other")
-	yac.Cmd("train", "code", "variable", "struct", "key", "key", "other")
-	yac.Cmd("train", "code", "define", "#define", "key", "other")
-
+	// yac := m.Sess("tags", m.Sess("yac").Cmd("scan"))
+	// yac.Cmd("train", "void", "void", "[\t ]+")
+	// yac.Cmd("train", "other", "other", "[^\n]+")
+	// yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
+	// yac.Cmd("train", "code", "def", "def", "key", "(", "other")
+	// yac.Cmd("train", "code", "def", "class", "key", "other")
+	// yac.Cmd("train", "code", "struct", "struct", "key", "\\{")
+	// yac.Cmd("train", "code", "struct", "\\}", "key", ";")
+	// yac.Cmd("train", "code", "struct", "typedef", "struct", "key", "key", ";")
+	// yac.Cmd("train", "code", "function", "key", "\\*", "key", "(", "other")
+	// yac.Cmd("train", "code", "function", "key", "key", "(", "other")
+	// yac.Cmd("train", "code", "variable", "struct", "key", "key", "other")
+	// yac.Cmd("train", "code", "define", "#define", "key", "other")
+	//
 	if m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
 		web.Caches["key"] = &ctx.Cache{Name: "服务密钥", Value: m.Conf("key"), Help: "服务密钥"}

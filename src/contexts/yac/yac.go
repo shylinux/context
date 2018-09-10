@@ -34,6 +34,7 @@ type YAC struct {
 	mat   []map[byte]*State
 	state map[State]*State
 
+	lex *ctx.Message
 	*ctx.Context
 }
 

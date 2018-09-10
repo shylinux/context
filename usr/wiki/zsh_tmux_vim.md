@@ -1,4 +1,4 @@
-## 0. 简介
+## 简介
 
 zsh 和bash一样，是一种终端的shell，但提供了更丰富的功能，更快捷的补全。
 
@@ -12,7 +12,7 @@ vim 是一款强大的编辑器，通过模式化快捷键提升编辑速度，�
 
 - Mac包管理器: <https://brew.sh/>
 
-### 0.1 zsh安装
+### zsh安装
 Mac上自带zsh，不用安装，但Ubuntu上需要自己安装一下。
 ```
 $ sudo apt-get install zsh
@@ -25,7 +25,7 @@ $ chsh -s /usr/bin/zsh
 ```
 $ curl -L https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh | sh
 ```
-### 0.2 tmux安装
+### tmux安装
 Ubuntu上安装
 ```
 $ sudo apt-get install tmux
@@ -42,7 +42,7 @@ $ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/maste
 ```
 $ tmux
 ```
-### 0.3 vim安装
+### vim安装
 Mac上自带vim，不需要安装，但Ubuntu需要自己安装一下。
 ```
 $ sudo apt-get install vim
@@ -51,12 +51,12 @@ vim有很丰富的插件，可以下载一个插件管理器。
 ```
 $ git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 ```
-## 1. 基本快捷键
-### 1.1 zsh使用
-### 1.2 tmux使用
-### 1.3 vim使用
-## 2. 个性化配置
-## 3. 源码解析
+## 基本快捷键
+### zsh使用
+### tmux使用
+### vim使用
+## 个性化配置
+## 源码解析
 Mac上安装pip
 ```
 $ sudo easy_install pip
