@@ -126,6 +126,23 @@ function menu() {
 			a.innerText = a.href
 		}
 	}
+
+	var m = document.getElementsByTagName("pre");
+	for (var i = 0; i < m.length; i++) {
+		var line = (m[i].clientHeight-10)/15
+		// if (line < 3) {
+		// 	continue
+		// }
+		console.log(m[i].clientHeight)
+		var nu = m[i].parentElement.insertBefore(document.createElement("div"), m[i]);
+		nu.className = "number1"
+
+		for (var j = 1; j <= line; j++) {
+			console.log(j)
+			var li = nu.appendChild(document.createElement("div"));
+			li.appendChild(document.createTextNode(""+j));
+		}
+	}
 }
 function query(event) {
 	if (event) {

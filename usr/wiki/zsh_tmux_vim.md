@@ -65,6 +65,5 @@ $ sudo apt-get update
 $ sudo apt-get install asciinema
 $ sudo apt-get install python3-pip
 $ sudo pip install TermRecord
-
 ```
 [终端录制](https://asciinema.org/)
