@@ -253,9 +253,10 @@ window.onload = function() {
                 {{end}}
                 <ul>
             {{end}}
-		{{else}}
-			<p>{{append . "body"|meta|unscaped}}</p>
-			<p><pre><code>{{append . "code"|meta}}</code></pre><p>
+		{{else if append . "code"|meta}}
+        <p><pre><code>{{append . "code"|meta}}</code></pre><p>
+    {{else}}
+        <p>{{append . "body"|meta|unscaped}}</p>
 		{{end}}
 	</div>
 </div>
