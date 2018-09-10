@@ -62,6 +62,12 @@ function menu() {
 	}
 	max = max - min;
 
+	var link = [];
+	var a = document.getElementsByTagName("a");
+	for (var i = 0; i < a.length; i++) {
+		link.push({href: a[i].href, title: a[i].innerText});
+	}
+
 	for (var i = 0; i < list.length-1; i++) {
 		for (var j = i+1; j < list.length; j++) {
 			if (list[j].position < list[i].position) {
@@ -104,6 +110,17 @@ function menu() {
 			a.innerText = text+" ("+parseInt((list[j].position-min)/max*100)+"%)";
 
 			one.className = list[j].level;
+		}
+
+		var one = m[i].appendChild(document.createElement("div"));
+		var a = one.appendChild(document.createTextNode("相关链接"));
+
+		for (var j = 0; j < link.length; j++) {
+			var one = m[i].appendChild(document.createElement("div"));
+			var a = one.appendChild(document.createTextNode(link[j].title+": "));
+			var a = one.appendChild(document.createElement("a"));
+			a.href = link[j].href
+			a.innerText = a.href
 		}
 	}
 }

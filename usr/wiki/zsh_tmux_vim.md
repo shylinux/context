@@ -8,10 +8,6 @@ vim 是一款强大的编辑器，通过模式化快捷键提升编辑速度，�
 
 使用zsh+tmux+vim的工具链，根据自己的使用习惯进行个性化配置，可以极大的提升编程开发速度。
 
-相关链接
-
-- Mac包管理器: <https://brew.sh/>
-
 ### zsh安装
 Mac上自带zsh，不用安装，但Ubuntu上需要自己安装一下。
 ```
@@ -34,7 +30,7 @@ Mac上安装
 ```
 $ brew install tmux
 ```
-如果Mac上没有brew，可以安装一下.
+如果Mac上没有brew，可以安装一下 [Mac 包管理器 brew](https://brew.sh/)
 ```
 $ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 ```
@@ -71,4 +67,4 @@ $ sudo apt-get install python3-pip
 $ sudo pip install TermRecord
 
 ```
-- 终端录制: <https://asciinema.org/>
+[终端录制](https://asciinema.org/)
