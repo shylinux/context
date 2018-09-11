@@ -4,6 +4,7 @@ function jumpto(url) {
 	}
 	location.href=url;
 }
+
 function keyup(event) {
 	console.log(event);
 	if (typeof window.control == "function") {
@@ -23,6 +24,7 @@ function keyup(event) {
 	}
 	return true
 }
+
 document.onkeyup = keyup;
 function toggle() {
 	window.list_hide = !window.list_hide;
@@ -42,6 +44,7 @@ function toggle() {
 		content.style.width="85%";
 	}
 }
+
 function menu() {
 	var max = 0;
 	var min = 1000;
@@ -144,6 +147,7 @@ function menu() {
 		}
 	}
 }
+
 function query(event) {
 	if (event) {
 		if (event.code == "Enter") {
@@ -164,10 +168,12 @@ function query(event) {
 		input.style.width = "0px";
 	}
 }
+
 var tags_list = {};
 ctx.GET("/wiki/define.json", undefined, function(msg){
 	tags_list = msg["define"];
 })
+
 function tags(event) {
 	console.log(event);
 
@@ -184,6 +190,7 @@ function tags(event) {
         }
     }
 }
+
 document.onmouseup = tags;
 window.onload = function() {
 	toggle();

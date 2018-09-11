@@ -986,7 +986,10 @@ func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
 
 // }}}
 func (m *Message) Color(color int, str string, arg ...interface{}) *Message { // {{{
-	if str = fmt.Sprintf(str, arg...); m.Options("terminal_color") {
+	if len(arg) > 0 {
+		str = fmt.Sprintf(str, arg...)
+	}
+	if m.Options("terminal_color") {
 		str = fmt.Sprintf("\033[%dm%s\033[0m", color, str)
 	}
 	return m.Add("result", str)
@@ -2899,7 +2902,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"command": &Command{
 			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]",
 			Help: "查看或修改命令",
-			Form: map[string]int{"condition": -1, "list_help": 1},
+			Form: map[string]int{"list_name": 1, "list_help": 1, "condition": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if len(arg) == 0 { // {{{
 					keys := []string{}
@@ -2941,6 +2944,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					if m.target.Commands == nil {
 						m.target.Commands = map[string]*Command{}
 					}
+
 					m.target.Commands[m.Cap("list_count")] = &Command{
 						Name: strings.Join(arg[1:], " "),
 						Help: m.Confx("list_help"),
@@ -2961,6 +2965,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							m.Copy(msg, "result").Copy(msg, "append")
 						},
 					}
+
+					if m.Has("list_name") {
+						m.target.Commands[m.Option("list_name")] = m.target.Commands[m.Cap("list_count")]
+					}
+
 					m.Capi("list_count", 1)
 					return
 				case "list":

@@ -118,9 +118,7 @@ func (aaa *AAA) Start(m *ctx.Message, arg ...string) bool { // {{{
 			from := msg.Option("username")
 			m.Log("lark", "%v", msg.Meta["detail"])
 			m.Travel(func(m *ctx.Message, n int) bool {
-				m.Log("fuck", "why-%v=%v", m.Cap("username"), msg.Detail(1))
 				if m.Cap("username") == msg.Detail(1) {
-					m.Log("fuck", "why-%v=%v", m.Cap("username"), msg.Detail(1))
 					m.Confv("lark", strings.Join([]string{from, "-2"}, "."),
 						map[string]interface{}{"time": msg.Time(), "type": "recv", "text": msg.Detail(2)})
 				}
@@ -206,14 +204,13 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if aaa, ok := c.Server.(*AAA); m.Assert(ok) { // {{{
 					stream := ""
-					method := ""
-					username := ""
-					m.Log("fuck", "%s %s", method, username)
+					// method := ""
+					// username := ""
 					if len(arg) > 0 {
 						switch arg[0] {
 						case "openid":
-							method = arg[0]
-							username = arg[1]
+							// method = arg[0]
+							// username = arg[1]
 							stream = arg[1]
 						}
 					}

@@ -1,6 +1,6 @@
 login root root
 ~aaa
-	login load var/login.txt
+	# login load var/login.txt
 ~file1
 	history load var/history.txt
 

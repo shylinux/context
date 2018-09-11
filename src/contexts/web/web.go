@@ -919,10 +919,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			//权限检查
 			dir := m.Option("dir", path.Join(m.Cap("directory"), "local", m.Option("username"), m.Option("dir", strings.TrimPrefix(m.Option("path"), "/index"))))
-			if check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir); !check.Results(0) {
-				m.Copy(check, "append")
-				return
-			}
+			// if check := m.Spawn(c).Cmd("/check", "command", "/index/", "dir", dir); !check.Results(0) {
+			// 	m.Copy(check, "append")
+			// 	return
+			// }
 
 			//执行命令
 			if m.Has("details") {
@@ -953,10 +953,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// }}}
 		}},
 		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
-				m.Copy(check, "append")
-				return
-			}
+			// if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
+			// 	m.Copy(check, "append")
+			// 	return
+			// }
 
 			r := m.Optionv("request").(*http.Request)
 			if m.Option("method") == "POST" {
