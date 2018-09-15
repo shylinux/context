@@ -133,9 +133,9 @@ function menu() {
 	var m = document.getElementsByTagName("pre");
 	for (var i = 0; i < m.length; i++) {
 		var line = (m[i].clientHeight-10)/15
-		if (line < 3) {
-			continue
-		}
+		// if (line < 3) {
+		// 	continue
+		// }
 		console.log(m[i].clientHeight)
 		var nu = m[i].parentElement.insertBefore(document.createElement("div"), m[i]);
 		nu.className = "number1"
