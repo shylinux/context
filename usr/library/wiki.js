@@ -54,6 +54,8 @@ function menu() {
 		var head = document.getElementsByTagName(hs[i]);
 		for (var j = 0; j < head.length; j++) {
 			head[j].id = "head"+head[j].offsetTop;
+			head[j].onclick = function(event) {
+			}
 			list.push({"level": hs[i], "position": head[j].offsetTop, "title": head[j].innerText, "hash": head[j].id})
 			if (head[j].offsetTop > max) {
 				max = head[j].offsetTop;
