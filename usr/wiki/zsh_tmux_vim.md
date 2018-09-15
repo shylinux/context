@@ -1,16 +1,23 @@
-## 简介
+## 《终端工具链》简介
+终端工具链，就是对编程开发过程中所用到的各种命令行的工具进行高效的组合，不断的提升编程速度与开发效率。
 
-zsh 和bash一样，是一种终端的shell，但提供了更丰富的功能，更快捷的补全。
+在主流的系统中，Ubuntu的命令行最为强大，有丰富的命令行工具，可以很容易组合出自己的终端工具链；
+其次是MacOSX，命令行也很丰富，再搭配上苹果电脑的硬件与系统，可以组合出流畅的终端工具链；
+最后是Windows，命令行功能弱的可以忽略，但可以安装一个shell工具[git-scm](https://git-scm.com/downloads)，使用一些基本的命令，如果需要更丰富的命令行工具，可以安装虚拟机或是远程连接云主机，使用Ubuntu。
 
-tmux 是一款高效的终端分屏器，可以在终端把一块屏幕分成多个小窗口，每个窗口都启动一个独立shell。
+命令行终端，与图形界面不同，是以一种文本化的方式与系统进行交互。
+可以很直接、很高效执行各种系统操作，同时各种重复性的操作，都可以很方便的写成程序脚本，和系统命令一样直接调用，不断的提升操作效率。
 
-docker 是一种容器软件，像虚拟机一样为应用软件提供一个完整独立的运行环境，但以一种更加轻量简捷的方式实现。
+在终端里，有大量丰富的命令可以使用，不可能全部掌握，一些基本的命令会使用即可。
+但在开发流程，想提升编程速度与开发效率，就需要深入理解与熟练掌握这几个工具：zsh、tmux、docker、git、vim。
 
-git 是代码的版本控制软件，用来记录代码各种变化。
+- **zsh** 和系统默认自带的bash一样，也是一种shell，不断的解析用户或脚本的输入，执行各种命令。但提供了更丰富的特性，如各种补全，命令补全、文件补全、历史补全，可以极大的提升操作效率。
+- **tmux** 是一款高效的终端分屏器，可以在终端把一块屏幕分成多个小窗口，每个窗口都启动一个独立shell，这样就可以充分的利用屏幕，同时执行多个命令。
+- **docker** 是一种容器软件，像虚拟机一样为应用软件提供一个完整独立的运行环境，但以一种更加轻量简捷的方式实现，极大的简化的软件的部署与分发。
+- **git** 是代码的版本控制软件，用来管理代码的每次变化，分支与版本，本地与远程代码仓库，可以实现多人协作开发。
+- **vim** 是一款强大的编辑器，通过模式化快捷键提升编辑速度，通过灵活的脚本与插件扩展丰富的功能。
 
-vim 是一款强大的编辑器，通过模式化快捷键提升编辑速度，通过灵活的脚本与插件扩展丰富的功能。
-
-使用zsh+tmux+vim的工具链，根据自己的使用习惯进行个性化配置，可以极大的提升编程开发速度。
+使用zsh+tmux+vim的工具链，根据自己的使用习惯进行个性化配置，就可以极大的提升编程速度与开发效率。
 
 ### zsh安装
 Mac上自带zsh，不用安装，但Ubuntu上需要自己安装一下。
@@ -35,6 +42,7 @@ $ sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools
 $ sudo apt-get install curl
 ```
 ### tmux安装
+[tmux源码](https://github.com/tmux/tmux)
 Ubuntu上安装
 ```
 $ sudo apt-get install tmux
@@ -77,7 +85,7 @@ Plugin 'VundleVim/Vundle.vim'
 call vundle#end()
 filetype plugin indent on
 ```
-### YouCompleteMe安装
+#### YouCompleteMe安装
 vim只是编辑器，如果需要语法检查与补全功能可以安装插件[YouCompleteMe](https://github.com/Valloric/YouCompleteMe)。
 打开.vimrc配置文件，添加插件。
 ```
@@ -105,7 +113,7 @@ Ubuntu上如果没有cmake还需要安装一下。
 ```
 $ sudo apt-get install cmake
 ```
-### vim源码安装
+#### vim源码安装
 vim默认不支持python的语法补全，如果需要用到python，可以下载[vim源码](https://github.com/vim/vim)，编译安装。更多信息查看[vim官网](https://www.vim.org/)
 ```
 $ sudo apt-get install python
@@ -124,6 +132,22 @@ $ sudo mkdir /usr/local/vim8
 $ sudo make install
 ```
 ## 基本功能使用
+打开终端，体验基本命令。
+
+- 在Ubuntu中，按Ctrl+Alt+T，可以直接打开终端。
+- 在Mac中，打开Finder，然后，应用->实用工具->终端。
+- 在Windows里，先安装[git-scm](https://git-scm.com/downloads)，然后打开应用Git bash。
+
+输入"date"，并按回车，即可查看当前日期与时间。
+```
+$ date
+Wed Sep 12 09:32:53 CST 2018
+```
+输入"pwd"，并按回车，即可查看当前所在目录。
+```
+$ pwd
+/Users/shaoying
+```
 ### zsh使用
 ### tmux使用
 ### docker使用
