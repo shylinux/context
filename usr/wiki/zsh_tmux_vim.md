@@ -65,7 +65,68 @@ $ wget http://www.baidu.com
 ### zsh使用
 ### tmux使用
 ### docker使用
-### git使用
+
+- [Windows版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-windows)
+- [Mac版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-mac)
+
+#### docker镜像管理
+
+- 查看镜像 docker image ls
+- 下载镜像 docker image pull
+
+刚安装docker后，查看镜像列表，如下为空。
+```
+$ docker image ls
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+```
+像github管理代码仓库一样，docker hub上也存放了很多镜像，用户可以自由的下载与上传各种镜像。
+如下示例，下载一个busybox镜像。busybox是将Unix下的常用命令经过挑选裁剪集成一个程序中，搭配Linux内核就可以做出一个小型的操作系统，在嵌入式领域应用广泛。
+体积很小不到1M，下载很快，所以这里用做示例。更多信息参考[busybox官网](https://busybox.net/)
+```
+$ docker image pull busybox
+```
+下载完成后，再查看镜像列表，就会看到busybox镜像相关的信息。
+```
+$ docker image ls
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+busybox             latest              e1ddd7948a1c        6 weeks ago         1.16MB
+```
+#### docker容器管理
+
+- 查看容器 docker ps
+- 启动容器 docker run
+- 停止容器 docker exec
+- 停止容器 docker stop
+
+如下示例，查看容器列表，因为还没启动任何容器，所以这里为空。
+```
+$ docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+```
+如下示例，用busybox:latest镜像，启动一个容器，并调用sh命令。
+-d 指用守护的方式启动，与交互式 -i 不同，守护式启动，容器可以一直运行，不会因为终端容器关闭而停止。
+--name参数，指定容器的名字为demo，docker中标识容器有两种方式，一是通过ID查找容器，二是通过NAMES查找容器，为了方便记忆与查找，建议启动容器时加上名字参数。
+```
+$ docker run --name demo -dt busybox:latest sh  
+29ff6b8343c4a2c57eab297e74e62422ab9bbd481d69f5ebf108f4aa23ae835c
+```
+如下示例，再次查看容器列表，看到容器已经启动。
+```
+$ docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+29ff6b8343c4        busybox:latest      "sh"                4 minutes ago       Up 4 minutes                            demo
+```
+
+```
+$ docker exec -it
+```
+### git入门
+Mac上自带git，不需要安装。
+Windows上安装了的git-scm，也集成了git，也不需要单独安装。
+但Ubuntu需要自己安装一下。
+```
+$ sudo apt-get install git
+```
 ### vim入门
 Mac上自带vim，不需要安装。
 Windows上安装了的git-scm，也集成了vim，也不需要单独安装。
@@ -100,7 +161,8 @@ You can use vim to input text or code into complute in a free style.
 之所以vim是最高效的编辑器，这就是其中的原因之一。
 
 常见的模式有：命令模式、编辑模式、底行模式。
-启动vim后，默认的模式是命令模式，其它模式都是以命令模式为基准中心进行相互切换。即由命令模式切到到编辑模式，由编辑模式切换到命令模式；由命令模式切换到底行模式，由底行模式切换到命令模式。
+启动vim后，默认的模式是命令模式，其它模式都是以命令模式为基准中心进行相互切换。
+即由命令模式切到到编辑模式，由编辑模式切换到命令模式；由命令模式切换到底行模式，由底行模式切换到命令模式。
 
 - 命令模式: 通过各种快捷键，对文件内容进行各种快速的查看、搜索、修改等操作。
 - 编辑模式: 和其它编辑器一样，各种字母数字按键会当成文件的内容直接输入。
@@ -191,7 +253,8 @@ vim的配置命令是set，在命令模式中输入":set "，再加上需要修�
 ```
 :set number
 ```
-***显示相对行号***，很多时候目标位置距当前位置相隔很多行，还要去目测或一行行去数相对位置。设置显示相对行号后，就可以直接看到窗口中所有行相对于当前行的相对行号。
+***显示相对行号***，很多时候目标位置距当前位置相隔很多行，还要去目测或一行行去数相对位置。
+设置显示相对行号后，就可以直接看到窗口中所有行相对于当前行的相对行号。
 ```
 :set relativenumber
 ```
@@ -237,7 +300,42 @@ set cc=80
 set nowrap
 set scrolloff=3
 ```
+#### vim的扩展插件
+除的vim自带的配置与命令，还有大量丰富的插件，可以扩展很多功能。
+但大量的插件手动维护太复杂，可以下载一个[vim插件管理器](https://github.com/VundleVim/Vundle.vim)。
+执行如下命令，下载插件。
+```
+$ git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
+```
+下载完成后，还需要在启动脚本文件中，加入一些命令启用此插件管理器。
+打开~/.vimrc，并添加以下第2行及以后的内容。
+```
+$ vi ~/.vimrc
+filetype off
+set nocompatible
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
+Plugin 'VundleVim/Vundle.vim'
+call vundle#end()
+filetype plugin on
+```
+以后如果需要添加新的插件，就可以在"call vundle#begin()"与"call vundle#end()"之间插入Plugin命令。
+格式像"Plugin 'VundleVim/Vundle.vim'"一样，如安装注释插件"tComment"，在"Plugin 'VundleVim/Vundle.vim'"后面插入如下命令。
+```
+Plugin 'vim-scripts/tComment'
+```
+保存文件并退出，重新打开vim，执行":PluginInstall"命令。vundle就会从github上，下载tComment插件。
+```
+:PlugInstall
+```
+重新打开vim，输入":help tComment"，即可查看此插件的帮助文档。
+```
+:help tComment
+```
+***tComment插件***可以对代码进行快速注释或取消注释。在编写代码尤其是调试代码时，经常会遇到需要暂时注释掉一段代码，但稍后又取消掉注释。
+tComment通过简单的命令就可以很快的实现此功能，不再需要手动的去插入一堆注释的符号。
 
+- "gcc" 注释或取消注释当前行的代码。
 
 
 ## 个性化配置
@@ -336,7 +434,7 @@ Ubuntu上如果没有cmake还需要安装一下。
 $ sudo apt-get install cmake
 ```
 #### vim源码安装
-vim默认不支持python的语法补全，如果需要用到python，可以下载[vim源码](https://github.com/vim/vim)，编译安装。更多信息查看[vim官网](https://www.vim.org/)
+vim默认不支持python的语法补全，如果需要用到python，可以下载[vim源码](https://github.com/vim/vim)，编译安装。 更多信息查看[vim官网](https://www.vim.org/)。
 ```
 $ sudo apt-get install python
 $ sudo apt-get install python-pip

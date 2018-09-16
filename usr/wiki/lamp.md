@@ -3,7 +3,7 @@
 
 - Linux
 - Nginx
-- Python
+- Python 是一种脚本语言，
 - MySQL
 - Redis
 
@@ -11,6 +11,8 @@
 ### Linux
 ### Nginx
 ### Python
+Mac上自带python，不需要安装。Ubuntu上也自带python。更多信息参考：[python官网](https://www.python.org/)
+
 ### MySQL
 ### Redis
 ## 微服务化
