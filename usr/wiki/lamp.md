@@ -14,15 +14,17 @@ Linux系统的应用十分广泛，有很多流行的桌面操作系统与移动
 
 严格上意义上讲Linux只是一个系统内核，没法直接使用，还需要各种应用软件。
 GNU是一个软件基金组织，提供了各种各样免费开源的自由软件。
-debian就是把Linux内核与GNU软件打包成一个完整的操作系统，并且提供了软件包管理工具，可以很方便的下载各种应用软件。
-ubuntu在debian的基础上，提供了更加友好的桌面系统，降低了使用难度。
-apache也是一个著名的软件基金组织，赞助了一系列的开源软件，尤其是服务器相关的软件，所以推动了WEB繁荣发展。
+Debian就是把Linux内核与GNU软件打包成一个完整的操作系统，并且提供了软件包管理工具，可以很方便的下载各种应用软件。
+Ubuntu在Debian的基础上，提供了更加友好的桌面系统，降低了使用难度。
+Apache也是一个著名的软件基金组织，赞助了一系列的开源软件，尤其是服务器相关的软件，所以推动了WEB繁荣发展。
+Mozilla是一个软件社区，开发了浏览器Firefox，提供了一系列的Web技术与文档，推动了WEB繁荣发展。
 
 - [Linux官网](https://www.linux.org/)
 - [GNU官网](https://www.gnu.org/)
-- [debian官网](https://www.debian.org/)
+- [Debian官网](https://www.debian.org/)
 - [Ubuntu官网](https://www.ubuntu.com/)
 - [Apache官网](https://www.apache.org/)
+- [Mozilla官网](https://developer.mozilla.org/)
 
 电脑端常见的操作系统是MacOSX与Windows。
 所以使用Linux常用的方式有：
@@ -32,7 +34,27 @@ apache也是一个著名的软件基金组织，赞助了一系列的开源软�
 - 本地安装虚拟机，当然最主要的还是在自己电脑上安装一下，可以选择各种虚拟机软件安装如VMWare或VirtualBox，像应用软件一样安装操作系统。最近流行的Docker容器技术，也可以尝试一下。
 
 #### 软件管理
-apt是debian与ubuntu的软件管理工具，Linux之所以这么流行，就是因为有大量优秀的开源软件与免费软件可以自由的获取与使用。
+Linux之所以这么流行，就是因为有大量优秀的开源软件与免费软件可以自由的获取与使用。
+apt是Debian的软件管理工具，只需要一条命令即可下载所需的软件。
+软件包，是开发人员将程序、文档、脚本、配置等相关打包在一起，方便软件的分发与部署。
+软件源，是专门存放软件包的服务器，用户可以在线搜索、查看、下载各种软件包。
+软件包之间会存在依赖关系，使用apt下载软件包时，会检测软件包的依赖关系，自动下载并安装相关的软件包。
+
+
+最常用的两条命令是update与install，更新软件信息列表和安装软件包。
+更新软件包信息列表，从软件源服务器上下载软件包的信息列表。安装软件时，会根据这些信息下载相关软件包。
+需要经常更新一下。
+```
+$ sudo apt-get update
+```
+安装软件包，只需输入软件包名就可以自动下载并安装相关软件。如下安装vim。
+```
+$ sudo apt-get install vim
+```
+当不知道软件包的完整名字时，可以使用search命令，如下搜索docker。
+```
+$ apt-cache search docker
+```
 
 - 软件源 /etc/apt/sources.list
 - 软件包清单 /var/lib/apt/lists
@@ -47,10 +69,71 @@ apt是debian与ubuntu的软件管理工具，Linux之所以这么流行，就是
 - 查看软件包 apt-cache show
 
 #### 帮助信息
+Linux有大量的软件与工具，每个软件都有自己的使用方法与参数。
+一下子记住这么多信息是不可能的，所以需要快速找到相关的帮助信息。
 
-- man
-- whatis
-- apropos
+最直接的帮助信息是软件自带，输入参数-h或是--help，就可以查看参数列表及相关信息。如下查看命令ps的帮助信息。
+```
+$ ps --help
+```
+另外，查看更详细的使用信息使用man命令。man手册，使用交互式查看文档，可以翻页，可以搜索。
+```
+$ man ps
+```
+使用whatis可以查看命令的简要描述信息。
+```
+$ whatis ps
+```
+查看命令所在的文件。
+```
+$ which ps
+```
+当不知道命令的完整名字时，可以使用模糊搜索。
+```
+$ apropos nice
+```
+很多软件都有自己的官网，如果还需要更多的信息，可以去官网查阅在线的文档。
+
+#### 远程登录
+很多时候运行环境并不在本机，需要去远程登录设备，如访问服务器，如连接开发板。
+这时就会用到ssh工具，ssh是security shell的简写，提供加密通信的远程连接。可以远程执行各种命令，传输文件等。
+
+ssh参数指定所需要用户名与主机地址，即可。
+```
+$ ssh shy@10.0.0.10
+```
+
+如果使用密码认证，每次都需要输入密码，很是麻烦，尤其是开发环境也在远程设备上，需要频繁的输入密码。
+可以使用ssh-keygen命令，生成密钥对，使用密钥文件登录。
+```
+$ ssh-keygen
+```
+
+密钥生成后，用ssh-copy-id命令将公钥上传到远程主机。下次再用ssh登录时就不用再输入密码了。
+```
+$ ssh-copy-id shy@10.0.0.10
+```
+
+有时候需要上传或是下载文件，scp命令像cp命令一样简单，可以直接在本机与远程主机传输文件。
+与cp不同的是，远程文件名前需要加上用户名与主机地址。
+
+将远程主机的文件下载到本地。
+```
+$ scp shy@10.0.0.10:/home/shy/.vimrc vimrc
+```
+将本地文件上传到远程主机。
+```
+$ scp vimrc shy@10.0.0.10:/home/shy/.vimrc
+```
+当需传输更多文件时，可以使用sftp命令，交互式的访问远程目录。使用get下载文件，put上传文件。
+```
+$ sftp shy@10.0.0.10
+```
+
+- 私钥文件 ~/.ssh/id_rsa
+- 公钥文件 ~/.ssh/id_rsa.pub
+- 授权公钥 ~/.ssh/authorized_keys
+
 
 #### 本地化
 
@@ -109,20 +192,28 @@ apt是debian与ubuntu的软件管理工具，Linux之所以这么流行，就是
 #### 内核管理
 #### 系统启动
 system
-#### 远程登录
-
-- ssh
-- scp
-- sftp
-- ssh-keygen -t rsa
-- ~/.ssh/id_rsa
-- ~/.ssh/id_rsa.pub
-- ssh-copy-id
-- ~/.ssh/authorized_keys
-
-
 
 ### Nginx
+nginx是一种Web服务器，尤其是反向代理与负载均衡功能在高并发的服务器上应用广泛。更多信息参考：[nginx官网](http://nginx.org/)
+
+安装nginx
+```
+$ sudo apt-get install nginx
+```
+启动nginx
+```
+$ sudo nginx
+```
+访问nginx
+```
+$ curl localhost
+```
+
+nginx通过丰富的配置文件，启用各种功能。查看nginx相关的文件。
+```
+$ nginx -V
+```
+
 ### Python
 Mac上自带python，不需要安装。Ubuntu上也自带python。更多信息参考：[python官网](https://www.python.org/)
 
