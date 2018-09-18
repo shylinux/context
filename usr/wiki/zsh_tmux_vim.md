@@ -63,6 +63,19 @@ shy-MacBook-Pro.local
 $ wget http://www.baidu.com
 ```
 ### zsh使用
+Mac上自带zsh，不用安装，但Ubuntu上需要自己安装一下。
+```
+$ sudo apt-get install zsh
+```
+原生的zsh不是很好用，可以安装一个[zsh插件管理器](https://github.com/robbyrussell/oh-my-zsh)。
+更多信息可以查看[ohmyzsh官网](https://ohmyz.sh/)。
+```
+$ sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+```
+如果在Ubuntu上没有安装curl，可以安装一下。
+```
+$ sudo apt-get install curl
+```
 ### tmux使用
 ### docker使用
 

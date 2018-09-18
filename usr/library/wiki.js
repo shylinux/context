@@ -51,13 +51,12 @@ function menu() {
 	var max = 0;
 	var min = 1000;
 	var list = [];
-	var hs = ["h2", "h3"];
+	var hs = ["h2", "h3", "h4"];
 	for (var i = 0; i < hs.length; i++) {
 		var head = document.getElementsByTagName(hs[i]);
 		for (var j = 0; j < head.length; j++) {
 			head[j].id = "head"+head[j].offsetTop;
-			head[j].onclick = function(event) {
-			}
+			head[j].onclick = function(event) {}
 			list.push({"level": hs[i], "position": head[j].offsetTop, "title": head[j].innerText, "hash": head[j].id})
 			if (head[j].offsetTop > max) {
 				max = head[j].offsetTop;
@@ -85,17 +84,22 @@ function menu() {
 		}
 	}
 
-	var index2 = -1;
-	var index3 = 0;
+  var index = [-1, 0, 0]
 	for (var i = 0; i < list.length; i++) {
 		if (list[i].level == "h2") {
-			index2++;
-			index3=0;
+			index[0]++;
+			index[1]=0;
+			index[2]=0;
+    } else if (list[i].level == "h3") {
+			index[1]++;
+			index[2]=0;
 		} else {
-			index3++;
-			list[i].index3 = index3;
+			index[2]++;
 		}
-		list[i].index2 = index2;
+
+    list[i].index4 = index[2];
+    list[i].index3 = index[1];
+		list[i].index2 = index[0];
 	}
 
 	var m = document.getElementsByClassName("menu");
@@ -104,7 +108,10 @@ function menu() {
 			var text = list[j].index2+"."
 			if (list[j].level == "h3") {
 				text += list[j].index3
-			}
+			} else if (list[j].level == "h4") {
+				text += list[j].index3+"."+list[j].index4
+      }
+
 			text += " "
 			text += list[j].title;
 
