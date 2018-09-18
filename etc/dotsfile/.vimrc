@@ -1,12 +1,17 @@
 "加载插件"{{{
 call plug#begin()
 Plug 'vim-scripts/tComment'
-Plug 'airblade/vim-gitgutter'
+Plug 'tpope/vim-fugitive'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'ntpeters/vim-better-whitespace'
+Plug 'easymotion/vim-easymotion'
+nmap f ;;f
+nmap F ;;F
 
 Plug 'vim-scripts/taglist.vim'
+let g:Tlist_WinWidth=45
+let g:Tlist_Exit_OnlyWindow=1
 let g:Tlist_Enable_Fold_Column=0
 nnoremap <F2> :TlistToggle<CR>
 
@@ -71,6 +76,7 @@ set hlsearch
 set incsearch
 set nowrapscan
 set smartcase
+set ignorecase
 
 set hidden
 set autowrite
@@ -96,6 +102,7 @@ cnoremap jk <CR>
 "}}}
 " 编程配置{{{
 set keywordprg=man\ -a
+command! RR wa | source ~/.vimrc |e
 
 autocmd BufNewFile,BufReadPost *.shy set filetype=shy
 autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s

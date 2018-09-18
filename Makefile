@@ -6,7 +6,6 @@ install:
 	@go get github.com/nsf/termbox-go
 	@go get github.com/skip2/go-qrcode
 	@go get github.com/gomarkdown/markdown
-	@cp etc/go.snippets ~/.vim/snippets/
 	@cp etc/shy.vim ~/.vim/syntax/
 	@touch etc/local.shy
 	@touch etc/local_exit.shy
@@ -37,3 +36,9 @@ linux32:
 linux_arm:
 	GOARCH=arm GOOS=linux go build $(BENCH)
 	mv bench bench_1.0_linux_arm
+
+back_dotsfile:
+	cp ~/.zsh_local etc/dotsfile
+	cp ~/.tmux.conf etc/dotsfile
+	cp ~/.vimrc etc/dotsfile
+
