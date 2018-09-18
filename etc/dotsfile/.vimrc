@@ -6,8 +6,8 @@ Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'ntpeters/vim-better-whitespace'
 Plug 'easymotion/vim-easymotion'
-nmap f ;;f
-nmap F ;;F
+nmap t ;;t
+nmap T ;;T
 
 Plug 'vim-scripts/taglist.vim'
 let g:Tlist_WinWidth=45
@@ -97,6 +97,7 @@ nnoremap j gj
 nnoremap k gk
 
 nnoremap df :FZF<CR>
+inoremap df _
 inoremap jk <Esc>
 cnoremap jk <CR>
 "}}}
