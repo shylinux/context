@@ -315,29 +315,23 @@ set scrolloff=3
 ```
 #### vim的扩展插件
 除的vim自带的配置与命令，还有大量丰富的插件，可以扩展很多功能。
-但大量的插件手动维护太复杂，可以下载一个[vim插件管理器](https://github.com/VundleVim/Vundle.vim)。
+但大量的插件手动维护太复杂，可以下载一个[vim插件管理器](https://github.com/junegunn/vim-plug)。
 执行如下命令，下载插件。
 ```
-$ git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
+$ curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 ```
 下载完成后，还需要在启动脚本文件中，加入一些命令启用此插件管理器。
 打开~/.vimrc，并添加以下第2行及以后的内容。
 ```
 $ vi ~/.vimrc
-filetype off
-set nocompatible
-set rtp+=~/.vim/bundle/Vundle.vim
-call vundle#begin()
-Plugin 'VundleVim/Vundle.vim'
-call vundle#end()
-filetype plugin on
+call plug#begin()
+Plug 'vim-scripts/tComment'
+call plug#end()
 ```
-以后如果需要添加新的插件，就可以在"call vundle#begin()"与"call vundle#end()"之间插入Plugin命令。
-格式像"Plugin 'VundleVim/Vundle.vim'"一样，如安装注释插件"tComment"，在"Plugin 'VundleVim/Vundle.vim'"后面插入如下命令。
-```
-Plugin 'vim-scripts/tComment'
-```
-保存文件并退出，重新打开vim，执行":PluginInstall"命令。vundle就会从github上，下载tComment插件。
+以后如果需要添加新的插件，就可以在"call plug#begin()"与"call plug#end()"之间插入Plug命令。
+如安装插件tComment，就插入"Plug 'vim-scripts/tComment'"。
+保存文件并退出，重新打开vim，执行":PlugInstall"命令。plug-vim就会从github上，下载tComment插件。
 ```
 :PlugInstall
 ```
