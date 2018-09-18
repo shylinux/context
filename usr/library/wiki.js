@@ -26,22 +26,24 @@ function keyup(event) {
 }
 
 document.onkeyup = keyup;
-function toggle() {
-	window.list_hide = !window.list_hide;
-	var list = document.getElementsByClassName("list")[0];
-	var content = document.getElementsByClassName("content")[0];
-	if (list_hide) {
-		list.style.visibility = "hidden";
-		list.style.width="0px";
-		list.style.height="0px";
-		list.style["min-width"]="0px";
-		content.style.width="100%";
-	} else {
-		list.style.visibility = "visible";
-		list.style.width="15%";
-		list.style.height="100%";
-		list.style["min-width"]="180px";
-		content.style.width="85%";
+function toggle(side) {
+	if (side == "left") {
+		window.left_list_hide = !window.left_list_hide;
+		var list = document.getElementsByClassName("list")[0];
+		var content = document.getElementsByClassName("content")[0];
+		if (left_list_hide) {
+			list.style.visibility = "hidden";
+			list.style.width="0px";
+			list.style.height="0px";
+			list.style["min-width"]="0px";
+			content.style.width="100%";
+		} else {
+			list.style.visibility = "visible";
+			list.style.width="15%";
+			list.style.height="100%";
+			list.style["min-width"]="180px";
+			content.style.width="85%";
+		}
 	}
 }
 

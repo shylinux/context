@@ -107,9 +107,15 @@ p {
 	height:100%;
 	float:left;
 }
+.toggle1 {
+	background-color:green;
+	width:2%;
+	height:100%;
+	float:right;
+}
 .texts {
-	width:96%;
-		max-width:800px;
+	max-width:800px;
+	width:94%;
 	float:left;
 	margin-left:2%;
 }
@@ -167,7 +173,8 @@ p {
 }
 </style>
 <div class="content">
-	<div class="toggle" title="点击，显示或隐藏目录" onclick="toggle()"></div>
+	<div class="toggle" title="点击，显示或隐藏目录" onclick="toggle('left')"></div>
+	<div class="toggle1" title="点击，显示或隐藏目录" onclick="toggle('right')"></div>
 	{{if option . "modify_time"|meta}}
 	<div class="record">上次修订时间: {{option . "modify_time"|meta}} 修订次数: {{option . "modify_count"|meta}}</div>
 	{{end}}

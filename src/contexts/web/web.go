@@ -459,6 +459,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				},
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
+					"module": "cli", "detail": []interface{}{"system", "tmux", "show-buffer"},
+					"template": "detail", "title": "buffer",
+					"option": map[string]interface{}{"ninput": 1},
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
 					"module": "cli", "command": "system",
 					"argument": []interface{}{"tmux", "show-buffer"},
 					"template": "result", "title": "buffer",
