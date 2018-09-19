@@ -1,7 +1,15 @@
+"安装plug-vim {{{
+"$ curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+"
+"安装vim各种插件
+":PlugInstall
+"
+"}}}
 "加载插件"{{{
 call plug#begin()
 Plug 'vim-scripts/tComment'
 Plug 'tpope/vim-fugitive'
+Plug 'airblade/vim-gitgutter'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'ntpeters/vim-better-whitespace'
@@ -35,17 +43,28 @@ Plug 'godlygeek/tabular'
 Plug 'plasticboy/vim-markdown'
 Plug 'vim-scripts/python.vim'
 
+Plug 'mbbill/echofunc'
 Plug 'vim-syntastic/syntastic'
+let g:syntastic_quiet_messages = { "regex": [
+            \ "Missing module docstring",
+            \ "Missing class docstring",
+            \ "Missing function docstring",
+            \ "Wrong continued indentation",
+            \ "Line Too Long",
+            \ "defined outside __init__",
+         \ ] }
+
 Plug 'Valloric/YouCompleteMe'
+let g:syntastic_enable_signs = 1
 let g:ycm_confirm_extra_conf=0
 nnoremap gd :YcmCompleter GoToDeclaration<CR>
 
 Plug 'benmills/vimux'
 let mapleader=";"
-nnoremap <Leader>vp :VimuxPromptCommand<CR>
-nnoremap <Leader>vl :VimuxRunLastCommand<CR>
-nnoremap <Leader>vx :VimuxInterruptRunner<CR>
-nnoremap <Leader>vz :VimuxZoomRunner<CR>
+nnoremap <Leader>; :VimuxPromptCommand<CR>
+" nnoremap <Leader>j :VimuxZoomRunner<CR>
+" nnoremap <Leader>l :VimuxRunLastCommand<CR>
+" nnoremap <Leader>vx :VimuxInterruptRunner<CR>
 
 Plug 'vim-scripts/matrix.vim--Yang'
 call plug#end()
@@ -66,6 +85,7 @@ set tabstop=4
 set shiftwidth=4
 set cindent
 set expandtab
+set backspace=indent,eol,start
 
 set showmatch
 set matchtime=2
@@ -103,9 +123,12 @@ cnoremap jk <CR>
 "}}}
 " 编程配置{{{
 set keywordprg=man\ -a
-command! RR wa | source ~/.vimrc |e
 
 autocmd BufNewFile,BufReadPost *.shy set filetype=shy
 autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s
 autocmd BufNewFile,BufReadPost *.conf set filetype=nginx
+
+command! RR wa | source ~/.vimrc |e
+
+source ~/.vim_local
 "}}}
