@@ -77,6 +77,86 @@ $ sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools
 $ sudo apt-get install curl
 ```
 ### tmux使用
+tmux是终端管理软件，可以将一个窗口分隔成任意多个终端，这样就可以在一个窗口中同时执行多条命令。
+而且tmux在后台运行，即使窗口关闭或是网络连接断开了，终端依然在运行，可以重新连接，窗口的所有数据不会丢失。
+所以tmux可以极大的提高工作的效率和连续性。
+
+Ubuntu上安装tmux
+```
+$ sudo apt-get install tmux
+```
+Mac上安装tmux
+```
+$ brew install tmux
+```
+Windows上安装tmux还是算了，太折腾了。
+
+启动或连接tmux。
+```
+$ tmux
+```
+每次在终端运行tmux命令，tmux首先连接后台服务，如果服务进程不存在，就会创建一个后台服务进程。
+服务启动后，和普通终端一样，就可以在tmux的窗口中执行各种命令行。
+
+#### tmux快捷键体验
+tmux默认的控制键是Ctrl+b，然后再输入命令字符。就可以对tmux进行各种控制。
+
+如下按下Ctrl+b，然后再按引号键，就可以将当前终端分隔成上下两个终端。
+```
+Ctrl+b "
+```
+如下按下Ctrl+b，然后再按百分号键，就可以将当前终端分隔成左右两个终端。
+```
+Ctrl+b %
+```
+如下按下Ctrl+b，然后再按字母o，就可以在两个终端来回切换。
+```
+Ctrl+b o
+```
+
+如下按下Ctrl+b，然后再按字母c，就可以创建一个新窗口。
+```
+Ctrl+b c
+```
+如下按下Ctrl+b，然后再按字母n，就可以切换到下一个窗口。
+```
+Ctrl+b n
+```
+如下按下Ctrl+b，然后再按字母p，就可以切换到下一个窗口。
+```
+Ctrl+b p
+```
+
+#### tmux命令行体验
+tmux的控制方式除了方便的快捷键，还有丰富的命令行。
+
+如下命令，查看有多少个窗口。
+```
+$ tmux list-windows
+```
+如下命令，创建一个新窗口。再调用list-windows，就可以看到新的窗口。
+```
+$ tmux new-window
+```
+如下命令，查看有多少个会话。
+```
+$ tmux list-sessions
+```
+如下命令，连接最近的会话。
+```
+$ tmux attach-session
+```
+
+#### tmux客户端与会话
+tmux是以CS的服务模型实现窗口管理。
+tmux的后台服务，负责管理客户端与会话的连接。可以同时管理多个会话，多个客户端，所以可以支持多个人同时连接服务。
+而且可以多个客户端连接同一个会话，这样连接的话，多个客户端是完全一样界面，从而实现屏幕共享，协同操作。
+
+#### tmux窗口与面板
+#### tmux配置文件
+#### tmux缓存管理
+
+同时管理多个终端。[tmux源码](https://github.com/tmux/tmux)
 ### docker使用
 
 - [Windows版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-windows)

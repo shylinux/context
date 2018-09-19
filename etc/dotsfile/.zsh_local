@@ -1,16 +1,3 @@
-export PROMPT=$LOCAL_PROMPT'%![%*]%c$ '
-export EDITOR=vim
-
-alias t='tmux'
-alias v='vim'
-alias g='git'
-
-bindkey -e
-bindkey jk accept-line
-bindkey "^N" down-line-or-beginning-search
-bindkey "^P" up-line-or-beginning-search
-
-bindkey -M vicmd j down-line-or-beginning-search
-bindkey -M vicmd k up-line-or-beginning-search
-
+export PROMPT='vps%![%*]%c$ '
+export GOPATH=~/etcvpn:$GOPATH
 
