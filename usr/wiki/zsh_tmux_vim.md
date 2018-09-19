@@ -197,12 +197,13 @@ $ docker ps
 CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
 ```
 如下示例，用busybox:latest镜像，启动一个容器，并调用sh命令。
--d 指用守护的方式启动，与交互式 -i 不同，守护式启动，容器可以一直运行，不会因为终端容器关闭而停止。
---name参数，指定容器的名字为demo，docker中标识容器有两种方式，一是通过ID查找容器，二是通过NAMES查找容器，为了方便记忆与查找，建议启动容器时加上名字参数。
 ```
 $ docker run --name demo -dt busybox:latest sh  
 29ff6b8343c4a2c57eab297e74e62422ab9bbd481d69f5ebf108f4aa23ae835c
 ```
+其中，-d 指用守护的方式启动，与交互式 -i 不同，守护式启动，容器可以一直运行，不会因为终端容器关闭而停止。
+--name参数，指定容器的名字为demo，docker中标识容器有两种方式，一是通过ID查找容器，二是通过NAMES查找容器，为了方便记忆与查找，建议启动容器时加上名字参数。
+
 如下示例，再次查看容器列表，看到容器已经启动。
 ```
 $ docker ps
@@ -210,9 +211,26 @@ CONTAINER ID        IMAGE               COMMAND             CREATED             
 29ff6b8343c4        busybox:latest      "sh"                4 minutes ago       Up 4 minutes                            demo
 ```
 
+连接容器demo，调用命令解析器sh。这样就连接上了容器的命令行，可以执行各种命令。
 ```
-$ docker exec -it
+$ docker exec -it demo sh
+#
 ```
+
+容器的停止，退出连接后，容器依然在后台运行，可以反复被连接。如果想停止容器的运行就用stop命令。
+```
+$ docker stop demo
+```
+
+#### 挂载文件
+之前启动的容器都是与本机之间没有什么交互，是一个完全独立的运行环境。
+如果需要容器与本机交互一些文件，就可以在启动容器时指定文件参数。
+```
+$ docker run --name demo1 -v/Users/shaoying:/home/shaoying  -dt busybox:latest sh
+```
+
+#### 端口映射
+
 ### git入门
 Mac上自带git，不需要安装。
 Windows上安装了的git-scm，也集成了git，也不需要单独安装。
@@ -396,7 +414,7 @@ set scrolloff=3
 #### vim的扩展插件
 除的vim自带的配置与命令，还有大量丰富的插件，可以扩展很多功能。
 但大量的插件手动维护太复杂，可以下载一个[vim插件管理器](https://github.com/junegunn/vim-plug)。
-执行如下命令，下载插件。
+执行如下命令，下载plug-vim。
 ```
 $ curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
@@ -411,11 +429,19 @@ call plug#end()
 ```
 以后如果需要添加新的插件，就可以在"call plug#begin()"与"call plug#end()"之间插入Plug命令。
 如安装插件tComment，就插入"Plug 'vim-scripts/tComment'"。
-保存文件并退出，重新打开vim，执行":PlugInstall"命令。plug-vim就会从github上，下载tComment插件。
+重新加载启动脚本。
+```
+:source ~/.vimrc
+```
+执行":PlugInstall"命令。plug-vim就会从github上，下载tComment插件。
 ```
 :PlugInstall
 ```
-重新打开vim，输入":help tComment"，即可查看此插件的帮助文档。
+重新加载启动脚本。
+```
+:source ~/.vimrc
+```
+输入":help tComment"，即可查看此插件的帮助文档。
 ```
 :help tComment
 ```
@@ -538,4 +564,9 @@ $ make -j8
 $ sudo mkdir /usr/local/vim8
 $ sudo make install
 ```
+
 ## 源码解析
+```
+$ sudo apt-get install build-essential
+```
+
