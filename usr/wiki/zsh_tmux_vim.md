@@ -150,6 +150,11 @@ Ctrl+b d
 $ tmux
 ```
 
+如下按下Ctrl+b，然后再按问号?，就可以查看所有快捷键。可以按方向键上下翻页，按字母q可以退出查看。
+```
+Ctrl+b ?
+```
+
 #### tmux命令行体验
 tmux的控制方式除了方便的快捷键，还有丰富的命令行。
 
@@ -168,6 +173,23 @@ $ tmux list-sessions
 如下命令，连接最近的会话。
 ```
 $ tmux attach-session
+```
+
+除了在外部终端命令行中执行tmux命令，还可以在tmux中执行命令，按Ctrl+b然后按冒号，就进入底行模式，然后就可以输入各种命令，最后按回车执行。
+```
+Ctrl+b : split-window <Enter>
+```
+显示时间，按任意键退出。
+```
+Ctrl+b : clock-mode <Enter>
+```
+显示状态条
+```
+Ctrl+b : set status on <Enter>
+```
+隐藏状态条
+```
+Ctrl+b : set status on <Enter>
 ```
 
 #### tmux客户端与会话
@@ -314,6 +336,29 @@ visual-silence
 word-separators
 
 
+#### tmux缓存管理
+list-buffers
+show-buffer
+save-buffer
+load-buffer
+set-buffer
+delete-buffer
+choose-buffer
+paste-buffer
+clear-history
+
+#### tmux状态行
+display-message
+confirm-before
+command-prompt
+
+#### tmux其它命令
+clock-mode
+server-info
+lock-server
+if-shell
+run-shell
+wait-for
 
 #### tmux缓存管理
 
