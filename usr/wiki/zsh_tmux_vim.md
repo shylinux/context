@@ -19,7 +19,7 @@
 
 使用zsh+tmux+vim的工具链，根据自己的使用习惯进行个性化配置，就可以极大的提升编程速度与开发效率。
 
-## 入门指南
+## 基础入门
 每个系统上打开终端的方式都不一样，根据自己的系统进行操作。
 
 - 在Ubuntu中，按Ctrl+Alt+T，可以直接打开终端。
@@ -62,6 +62,11 @@ shy-MacBook-Pro.local
 ```
 $ wget http://www.baidu.com
 ```
+
+如果Mac上没有brew，可以安装一下[Mac包管理器](https://github.com/Homebrew/brew)。更多信息参考[HomeBrew官网](https://brew.sh/)
+```
+$ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+```
 ### zsh使用
 Mac上自带zsh，不用安装，但Ubuntu上需要自己安装一下。
 ```
@@ -73,12 +78,22 @@ $ sudo apt-get install zsh
 $ sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
 ```
 如果在Ubuntu上没有安装curl，可以安装一下。
+
+在终端常用的搜索命令有find与grep。
+ag就是取代grep，对指定目录下的所有文件的内容进行全文搜索。
+度h
 ```
 $ sudo apt-get install curl
 ```
+```
+$ brew install the_silver_searcher
+```
+```
+$ sudo apt-get install silversearcher-ag
+```
 ### tmux使用
 tmux是终端管理软件，可以将一个窗口分隔成任意多个终端，这样就可以在一个窗口中同时执行多条命令。
-而且tmux在后台运行，即使窗口关闭或是网络连接断开了，终端依然在运行，可以重新连接，窗口的所有数据不会丢失。
+而且tmux在后台运行服务，即使窗口关闭或是网络连接断开了，终端依然在运行，可以重新连接，窗口的所有数据不会丢失。
 所以tmux可以极大的提高工作的效率和连续性。
 
 Ubuntu上安装tmux
@@ -122,9 +137,17 @@ Ctrl+b c
 ```
 Ctrl+b n
 ```
-如下按下Ctrl+b，然后再按字母p，就可以切换到下一个窗口。
+如下按下Ctrl+b，然后再按字母p，就可以切换到上一个窗口。
 ```
 Ctrl+b p
+```
+如下按下Ctrl+b，然后再按字母d，就会断开当前连接，回到原始的终端窗口，但tmux会话中的所有终端都还在运行。
+```
+Ctrl+b d
+```
+在终端中执行tmux命令，tmux会重新连接会话。
+```
+$ tmux
 ```
 
 #### tmux命令行体验
@@ -150,10 +173,148 @@ $ tmux attach-session
 #### tmux客户端与会话
 tmux是以CS的服务模型实现窗口管理。
 tmux的后台服务，负责管理客户端与会话的连接。可以同时管理多个会话，多个客户端，所以可以支持多个人同时连接服务。
-而且可以多个客户端连接同一个会话，这样连接的话，多个客户端是完全一样界面，从而实现屏幕共享，协同操作。
+而且多个客户端可以连接同一个会话，多个客户端是完全一样界面，从而实现屏幕共享，协同操作。
+
+
+会话管理
+
+- list-sessions
+- has-session
+- new-session
+- kill-session
+- rename-session
+- attach-session
+
+客户端管理
+
+- list-clients
+- detach-client
+- switch-client
+- refresh-client
+- suspend-client
+
+其它管理
+
+- start-server
+- kill-server
+- list-commands
+- source-file
+- show-messages
+- lock-session
+- lock-client
 
 #### tmux窗口与面板
+list-windows
+find-window
+last-window
+next-window
+previous-window
+select-window
+
+new-window
+move-window
+swap-window
+link-window
+unlink-window
+kill-window
+respawn-window
+rename-window
+
+rotate-window
+split-window
+
+next-layout
+previous-layout
+select-layout
+
+list-panes
+display-panes
+last-pane
+select-pane
+
+move-pane
+swap-pane
+join-pane
+kill-pane
+break-pane
+respawn-pane
+resize-pane
+capture-pane
+pipe-pane
+
+
+choose-client
+choose-session
+choose-window
+choose-tree
+choose-list
+
+bind-key
+list-keys
+send-keys
+send-prefix
+unbind-key
+
 #### tmux配置文件
+assume-paste-time
+
+base-index
+bell-action
+bell-on-alert
+default-shell
+default-command
+default-terminal
+desctroy-unattached
+detach-on-destroy
+display-panes-active-colour
+display-pnaes-colour
+display-panes-time
+display-time
+history-limit
+lock-after-time
+lock-command
+lock-server
+
+message-command-style
+message-style
+message-limit
+mouse-resize-pane
+mouse-select-pane
+mouse-select-window
+mouse-utf8
+pane-active-border-style
+pane-border-style
+
+prefix
+prefix2
+renumber-windows
+repeat-time
+set-remain-on-exit
+set-titles
+set-titles-string
+status
+status-interval
+status-justify
+status-keys
+status-left
+status-left-length
+status-left-style
+status-right
+status-right-length
+status-right-style
+status-position
+status-style
+status-utf8
+terminal-overrides
+update-environment
+visual-activity
+visual-bell
+visual-content
+visual-silence
+word-separators
+
+
+
 #### tmux缓存管理
 
 同时管理多个终端。[tmux源码](https://github.com/tmux/tmux)
@@ -451,12 +612,8 @@ tComment通过简单的命令就可以很快的实现此功能，不再需要手
 - "gcc" 注释或取消注释当前行的代码。
 
 
-## 个性化配置
-### zsh安装
-Mac上自带zsh，不用安装，但Ubuntu上需要自己安装一下。
-```
-$ sudo apt-get install zsh
-```
+## 进阶指南
+### zsh技巧
 在Mac上，将zsh设置为默认的shell。
 ```
 $ chsh -s /bin/zsh
@@ -465,59 +622,10 @@ $ chsh -s /bin/zsh
 ```
 $ chsh -s /usr/bin/zsh
 ```
-原生的zsh不是很好用，可以安装一个[zsh插件管理器](https://github.com/robbyrussell/oh-my-zsh)。
-更多信息可以查看[ohmyzsh官网](https://ohmyz.sh/)。
-```
-$ sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
-```
-如果在Ubuntu上没有安装curl，可以安装一下。
-```
-$ sudo apt-get install curl
-```
-### tmux安装
-[tmux源码](https://github.com/tmux/tmux)
-Ubuntu上安装
-```
-$ sudo apt-get install tmux
-```
-Mac上安装
-```
-$ brew install tmux
-```
-如果Mac上没有brew，可以安装一下[Mac包管理器](https://github.com/Homebrew/brew)。更多信息参考[HomeBrew官网](https://brew.sh/)
-```
-$ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-```
-### docker安装
-[docker下载](https://www.docker.com/products/docker-desktop)
-
-[docker源码](https://github.com/docker/docker-ce)
-### git安装
-Mac上自带git，不需要安装，但Ubuntu需要自己安装一下。
-```
-$ sudo apt-get install git
-```
-### vim安装
-Mac上自带vim，不需要安装，但Ubuntu需要自己安装一下。
-```
-$ sudo apt-get install vim
-```
-vim通过丰富的插件，可以扩展很多功能，定制出完全个性化的编辑器。
-但大量的插件手动维护太复杂，可以下载一个[vim插件管理器](https://github.com/VundleVim/Vundle.vim)。
-```
-$ git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
-```
-启用vundle插件管理：打开~/.vimrc，并添加以下第2行及以后的内容。
-```
-$ vi ~/.vimrc
-filetype off
-set nocompatible
-set rtp+=~/.vim/bundle/Vundle.vim
-call vundle#begin()
-Plugin 'VundleVim/Vundle.vim'
-call vundle#end()
-filetype plugin indent on
-```
+### tmux技巧
+### docker技巧
+### git技巧
+### vim技巧
 #### YouCompleteMe安装
 vim只是编辑器，如果需要语法检查与补全功能可以安装插件[YouCompleteMe](https://github.com/Valloric/YouCompleteMe)。
 打开.vimrc配置文件，添加插件。
@@ -546,8 +654,19 @@ Ubuntu上如果没有cmake还需要安装一下。
 ```
 $ sudo apt-get install cmake
 ```
+
+## 源码解析
+### zsh源码解析
+[zsh源码](https://github.com/zsh-users/zsh)
+### tmux源码解析
+[tmux源码](https://github.com/tmux/tmux)
+### docker源码解析
+[docker源码](https://github.com/docker/docker-ce)
+### git源码解析
+[git源码](https://github.com/git/git)
+### vim源码解析
 #### vim源码安装
-vim默认不支持python的语法补全，如果需要用到python，可以下载[vim源码](https://github.com/vim/vim)，编译安装。 更多信息查看[vim官网](https://www.vim.org/)。
+vim默认不支持python的语法补全，如果需要用到python，可以下载[vim源码](https://github.com/vim/vim)，编译安装。
 ```
 $ sudo apt-get install python
 $ sudo apt-get install python-pip
@@ -565,7 +684,6 @@ $ sudo mkdir /usr/local/vim8
 $ sudo make install
 ```
 
-## 源码解析
 ```
 $ sudo apt-get install build-essential
 ```
