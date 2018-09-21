@@ -37,8 +37,18 @@ linux_arm:
 	GOARCH=arm GOOS=linux go build $(BENCH)
 	mv bench bench_1.0_linux_arm
 
+
+DOCS=etc/dotsfile
 back_dotsfile:
-	cp ~/.zsh_local etc/dotsfile
-	cp ~/.tmux.conf etc/dotsfile
-	cp ~/.vimrc etc/dotsfile
+	cp ~/.zshrc $(DOCS)
+	cp ~/.tmux.conf $(DOCS)
+	cp ~/.vimrc $(DOCS)
+
+load_dotsfile: ~/.zshrc ~/.tmux.conf ~/.vimrc
+~/.zshrc: $(DOCS)/.zshrc
+	cp $(DOCS)/.zshrc ~/
+~/.tmux.conf: $(DOCS)/.tmux.conf
+	cp $(DOCS)/.tmux.conf ~/
+~/.vimrc: $(DOCS)/.vimrc
+	cp $(DOCS)/.vimrc ~/
 
