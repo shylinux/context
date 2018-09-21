@@ -38,17 +38,20 @@ linux_arm:
 	mv bench bench_1.0_linux_arm
 
 
-DOCS=etc/dotsfile
+DOTS=etc/dotsfile
 back_dotsfile:
-	cp ~/.zshrc $(DOCS)
-	cp ~/.tmux.conf $(DOCS)
-	cp ~/.vimrc $(DOCS)
+	cp ~/.zshrc $(DOTS)
+	cp ~/.tmux.conf $(DOTS)
+	cp ~/.vimrc $(DOTS)
+	cp ~/.vim/syntax/shy.vim etc/
 
 load_dotsfile: ~/.zshrc ~/.tmux.conf ~/.vimrc
-~/.zshrc: $(DOCS)/.zshrc
-	cp $(DOCS)/.zshrc ~/
-~/.tmux.conf: $(DOCS)/.tmux.conf
-	cp $(DOCS)/.tmux.conf ~/
-~/.vimrc: $(DOCS)/.vimrc
-	cp $(DOCS)/.vimrc ~/
+~/.zshrc: $(DOTS)/.zshrc
+	cp $(DOTS)/.zshrc ~/
+~/.tmux.conf: $(DOTS)/.tmux.conf
+	cp $(DOTS)/.tmux.conf ~/
+~/.vimrc: $(DOTS)/.vimrc
+	cp $(DOTS)/.vimrc ~/
+~/.vim/syntax/shy.vim: etc/shy.vim
+	cp etc/shy.vim ~/.vim/syntax/
 

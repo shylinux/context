@@ -19,6 +19,7 @@ syn keyword shStatement let var
 " ctx command
 syn match   shStatement "\(^\|\t\|$(\)cache"
 syn match   shStatement "\(^\|\t\|$(\)config"
+syn match   shStatement "\(^\|\t\|$(\)command"
 syn match   shStatement "\(^\|\t\|$(\)detail"
 syn match   shStatement "\(^\|\t\|$(\)option"
 syn match   shStatement "\(^\|\t\|$(\)append"
