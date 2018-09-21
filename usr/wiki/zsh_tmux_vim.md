@@ -92,9 +92,14 @@ $ brew install the_silver_searcher
 $ sudo apt-get install silversearcher-ag
 ```
 ### tmux使用
-tmux是终端管理软件，可以将一个窗口分隔成任意多个终端，这样就可以在一个窗口中同时执行多条命令。
-而且tmux在后台运行服务，即使窗口关闭或是网络连接断开了，终端依然在运行，可以重新连接，窗口的所有数据不会丢失。
-所以tmux可以极大的提高工作的效率和连续性。
+在开发与测试的过程中，经常会同时处理多个事情，就用到多个终端窗口，可以使用SecureCRT、PuTTY、Terimal、iTerm、Konsole等软件去管理这些终端。
+不过窗口一多，在一堆标签中来回切换窗口，简直是恶梦一样，经常会翻来翻去，搞半天才能找到自己想用的终端窗口。
+而且尤其是连接远程服务器，网络一但断开，所有的窗口就要重新连接，而且终端里的操作历史基本上就废了，很多工作就要重新操作一遍了。
+
+tmux就是一款极其强大的终端管理软件。
+它不仅可以把一个窗口分隔成任意多个小窗口，每个窗口都是一个独立的终端，像IDE一样把几个相关的终端窗口放在一个界面中。
+而且即使网络中断也不会丢失任何数据，重新连接后可以继续工作，不会感觉出现场环境有任何变化。
+仅凭这两点，tmux就可以极大的提高工作的效率和工作连续性。
 
 Ubuntu上安装tmux
 ```
@@ -104,53 +109,56 @@ Mac上安装tmux
 ```
 $ brew install tmux
 ```
-Windows上安装tmux还是算了，太折腾了。
+Windows上安装tmux还是算了，太折腾了，放弃吧，兄弟。
 
 启动或连接tmux。
 ```
 $ tmux
 ```
-每次在终端运行tmux命令，tmux首先连接后台服务，如果服务进程不存在，就会创建一个后台服务进程。
-服务启动后，和普通终端一样，就可以在tmux的窗口中执行各种命令行。
+每次在终端运行tmux命令时，tmux命令本身作为一个客户端，会去连接后台服务，如果服务进程不存在，就会创建一个后台服务进程。
+所以tmux是以CS的服务模式管理终端的，即使网络中断了，客户端退出了，所有的运行终端都完整的保存在服务进程中。
+
+服务启动后，和普通终端一样，就可以在tmux的窗口中执行各种命令行了。
+tmux有三种交互方式，快捷键，命令行，配置文件。
 
 #### tmux快捷键体验
 tmux默认的控制键是Ctrl+b，然后再输入命令字符。就可以对tmux进行各种控制。
 
-如下按下Ctrl+b，然后再按引号键，就可以将当前终端分隔成上下两个终端。
+示例如下，按下Ctrl+b，然后再按引号键，就可以将当前终端窗口分隔成上下两个终端。
 ```
 Ctrl+b "
 ```
-如下按下Ctrl+b，然后再按百分号键，就可以将当前终端分隔成左右两个终端。
+示例如下，按下Ctrl+b，然后再按百分号键，就可以将当前终端窗口分隔成左右两个终端。
 ```
 Ctrl+b %
 ```
-如下按下Ctrl+b，然后再按字母o，就可以在两个终端来回切换。
+示例如下，按下Ctrl+b，然后再按字母o，就可以在两个终端窗口间来回切换。
 ```
 Ctrl+b o
 ```
 
-如下按下Ctrl+b，然后再按字母c，就可以创建一个新窗口。
+示例如下，按下Ctrl+b，然后再按字母c，就可以创建一个新窗口。
 ```
 Ctrl+b c
 ```
-如下按下Ctrl+b，然后再按字母n，就可以切换到下一个窗口。
+示例如下，按下Ctrl+b，然后再按字母n，就可以切换到后一个窗口。
 ```
 Ctrl+b n
 ```
-如下按下Ctrl+b，然后再按字母p，就可以切换到上一个窗口。
+示例如下，按下Ctrl+b，然后再按字母p，就可以切换到前一个窗口。
 ```
 Ctrl+b p
 ```
-如下按下Ctrl+b，然后再按字母d，就会断开当前连接，回到原始的终端窗口，但tmux会话中的所有终端都还在运行。
+示例如下，按下Ctrl+b，然后再按字母d，就会断开当前连接，回到原始的终端窗口，但tmux会话中的所有终端都还在运行。
 ```
 Ctrl+b d
 ```
-在终端中执行tmux命令，tmux会重新连接会话。
+断开连接后，在终端中再次执行tmux命令，tmux会重新连接会话，之前的窗口都会原样打开。
 ```
 $ tmux
 ```
 
-如下按下Ctrl+b，然后再按问号?，就可以查看所有快捷键。可以按方向键上下翻页，按字母q可以退出查看。
+示例如下，按下Ctrl+b，然后再按问号?，就可以查看所有快捷键。可以按方向键上下翻页，按字母q可以退出查看。
 ```
 Ctrl+b ?
 ```
@@ -192,177 +200,368 @@ Ctrl+b : set status on <Enter>
 Ctrl+b : set status on <Enter>
 ```
 
-#### tmux客户端与会话
-tmux是以CS的服务模型实现窗口管理。
-tmux的后台服务，负责管理客户端与会话的连接。可以同时管理多个会话，多个客户端，所以可以支持多个人同时连接服务。
-而且多个客户端可以连接同一个会话，多个客户端是完全一样界面，从而实现屏幕共享，协同操作。
+#### tmux功能详解
+每次运行tmux都会启动一个客户端client，每个客户端client会连接到服务端server下的某一个会话session。
+当然多个客户端client可以连接同一个会话session，所以client与session是多对一的关系。
+
+每一个会话session下面可以管理多个窗口window，每个窗口window可以被分隔成多个窗格pane，每个窗格pane就是一个独立的终端teriminal。
+所以从server->session->window->pane就形成一个树状的结构，每个叶子节点就是pane，即一个终端。
+
+命令如下，查看客户端列表。
+```
+$ tmux list-clients
+/dev/ttys000: context [158x42 xterm-256color] (utf8)
+```
+其中"/dev/ttys000"就是客户端设备, "context"是会话名，"158x42"是窗口宽高，utf8是字符集。
+
+命令的详细定义可以查man手册，"man tmux"，可以查看每条命令的详细定义。
+```
+list-clients (lsc) [-F format] [-t target-session]
+```
+其中"list-clients"是命令，lsc是命令简写，
+"-F format"，可以指定输出内容格式，
+"-t target-session"，可以查看指定会话下有多少客户端连接，默认查看所有会话下的客户端。
+
+查看所有会话session
+```
+list-sessions (ls) [-F format]
+```
+
+查看某会话或所有会话下的所有窗口window
+```
+list-windows (lsw) [-a] [-F format] [-t target-session]
+```
+
+查看某窗口或所有窗口下的所有空格pane
+```
+list-panes (lsp) [-as] [-F format] [-t target-window]
+```
+除了终端管理，tmux还提供了缓存管理，方便在终端间复制文字。tmux会保存每次复制的内容。
+```
+list-buffers (lsb) [-F format]
+```
+
+查看所有命令行
+```
+list-commands (lscm) [-F format]
+```
+查看所有快捷键
+```
+list-keys (lsk) [-t mode-table] [-T key-table]
+```
+#### tmux会话管理
+新建会话
+```
+new-session (new) [-AdDEP] [-c start-directory] [-F format] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [command]
+```
+- "-s session-name" 指定会话名
+- "-n window-name" 指定初始窗口的名字
+- "-c start-directory" 设定起始目录
+- "-d" 会话创建成功后，不自动连接
+    - "-x width" 指定窗口宽度
+    - "-y width" 指定窗口调试
+- "-A" 如果会话存在就自动连接
+    - "-D" 自动连接会话时，断开会话与其它客户端连接
+- "-t target-session" 创建共享会话，新会话session-name与已存在的target-session共享所有窗口
+- "-P format" 指定命令输出的格式
+- "command" 窗口创建成功后执行的shell命令
 
 
-会话管理
+会话是否存在
+```
+has-session (has) [-t target-session]
+```
+重命名会话
+```
+rename-session (rename) [-t target-session] new-name
+```
+连接会话
+```
+attach-session (attach) [-dEr] [-c working-directory] [-t target-session]
+```
+锁定会话
+```
+lock-session (locks) [-t target-session]
+```
+删除会话
+```
+kill-session (killp) [-a] [-t target-pane]
+```
 
-- list-sessions
-- has-session
-- new-session
-- kill-session
-- rename-session
-- attach-session
+#### tmux窗口管理
+创建窗口
+```
+new-window (neww) [-adkP] [-c start-directory] [-F format] [-n window-name] [-t target-window] [command]
+```
+重命令窗口
+```
+rename-window (renamew) [-t target-window] new-name
+```
+查找窗口
+```
+find-window (findw) [-CNT] [-F format] [-t target-window] match-string
+```
 
-客户端管理
+切换最近使用的窗口
+```
+last-window (last) [-t target-session]
+```
+切换下一个的窗口
+```
+next-window (next) [-a] [-t target-session]
+```
+切换上一个的窗口
+```
+previous-window (prev) [-a] [-t target-session]
+```
 
-- list-clients
-- detach-client
-- switch-client
-- refresh-client
-- suspend-client
+交换两个窗口的位置
+```
+swap-window (swapw) [-d] [-s src-window] [-t dst-window]
+```
+移动窗口到指定位置
+```
+move-window (movew) [-dkr] [-s src-window] [-t dst-window]
+```
+镜像出一个窗口
+```
+link-window (linkw) [-dk] [-s src-window] [-t dst-window]
+```
+删除镜像
+```
+unlink-window (unlinkw) [-k] [-t target-window]
+```
+删除窗口
+```
+kill-window (killw) [-a] [-t target-window]
+```
+激活窗口
+```
+respawn-window (respawnw) [-k] [-t target-window] [command]
+```
 
-其它管理
+分隔窗口
+```
+split-window (splitw) [-bdfhvP] [-c start-directory] [-F format] [-p percentage|-l size] [-t target-pane] [command]
+```
 
-- start-server
-- kill-server
-- list-commands
-- source-file
-- show-messages
-- lock-session
-- lock-client
+循环移动窗口位置
+```
+rotate-window (rotatew) [-DU] [-t target-window]
+```
 
-#### tmux窗口与面板
-list-windows
-find-window
-last-window
-next-window
-previous-window
-select-window
+窗口切换到下一种布局
+```
+next-layout (nextl) [-t target-window]
+```
+窗口切换到上一种布局
+```
+previous-layout (prevl) [-t target-window]
+```
 
-new-window
-move-window
-swap-window
-link-window
-unlink-window
-kill-window
-respawn-window
-rename-window
+显示所有窗口的序号
+```
+display-panes (displayp) [-t target-client]
+```
 
-rotate-window
-split-window
+```
+last-pane (lastp) [-de] [-t target-window]
+swap-pane (swapp) [-dDU] [-s src-pane] [-t dst-pane]
+move-pane (movep) [-bdhv] [-p percentage|-l size] [-s src-pane] [-t dst-pane]
+join-pane (joinp) [-bdhv] [-p percentage|-l size] [-s src-pane] [-t dst-pane]
+kill-pane (killp) [-a] [-t target-pane]
+resize-pane (resizep) [-DLMRUZ] [-x width] [-y height] [-t target-pane] [adjustment]
+respawn-pane (respawnp) [-k] [-t target-pane] [command]
 
-next-layout
-previous-layout
-select-layout
+break-pane (breakp) [-dP] [-F format] [-s src-pane] [-t dst-window]
+capture-pane (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+pipe-pane (pipep) [-o] [-t target-pane] [command]
+```
 
-list-panes
-display-panes
-last-pane
-select-pane
-
-move-pane
-swap-pane
-join-pane
-kill-pane
-break-pane
-respawn-pane
-resize-pane
-capture-pane
-pipe-pane
-
-
-choose-client
-choose-session
-choose-window
-choose-tree
-choose-list
-
-bind-key
-list-keys
-send-keys
-send-prefix
-unbind-key
-
-#### tmux配置文件
-assume-paste-time
-
-base-index
-bell-action
-bell-on-alert
-default-shell
-default-command
-default-terminal
-desctroy-unattached
-detach-on-destroy
-display-panes-active-colour
-display-pnaes-colour
-display-panes-time
-display-time
-history-limit
-lock-after-time
-lock-command
-lock-server
-
-message-command-style
-message-style
-message-limit
-mouse-resize-pane
-mouse-select-pane
-mouse-select-window
-mouse-utf8
-pane-active-border-style
-pane-border-style
-
-prefix
-prefix2
-renumber-windows
-repeat-time
-set-remain-on-exit
-set-titles
-set-titles-string
-status
-status-interval
-status-justify
-status-keys
-status-left
-status-left-length
-status-left-style
-status-right
-status-right-length
-status-right-style
-status-position
-status-style
-status-utf8
-terminal-overrides
-update-environment
-visual-activity
-visual-bell
-visual-content
-visual-silence
-word-separators
-
+```
+choose-client (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+choose-session (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+choose-window (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+choose-buffer (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+choose-tree (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+select-layout (selectl) [-nop] [-t target-window] [layout-name]
+select-window (selectw) [-lnpT] [-t target-window]
+select-pane (selectp) [-DdegLlMmRU] [-P style] [-t target-pane]
+```
 
 #### tmux缓存管理
-list-buffers
-show-buffer
-save-buffer
-load-buffer
-set-buffer
-delete-buffer
-choose-buffer
-paste-buffer
-clear-history
+```
+show-buffer (showb) [-b buffer-name]
+load-buffer (loadb) [-b buffer-name] path
+save-buffer (saveb) [-a] [-b buffer-name] path
+paste-buffer (pasteb) [-dpr] [-s separator] [-b buffer-name] [-t target-pane]
+set-buffer (setb) [-a] [-b buffer-name] [-n new-buffer-name] data
+delete-buffer (deleteb) [-b buffer-name]
+clear-history (clearhist) [-t target-pane]
+copy-mode (confirm) [-p prompt] [-t target-client] command
+```
 
-#### tmux状态行
-display-message
-confirm-before
-command-prompt
+#### tmux快捷键与命令行
+```
+bind-key (bind) [-cnr] [-t mode-table] [-R repeat-count] [-T key-table] key command [arguments]
+unbind-key (unbind) [-acn] [-t mode-table] [-T key-table] key
+send-keys (send) [-lRM] [-t target-pane] key ...
+send-prefix (send) [-lRM] [-t target-pane] key ...
+clock-mode (clearhist) [-t target-pane]
+```
 
-#### tmux其它命令
-clock-mode
-server-info
-lock-server
-if-shell
-run-shell
-wait-for
+```
+display-message (display) [-p] [-c target-client] [-F format] [-t target-pane] [message]
+show-messages (showmsgs) [-JT] [-t target-client]
+show-options (show) [-gqsvw] [-t target-session|target-window] [option]
+set-option (set) [-agosquw] [-t target-window] option [value]
+source-file (source) [-q] path
+confirm-before (confirm) [-p prompt] [-t target-client] command
+command-prompt (clearhist) [-t target-pane]
+show-environment (showenv) [-gs] [-t target-session] [name]
+set-environment (setenv) [-gru] [-t target-session] name [value]
+run-shell (run) [-b] [-t target-pane] shell-command
+if-shell (if) [-bF] [-t target-pane] shell-command command [command]
+wait-for (wait) [-L|-S|-U] channel
+set-hook (setenv) [-gru] [-t target-session] name [value]
+show-hooks (showenv) [-gs] [-t target-session] [name]
+```
 
-#### tmux缓存管理
+#### tmux客户端与服务端
+```
+refresh-client (refresh) [-S] [-C size] [-t target-client]
+suspend-client (suspendc) [-t target-client]
+switch-client (switchc) [-Elnpr] [-c target-client] [-t target-session] [-T key-table]
+detach-client (detach) [-P] [-a] [-s target-session] [-t target-client]
+lock-client (lockc) [-t target-client]
+```
+```
+server-info (info) 
+start-server (start) 
+kill-server (killp) [-a] [-t target-pane]
+lock-server (lock) 
+```
 
-同时管理多个终端。[tmux源码](https://github.com/tmux/tmux)
+#### tmux服务配置
+```
+buffer-limit 20
+default-terminal "screen"
+escape-time 500
+exit-unattached off
+focus-events off
+history-file ""
+message-limit 100
+quiet off
+set-clipboard on
+terminal-overrides "xterm*:XT:Ms=\E]52;%p1%s;%p2%s\007:Cs=\E]12;%p1%s\007:Cr=\E]112\007:Ss=\E[%p1%d q:Se=\E[2 q,screen*:XT"
+```
+
+#### tmux会话配置
+```
+mouse on
+prefix C-s
+prefix2 None
+
+base-index 1
+renumber-windows on
+history-limit 50000
+
+status on
+status-keys vi
+status-interval 15
+status-justify left
+status-position bottom
+status-style fg=black,bg=green
+status-left "[#S] "
+status-left-length 10
+status-left-style default
+status-right " "#{=21:pane_title}" %H:%M %d-%b-%y"
+status-right-length 40
+status-right-style default
+message-style fg=black,bg=yellow
+message-command-style fg=yellow,bg=black
+visual-activity off
+visual-bell off
+visual-silence off
+bell-action any
+bell-on-alert off
+
+set-titles off
+set-titles-string "#S:#I:#W - "#T" #{session_alerts}"
+word-separators " -_@"
+
+display-panes-active-colour red
+display-panes-colour blue
+display-panes-time 5000
+display-time 5000
+repeat-time 500
+assume-paste-time 1
+key-table "root"
+
+destroy-unattached off
+detach-on-destroy on
+set-remain-on-exit off
+default-command ""
+default-shell "/bin/zsh"
+lock-after-time 0
+lock-command "lock -np"
+update-environment "DISPLAY SSH_ASKPASS SSH_AUTH_SOCK SSH_AGENT_PID SSH_CONNECTION WINDOWID XAUTHORITY"
+```
+
+#### tmux窗口配置
+```
+set-window-option (setw) [-agoqu] [-t target-window] option [value]
+show-window-options (showw) [-gv] [-t target-window] [option]
+```
+
+```
+aggressive-resize off
+alternate-screen on
+monitor-activity off
+monitor-silence 0
+synchronize-panes off
+
+wrap-search on
+xterm-keys off
+remain-on-exit off
+
+mode-keys vi
+mode-style fg=black,bg=yellow
+allow-rename off
+automatic-rename on
+automatic-rename-format "#{?pane_in_mode,[tmux],#{pane_current_command}}#{?pane_dead,[dead],}"
+pane-base-index 1
+
+
+force-height 0
+force-width 0
+main-pane-height 24
+main-pane-width 80
+other-pane-height 0
+other-pane-width 0
+
+clock-mode-style 24
+clock-mode-colour blue
+
+pane-border-style default
+pane-border-status off
+pane-active-border-style fg=green
+pane-border-format "#{?pane_active,#[reverse],}#{pane_index}#[default] "#{pane_title}""
+
+window-style default
+window-active-style default
+
+
+window-status-separator " "
+window-status-style default
+window-status-bell-style reverse
+window-status-last-style default
+window-status-current-style default
+window-status-activity-style reverse
+window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
+window-status-current-format "#I:#W#{?window_flags,#{window_flags}, }"
+```
+
 ### docker使用
 
 - [Windows版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-windows)
