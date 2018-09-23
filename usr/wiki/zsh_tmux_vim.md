@@ -109,7 +109,7 @@ Mac上安装tmux
 ```
 $ brew install tmux
 ```
-Windows上安装tmux还是算了，太折腾了，放弃吧，兄弟。
+Windows上安装tmux还是算了，太折腾了，放弃吧。
 
 启动或连接tmux。
 ```
@@ -249,6 +249,7 @@ list-commands (lscm) [-F format]
 ```
 list-keys (lsk) [-t mode-table] [-T key-table]
 ```
+
 #### tmux会话管理
 新建会话
 ```
@@ -293,6 +294,33 @@ kill-session (killp) [-a] [-t target-pane]
 ```
 new-window (neww) [-adkP] [-c start-directory] [-F format] [-n window-name] [-t target-window] [command]
 ```
+- -n 指定新窗口的名字
+- -t 指定新窗口的位置
+    - -a 新创建的窗口在-t指定窗口后面的位置
+    - -k -t指定的位置如果存在窗口，则删除此窗口，并插入新的窗口
+- -c 指定新窗口的当前目录
+- -d 新窗口创建后，不切换为当前窗口
+- -P 命令执行成功后，返回字符串
+    - -F 返回字符串的格式
+- command 窗口启动后执行的命令
+
+分割窗口，将一个窗口分成上下或左右两个窗口
+```
+split-window (splitw) [-bdfhvP] [-c start-directory] [-F format] [-p percentage|-l size] [-t target-pane] [command]
+```
+- -t 被分割的窗口
+- -h 分割成左右两个窗口
+- -v 分割成上下两个窗口
+- -b 指定新窗口的位置在左边或是上边
+- -f 新窗口高度占满整个窗口
+- -p 指定窗口宽度或高度百分比
+- -l 指定窗口的宽度或高度
+- -P 命令执行成功后返回字符串
+    - -F 返回字符串的格式
+- -d 新窗口不切换为当前窗口
+- -c 新窗口的当前目录
+- command 执行的命令
+
 重命令窗口
 ```
 rename-window (renamew) [-t target-window] new-name
@@ -301,6 +329,10 @@ rename-window (renamew) [-t target-window] new-name
 ```
 find-window (findw) [-CNT] [-F format] [-t target-window] match-string
 ```
+- -N 从窗口名字中匹配
+- -C 从窗口内容中匹配
+- -T 从窗口标题中匹配
+- match-string 匹配字符串
 
 切换最近使用的窗口
 ```
@@ -340,11 +372,6 @@ kill-window (killw) [-a] [-t target-window]
 respawn-window (respawnw) [-k] [-t target-window] [command]
 ```
 
-分隔窗口
-```
-split-window (splitw) [-bdfhvP] [-c start-directory] [-F format] [-p percentage|-l size] [-t target-pane] [command]
-```
-
 循环移动窗口位置
 ```
 rotate-window (rotatew) [-DU] [-t target-window]
@@ -364,85 +391,291 @@ previous-layout (prevl) [-t target-window]
 display-panes (displayp) [-t target-client]
 ```
 
+切换到上一次选中的面板
 ```
 last-pane (lastp) [-de] [-t target-window]
-swap-pane (swapp) [-dDU] [-s src-pane] [-t dst-pane]
-move-pane (movep) [-bdhv] [-p percentage|-l size] [-s src-pane] [-t dst-pane]
-join-pane (joinp) [-bdhv] [-p percentage|-l size] [-s src-pane] [-t dst-pane]
-kill-pane (killp) [-a] [-t target-pane]
-resize-pane (resizep) [-DLMRUZ] [-x width] [-y height] [-t target-pane] [adjustment]
-respawn-pane (respawnp) [-k] [-t target-pane] [command]
+```
 
+交换两个面板的位置
+```
+swap-pane (swapp) [-dDU] [-s src-pane] [-t dst-pane]
+```
+合并面板，把"-t dst-pane"的面板分割成两个， 把-s指定的面板移到新分割的位置中，-t与-s位于相同的窗口中
+```
+move-pane (movep) [-bdhv] [-p percentage|-l size] [-s src-pane] [-t dst-pane]
+```
+合并面板，把"-t dst-pane"的面板分割成两个， 把-s指定的面板移到新分割的位置中，-t与-s位于不同的窗口中
+```
+join-pane (joinp) [-bdhv] [-p percentage|-l size] [-s src-pane] [-t dst-pane]
+```
+把某个面板，移动到一个新的窗口
+```
 break-pane (breakp) [-dP] [-F format] [-s src-pane] [-t dst-window]
-capture-pane (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+```
+调整大小
+```
+resize-pane (resizep) [-DLMRUZ] [-x width] [-y height] [-t target-pane] [adjustment]
+```
+- -Z 占满全屏或恢复原大小
+- -U 扩大上边缘位置
+- -D 扩大下边缘位置
+- -L 扩大左边缘位置
+- -R 扩大右边缘位置
+
+```
 pipe-pane (pipep) [-o] [-t target-pane] [command]
 ```
 
+捕获面板内容
+```
+capture-pane (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+```
+- -e 保留转义格式
+- -p 输出内容到标准输出
+- -b 输出内容到缓存
+- -S start-line 起始行
+- -E end-line 结束行
+- -t 目标面板
+
+重新激活面板
+```
+respawn-pane (respawnp) [-k] [-t target-pane] [command]
+```
+
+删除一个面板
+```
+kill-pane (killp) [-a] [-t target-pane]
+```
+
+切换当前窗口
+```
+select-window (selectw) [-lnpT] [-t target-window]
+```
+
+切换当前面板
+```
+select-pane (selectp) [-DdegLlMmRU] [-P style] [-t target-pane]
+```
+- -d 禁止面板输入
+- -e 使能面板输入
+- -m 标记面板，被标记的面板作为join-pane swap-pane swap-window命令-s的默认参数
+- -M 取消标记
+- -g 显示终端属性
+- -P style 设置终端属性
+- -t 目标面板
+- -D -U -L -R 目标面板为-t指定面板的相邻面板
+
+选择窗口布局
+```
+select-layout (selectl) [-nop] [-t target-window] [layout-name]
+```
+
+交互式选择客户端
 ```
 choose-client (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+```
+交互式选择会话
+```
 choose-session (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+```
+交互式选择窗口
+```
 choose-window (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
-choose-buffer (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
+```
+交互式选择会话或窗口
+```
 choose-tree (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
-select-layout (selectl) [-nop] [-t target-window] [layout-name]
-select-window (selectw) [-lnpT] [-t target-window]
-select-pane (selectp) [-DdegLlMmRU] [-P style] [-t target-pane]
+```
+交互式选择缓存
+```
+choose-buffer (capturep) [-aCeJpPq] [-b buffer-name] [-E end-line] [-S start-line][-t target-pane]
 ```
 
 #### tmux缓存管理
+进入复制模式
+```
+copy-mode [-t target-pane]
+```
+复制模式，用户就可以浏览此窗口的输出历史，并可以复制内容到缓存
+
+清空面板输出的历史记录
+```
+clear-history (clearhist) [-t target-pane]
+```
+
+粘贴缓存内容到指定面板
+```
+paste-buffer (pasteb) [-dpr] [-s separator] [-b buffer-name] [-t target-pane]
+```
+设置缓存内容
+```
+set-buffer (setb) [-a] [-b buffer-name] [-n new-buffer-name] data
+```
+- -a 保存缓存内容，并追加到后面
+- -b 指定缓存的名字
+- -n 缓存的新名字
+- data 新加内容
+
+显示某条缓存的内容
 ```
 show-buffer (showb) [-b buffer-name]
-load-buffer (loadb) [-b buffer-name] path
+```
+将某条缓存内容保存到文件
+```
 save-buffer (saveb) [-a] [-b buffer-name] path
-paste-buffer (pasteb) [-dpr] [-s separator] [-b buffer-name] [-t target-pane]
-set-buffer (setb) [-a] [-b buffer-name] [-n new-buffer-name] data
+```
+将文件内容加载到某条缓存
+```
+load-buffer (loadb) [-b buffer-name] path
+```
+删除某条缓存
+```
 delete-buffer (deleteb) [-b buffer-name]
-clear-history (clearhist) [-t target-pane]
-copy-mode (confirm) [-p prompt] [-t target-client] command
 ```
 
 #### tmux快捷键与命令行
+
+发送前缀键到面板
+```
+send-prefix [-t target-pane]
+```
+发送字符到面板
+```
+send-keys (send) [-lRM] [-t target-pane] key ...
+```
+快捷键映射到命令行
 ```
 bind-key (bind) [-cnr] [-t mode-table] [-R repeat-count] [-T key-table] key command [arguments]
+```
+取消映射
+```
 unbind-key (unbind) [-acn] [-t mode-table] [-T key-table] key
-send-keys (send) [-lRM] [-t target-pane] key ...
-send-prefix (send) [-lRM] [-t target-pane] key ...
-clock-mode (clearhist) [-t target-pane]
 ```
 
 ```
+clock-mode (clearhist) [-t target-pane]
+```
+
+输出信息
+```
 display-message (display) [-p] [-c target-client] [-F format] [-t target-pane] [message]
+```
+- -p 作为命令的输出，否则输出到状态行
+- -c target-client 指定客户端
+- -t target-pane 指定面板
+- message 输出的消息
+
+查看输出历史
+```
 show-messages (showmsgs) [-JT] [-t target-client]
-show-options (show) [-gqsvw] [-t target-session|target-window] [option]
-set-option (set) [-agosquw] [-t target-window] option [value]
-source-file (source) [-q] path
+```
+
+执行命令前，让用户选择一下是否执行
+```
 confirm-before (confirm) [-p prompt] [-t target-client] command
-command-prompt (clearhist) [-t target-pane]
-show-environment (showenv) [-gs] [-t target-session] [name]
-set-environment (setenv) [-gru] [-t target-session] name [value]
+```
+执行命令前，让用户输出一些参数
+```
+command-prompt [-p prompts] [-I inputs] [-t target-client] [template]
+```
+- -p 提示信息
+- -I 参数默认值
+- -t 指定客户端
+- template 命令模板
+```
+
+执行Shell命令
+```
 run-shell (run) [-b] [-t target-pane] shell-command
+```
+执行完Shell命令，根据执行结果，选择执行tmux的命令
+```
 if-shell (if) [-bF] [-t target-pane] shell-command command [command]
+```
+
+显示环境变量
+```
+show-environment (showenv) [-gs] [-t target-session] [name]
+```
+设置环境变量
+```
+set-environment (setenv) [-gru] [-t target-session] name [value]
+```
+
+显示配置
+```
+show-options (show) [-gqsvw] [-t target-session|target-window] [option]
+```
+- -s 服务级配置
+- -w 窗口级配置
+- -g 显示全局配置
+- -v 只显示配置值
+- -t 目标会话或窗口
+- option 配置项
+
+修改配置
+```
+set-option (set) [-agosquw] [-t target-window] option [value]
+```
+
+加载脚本，
+可以将tmux命令写文件中，并随时加载执行，tmux服务在启动时，会默认加载~/.tmux.conf，所以可以将一些默认的配置写此文件中
+```
+source-file (source) [-q] path
+```
+
+同步机制，
+tmux提供了一种同步机制，shell命令可以等待tmux条件，tmux可触发条件
+```
 wait-for (wait) [-L|-S|-U] channel
+```
+
+其它命令
+```
 set-hook (setenv) [-gru] [-t target-session] name [value]
 show-hooks (showenv) [-gs] [-t target-session] [name]
 ```
 
 #### tmux客户端与服务端
+刷新客户端
 ```
 refresh-client (refresh) [-S] [-C size] [-t target-client]
+```
+挂起客户端
+```
 suspend-client (suspendc) [-t target-client]
+```
+切换客户端与会话的关系
+```
 switch-client (switchc) [-Elnpr] [-c target-client] [-t target-session] [-T key-table]
+```
+断开客户端与会话的连接
+```
 detach-client (detach) [-P] [-a] [-s target-session] [-t target-client]
+```
+锁定客户端
+```
 lock-client (lockc) [-t target-client]
 ```
+查看服务信息
 ```
 server-info (info) 
+```
+启动服务进程
+```
 start-server (start) 
-kill-server (killp) [-a] [-t target-pane]
+```
+结束服务进程
+```
+kill-server
+```
+锁定所有客户端
+```
 lock-server (lock) 
 ```
 
 #### tmux服务配置
+常规配置
 ```
 buffer-limit 20
 default-terminal "screen"
@@ -457,15 +690,19 @@ terminal-overrides "xterm*:XT:Ms=\E]52;%p1%s;%p2%s\007:Cs=\E]12;%p1%s\007:Cr=\E]
 ```
 
 #### tmux会话配置
+使用set命令，可以修改tmux一些配置，让tmux更加个性化
+
+启用鼠标
 ```
 mouse on
+```
+设置命令前缀
+```
 prefix C-s
 prefix2 None
-
-base-index 1
-renumber-windows on
-history-limit 50000
-
+```
+设置状态栏
+```
 status on
 status-keys vi
 status-interval 15
@@ -485,21 +722,22 @@ visual-bell off
 visual-silence off
 bell-action any
 bell-on-alert off
-
 set-titles off
 set-titles-string "#S:#I:#W - "#T" #{session_alerts}"
-word-separators " -_@"
+```
 
+窗口显示的配置
+```
 display-panes-active-colour red
 display-panes-colour blue
 display-panes-time 5000
 display-time 5000
-repeat-time 500
-assume-paste-time 1
-key-table "root"
+```
 
-destroy-unattached off
+启动或结束的窗口时的配置
+```
 detach-on-destroy on
+destroy-unattached off
 set-remain-on-exit off
 default-command ""
 default-shell "/bin/zsh"
@@ -508,12 +746,66 @@ lock-command "lock -np"
 update-environment "DISPLAY SSH_ASKPASS SSH_AUTH_SOCK SSH_AGENT_PID SSH_CONNECTION WINDOWID XAUTHORITY"
 ```
 
-#### tmux窗口配置
+常规配置
 ```
-set-window-option (setw) [-agoqu] [-t target-window] option [value]
-show-window-options (showw) [-gv] [-t target-window] [option]
+base-index 1
+renumber-windows on
+history-limit 50000
+word-separators " -_@"
+key-table "root"
+repeat-time 500
+assume-paste-time 1
 ```
 
+#### tmux窗口配置
+使用set -w命令或是set-window-option命令，可以设置窗口的一些配置
+窗口布局设置
+```
+force-height 0
+force-width 0
+main-pane-height 24
+main-pane-width 80
+other-pane-height 0
+other-pane-width 0
+```
+
+窗口样式
+```
+pane-border-style default
+pane-border-status off
+pane-active-border-style fg=green
+pane-border-format "#{?pane_active,#[reverse],}#{pane_index}#[default] "#{pane_title}""
+
+window-style default
+window-active-style default
+
+clock-mode-style 24
+clock-mode-colour blue
+```
+
+状态栏样式
+```
+window-status-separator " "
+window-status-style default
+window-status-bell-style reverse
+window-status-last-style default
+window-status-current-style default
+window-status-activity-style reverse
+window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
+window-status-current-format "#I:#W#{?window_flags,#{window_flags}, }"
+```
+
+常规配置
+```
+mode-keys vi
+mode-style fg=black,bg=yellow
+allow-rename off
+automatic-rename on
+automatic-rename-format "#{?pane_in_mode,[tmux],#{pane_current_command}}#{?pane_dead,[dead],}"
+pane-base-index 1
+```
+
+其它配置
 ```
 aggressive-resize off
 alternate-screen on
@@ -524,42 +816,6 @@ synchronize-panes off
 wrap-search on
 xterm-keys off
 remain-on-exit off
-
-mode-keys vi
-mode-style fg=black,bg=yellow
-allow-rename off
-automatic-rename on
-automatic-rename-format "#{?pane_in_mode,[tmux],#{pane_current_command}}#{?pane_dead,[dead],}"
-pane-base-index 1
-
-
-force-height 0
-force-width 0
-main-pane-height 24
-main-pane-width 80
-other-pane-height 0
-other-pane-width 0
-
-clock-mode-style 24
-clock-mode-colour blue
-
-pane-border-style default
-pane-border-status off
-pane-active-border-style fg=green
-pane-border-format "#{?pane_active,#[reverse],}#{pane_index}#[default] "#{pane_title}""
-
-window-style default
-window-active-style default
-
-
-window-status-separator " "
-window-status-style default
-window-status-bell-style reverse
-window-status-last-style default
-window-status-current-style default
-window-status-activity-style reverse
-window-status-format "#I:#W#{?window_flags,#{window_flags}, }"
-window-status-current-format "#I:#W#{?window_flags,#{window_flags}, }"
 ```
 
 ### docker使用
