@@ -6,7 +6,6 @@ install:
 	@go get github.com/nsf/termbox-go
 	@go get github.com/skip2/go-qrcode
 	@go get github.com/gomarkdown/markdown
-	@cp etc/shy.vim ~/.vim/syntax/
 	@touch etc/local.shy
 	@touch etc/local_exit.shy
 	@touch etc/init.shy
@@ -43,15 +42,16 @@ back_dotsfile:
 	cp ~/.zshrc $(DOTS)
 	cp ~/.tmux.conf $(DOTS)
 	cp ~/.vimrc $(DOTS)
-	cp ~/.vim/syntax/shy.vim etc/
+	cp ~/.vim/syntax/shy.vim $(DOTS)
+	git status -sb $(DOTS)
 
-load_dotsfile: ~/.zshrc ~/.tmux.conf ~/.vimrc
+load_dotsfile: ~/.zshrc ~/.tmux.conf ~/.vimrc ~/.vim/syntax/shy.vim
 ~/.zshrc: $(DOTS)/.zshrc
 	cp $(DOTS)/.zshrc ~/
 ~/.tmux.conf: $(DOTS)/.tmux.conf
 	cp $(DOTS)/.tmux.conf ~/
 ~/.vimrc: $(DOTS)/.vimrc
 	cp $(DOTS)/.vimrc ~/
-~/.vim/syntax/shy.vim: etc/shy.vim
-	cp etc/shy.vim ~/.vim/syntax/
+~/.vim/syntax/shy.vim: $(DOTS)/shy.vim
+	cp $(DOTS)/shy.vim ~/.vim/syntax/
 

@@ -587,7 +587,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"get": &ctx.Command{
 			Name: "get [method GET|POST] [file name filename] url arg...",
 			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "file": 2, "type": 1, "body": 1},
+			Form: map[string]int{"method": 1, "file": 2, "type": 1, "body": 1, "fields": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
 					if web.client == nil {
@@ -718,23 +718,62 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Assert(e)
 
 					if res.Header.Get("Content-Type") == "application/json" {
-						result := map[string]interface{}{}
+						var result interface{}
 						json.Unmarshal(buf, &result)
-						for k, v := range result {
-							switch value := v.(type) {
-							case string:
-								m.Append(k, value)
-							case float64:
-								m.Append(k, fmt.Sprintf("%d", int(value)))
-							default:
-								m.Put("append", k, value)
+						switch ret := result.(type) {
+						case map[string]interface{}:
+							for k, v := range ret {
+								switch value := v.(type) {
+								case string:
+									m.Append(k, value)
+								case float64:
+									m.Append(k, fmt.Sprintf("%d", int(value)))
+								}
 							}
+							m.Table()
+							return
+						case []interface{}:
+							fields := map[string]bool{}
+							for _, k := range strings.Split(m.Option("fields"), " ") {
+								if k != "" {
+									fields[k] = true
+								}
+
+								m.Meta["append"] = append(m.Meta["append"], k)
+							}
+
+							for _, r := range ret {
+								if rr, ok := r.(map[string]interface{}); ok {
+									for k, v := range rr {
+										switch value := v.(type) {
+										case string:
+											if _, ok := fields[k]; len(fields) == 0 || ok {
+												m.Add("append", k, strings.Replace(value, "\n", " ", -1))
+											}
+										case float64:
+											if _, ok := fields[k]; len(fields) == 0 || ok {
+												m.Add("append", k, strings.Replace(fmt.Sprintf("%d", int(value)), "\n", " ", -1))
+											}
+										case map[string]interface{}:
+											for kk, vv := range value {
+												key := k + "." + kk
+												if _, ok := fields[key]; len(fields) == 0 || ok {
+													m.Add("append", key, strings.Replace(fmt.Sprintf("%v", vv), "\n", " ", -1))
+												}
+											}
+										}
+									}
+								}
+							}
+							m.Table()
+							return
 						}
+
 					}
 
 					result := string(buf)
 					m.Echo("%s", result)
-					m.Append("response", result)
+					// m.Append("response", result)
 				} // }}}
 			}},
 		"post": &ctx.Command{Name: "post", Help: "访问服务",
@@ -1203,14 +1242,23 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/json": &ctx.Command{Name: "/json", Help: "json响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			w := m.Optionv("response").(http.ResponseWriter) // {{{
 
-			meta := map[string][]string{}
+			meta := map[string]interface{}{}
 			if len(m.Meta["result"]) > 0 {
 				meta["result"] = m.Meta["result"]
 			}
 			if len(m.Meta["append"]) > 0 {
 				meta["append"] = m.Meta["append"]
 				for _, v := range m.Meta["append"] {
-					meta[v] = m.Meta[v]
+					m.Log("json", "won %v %v", v, m.Meta[v])
+					if _, ok := m.Data[v]; ok {
+						meta[v] = m.Data[v]
+						m.Log("json", "1won %v %v", v, meta[v])
+						m.Log("json", "1won %v %v", v, meta[v], m.Meta[v])
+					} else if _, ok := m.Meta[v]; ok {
+						m.Log("json", "2won %v %v", v, meta[v])
+						meta[v] = m.Meta[v]
+					}
+					m.Log("json", "won %v %v", v, meta[v])
 				}
 			}
 
@@ -1553,6 +1601,38 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
+		}},
+		"/lookup": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) > 0 {
+				m.Option("service", arg[0])
+			}
+			msg := m.Sess("cli").Cmd("system", "sd", "lookup", m.Option("service"))
+
+			rs := strings.Split(msg.Result(0), "\n")
+			i := 0
+			for ; i < len(rs); i++ {
+				if len(rs[i]) == 0 {
+					break
+				}
+				fields := strings.SplitN(rs[i], ": ", 2)
+				m.Append(fields[0], fields[1])
+			}
+
+			lists := []interface{}{}
+			for i += 2; i < len(rs); i++ {
+				fields := strings.SplitN(rs[i], "  ", 3)
+				if len(fields) < 3 {
+					break
+				}
+				lists = append(lists, map[string]interface{}{
+					"ip":   fields[0],
+					"port": fields[1],
+					"tags": fields[2],
+				})
+			}
+
+			m.Appendv("lists", lists)
+			m.Log("log", "%v", lists)
 		}},
 	},
 }
