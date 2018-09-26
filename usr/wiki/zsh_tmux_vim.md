@@ -678,14 +678,15 @@ lock-server (lock)
 常规配置
 ```
 buffer-limit 20
+message-limit 100
+exit-unattached off
+set-clipboard on
+
 default-terminal "screen"
 escape-time 500
-exit-unattached off
 focus-events off
 history-file ""
-message-limit 100
 quiet off
-set-clipboard on
 terminal-overrides "xterm*:XT:Ms=\E]52;%p1%s;%p2%s\007:Cs=\E]12;%p1%s\007:Cr=\E]112\007:Ss=\E[%p1%d q:Se=\E[2 q,screen*:XT"
 ```
 
@@ -820,8 +821,212 @@ remain-on-exit off
 
 ### docker使用
 
+程序在运行的过程中，很多都需要依赖外部系统环境，如配置文件、环境变量、缓存文件等。
+现在软件往往将这些文件打包成软件包，交付给用户，并部署到生产环境。但这种方式还存在很多问题。
+
+- 测试环境的一些文件或环境变量没有放到软件包中
+- 生产环境中程序与程序之间使用相同的资源，产生冲突
+- 在测试环境中，测试运行没问题，但一部署到生产环境，就出现了问题。
+- 当系统的程序一多，使用时间一长，就会积累下一堆垃圾文件，尤其是Windows和Android。
+
+docker以容器的形式，将程序运行的所有环境，打包成一个独立的镜像，进行交付与部署。
+应用程序运行的容器中，有一个独立的根文件系统，并可以监听任意端口，设置环境变量，就好像独自占有一个操作系统。
+这样就可以保证程序运行环境的完整性与独立性，测试环境与生产环境不会有差异。
+在外部看来就只是一个镜像文件，很方便的添加与删除，也不会在系统残留任何文件。
+并且这个容器中的运行环境，可以像git管理代码一样，记录下各个历史版本，并可以随时切换。
+
+与VMware或是VirtualBox之类的虚拟机相比，docker更加轻量，docker中的进程和本机进程一样，docker中的文件和本机文件一样，docker只是将它们组织在一起。
+而不像虚拟机一样，需要虚拟出一个完整的操作系统，并提供一堆设备驱动程序，一台普通的电脑开几个虚拟机资源就不足了，但docker却像进程一样占有很少的资源，可以运行很多容器。
+
+docker分为企业版EE，社区版CE，对于个人使用社会版即可。更多信息参考：[docker官网](https://docs.docker.com/)
+
 - [Windows版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-windows)
 - [Mac版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-mac)
+
+Ubuntu上安装docker
+```
+$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+$ sudo add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+    $(lsb_release -cs) \
+    stable"
+$ sudo apt-get update
+$ sudo apt-get install docker-ce
+```
+
+
+
+```
+$ docker
+Usage:	docker [OPTIONS] COMMAND
+
+A self-sufficient runtime for containers
+
+Options:
+      --config string      Location of client config files (default "/Users/shaoying/.docker")
+  -D, --debug              Enable debug mode
+  -H, --host list          Daemon socket(s) to connect to
+  -l, --log-level string   Set the logging level ("debug"|"info"|"warn"|"error"|"fatal") (default "info")
+      --tls                Use TLS; implied by --tlsverify
+      --tlscacert string   Trust certs signed only by this CA (default "/Users/shaoying/.docker/ca.pem")
+      --tlscert string     Path to TLS certificate file (default "/Users/shaoying/.docker/cert.pem")
+      --tlskey string      Path to TLS key file (default "/Users/shaoying/.docker/key.pem")
+      --tlsverify          Use TLS and verify the remote
+  -v, --version            Print version information and quit
+
+Management Commands:
+  checkpoint  Manage checkpoints
+  config      Manage Docker configs
+  container   Manage containers
+  image       Manage images
+  network     Manage networks
+  node        Manage Swarm nodes
+  plugin      Manage plugins
+  secret      Manage Docker secrets
+  service     Manage services
+  stack       Manage Docker stacks
+  swarm       Manage Swarm
+  system      Manage Docker
+  trust       Manage trust on Docker images
+  volume      Manage volumes
+
+Commands:
+  attach      Attach local standard input, output, and error streams to a running container
+  build       Build an image from a Dockerfile
+  commit      Create a new image from a container's changes
+  cp          Copy files/folders between a container and the local filesystem
+  create      Create a new container
+  deploy      Deploy a new stack or update an existing stack
+  diff        Inspect changes to files or directories on a container's filesystem
+  events      Get real time events from the server
+  exec        Run a command in a running container
+  export      Export a container's filesystem as a tar archive
+  history     Show the history of an image
+  images      List images
+  import      Import the contents from a tarball to create a filesystem image
+  info        Display system-wide information
+  inspect     Return low-level information on Docker objects
+  kill        Kill one or more running containers
+  load        Load an image from a tar archive or STDIN
+  login       Log in to a Docker registry
+  logout      Log out from a Docker registry
+  logs        Fetch the logs of a container
+  pause       Pause all processes within one or more containers
+  port        List port mappings or a specific mapping for the container
+  ps          List containers
+  pull        Pull an image or a repository from a registry
+  push        Push an image or a repository to a registry
+  rename      Rename a container
+  restart     Restart one or more containers
+  rm          Remove one or more containers
+  rmi         Remove one or more images
+  run         Run a command in a new container
+  save        Save one or more images to a tar archive (streamed to STDOUT by default)
+  search      Search the Docker Hub for images
+  start       Start one or more stopped containers
+  stats       Display a live stream of container(s) resource usage statistics
+  stop        Stop one or more running containers
+  tag         Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE
+  top         Display the running processes of a container
+  unpause     Unpause all processes within one or more containers
+  update      Update configuration of one or more containers
+  version     Show the Docker version information
+  wait        Block until one or more containers stop, then print their exit codes
+
+Run 'docker COMMAND --help' for more information on a command.
+```
+
+```
+$ docker
+Usage:	docker [OPTIONS] COMMAND
+
+A self-sufficient runtime for containers
+
+Options:
+      --config string      Location of client config files (default "/Users/shaoying/.docker")
+  -D, --debug              Enable debug mode
+  -H, --host list          Daemon socket(s) to connect to
+  -l, --log-level string   Set the logging level ("debug"|"info"|"warn"|"error"|"fatal") (default "info")
+      --tls                Use TLS; implied by --tlsverify
+      --tlscacert string   Trust certs signed only by this CA (default "/Users/shaoying/.docker/ca.pem")
+      --tlscert string     Path to TLS certificate file (default "/Users/shaoying/.docker/cert.pem")
+      --tlskey string      Path to TLS key file (default "/Users/shaoying/.docker/key.pem")
+      --tlsverify          Use TLS and verify the remote
+  -v, --version            Print version information and quit
+
+Management Commands:
+  checkpoint  Manage checkpoints
+  node        Manage Swarm nodes
+  plugin      Manage plugins
+  secret      Manage Docker secrets
+  service     Manage services
+  stack       Manage Docker stacks
+  swarm       Manage Swarm
+  trust       Manage trust on Docker images
+
+Commands:
+  attach      Attach local standard input, output, and error streams to a running container
+  build       Build an image from a Dockerfile
+  commit      Create a new image from a container's changes
+  cp          Copy files/folders between a container and the local filesystem
+  create      Create a new container
+  deploy      Deploy a new stack or update an existing stack
+  diff        Inspect changes to files or directories on a container's filesystem
+  events      Get real time events from the server
+  exec        Run a command in a running container
+  export      Export a container's filesystem as a tar archive
+  history     Show the history of an image
+  images      List images
+  import      Import the contents from a tarball to create a filesystem image
+  info        Display system-wide information
+  inspect     Return low-level information on Docker objects
+  kill        Kill one or more running containers
+  load        Load an image from a tar archive or STDIN
+  login       Log in to a Docker registry
+  logout      Log out from a Docker registry
+  logs        Fetch the logs of a container
+  pause       Pause all processes within one or more containers
+  port        List port mappings or a specific mapping for the container
+  ps          List containers
+  pull        Pull an image or a repository from a registry
+  push        Push an image or a repository to a registry
+  rename      Rename a container
+  restart     Restart one or more containers
+  rm          Remove one or more containers
+  rmi         Remove one or more images
+  run         Run a command in a new container
+  save        Save one or more images to a tar archive (streamed to STDOUT by default)
+  search      Search the Docker Hub for images
+  start       Start one or more stopped containers
+  stats       Display a live stream of container(s) resource usage statistics
+  stop        Stop one or more running containers
+  tag         Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE
+  top         Display the running processes of a container
+  unpause     Unpause all processes within one or more containers
+  update      Update configuration of one or more containers
+  version     Show the Docker version information
+  wait        Block until one or more containers stop, then print their exit codes
+
+Run 'docker COMMAND --help' for more information on a command.
+```
+
+镜像管理
+image       Manage images
+
+容器管理
+container   Manage containers
+
+配置管理
+config      Manage Docker configs
+
+系统管理
+system      Manage Docker
+
+网络管理
+network     Manage networks
+
+磁盘管理
+volume      Manage volumes
 
 #### docker镜像管理
 
