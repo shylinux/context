@@ -329,6 +329,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"cert":     &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":      &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
 		"record":   &ctx.Config{Name: "record", Value: map[string]interface{}{}, Help: "访问记录"},
+		"lark_msg": &ctx.Config{Name: "lark_msg", Value: []interface{}{}, Help: "聊天记录"},
 		"wiki_dir": &ctx.Config{Name: "wiki_dir", Value: "usr/wiki", Help: "路由数量"},
 		"wiki_list_show": &ctx.Config{Name: "wiki_list_show", Value: map[string]interface{}{
 			"md": true,
@@ -587,11 +588,24 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"get": &ctx.Command{
 			Name: "get [method GET|POST] [file name filename] url arg...",
 			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "file": 2, "type": 1, "body": 1, "fields": 1},
+			Form: map[string]int{"method": 1, "headers": 2, "file": 2, "body_type": 1, "body": 1, "fields": 1, "value": 1, "json_route": 1, "json_key": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
 					if web.client == nil {
 						web.client = &http.Client{}
+					}
+
+					if m.Has("value") {
+						args := strings.Split(m.Option("value"), " ")
+						values := []interface{}{}
+						for _, v := range args {
+							if len(v) > 1 && v[0] == '$' {
+								values = append(values, m.Cap(v[1:]))
+							} else {
+								values = append(values, v)
+							}
+						}
+						arg[0] = fmt.Sprintf(arg[0], values...)
 					}
 
 					method := m.Confx("method")
@@ -610,7 +624,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							m.Assert(e)
 							defer file.Close()
 
-							if m.Option("type") == "json" {
+							if m.Option("body_type") == "json" {
 								contenttype = "application/json"
 								body = file
 								break
@@ -638,18 +652,31 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							contenttype = writer.FormDataContentType()
 							body = buf
 							writer.Close()
-						} else if m.Option("type") == "json" {
+						} else if m.Option("body_type") == "json" {
 							if m.Options("body") {
 								data := []interface{}{}
 								for _, v := range arg[1:] {
+									if len(v) > 1 && v[0] == '$' {
+										v = m.Cap(v[1:])
+									}
 									data = append(data, v)
 								}
-								m.Log("body", "%v", fmt.Sprintf(m.Option("body"), data...))
 								body = strings.NewReader(fmt.Sprintf(m.Option("body"), data...))
 							} else {
-								data := map[string]string{}
-								for i := 1; i < len(arg)-1; i++ {
-									data[arg[i]] = arg[i+1]
+								data := map[string]interface{}{}
+								for i := 1; i < len(arg)-1; i += 2 {
+									switch arg[i+1] {
+									case "false":
+										data[arg[i]] = false
+									case "true":
+										data[arg[i]] = true
+									default:
+										if len(arg[i+1]) > 1 && arg[i+1][0] == '$' {
+											data[arg[i]] = m.Cap(arg[i+1][1:])
+										} else {
+											data[arg[i]] = arg[i+1]
+										}
+									}
 								}
 
 								b, e := json.Marshal(data)
@@ -669,12 +696,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 					}
 
-					m.Log("info", "content-type: %s", contenttype)
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
+					for i := 0; i < len(m.Meta["headers"]); i += 2 {
+						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
+					}
 
 					if len(contenttype) > 0 {
 						req.Header.Set("Content-Type", contenttype)
+						m.Log("info", "content-type: %s", contenttype)
 					}
 
 					for _, v := range web.cookie {
@@ -689,10 +719,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 					for _, v := range res.Cookies() {
 						web.cookie[v.Name] = v
+						m.Log("info", "set-cookie %s: %v", v.Name, v.Value)
 					}
 
-					for k, v := range res.Header {
-						m.Log("info", "%s: %v", k, v)
+					if m.Confs("logheaders") {
+						for k, v := range res.Header {
+							m.Log("info", "%s: %v", k, v)
+						}
 					}
 
 					if m.Confs("output") {
@@ -717,32 +750,57 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					buf, e := ioutil.ReadAll(res.Body)
 					m.Assert(e)
 
-					if res.Header.Get("Content-Type") == "application/json" {
+					ct := res.Header.Get("Content-Type")
+					if len(ct) >= 16 && ct[:16] == "application/json" {
 						var result interface{}
 						json.Unmarshal(buf, &result)
+						m.Option("response_json", result)
+						if m.Has("json_route") {
+							routes := strings.Split(m.Option("json_route"), ".")
+							for _, k := range routes {
+								if len(k) > 0 && k[0] == '$' {
+									k = m.Cap(k[1:])
+								}
+								switch r := result.(type) {
+								case map[string]interface{}:
+									result = r[k]
+								}
+							}
+						}
+
+						fields := map[string]bool{}
+						for _, k := range strings.Split(m.Option("fields"), " ") {
+							if k == "" {
+								continue
+							}
+							fields[k] = true
+							if len(fields) == 1 {
+								m.Meta["append"] = append(m.Meta["append"], "index")
+							}
+							m.Meta["append"] = append(m.Meta["append"], k)
+						}
+
 						switch ret := result.(type) {
 						case map[string]interface{}:
+							m.Log("fuck", "fuck %v", ret)
+							m.Append("index", "0")
 							for k, v := range ret {
 								switch value := v.(type) {
 								case string:
-									m.Append(k, value)
+									m.Append(k, strings.Replace(value, "\n", " ", -1))
 								case float64:
 									m.Append(k, fmt.Sprintf("%d", int(value)))
+								default:
+									if _, ok := fields[k]; ok {
+										m.Append(k, fmt.Sprintf("%v", value))
+									}
 								}
 							}
 							m.Table()
 							return
 						case []interface{}:
-							fields := map[string]bool{}
-							for _, k := range strings.Split(m.Option("fields"), " ") {
-								if k != "" {
-									fields[k] = true
-								}
-
-								m.Meta["append"] = append(m.Meta["append"], k)
-							}
-
-							for _, r := range ret {
+							for i, r := range ret {
+								m.Add("append", "index", i)
 								if rr, ok := r.(map[string]interface{}); ok {
 									for k, v := range rr {
 										switch value := v.(type) {
@@ -752,7 +810,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 											}
 										case float64:
 											if _, ok := fields[k]; len(fields) == 0 || ok {
-												m.Add("append", k, strings.Replace(fmt.Sprintf("%d", int(value)), "\n", " ", -1))
+												m.Add("append", k, fmt.Sprintf("%v", value))
+											}
+										case bool:
+											if _, ok := fields[k]; len(fields) == 0 || ok {
+												m.Add("append", k, fmt.Sprintf("%v", value))
 											}
 										case map[string]interface{}:
 											for kk, vv := range value {
@@ -761,20 +823,32 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 													m.Add("append", key, strings.Replace(fmt.Sprintf("%v", vv), "\n", " ", -1))
 												}
 											}
+										default:
+											if _, ok := fields[k]; ok {
+												m.Add("append", k, fmt.Sprintf("%v", value))
+											}
 										}
 									}
 								}
 							}
+
+							if m.Has("json_key") {
+								m.Sort(m.Option("json_key"))
+							}
+							m.Meta["index"] = nil
+							for i, _ := range ret {
+								m.Add("append", "index", i)
+							}
 							m.Table()
 							return
 						}
-
 					}
 
 					result := string(buf)
 					m.Echo("%s", result)
 					// m.Append("response", result)
 				} // }}}
+
 			}},
 		"post": &ctx.Command{Name: "post", Help: "访问服务",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1264,6 +1338,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			if b, e := json.Marshal(meta); m.Assert(e) {
 				w.Header().Set("Content-Type", "application/javascript")
+				m.Log("json", "won %v", string(b))
 				w.Write(b)
 			}
 			// }}}
@@ -1287,7 +1362,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			yac := m.Find("yac.parse4", true)
 
 			msg := m.Sess("nfs").Cmd("dir", path.Join(m.Conf("wiki_dir"), "src", m.Option("dir")), "dir_name", "path")
-			for i, v := range msg.Meta["filename"] {
+			for _, v := range msg.Meta["filename"] {
 				name := strings.TrimSpace(v)
 				es := strings.Split(name, ".")
 				switch es[len(es)-1] {
@@ -1303,7 +1378,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				f, e := os.Open(name)
 				m.Assert(e)
 				defer f.Close()
-				m.Log("fuck", "%d/%d %s", i, len(msg.Meta["filename"]), v)
 
 				bio := bufio.NewScanner(f)
 				for line := 1; bio.Scan(); line++ {
@@ -1347,7 +1421,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					yac.Meta = nil
 				}
 			}
-			m.Log("fuck", "parse %s", time.Now().Format("2006-01-02 15:04:05"))
 		}},
 		"/wiki_body": &ctx.Command{Name: "/wiki_body", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			which := path.Join(m.Conf("wiki_dir"), m.Confx("which"))
@@ -1601,6 +1674,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
+		}},
+		"/lark": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
+
+			data := map[string]interface{}{}
+			switch r.Header.Get("Content-Type") {
+			case "application/json":
+				b, e := ioutil.ReadAll(r.Body)
+				e = json.Unmarshal(b, &data)
+				m.Assert(e)
+			}
+
+			if _, ok := data["challenge"]; ok {
+				w.Header().Set("Content-Type", "application/javascript")
+				fmt.Fprintf(w, "{\"challenge\": \"%s\"}", data["challenge"])
+				return
+			}
+			m.Confv("lark_msg", "-1", data)
 		}},
 		"/lookup": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) > 0 {

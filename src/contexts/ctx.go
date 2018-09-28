@@ -2841,7 +2841,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								} else {
 									m.Add("append", "context", "")
 								}
-								if msg.target.Message != nil {
+								if msg.target.message != nil {
 									m.Add("append", "message", msg.target.message.code)
 								} else {
 									m.Add("append", "message", "")
@@ -2902,7 +2902,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"command": &Command{
 			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]",
 			Help: "查看或修改命令",
-			Form: map[string]int{"list_name": 1, "list_help": 1, "condition": -1},
+			Form: map[string]int{"list_name": 1, "list_help": 1, "list_cache": 2, "list_index": 1, "condition": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if len(arg) == 0 { // {{{
 					keys := []string{}
@@ -2944,11 +2944,36 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					if m.target.Commands == nil {
 						m.target.Commands = map[string]*Command{}
 					}
+					cache_name := ""
+					cache_index := ""
+					if m.Has("list_cache") {
+						cache_name = m.Meta["list_cache"][0]
+						cache_index = m.Meta["list_cache"][1]
+						m.Cap(cache_name, cache_name, "", cache_index)
+					}
+
+					list_index := 0
+					if m.Has("list_index") {
+						if m.Option("list_index") == "_" {
+							list_index = -1
+						} else {
+							list_index = m.Optioni("list_index")
+						}
+					}
 
 					m.target.Commands[m.Cap("list_count")] = &Command{
 						Name: strings.Join(arg[1:], " "),
 						Help: m.Confx("list_help"),
 						Hand: func(m *Message, c *Context, key string, args ...string) {
+							m.Log("fcuK", "wat %v %v", args, list_index)
+							li := list_index
+							if li == -1 {
+								if len(args) > 0 {
+									if i, e := strconv.Atoi(args[0]); e == nil {
+										li, args = i, args[1:]
+									}
+								}
+							}
 							list := []string{}
 							j := 0
 							for i := 1; i < len(arg); i++ {
@@ -2962,7 +2987,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							list = append(list, args[j:]...)
 
 							msg := m.Spawn().Cmd(list)
-							m.Copy(msg, "result").Copy(msg, "append")
+							if len(msg.Meta["append"]) > 0 {
+								for i, _ := range msg.Meta[msg.Meta["append"][0]] {
+									m.Add("append", "index", i)
+								}
+							}
+							if cache_name != "" && li > -1 {
+								m.Echo(m.Cap(cache_name, msg.Meta[cache_index][li]))
+							} else {
+								m.Copy(msg, "result").Copy(msg, "append")
+							}
 						},
 					}
 
@@ -2995,7 +3029,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 					for i := begin; i < end; i++ {
 						if c, ok := m.target.Commands[fmt.Sprintf("%d", i)]; ok {
-							m.Echo("%d(%s): %s\n", i, c.Help, c.Name)
+							m.Echo("%d(%s): %s\n", i, c.Help, strings.Replace(c.Name, "\n", " ", -1))
 						}
 					}
 					return
@@ -3460,6 +3494,21 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 					}
 				} // }}}
+			}},
+		"format": &Command{
+			Name: "format",
+			Help: "format",
+			Hand: func(m *Message, c *Context, key string, arg ...string) {
+				values := []interface{}{}
+				for _, v := range arg[1:] {
+					if v[0] == '$' {
+						values = append(values, m.Cap(v[1:]))
+					} else {
+						values = append(values, v)
+					}
+				}
+				m.Echo(arg[0], values...)
+				m.Append("format", m.Result(0))
 			}},
 	},
 }
