@@ -773,82 +773,78 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							if k == "" {
 								continue
 							}
-							fields[k] = true
-							if len(fields) == 1 {
+							if fields[k] = true; len(fields) == 1 {
 								m.Meta["append"] = append(m.Meta["append"], "index")
 							}
 							m.Meta["append"] = append(m.Meta["append"], k)
 						}
 
-						switch ret := result.(type) {
-						case map[string]interface{}:
-							m.Log("fuck", "fuck %v", ret)
-							m.Append("index", "0")
-							for k, v := range ret {
-								switch value := v.(type) {
-								case string:
-									m.Append(k, strings.Replace(value, "\n", " ", -1))
-								case float64:
-									m.Append(k, fmt.Sprintf("%d", int(value)))
-								default:
-									if _, ok := fields[k]; ok {
-										m.Append(k, fmt.Sprintf("%v", value))
+						if len(fields) > 0 {
+
+							switch ret := result.(type) {
+							case map[string]interface{}:
+								m.Append("index", "0")
+								for k, v := range ret {
+									switch value := v.(type) {
+									case string:
+										m.Append(k, strings.Replace(value, "\n", " ", -1))
+									case float64:
+										m.Append(k, fmt.Sprintf("%d", int(value)))
+									default:
+										if _, ok := fields[k]; ok {
+											m.Append(k, fmt.Sprintf("%v", value))
+										}
 									}
 								}
-							}
-							m.Table()
-							return
-						case []interface{}:
-							for i, r := range ret {
-								m.Add("append", "index", i)
-								if rr, ok := r.(map[string]interface{}); ok {
-									for k, v := range rr {
-										switch value := v.(type) {
-										case string:
-											if _, ok := fields[k]; len(fields) == 0 || ok {
-												m.Add("append", k, strings.Replace(value, "\n", " ", -1))
-											}
-										case float64:
-											if _, ok := fields[k]; len(fields) == 0 || ok {
-												m.Add("append", k, fmt.Sprintf("%v", value))
-											}
-										case bool:
-											if _, ok := fields[k]; len(fields) == 0 || ok {
-												m.Add("append", k, fmt.Sprintf("%v", value))
-											}
-										case map[string]interface{}:
-											for kk, vv := range value {
-												key := k + "." + kk
-												if _, ok := fields[key]; len(fields) == 0 || ok {
-													m.Add("append", key, strings.Replace(fmt.Sprintf("%v", vv), "\n", " ", -1))
+							case []interface{}:
+								for i, r := range ret {
+									m.Add("append", "index", i)
+									if rr, ok := r.(map[string]interface{}); ok {
+										for k, v := range rr {
+											switch value := v.(type) {
+											case string:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, strings.Replace(value, "\n", " ", -1))
 												}
-											}
-										default:
-											if _, ok := fields[k]; ok {
-												m.Add("append", k, fmt.Sprintf("%v", value))
+											case float64:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, fmt.Sprintf("%d", int64(value)))
+												}
+											case bool:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, fmt.Sprintf("%v", value))
+												}
+											case map[string]interface{}:
+												for kk, vv := range value {
+													key := k + "." + kk
+													if _, ok := fields[key]; len(fields) == 0 || ok {
+														m.Add("append", key, strings.Replace(fmt.Sprintf("%v", vv), "\n", " ", -1))
+													}
+												}
+											default:
+												if _, ok := fields[k]; ok {
+													m.Add("append", k, fmt.Sprintf("%v", value))
+												}
 											}
 										}
 									}
 								}
-							}
 
-							if m.Has("json_key") {
-								m.Sort(m.Option("json_key"))
+								if m.Has("json_key") {
+									m.Sort(m.Option("json_key"))
+								}
+								m.Meta["index"] = nil
+								for i, _ := range ret {
+									m.Add("append", "index", i)
+								}
 							}
-							m.Meta["index"] = nil
-							for i, _ := range ret {
-								m.Add("append", "index", i)
-							}
-							m.Table()
-							return
 						}
 					}
 
-					result := string(buf)
-					m.Echo("%s", result)
-					// m.Append("response", result)
+					if m.Table(); len(m.Meta["append"]) == 0 {
+						m.Echo("%s", string(buf))
+					}
 				} // }}}
-
 			}},
 		"post": &ctx.Command{Name: "post", Help: "访问服务",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1597,9 +1593,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				var data WXMsg
 
 				b, e := ioutil.ReadAll(r.Body)
-				m.Log("fuck", "b: %v", string(b))
 				e = xml.Unmarshal(b, &data)
-				m.Log("fuck", "b: %#v", data)
 
 				// de := xml.NewDecoder(r.Body)
 				// e := de.Decode(&data)

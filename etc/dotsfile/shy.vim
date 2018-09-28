@@ -17,31 +17,33 @@ syn keyword shStatement if else elif end for
 syn keyword shStatement let var
 
 " ctx command
-syn match   shStatement "\(^\|\t\|$(\)cache"
-syn match   shStatement "\(^\|\t\|$(\)config"
-syn match   shStatement "\(^\|\t\|$(\)detail"
-syn match   shStatement "\(^\|\t\|$(\)option"
-syn match   shStatement "\(^\|\t\|$(\)append"
-syn match   shStatement "\(^\|\t\|$(\)result"
+syn match   shStatement "\(^\|\t\|$(\|\ \ \)cache"
+syn match   shStatement "\(^\|\t\|$(\|\ \ \)config"
+
+syn match   shStatement "\(^\|\t\|$(\|\ \ \)detail"
+syn match   shStatement "\(^\|\t\|$(\|\ \ \)option"
+syn match   shStatement "\(^\|\t\|$(\|\ \ \)append"
+syn match   shStatement "\(^\|\t\|$(\|\ \ \)result"
 
 " ctx command
-syn match   shCommand "\(^\|\t\|$(\)message"
-syn match   shCommand "\(^\|\t\|$(\)session"
-syn match   shCommand "\(^\|\t\|$(\)context"
-syn match   shCommand "\(^\|\t\|$(\)server"
-syn match   shCommand "\(^\|\t\|$(\)command"
-syn match   shCommand "\(^\|\t\|$(\)right"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)command"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)context"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)message"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)session"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)server"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)right"
 
 " tcp command
-syn match   shCommand "\(^\|\t\|$(\)listen"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)listen"
 
 " web command
-syn match   shCommand "\(^\|\t\|$(\)serve"
-syn match   shCommand "\(^\|\t\|$(\)route"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)client"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)serve\$"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)route"
 
-syn match   shCommand "\(^\|\t\|$(\)open"
-syn match   shCommand "\(^\|\t\|$(\)cookie"
-syn match   shCommand "\(^\|\t\|$(\)login"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)open"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)cookie"
+syn match   shCommand "\(^\|\t\|$(\|\ \ \)login"
 
 hi def link shComment			Comment
 hi def link shString			String

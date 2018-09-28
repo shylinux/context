@@ -6,15 +6,16 @@ install:
 	@go get github.com/nsf/termbox-go
 	@go get github.com/skip2/go-qrcode
 	@go get github.com/gomarkdown/markdown
-	@touch etc/local.shy
-	@touch etc/local_exit.shy
-	@touch etc/init.shy
-	@touch etc/exit.shy
-	@touch etc/login.txt
-	@touch etc/history.txt
 	go install $(BENCH)
-	# @[ `uname` = "Darwin" ] && md5 `which bench`
 	@date
+
+install_all: install
+	touch etc/local.shy
+	touch etc/local_exit.shy
+	touch etc/init.shy
+	touch etc/exit.shy
+	touch etc/login.txt
+	touch etc/history.txt
 
 build:
 	go build $(BENCH)
