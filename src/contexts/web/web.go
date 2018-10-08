@@ -1,6 +1,6 @@
-package web // {{{
-// }}}
-import ( // {{{
+package web
+
+import (
 	"bufio"
 	"contexts"
 	"github.com/gomarkdown/markdown"
@@ -26,14 +26,11 @@ import ( // {{{
 	"time"
 )
 
-// }}}
-
 type MUX interface {
 	Handle(string, http.Handler)
 	HandleFunc(string, func(http.ResponseWriter, *http.Request))
 	Trans(*ctx.Message, string, func(*ctx.Message, *ctx.Context, string, ...string))
 }
-
 type WEB struct {
 	*http.ServeMux
 	*http.Server
@@ -44,7 +41,7 @@ type WEB struct {
 	*ctx.Context
 }
 
-func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string { // {{{
+func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string {
 	add, e := url.Parse(uri)
 	m.Assert(e)
 	adds := []string{m.Confx("protocol", add.Scheme, "%s://"), m.Confx("hostname", add.Host)}
@@ -86,9 +83,7 @@ func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string { // {{{
 
 	return strings.Join(adds, "")
 }
-
-// }}}
-func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) { // {{{
+func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn()
 		msg.TryCatch(msg, true, func(msg *ctx.Message) {
@@ -154,9 +149,7 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 		})
 	})
 }
-
-// }}}
-func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
+func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m := web.Message().Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 
 	if m.Confs("logheaders") {
@@ -186,10 +179,7 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) { // {{{
 		m.Log("info", "")
 	}
 }
-
-// }}}
-
-func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server { // {{{
+func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -198,9 +188,7 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	s.cookie = web.cookie
 	return s
 }
-
-// }}}
-func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
+func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	web.Caches["route"] = &ctx.Cache{Name: "请求路径", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
 	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已初始化"}
 	web.Caches["master"] = &ctx.Cache{Name: "服务入口(yes/no)", Value: "no", Help: "服务入口"}
@@ -219,9 +207,7 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server { // {{{
 	}
 	return web
 }
-
-// }}}
-func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
+func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	if len(arg) > 0 {
 		m.Cap("directory", arg[0])
 	}
@@ -307,17 +293,13 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool { // {{{
 
 	return true
 }
-
-// }}}
-func (web *WEB) Close(m *ctx.Message, arg ...string) bool { // {{{
+func (web *WEB) Close(m *ctx.Message, arg ...string) bool {
 	switch web.Context {
 	case m.Target():
 	case m.Source():
 	}
 	return true
 }
-
-// }}}
 
 var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	Caches: map[string]*ctx.Cache{
@@ -531,7 +513,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			Name: "client address [output [editor]]",
 			Help: "添加请求配置, address: 默认地址, output: 输出路径, editor: 编辑器",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if _, e := m.Target().Server.(*WEB); m.Assert(e) { // {{{
+				if _, e := m.Target().Server.(*WEB); m.Assert(e) {
 					if len(arg) == 0 {
 						return
 					}
@@ -553,13 +535,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
 						m.Conf("editor", arg[2])
 					}
-				} // }}}
+				}
 			}},
 		"cookie": &ctx.Command{
 			Name: "cookie [create]|[name [value]]",
 			Help: "读写请求的Cookie, name: 变量名, value: 变量值",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
+				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 					switch len(arg) {
 					case 0:
 						for k, v := range web.cookie {
@@ -583,14 +565,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							web.cookie[arg[0]] = &http.Cookie{Name: arg[0], Value: arg[1]}
 						}
 					}
-				} // }}}
+				}
 			}},
 		"get": &ctx.Command{
 			Name: "get [method GET|POST] [file name filename] url arg...",
 			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
 			Form: map[string]int{"method": 1, "headers": 2, "file": 2, "body_type": 1, "body": 1, "fields": 1, "value": 1, "json_route": 1, "json_key": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) { // {{{
+				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 					if web.client == nil {
 						web.client = &http.Client{}
 					}
@@ -844,7 +826,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if m.Table(); len(m.Meta["append"]) == 0 {
 						m.Echo("%s", string(buf))
 					}
-				} // }}}
+				}
 			}},
 		"post": &ctx.Command{Name: "post", Help: "访问服务",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -864,7 +846,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			case "linux":
 				m.Spawn().Cmd("open", url)
 			}
-			// }}}
+
 		}},
 		"serve": &ctx.Command{
 			Name: "serve [directory [address [protocol]]]",
@@ -876,7 +858,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			Name: "route script|template|directory route content",
 			Help: "添加响应, script: 脚本响应, template: 模板响应, directory: 目录响应, route: 请求路由, content: 响应内容",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if mux, ok := m.Target().Server.(MUX); m.Assert(ok) { // {{{
+				if mux, ok := m.Target().Server.(MUX); m.Assert(ok) {
 					switch len(arg) {
 					case 0:
 						for k, v := range m.Target().Commands {
@@ -910,26 +892,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
 						}
 					}
-				} // }}}
+				}
 			}},
 		"upload": &ctx.Command{Name: "upload file", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Spawn(m.Target()) // {{{
+			msg := m.Spawn(m.Target())
 			msg.Cmd("get", "/upload", "method", "POST", "file", "file", arg[0])
 			m.Copy(msg, "result")
-			// }}}
+
 		}},
 		"/library/": &ctx.Command{Name: "/library", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request) // {{{
+			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 			dir := path.Join(m.Conf("library_dir"), m.Option("path"))
 			if s, e := os.Stat(dir); e == nil && !s.IsDir() {
 				http.ServeFile(w, r, dir)
 				return
 			}
-			// }}}
+
 		}},
 		"/travel": &ctx.Command{Name: "/travel", Help: "文件上传", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			// r := m.Optionv("request").(*http.Request) // {{{
+			// r := m.Optionv("request").(*http.Request)
 			// w := m.Optionv("response").(http.ResponseWriter)
 
 			if !m.Options("dir") {
@@ -1020,10 +1002,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 			m.Append("template", m.Conf("travel_main"), m.Conf("travel_tmpl"))
-			// }}}
+
 		}},
 		"/index/": &ctx.Command{Name: "/index", Help: "网页门户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request) // {{{
+			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 
 			if login := m.Spawn().Cmd("/login"); login.Has("template") {
@@ -1065,10 +1047,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			//浏览目录
 			m.Append("template", m.Append("username"))
 			m.Option("page_title", "index")
-			// }}}
+
 		}},
 		"/create": &ctx.Command{Name: "/create", Help: "创建目录或文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			// if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) { // {{{
+			// if check := m.Spawn().Cmd("/share", "/upload", "dir", m.Option("dir")); !check.Results(0) {
 			// 	m.Copy(check, "append")
 			// 	return
 			// }
@@ -1113,10 +1095,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 			m.Append("redirect", m.Option("referer"))
-			// }}}
+
 		}},
 		"/share": &ctx.Command{Name: "/share arg...", Help: "资源共享", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if check := m.Spawn().Cmd("/check", "target", m.Option("module"), m.Optionv("share")); !check.Results(0) { // {{{
+			if check := m.Spawn().Cmd("/check", "target", m.Option("module"), m.Optionv("share")); !check.Results(0) {
 				m.Copy(check, "append")
 				return
 			}
@@ -1205,10 +1187,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Add("append", "to", u)
 				}
 			}
-			// }}}
+
 		}},
 		"/check": &ctx.Command{Name: "/check arg...", Help: "权限检查, cache|config|command: 接口类型, name: 接口名称, args: 其它参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if login := m.Spawn().Cmd("/login"); login.Has("template") { // {{{
+			if login := m.Spawn().Cmd("/login"); login.Has("template") {
 				m.Echo("no").Copy(login, "append")
 				return
 			}
@@ -1219,10 +1201,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			m.Echo("ok")
-			// }}}
+
 		}},
 		"/login": &ctx.Command{Name: "/login", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if m.Options("sessid") { // {{{
+			if m.Options("sessid") {
 				if aaa := m.Sess("aaa").Cmd("login", m.Option("sessid")); aaa.Results(0) {
 					m.Append("redirect", m.Option("referer"))
 					m.Append("username", aaa.Cap("username"))
@@ -1242,10 +1224,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			w.WriteHeader(http.StatusUnauthorized)
 			m.Append("template", "login")
-			// }}}
+
 		}},
 		"/render": &ctx.Command{Name: "/render index", Help: "模板响应, main: 模板入口, tmpl: 附加模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			w := m.Optionv("response").(http.ResponseWriter) // {{{
+			w := m.Optionv("response").(http.ResponseWriter)
 			w.Header().Add("Content-Type", "text/html")
 			m.Optioni("ninput", 0)
 
@@ -1307,10 +1289,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 			m.Assert(tpl.ExecuteTemplate(w, "tail", m))
-			// }}}
+
 		}},
 		"/json": &ctx.Command{Name: "/json", Help: "json响应", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			w := m.Optionv("response").(http.ResponseWriter) // {{{
+			w := m.Optionv("response").(http.ResponseWriter)
 
 			meta := map[string]interface{}{}
 			if len(m.Meta["result"]) > 0 {
@@ -1337,18 +1319,20 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Log("json", "won %v", string(b))
 				w.Write(b)
 			}
-			// }}}
+
 		}},
 		"/paste": &ctx.Command{Name: "/paste", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
 				m.Sess("cli").Cmd("system", "tmux", "set-buffer", "-b", "0", m.Option("content"))
 			}
+
 		}},
 		"/blog": &ctx.Command{Name: "/blog", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if m.Has("title") && m.Has("content") {
 			}
 
 			m.Echo("blog service")
+
 		}},
 		"/wiki_tags": &ctx.Command{Name: "/wiki_tags ", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) > 0 {

@@ -1,6 +1,6 @@
-package ctx // {{{
-// }}}
-import ( // {{{
+package ctx
+
+import (
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,18 +16,14 @@ import ( // {{{
 	"time"
 )
 
-// }}}
-
-func Right(str string) bool { // {{{
+func Right(str string) bool {
 	switch str {
 	case "", "0", "false", "off", "no", "error: ":
 		return false
 	}
 	return true
 }
-
-// }}}
-func Trans(arg ...interface{}) []string { // {{{
+func Trans(arg ...interface{}) []string {
 	ls := []string{}
 	for _, v := range arg {
 		switch val := v.(type) {
@@ -71,9 +67,7 @@ func Trans(arg ...interface{}) []string { // {{{
 	}
 	return ls
 }
-
-// }}}
-func Chain(m *Message, data interface{}, args ...interface{}) interface{} { // {{{
+func Chain(m *Message, data interface{}, args ...interface{}) interface{} {
 	if len(args) == 1 {
 		if arg, ok := args[0].([]string); ok {
 			args = args[:0]
@@ -223,22 +217,18 @@ func Chain(m *Message, data interface{}, args ...interface{}) interface{} { // {
 	return root
 }
 
-// }}}
-
 type Cache struct {
 	Name  string
 	Value string
 	Help  string
 	Hand  func(m *Message, x *Cache, arg ...string) string
 }
-
 type Config struct {
 	Name  string
 	Value interface{}
 	Help  string
 	Hand  func(m *Message, x *Config, arg ...string) string
 }
-
 type Command struct {
 	Name string
 	Help string
@@ -254,7 +244,6 @@ type Server interface {
 	Start(m *Message, arg ...string) bool
 	Close(m *Message, arg ...string) bool
 }
-
 type Context struct {
 	Name string
 	Help string
@@ -276,7 +265,7 @@ type Context struct {
 	Server
 }
 
-func (c *Context) Register(s *Context, x Server) { // {{{
+func (c *Context) Register(s *Context, x Server) {
 	if c.contexts == nil {
 		c.contexts = make(map[string]*Context)
 	}
@@ -288,9 +277,7 @@ func (c *Context) Register(s *Context, x Server) { // {{{
 	s.context = c
 	s.Server = x
 }
-
-// }}}
-func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
+func (c *Context) Spawn(m *Message, name string, help string) *Context {
 	s := &Context{Name: name, Help: help, root: c.root, context: c}
 
 	if m.target = s; c.Server != nil {
@@ -301,9 +288,7 @@ func (c *Context) Spawn(m *Message, name string, help string) *Context { // {{{
 
 	return s
 }
-
-// }}}
-func (c *Context) Begin(m *Message, arg ...string) *Context { // {{{
+func (c *Context) Begin(m *Message, arg ...string) *Context {
 	if len(arg) > 0 {
 		m.Meta["detail"] = arg
 	}
@@ -336,9 +321,7 @@ func (c *Context) Begin(m *Message, arg ...string) *Context { // {{{
 
 	return c
 }
-
-// }}}
-func (c *Context) Start(m *Message, arg ...string) bool { // {{{
+func (c *Context) Start(m *Message, arg ...string) bool {
 	if len(arg) > 0 {
 		m.Set("detail", arg...)
 	}
@@ -364,9 +347,7 @@ func (c *Context) Start(m *Message, arg ...string) bool { // {{{
 	})
 	return <-running
 }
-
-// }}}
-func (c *Context) Close(m *Message, arg ...string) bool { // {{{
+func (c *Context) Close(m *Message, arg ...string) bool {
 	if len(c.requests) == 0 {
 		return true
 	}
@@ -406,20 +387,13 @@ func (c *Context) Close(m *Message, arg ...string) bool { // {{{
 	}
 	return true
 }
-
-// }}}
-
-func (c *Context) Context() *Context { // {{{
+func (c *Context) Context() *Context {
 	return c.context
 }
-
-// }}}
-func (c *Context) Message() *Message { // {{{
+func (c *Context) Message() *Message {
 	return c.message
 }
-
-// }}}
-func (c *Context) Has(key ...string) bool { // {{{
+func (c *Context) Has(key ...string) bool {
 	switch len(key) {
 	case 1:
 		if _, ok := c.Caches[key[0]]; ok {
@@ -442,8 +416,6 @@ func (c *Context) Has(key ...string) bool { // {{{
 	return false
 }
 
-// }}}
-
 type Message struct {
 	code int
 	time time.Time
@@ -465,37 +437,26 @@ type Message struct {
 	Remote chan bool
 }
 
-func (m *Message) Code() int { // {{{
+func (m *Message) Code() int {
 	return m.code
 }
-
-// }}}
-func (m *Message) Time() string { // {{{
+func (m *Message) Time() string {
 	return m.time.Format("2006-01-02 15:04:05")
 }
-
-// }}}
-func (m *Message) Message() *Message { // {{{
+func (m *Message) Message() *Message {
 	return m.message
 }
-
-// }}}
-func (m *Message) Source() *Context { // {{{
+func (m *Message) Source() *Context {
 	return m.source
 }
-
-// }}}
-func (m *Message) Target() *Context { // {{{
+func (m *Message) Target() *Context {
 	return m.target
 }
-
-// }}}
-func (m *Message) Format() string { // {{{
+func (m *Message) Format() string {
 	return fmt.Sprintf("%d(%s->%s): %s %v %v", m.code, m.source.Name, m.target.Name, m.time.Format("15:04:05"), m.Meta["detail"], m.Meta["option"])
 }
 
-// }}}
-func (m *Message) Tree(code int) *Message { // {{{
+func (m *Message) Tree(code int) *Message {
 	ms := []*Message{m}
 	for i := 0; i < len(ms); i++ {
 		if ms[i].Code() == code {
@@ -505,9 +466,7 @@ func (m *Message) Tree(code int) *Message { // {{{
 	}
 	return nil
 }
-
-// }}}
-func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {{{
+func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message {
 	switch meta {
 	case "target":
 		m.target = msg.target
@@ -544,10 +503,7 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message { // {
 
 	return m
 }
-
-// }}}
-
-func (m *Message) Log(action string, str string, arg ...interface{}) *Message { // {{{
+func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 	l := m.Sess("log", !m.Confs("compact_log"))
 	if l == nil || m.Detail(0) == "log" || m.Detail(0) == "write" || m.Options("silent") {
 		return m
@@ -558,8 +514,7 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message { 
 	return m
 }
 
-// }}}
-func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
+func (m *Message) Assert(e interface{}, msg ...string) bool {
 	switch v := e.(type) {
 	case nil:
 		return true
@@ -592,9 +547,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool { // {{{
 	m.Log("error", "%s", fmt.Sprintln(e))
 	panic(m.Set("result", "error: ", fmt.Sprintln(e), "\n"))
 }
-
-// }}}
-func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message { // {{{
+func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message {
 	defer func() {
 		if e := recover(); e != nil && e != io.EOF {
 			// switch v := e.(type) {
@@ -625,9 +578,7 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 	return m
 }
 
-// }}}
-
-func (m *Message) Instance(msg *Message, source ...bool) bool { // {{{
+func (m *Message) Instance(msg *Message, source ...bool) bool {
 	c := m.target
 	if len(source) > 0 && source[0] == true {
 		c = m.source
@@ -640,9 +591,7 @@ func (m *Message) Instance(msg *Message, source ...bool) bool { // {{{
 	}
 	return false
 }
-
-// }}}
-func (m *Message) BackTrace(hand func(m *Message) bool, c ...*Context) *Message { // {{{
+func (m *Message) BackTrace(hand func(m *Message) bool, c ...*Context) *Message {
 	target := m.target
 	if len(c) > 0 {
 		m.target = c[0]
@@ -655,9 +604,7 @@ func (m *Message) BackTrace(hand func(m *Message) bool, c ...*Context) *Message 
 	m.target = target
 	return m
 }
-
-// }}}
-func (m *Message) Travel(hand func(m *Message, i int) bool, c ...*Context) { // {{{
+func (m *Message) Travel(hand func(m *Message, i int) bool, c ...*Context) {
 	target := m.target
 	if len(c) > 0 {
 		m.target = c[0]
@@ -682,9 +629,7 @@ func (m *Message) Travel(hand func(m *Message, i int) bool, c ...*Context) { // 
 	m.target = target
 }
 
-// }}}
-
-func (m *Message) Spawn(arg ...interface{}) *Message { // {{{
+func (m *Message) Spawn(arg ...interface{}) *Message {
 	c := m.target
 	if len(arg) > 0 {
 		switch v := arg[0].(type) {
@@ -707,9 +652,7 @@ func (m *Message) Spawn(arg ...interface{}) *Message { // {{{
 	m.messages = append(m.messages, msg)
 	return msg
 }
-
-// }}}
-func (m *Message) Find(name string, root ...bool) *Message { // {{{
+func (m *Message) Find(name string, root ...bool) *Message {
 	target := m.target.root
 	if len(root) > 0 && !root[0] {
 		target = m.target
@@ -729,9 +672,7 @@ func (m *Message) Find(name string, root ...bool) *Message { // {{{
 	m.Log("find", "find %s", name)
 	return m.Spawn(target)
 }
-
-// }}}
-func (m *Message) Search(key string, root ...bool) []*Message { // {{{
+func (m *Message) Search(key string, root ...bool) []*Message {
 	reg, e := regexp.Compile(key)
 	m.Assert(e)
 
@@ -759,9 +700,7 @@ func (m *Message) Search(key string, root ...bool) []*Message { // {{{
 
 	return ms
 }
-
-// }}}
-func (m *Message) Sess(key string, arg ...interface{}) *Message { // {{{
+func (m *Message) Sess(key string, arg ...interface{}) *Message {
 	spawn := true
 	if _, ok := m.Sessions[key]; !ok && len(arg) > 0 {
 		if m.Sessions == nil {
@@ -822,17 +761,13 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message { // {{{
 
 	return nil
 }
-
-// }}}
-func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
+func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
 	if m.callback = cb; len(arg) > 0 || len(m.Meta["detail"]) > 0 {
 		m.Cmd(arg...)
 	}
 	return m
 }
-
-// }}}
-func (m *Message) Back(msg *Message) *Message { // {{{
+func (m *Message) Back(msg *Message) *Message {
 	if msg == nil || m.callback == nil {
 		return m
 	}
@@ -849,9 +784,7 @@ func (m *Message) Back(msg *Message) *Message { // {{{
 
 	return m
 }
-
-// }}}
-func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg ...interface{}) *Message { // {{{
+func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
 	if !sync {
 		return m.Call(cb, arg...)
 	}
@@ -866,9 +799,7 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 	return <-wait
 }
 
-// }}}
-
-func (m *Message) Add(meta string, key string, value ...interface{}) *Message { // {{{
+func (m *Message) Add(meta string, key string, value ...interface{}) *Message {
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
@@ -901,9 +832,7 @@ func (m *Message) Add(meta string, key string, value ...interface{}) *Message { 
 
 	return m
 }
-
-// }}}
-func (m *Message) Set(meta string, arg ...string) *Message { // {{{
+func (m *Message) Set(meta string, arg ...string) *Message {
 	switch meta {
 	case "detail", "result":
 		delete(m.Meta, meta)
@@ -927,9 +856,7 @@ func (m *Message) Set(meta string, arg ...string) *Message { // {{{
 	}
 	return m
 }
-
-// }}}
-func (m *Message) Put(meta string, key string, value interface{}) *Message { // {{{
+func (m *Message) Put(meta string, key string, value interface{}) *Message {
 	switch meta {
 	case "option", "append":
 		if m.Set(meta, key); m.Data == nil {
@@ -943,9 +870,7 @@ func (m *Message) Put(meta string, key string, value interface{}) *Message { // 
 	}
 	return m
 }
-
-// }}}
-func (m *Message) Has(key string) bool { // {{{
+func (m *Message) Has(key string) bool {
 	if _, ok := m.Data[key]; ok {
 		return true
 	}
@@ -954,38 +879,27 @@ func (m *Message) Has(key string) bool { // {{{
 	}
 	return false
 }
-
-// }}}
-func (m *Message) Get(key string) string { // {{{
+func (m *Message) Get(key string) string {
 	if meta, ok := m.Meta[key]; ok && len(meta) > 0 {
 		return meta[0]
 	}
 	return ""
 }
-
-// }}}
-func (m *Message) Geti(key string) int { // {{{
+func (m *Message) Geti(key string) int {
 	n, e := strconv.Atoi(m.Get(key))
 	m.Assert(e)
 	return n
 }
-
-// }}}
-func (m *Message) Gets(key string) bool { // {{{
+func (m *Message) Gets(key string) bool {
 	return Right(m.Get(key))
 }
-
-// }}}
-
-func (m *Message) Echo(str string, arg ...interface{}) *Message { // {{{
+func (m *Message) Echo(str string, arg ...interface{}) *Message {
 	if len(arg) > 0 {
 		return m.Add("result", fmt.Sprintf(str, arg...))
 	}
 	return m.Add("result", str)
 }
-
-// }}}
-func (m *Message) Color(color int, str string, arg ...interface{}) *Message { // {{{
+func (m *Message) Color(color int, str string, arg ...interface{}) *Message {
 	if len(arg) > 0 {
 		str = fmt.Sprintf(str, arg...)
 	}
@@ -994,9 +908,7 @@ func (m *Message) Color(color int, str string, arg ...interface{}) *Message { //
 	}
 	return m.Add("result", str)
 }
-
-// }}}
-func (m *Message) Table(cbs ...func(maps map[string]string, list []string, line int) (goon bool)) *Message { // {{{
+func (m *Message) Table(cbs ...func(maps map[string]string, list []string, line int) (goon bool)) *Message {
 	var cb func(maps map[string]string, list []string, line int) (goon bool)
 	if len(cbs) > 0 {
 		cb = cbs[0]
@@ -1106,9 +1018,7 @@ func (m *Message) Table(cbs ...func(maps map[string]string, list []string, line 
 
 	return m
 }
-
-// }}}
-func (m *Message) Matrix(index int, arg ...interface{}) string { // {{{
+func (m *Message) Matrix(index int, arg ...interface{}) string {
 	if len(m.Meta["append"]) == 0 || index < 0 {
 		return ""
 	}
@@ -1139,9 +1049,7 @@ func (m *Message) Matrix(index int, arg ...interface{}) string { // {{{
 	}
 	return ""
 }
-
-// }}}
-func (m *Message) Sort(key string, arg ...string) *Message { // {{{
+func (m *Message) Sort(key string, arg ...string) *Message {
 	table := []map[string]string{}
 	m.Table(func(line map[string]string, lists []string, index int) bool {
 		if index != -1 {
@@ -1219,9 +1127,7 @@ func (m *Message) Sort(key string, arg ...string) *Message { // {{{
 	return m
 }
 
-// }}}
-
-func (m *Message) Insert(meta string, index int, arg ...interface{}) string { // {{{
+func (m *Message) Insert(meta string, index int, arg ...interface{}) string {
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
@@ -1262,9 +1168,7 @@ func (m *Message) Insert(meta string, index int, arg ...interface{}) string { //
 	}
 	return ""
 }
-
-// }}}
-func (m *Message) Detail(arg ...interface{}) string { // {{{
+func (m *Message) Detail(arg ...interface{}) string {
 	noset, index := true, 0
 	if len(arg) > 0 {
 		switch v := arg[0].(type) {
@@ -1278,21 +1182,15 @@ func (m *Message) Detail(arg ...interface{}) string { // {{{
 
 	return m.Insert("detail", index, arg...)
 }
-
-// }}}
-func (m *Message) Detaili(arg ...interface{}) int { // {{{
+func (m *Message) Detaili(arg ...interface{}) int {
 	i, e := strconv.Atoi(m.Detail(arg...))
 	m.Assert(e)
 	return i
 }
-
-// }}}
-func (m *Message) Details(arg ...interface{}) bool { // {{{
+func (m *Message) Details(arg ...interface{}) bool {
 	return Right(m.Detail(arg...))
 }
-
-// }}}
-func (m *Message) Result(arg ...interface{}) string { // {{{
+func (m *Message) Result(arg ...interface{}) string {
 	noset, index := true, 0
 	if len(arg) > 0 {
 		switch v := arg[0].(type) {
@@ -1306,22 +1204,15 @@ func (m *Message) Result(arg ...interface{}) string { // {{{
 
 	return m.Insert("result", index, arg...)
 }
-
-// }}}
-func (m *Message) Resulti(arg ...interface{}) int { // {{{
+func (m *Message) Resulti(arg ...interface{}) int {
 	i, e := strconv.Atoi(m.Result(arg...))
 	m.Assert(e)
 	return i
 }
-
-// }}}
-func (m *Message) Results(arg ...interface{}) bool { // {{{
+func (m *Message) Results(arg ...interface{}) bool {
 	return Right(m.Result(arg...))
 }
-
-// }}}
-
-func (m *Message) Option(key string, arg ...interface{}) string { // {{{
+func (m *Message) Option(key string, arg ...interface{}) string {
 	if len(arg) > 0 {
 		m.Insert(key, 0, arg...)
 		if _, ok := m.Meta[key]; ok {
@@ -1341,21 +1232,15 @@ func (m *Message) Option(key string, arg ...interface{}) string { // {{{
 	}
 	return ""
 }
-
-// }}}
-func (m *Message) Optioni(key string, arg ...interface{}) int { // {{{
+func (m *Message) Optioni(key string, arg ...interface{}) int {
 	i, e := strconv.Atoi(m.Option(key, arg...))
 	m.Assert(e)
 	return i
 }
-
-// }}}
-func (m *Message) Options(key string, arg ...interface{}) bool { // {{{
+func (m *Message) Options(key string, arg ...interface{}) bool {
 	return Right(m.Option(key, arg...))
 }
-
-// }}}
-func (m *Message) Optionv(key string, arg ...interface{}) interface{} { // {{{
+func (m *Message) Optionv(key string, arg ...interface{}) interface{} {
 	if len(arg) > 0 {
 		m.Put("option", key, arg[0])
 	}
@@ -1375,17 +1260,13 @@ func (m *Message) Optionv(key string, arg ...interface{}) interface{} { // {{{
 	}
 	return nil
 }
-
-// }}}
-func (m *Message) Optionx(key string, format string) interface{} { // {{{
+func (m *Message) Optionx(key string, format string) interface{} {
 	if value := m.Option(key); value != "" {
 		return fmt.Sprintf(format, value)
 	}
 	return ""
 }
-
-// }}}
-func (m *Message) Append(key string, arg ...interface{}) string { // {{{
+func (m *Message) Append(key string, arg ...interface{}) string {
 	if len(arg) > 0 {
 		m.Insert(key, 0, arg...)
 		if _, ok := m.Meta[key]; ok {
@@ -1407,21 +1288,15 @@ func (m *Message) Append(key string, arg ...interface{}) string { // {{{
 	}
 	return ""
 }
-
-// }}}
-func (m *Message) Appendi(key string, arg ...interface{}) int { // {{{
+func (m *Message) Appendi(key string, arg ...interface{}) int {
 	i, e := strconv.Atoi(m.Append(key, arg...))
 	m.Assert(e)
 	return i
 }
-
-// }}}
-func (m *Message) Appends(key string, arg ...interface{}) bool { // {{{
+func (m *Message) Appends(key string, arg ...interface{}) bool {
 	return Right(m.Append(key, arg...))
 }
-
-// }}}
-func (m *Message) Appendv(key string, arg ...interface{}) interface{} { // {{{
+func (m *Message) Appendv(key string, arg ...interface{}) interface{} {
 	if len(arg) > 0 {
 		m.Put("append", key, arg[0])
 	}
@@ -1444,22 +1319,16 @@ func (m *Message) Appendv(key string, arg ...interface{}) interface{} { // {{{
 	return nil
 }
 
-// }}}
-
-func (m *Message) Wait() bool { // {{{
+func (m *Message) Wait() bool {
 	if m.target.exit != nil {
 		return <-m.target.exit
 	}
 	return true
 }
-
-// }}}
-func (m *Message) Start(name string, help string, arg ...string) bool { // {{{
+func (m *Message) Start(name string, help string, arg ...string) bool {
 	return m.Set("detail", arg...).target.Spawn(m, name, help).Begin(m).Start(m)
 }
-
-// }}}
-func (m *Message) Cmd(args ...interface{}) *Message { // {{{
+func (m *Message) Cmd(args ...interface{}) *Message {
 	if len(args) > 0 {
 		m.Set("detail", Trans(args...)...)
 	}
@@ -1499,10 +1368,7 @@ func (m *Message) Cmd(args ...interface{}) *Message { // {{{
 	}
 	return m
 }
-
-// }}}
-
-func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
+func (m *Message) Confx(key string, arg ...interface{}) string {
 	conf := m.Conf(key)
 	if len(arg) == 0 {
 		value := m.Option(key)
@@ -1557,9 +1423,7 @@ func (m *Message) Confx(key string, arg ...interface{}) string { // {{{
 	}
 	return value
 }
-
-// }}}
-func (m *Message) Confs(key string, arg ...interface{}) bool { // {{{
+func (m *Message) Confs(key string, arg ...interface{}) bool {
 	index, value := "", m.Conf(key)
 	if len(arg) > 0 {
 		switch v := arg[0].(type) {
@@ -1586,9 +1450,7 @@ func (m *Message) Confs(key string, arg ...interface{}) bool { // {{{
 
 	return Right(value)
 }
-
-// }}}
-func (m *Message) Confi(key string, arg ...interface{}) int { // {{{
+func (m *Message) Confi(key string, arg ...interface{}) int {
 	index, value := "", m.Conf(key)
 	if len(arg) > 0 {
 		if i, ok := arg[0].(string); ok {
@@ -1610,9 +1472,7 @@ func (m *Message) Confi(key string, arg ...interface{}) int { // {{{
 
 	return n
 }
-
-// }}}
-func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
+func (m *Message) Confv(key string, args ...interface{}) interface{} {
 	var hand func(m *Message, x *Config, arg ...string) string
 	arg := Trans(args...)
 
@@ -1677,9 +1537,7 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} { // {{{
 	m.target.Configs[key] = &Config{Name: key, Value: Chain(m, nil, args), Help: "auto make", Hand: hand}
 	return Chain(m, key, args[len(args)-2+(len(args)%2)])
 }
-
-// }}}
-func (m *Message) Conf(key string, args ...interface{}) string { // {{{
+func (m *Message) Conf(key string, args ...interface{}) string {
 	var hand func(m *Message, x *Config, arg ...string) string
 
 	for _, c := range []*Context{m.target, m.source} {
@@ -1770,9 +1628,7 @@ func (m *Message) Conf(key string, args ...interface{}) string { // {{{
 
 	return ""
 }
-
-// }}}
-func (m *Message) Caps(key string, arg ...bool) bool { // {{{
+func (m *Message) Caps(key string, arg ...bool) bool {
 	if len(arg) > 0 {
 		if arg[0] {
 			m.Cap(key, "1")
@@ -1783,9 +1639,7 @@ func (m *Message) Caps(key string, arg ...bool) bool { // {{{
 
 	return Right(m.Cap(key))
 }
-
-// }}}
-func (m *Message) Capi(key string, arg ...int) int { // {{{
+func (m *Message) Capi(key string, arg ...int) int {
 	n, e := strconv.Atoi(m.Cap(key))
 	m.Assert(e)
 
@@ -1799,9 +1653,7 @@ func (m *Message) Capi(key string, arg ...int) int { // {{{
 
 	return n
 }
-
-// }}}
-func (m *Message) Cap(key string, arg ...string) string { // {{{
+func (m *Message) Cap(key string, arg ...string) string {
 	var hand func(m *Message, x *Cache, arg ...string) string
 
 	for _, c := range []*Context{m.target, m.source} {
@@ -1842,10 +1694,8 @@ func (m *Message) Cap(key string, arg ...string) string { // {{{
 	return ""
 }
 
-// }}}
-
 var CGI = template.FuncMap{
-	"meta": func(arg ...interface{}) string { // {{{
+	"meta": func(arg ...interface{}) string {
 		//meta meta [key [index]]
 		if len(arg) == 0 {
 			return ""
@@ -1894,8 +1744,8 @@ var CGI = template.FuncMap{
 			return ""
 		}
 		return list[index]
-	}, // }}}
-	"sess": func(arg ...interface{}) string { // {{{
+	},
+	"sess": func(arg ...interface{}) string {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -1912,9 +1762,9 @@ var CGI = template.FuncMap{
 			}
 		}
 		return ""
-	}, // }}}
+	},
 
-	"ctx": func(arg ...interface{}) string { // {{{
+	"ctx": func(arg ...interface{}) string {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -1958,8 +1808,8 @@ var CGI = template.FuncMap{
 			}
 		}
 		return ""
-	}, // }}}
-	"msg": func(arg ...interface{}) interface{} { // {{{
+	},
+	"msg": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2002,9 +1852,9 @@ var CGI = template.FuncMap{
 			}
 		}
 		return ""
-	}, // }}}
+	},
 
-	"cap": func(arg ...interface{}) string { // {{{
+	"cap": func(arg ...interface{}) string {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2033,8 +1883,8 @@ var CGI = template.FuncMap{
 			}
 		}
 		return ""
-	}, // }}}
-	"conf": func(arg ...interface{}) interface{} { // {{{
+	},
+	"conf": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2057,8 +1907,8 @@ var CGI = template.FuncMap{
 			}
 		}
 		return ""
-	}, // }}}
-	"cmd": func(arg ...interface{}) string { // {{{
+	},
+	"cmd": func(arg ...interface{}) string {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2072,9 +1922,9 @@ var CGI = template.FuncMap{
 			return strings.Join(msg.Meta["result"], "")
 		}
 		return ""
-	}, // }}}
+	},
 
-	"detail": func(arg ...interface{}) interface{} { // {{{
+	"detail": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2106,8 +1956,8 @@ var CGI = template.FuncMap{
 			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
-	}, // }}}
-	"option": func(arg ...interface{}) interface{} { // {{{
+	},
+	"option": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2149,8 +1999,8 @@ var CGI = template.FuncMap{
 			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
-	}, // }}}
-	"result": func(arg ...interface{}) interface{} { // {{{
+	},
+	"result": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2182,8 +2032,8 @@ var CGI = template.FuncMap{
 			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
-	}, // }}}
-	"append": func(arg ...interface{}) interface{} { // {{{
+	},
+	"append": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""
 		}
@@ -2225,12 +2075,12 @@ var CGI = template.FuncMap{
 			return fmt.Sprintf("%v", arg[0])
 		}
 		return ""
-	}, // }}}
-	"unscaped": func(str string) interface{} { // {{{
+	},
+	"unscaped": func(str string) interface{} {
 		return template.HTML(str)
-	}, // }}}
+	},
 
-	"list": func(arg interface{}) interface{} { // {{{
+	"list": func(arg interface{}) interface{} {
 		n := 0
 		switch v := arg.(type) {
 		case string:
@@ -2247,11 +2097,9 @@ var CGI = template.FuncMap{
 			list[i-1] = i
 		}
 		return list
-	}, // }}}
+	},
 }
-
 var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
-
 var Index = &Context{Name: "ctx", Help: "模块中心",
 	Caches: map[string]*Cache{
 		"nserver":  &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
@@ -2280,7 +2128,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			if len(arg) == 0 { // {{{
+			if len(arg) == 0 {
 				m.Echo("usage: help context [module [command|config|cache name]]\n")
 				m.Echo("     : 查看模块信息, module: 模块名, command: 模块命令, config: 模块配置, cache: 模块缓存, name: 模块参数\n")
 				m.Echo("usage: help command [name]\n")
@@ -2429,14 +2277,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
 				}
 			}
-			// }}}
+
 		}},
 		"message": &Command{Name: "message [code] [all]|[cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			if len(arg) > 0 && arg[0] == "spawn" {
 				m.Echo("%d", m.Spawn().code)
 				return
 			}
-			msg := m.Sess("cli", false) // {{{
+			msg := m.Sess("cli", false)
 			if len(arg) > 0 {
 				if code, e := strconv.Atoi(arg[0]); e == nil {
 					if msg = m.root.Tree(code); msg != nil {
@@ -2538,10 +2386,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Copy(sub, "result").Copy(sub, "append")
 			}
 
-			// }}}
 		}},
 		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.message // {{{
+			msg := m.message
 			if len(arg) == 0 {
 				m.Echo("%v\n", msg.Meta["detail"])
 				return
@@ -2552,10 +2399,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				index, arg = i, arg[1:]
 			}
 			m.Echo("%s", msg.Detail(index, arg))
-			// }}}
+
 		}},
 		"option": &Command{Name: "option [key [value...]]", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.message // {{{
+			msg := m.message
 			if len(arg) == 0 {
 				keys := []string{}
 				values := map[string][]string{}
@@ -2583,10 +2430,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Echo("%s", msg.Option(arg[0]))
 			}
 
-			// }}}
 		}},
 		"result": &Command{Name: "result [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.message // {{{
+			msg := m.message
 			if len(arg) == 0 {
 				m.Echo("%v\n", msg.Meta["result"])
 				return
@@ -2597,10 +2443,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				index, arg = i, arg[1:]
 			}
 			m.Echo("%s", msg.Result(index, arg))
-			// }}}
+
 		}},
 		"append": &Command{Name: "append [key [value...]]", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.message // {{{
+			msg := m.message
 			if len(arg) == 0 {
 				keys := []string{}
 				values := map[string][]string{}
@@ -2641,10 +2487,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 			m.Echo("%s", msg.Append(arg[0], arg[1:]))
-			// }}}
+
 		}},
 		"session": &Command{Name: "session [key [cmd...]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.message // {{{
+			msg := m.message
 			if len(arg) == 0 {
 				keys := []string{}
 				values := map[string]*Message{}
@@ -2694,22 +2540,22 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			if sub != nil {
 				msg.Sessions[arg[0]] = sub
 			}
-			// }}}
+
 		}},
 		"callback": &Command{Name: "callback", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			msg := m.message // {{{
+			msg := m.message
 			if len(arg) == 0 {
 				for msg := msg; msg != nil; msg = msg.message {
 					m.Echo("%d: %p\n", msg.code, msg.callback)
 				}
 			}
-			// }}}
+
 		}},
 		"context": &Command{
 			Name: "context [[find [root|home]|search [root|home] [name|help] [magic|rand|first|last]] name] [list|info|cache|config|command|switch] [args]",
 			Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				action := m.Conf("search_action") // {{{
+				action := m.Conf("search_action")
 				if len(arg) == 0 {
 					action = "list"
 				}
@@ -2862,13 +2708,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						// m.target = msg.target
 					}
 				}
-				// }}}
+
 			}},
 		"server": &Command{
 			Name: "server [spawn|begin|start|close][args]",
 			Help: "查看、新建、初始化、启动、停止服务",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				switch len(arg) { // {{{
+				switch len(arg) {
 				case 0:
 					m.Travel(func(m *Message, i int) bool {
 						if m.Cap("status") == "start" {
@@ -2897,14 +2743,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						msg.target.Close(msg)
 					}
 				}
-				// }}}
+
 			}},
 		"command": &Command{
 			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]",
 			Help: "查看或修改命令",
 			Form: map[string]int{"list_name": 1, "list_help": 1, "list_cache": 2, "list_index": 1, "condition": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				if len(arg) == 0 { // {{{
+				if len(arg) == 0 {
 					keys := []string{}
 					for k, _ := range m.target.Commands {
 						keys = append(keys, k)
@@ -3084,13 +2930,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						delete(m.target.Commands, arg[1])
 					}
 				}
-				// }}}
+
 			}},
 		"config": &Command{
 			Name: "config [all] [save|load file key...] [delete] [pop index] key [value...]|key name value help",
 			Help: "查看、读写、添加配置变量",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				all := false // {{{
+				all := false
 				if len(arg) > 0 && arg[0] == "all" {
 					arg, all = arg[1:], true
 				}
@@ -3229,7 +3075,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Assert(e)
 					m.Echo("%s", string(buf))
 				}
-				// }}}
+
 			}},
 		"cache": &Command{
 			Name: "cache [all|key [value]|key = value|key name value help|delete key]",
@@ -3276,14 +3122,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Cap(arg[0], arg[1:]...)
 				}
 				m.Echo("%s", m.Cap(arg[0]))
-				// }}}
+
 			}},
 		"right": &Command{
 			Name: "right [share|add|del group [cache|config|command item]]",
 			Help: "用户组管理，查看、添加、删除用户组或是接口",
 			Form: map[string]int{"target": 1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				owner := m.target // {{{
+				owner := m.target
 				if m.Has("target") {
 					owner = m.Find(m.Option("target")).target
 				}
@@ -3493,7 +3339,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							}
 						}
 					}
-				} // }}}
+				}
 			}},
 		"format": &Command{
 			Name: "format",

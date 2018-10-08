@@ -134,6 +134,24 @@ $ sftp shy@10.0.0.10
 - 公钥文件 ~/.ssh/id_rsa.pub
 - 授权公钥 ~/.ssh/authorized_keys
 
+#### 编译代码
+计算机由硬件与软件组成，软件又分为操作系统与应用程序。
+
+无论是Linux，还是MacOSX，还是Windows，操作系统给应用程序提供了API接口。
+应用程序通过调用这些API接口，实现各种各样的功能。
+
+如果现有的工具不能满足需求时，就需要下载工具的源码进行定制编译，或是开发一些模块。
+
+API
+
+
+
+##### Makefile
+make命令根据Makefile文件中定义的规则，调用各种命令，来生成目标文件。
+可以用来调用编译器，将项目的源码文件，编译成可执行文件。
+将源码文件编译成可执行文件。
+[Makefile官方文档](https://www.gnu.org/software/make/manual/make.html)
+<>
 
 #### 本地化
 

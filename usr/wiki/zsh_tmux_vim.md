@@ -838,12 +838,12 @@ docker以容器的形式，将程序运行的所有环境，打包成一个独�
 与VMware或是VirtualBox之类的虚拟机相比，docker更加轻量，docker中的进程和本机进程一样，docker中的文件和本机文件一样，docker只是将它们组织在一起。
 而不像虚拟机一样，需要虚拟出一个完整的操作系统，并提供一堆设备驱动程序，一台普通的电脑开几个虚拟机资源就不足了，但docker却像进程一样占有很少的资源，可以运行很多容器。
 
-docker分为企业版EE，社区版CE，对于个人使用社会版即可。更多信息参考：[docker官网](https://docs.docker.com/)
+docker分为企业版EE，社区版CE，对于个人使用社区版即可。更多信息参考：[docker官网](https://docs.docker.com/)
 
 - [Windows版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-windows)
 - [Mac版docker下载](https://store.docker.com/editions/community/docker-ce-desktop-mac)
 
-Ubuntu上安装docker
+Ubuntu上安装docker，还需要将docker官网加到软件源中
 ```
 $ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 $ sudo add-apt-repository \
@@ -854,256 +854,310 @@ $ sudo apt-get update
 $ sudo apt-get install docker-ce
 ```
 
-
-
+#### 入门体验
+如下示例，run命令用busybox镜像，启动了docker的一个容器。
 ```
-$ docker
-Usage:	docker [OPTIONS] COMMAND
-
-A self-sufficient runtime for containers
-
-Options:
-      --config string      Location of client config files (default "/Users/shaoying/.docker")
-  -D, --debug              Enable debug mode
-  -H, --host list          Daemon socket(s) to connect to
-  -l, --log-level string   Set the logging level ("debug"|"info"|"warn"|"error"|"fatal") (default "info")
-      --tls                Use TLS; implied by --tlsverify
-      --tlscacert string   Trust certs signed only by this CA (default "/Users/shaoying/.docker/ca.pem")
-      --tlscert string     Path to TLS certificate file (default "/Users/shaoying/.docker/cert.pem")
-      --tlskey string      Path to TLS key file (default "/Users/shaoying/.docker/key.pem")
-      --tlsverify          Use TLS and verify the remote
-  -v, --version            Print version information and quit
-
-Management Commands:
-  checkpoint  Manage checkpoints
-  config      Manage Docker configs
-  container   Manage containers
-  image       Manage images
-  network     Manage networks
-  node        Manage Swarm nodes
-  plugin      Manage plugins
-  secret      Manage Docker secrets
-  service     Manage services
-  stack       Manage Docker stacks
-  swarm       Manage Swarm
-  system      Manage Docker
-  trust       Manage trust on Docker images
-  volume      Manage volumes
-
-Commands:
-  attach      Attach local standard input, output, and error streams to a running container
-  build       Build an image from a Dockerfile
-  commit      Create a new image from a container's changes
-  cp          Copy files/folders between a container and the local filesystem
-  create      Create a new container
-  deploy      Deploy a new stack or update an existing stack
-  diff        Inspect changes to files or directories on a container's filesystem
-  events      Get real time events from the server
-  exec        Run a command in a running container
-  export      Export a container's filesystem as a tar archive
-  history     Show the history of an image
-  images      List images
-  import      Import the contents from a tarball to create a filesystem image
-  info        Display system-wide information
-  inspect     Return low-level information on Docker objects
-  kill        Kill one or more running containers
-  load        Load an image from a tar archive or STDIN
-  login       Log in to a Docker registry
-  logout      Log out from a Docker registry
-  logs        Fetch the logs of a container
-  pause       Pause all processes within one or more containers
-  port        List port mappings or a specific mapping for the container
-  ps          List containers
-  pull        Pull an image or a repository from a registry
-  push        Push an image or a repository to a registry
-  rename      Rename a container
-  restart     Restart one or more containers
-  rm          Remove one or more containers
-  rmi         Remove one or more images
-  run         Run a command in a new container
-  save        Save one or more images to a tar archive (streamed to STDOUT by default)
-  search      Search the Docker Hub for images
-  start       Start one or more stopped containers
-  stats       Display a live stream of container(s) resource usage statistics
-  stop        Stop one or more running containers
-  tag         Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE
-  top         Display the running processes of a container
-  unpause     Unpause all processes within one or more containers
-  update      Update configuration of one or more containers
-  version     Show the Docker version information
-  wait        Block until one or more containers stop, then print their exit codes
-
-Run 'docker COMMAND --help' for more information on a command.
+$ docker run -it busybox
+Unable to find image 'busybox:latest' locally
+latest: Pulling from library/busybox
+8c5a7da1afbc: Pull complete
+Digest: sha256:cb63aa0641a885f54de20f61d152187419e8f6b159ed11a251a09d115f_f9bd
+Status: Downloaded newer image for busybox:latest
+/ #
 ```
+这里本机并没有busybox的镜像，所以docker自动从dockhub上，下载了busybox的镜像，并用这个镜像启动了一个容器。
+像github共享代码一样，dockhub上也共享了各种系统镜像，用户可以自由的下载与上传。
 
+run命令需要一个参数，指定镜像的名称与版本，这里镜像的名字为busybox，默认的版本为latest，即最新版。
+busybox是将Unix下的常用命令经过挑选裁剪集成到一个程序中，搭配Linux内核就可以做出一个小型的操作系统，在嵌入式领域应用广泛。
+体积小到只有1M左右，下载很快，所以这里用做示例。更多信息参考[busybox官网](https://busybox.net/)
+
+"/ #"，看到最后一行的的命令提示符，就知道容器已经启动了，就可以在这个容器的shell中，执行各种命令与操作了。最后用Ctrl+D或关闭终端窗口，就可以结束容器。
+再次运行run，又可以重新启动容器。
+
+
+
+如下示例，除了交互式启动容器，还可以用守护的方式启动容器。
 ```
-$ docker
-Usage:	docker [OPTIONS] COMMAND
-
-A self-sufficient runtime for containers
-
-Options:
-      --config string      Location of client config files (default "/Users/shaoying/.docker")
-  -D, --debug              Enable debug mode
-  -H, --host list          Daemon socket(s) to connect to
-  -l, --log-level string   Set the logging level ("debug"|"info"|"warn"|"error"|"fatal") (default "info")
-      --tls                Use TLS; implied by --tlsverify
-      --tlscacert string   Trust certs signed only by this CA (default "/Users/shaoying/.docker/ca.pem")
-      --tlscert string     Path to TLS certificate file (default "/Users/shaoying/.docker/cert.pem")
-      --tlskey string      Path to TLS key file (default "/Users/shaoying/.docker/key.pem")
-      --tlsverify          Use TLS and verify the remote
-  -v, --version            Print version information and quit
-
-Management Commands:
-  checkpoint  Manage checkpoints
-  node        Manage Swarm nodes
-  plugin      Manage plugins
-  secret      Manage Docker secrets
-  service     Manage services
-  stack       Manage Docker stacks
-  swarm       Manage Swarm
-  trust       Manage trust on Docker images
-
-Commands:
-  attach      Attach local standard input, output, and error streams to a running container
-  build       Build an image from a Dockerfile
-  commit      Create a new image from a container's changes
-  cp          Copy files/folders between a container and the local filesystem
-  create      Create a new container
-  deploy      Deploy a new stack or update an existing stack
-  diff        Inspect changes to files or directories on a container's filesystem
-  events      Get real time events from the server
-  exec        Run a command in a running container
-  export      Export a container's filesystem as a tar archive
-  history     Show the history of an image
-  images      List images
-  import      Import the contents from a tarball to create a filesystem image
-  info        Display system-wide information
-  inspect     Return low-level information on Docker objects
-  kill        Kill one or more running containers
-  load        Load an image from a tar archive or STDIN
-  login       Log in to a Docker registry
-  logout      Log out from a Docker registry
-  logs        Fetch the logs of a container
-  pause       Pause all processes within one or more containers
-  port        List port mappings or a specific mapping for the container
-  ps          List containers
-  pull        Pull an image or a repository from a registry
-  push        Push an image or a repository to a registry
-  rename      Rename a container
-  restart     Restart one or more containers
-  rm          Remove one or more containers
-  rmi         Remove one or more images
-  run         Run a command in a new container
-  save        Save one or more images to a tar archive (streamed to STDOUT by default)
-  search      Search the Docker Hub for images
-  start       Start one or more stopped containers
-  stats       Display a live stream of container(s) resource usage statistics
-  stop        Stop one or more running containers
-  tag         Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE
-  top         Display the running processes of a container
-  unpause     Unpause all processes within one or more containers
-  update      Update configuration of one or more containers
-  version     Show the Docker version information
-  wait        Block until one or more containers stop, then print their exit codes
-
-Run 'docker COMMAND --help' for more information on a command.
+$ docker run -dt --name demo busybox
+d71c8e37bcc153db239f8b1eccb5fa53d202df84d3ffa7ae4e7f8c051d0d481a
 ```
+- "-dt"，指定容器守护的方式运行，即使终端窗口关闭了，守护式的容器会在后台一直运行，可以被反复连接使用。
+- "--name demo"，指定了容器的名字为demo，每个容器启动后docker会生成一个sha256的哈希值，如这里的"d71c8e37bcc153db239f8b1eccb5fa53d202df84d3ffa7ae4e7f8c051d0d481a"
+在之后的命令中，参数中需要指定容器的地方，都可以这个sha256的哈希值，也可以只写出前几位。但为了方便记忆，可以给容器指定名字。
+- "busybox"，指定镜像名字与版本
 
-镜像管理
-image       Manage images
-
-容器管理
-container   Manage containers
-
-配置管理
-config      Manage Docker configs
-
-系统管理
-system      Manage Docker
-
-网络管理
-network     Manage networks
-
-磁盘管理
-volume      Manage volumes
-
-#### docker镜像管理
-
-- 查看镜像 docker image ls
-- 下载镜像 docker image pull
-
-刚安装docker后，查看镜像列表，如下为空。
-```
-$ docker image ls
-REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
-```
-像github管理代码仓库一样，docker hub上也存放了很多镜像，用户可以自由的下载与上传各种镜像。
-如下示例，下载一个busybox镜像。busybox是将Unix下的常用命令经过挑选裁剪集成一个程序中，搭配Linux内核就可以做出一个小型的操作系统，在嵌入式领域应用广泛。
-体积很小不到1M，下载很快，所以这里用做示例。更多信息参考[busybox官网](https://busybox.net/)
-```
-$ docker image pull busybox
-```
-下载完成后，再查看镜像列表，就会看到busybox镜像相关的信息。
-```
-$ docker image ls
-REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
-busybox             latest              e1ddd7948a1c        6 weeks ago         1.16MB
-```
-#### docker容器管理
-
-- 查看容器 docker ps
-- 启动容器 docker run
-- 停止容器 docker exec
-- 停止容器 docker stop
-
-如下示例，查看容器列表，因为还没启动任何容器，所以这里为空。
+如下示例，ps命令可以查看正在运行的容器。
 ```
 $ docker ps
 CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+d71c8e37bcc1        busybox             "sh"                14 seconds ago      Up 13 seconds                           demo
 ```
-如下示例，用busybox:latest镜像，启动一个容器，并调用sh命令。
+如下示例，top命令可以查看某容器中运行的进程
 ```
-$ docker run --name demo -dt busybox:latest sh  
-29ff6b8343c4a2c57eab297e74e62422ab9bbd481d69f5ebf108f4aa23ae835c
-```
-其中，-d 指用守护的方式启动，与交互式 -i 不同，守护式启动，容器可以一直运行，不会因为终端容器关闭而停止。
---name参数，指定容器的名字为demo，docker中标识容器有两种方式，一是通过ID查找容器，二是通过NAMES查找容器，为了方便记忆与查找，建议启动容器时加上名字参数。
-
-如下示例，再次查看容器列表，看到容器已经启动。
-```
-$ docker ps
-CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
-29ff6b8343c4        busybox:latest      "sh"                4 minutes ago       Up 4 minutes                            demo
+$ docker top demo
+PID                 USER                TIME                COMMAND
+4163                root                0:00                sh
 ```
 
-连接容器demo，调用命令解析器sh。这样就连接上了容器的命令行，可以执行各种命令。
+如下示例，exec可以在容器中运行各种命令，并将命令输出到当前终端。
+```
+$ docker exec demo uname
+Linux
+$ docker exec demo hostname
+d71c8e37bcc1
+```
+如下示例，还可以连接容器，启动一个交互shell。Ctrl+D或是关闭终端窗口，只会结束当前shell，容器依然还在后台继续运行。还可以被反复连接。
 ```
 $ docker exec -it demo sh
-#
+/ #
+```
+如下示例，还可以对容器进行重命名。可以用ps命令查看，新名字已经生效。
+```
+$ docker rename demo demo1
 ```
 
-容器的停止，退出连接后，容器依然在后台运行，可以反复被连接。如果想停止容器的运行就用stop命令。
+容器中的根文件系统与本机的文件系统是完全隔离的，所以才能提供给容器中应用一个独立的运行环境。
+
+如下示例，可以将本机文件复制到容器中。
 ```
-$ docker stop demo
+$ docker cp ~/.vimrc demo1:/root
+$ docker exec demo1 ls -a /root
+.
+..
+.vimrc
+```
+如下示例，可以将容器中文件复制到本机。
+```
+$ docker cp demo1:/root vimrc
+$ ls
+vimrc
 ```
 
-#### 挂载文件
-之前启动的容器都是与本机之间没有什么交互，是一个完全独立的运行环境。
-如果需要容器与本机交互一些文件，就可以在启动容器时指定文件参数。
+如下示例，停止容器
 ```
-$ docker run --name demo1 -v/Users/shaoying:/home/shaoying  -dt busybox:latest sh
+$ docker stop demo1
 ```
 
-#### 端口映射
+ps命令默认只查看正在运行的容器，如果要查看已经停止的容器可以加参数-a
+```
+$ docker ps -a
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS                         PORTS               NAMES
+513a5e1fc6f4        busybox             "sh"                4 minutes ago       Exited (137) 3 seconds ago                         demo1
+```
 
-### git入门
+如下示例，已经停止的容器，还可以再启动，继续运行。
+```
+$ docker start demo1
+```
+
+如下示例，如果确定已经停止的容器，不会再次启动使用，可以删除掉。
+```
+$ docker rm demo1
+```
+
+#### 镜像管理
+```
+docker images
+image       Manage images
+
+images      List images
+search      Search the Docker Hub for images
+pull        Pull an image or a repository from a registry
+push        Push an image or a repository to a registry
+save        Save one or more images to a tar archive (streamed to STDOUT by default)
+load        Load an image from a tar archive or STDIN
+rmi         Remove one or more images
+
+history     Show the history of an image
+build       Build an image from a Dockerfile
+tag         Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE
+```
+
+#### 容器管理
+```
+stats       Display a live stream of container(s) resource usage statistics
+attach      Attach local standard input, output, and error streams to a running container
+container   Manage containers
+commit      Create a new image from a container's changes
+diff        Inspect changes to files or directories on a container's filesystem
+kill        Kill one or more running containers
+wait        Block until one or more containers stop, then print their exit codes
+create      Create a new container
+pause       Pause all processes within one or more containers
+unpause     Unpause all processes within one or more containers
+export      Export a container's filesystem as a tar archive
+import      Import the contents from a tarball to create a filesystem image
+logs        Fetch the logs of a container
+restart     Restart one or more containers
+update      Update configuration of one or more containers
+volume      Manage volumes
+network     Manage networks
+```
+
+#### 系统管理
+```
+deploy      Deploy a new stack or update an existing stack
+version     Show the Docker version information
+system      Manage Docker
+info        Display system-wide information
+login       Log in to a Docker registry
+logout      Log out from a Docker registry
+inspect     Return low-level information on Docker objects
+secret      Manage Docker secrets
+trust       Manage trust on Docker images
+```
+
+#### 集群管理
+```
+config      Manage Docker configs
+checkpoint  Manage checkpoints
+plugin      Manage plugins
+service     Manage services
+swarm       Manage Swarm
+node        Manage Swarm nodes
+stack       Manage Docker stacks
+```
+
+### git使用
+软件的开发是不断的迭代，不断的优化，不断的升级，是一个循序渐进的过程。
+所以需要对代码进行版本管理，记录每次提交的代码，可以随时查看变化与切换版本。
+
+软件开发有时需要同时进行多个任务，如在开发新功能时，需要修复线上bug，所以需要分支管理。
+一般一个项目中至少会有三种分支：master、feature、bugfix。
+
+此外软件开发的项目都一般是由团队完成，要多人协作共同完成功能开发，所以需要仓库管理，管理多人的代码。
+
+git就是这样一种开源的代码管理工具，可以用来管理代码的版本、分支、仓库等。
+
 Mac上自带git，不需要安装。
 Windows上安装了的git-scm，也集成了git，也不需要单独安装。
 但Ubuntu需要自己安装一下。
 ```
 $ sudo apt-get install git
 ```
+#### git 基础入门
+git help tutorial
+git help everyday
+git help workflows
+git help glossary
+
+git是一个命令集合，有很多子命令，可以通过help命令来查看。
+```
+$ git help
+```
+
+git init
+git status
+git diff
+git add
+git mv
+git rm
+git reset
+git commit
+git checkout
+git blame
+git log
+git tag
+
+git branch
+git merge
+git rebase
+
+git config
+git clone
+git remote
+git revert
+git fetch
+git pull
+git push
+
+git bisect
+git grep
+git show
+
+
+add                       merge-octopus
+add--interactive          merge-one-file
+am                        merge-ours
+annotate                  merge-recursive
+apply                     merge-resolve
+archimport                merge-subtree
+archive                   merge-tree
+bisect                    mergetool
+bisect--helper            mktag
+blame                     mktree
+branch                    mv
+bundle                    name-rev
+cat-file                  notes
+check-attr                p4
+check-ignore              pack-objects
+check-mailmap             pack-redundant
+check-ref-format          pack-refs
+checkout                  patch-id
+checkout-index            prune
+cherry                    prune-packed
+cherry-pick               pull
+citool                    push
+clean                     quiltimport
+clone                     read-tree
+column                    rebase
+commit                    receive-pack
+commit-tree               reflog
+config                    relink
+count-objects             remote
+credential                remote-ext
+credential-cache          remote-fd
+credential-cache--daemon  remote-ftp
+credential-osxkeychain    remote-ftps
+credential-store          remote-http
+cvsexportcommit           remote-https
+cvsimport                 remote-testsvn
+cvsserver                 repack
+daemon                    replace
+describe                  request-pull
+diff                      rerere
+diff-files                reset
+diff-index                rev-list
+diff-tree                 rev-parse
+difftool                  revert
+difftool--helper          rm
+fast-export               send-email
+fast-import               send-pack
+fetch                     sh-i18n--envsubst
+fetch-pack                shell
+filter-branch             shortlog
+fmt-merge-msg             show
+for-each-ref              show-branch
+format-patch              show-index
+fsck                      show-ref
+fsck-objects              stage
+gc                        stash
+get-tar-commit-id         status
+grep                      stripspace
+gui--askpass              submodule
+hash-object               submodule--helper
+help                      subtree
+http-backend              svn
+http-fetch                symbolic-ref
+http-push                 tag
+imap-send                 unpack-file
+index-pack                unpack-objects
+init                      update-index
+init-db                   update-ref
+instaweb                  update-server-info
+interpret-trailers        upload-archive
+log                       upload-pack
+ls-files                  var
+ls-remote                 verify-commit
+ls-tree                   verify-pack
+mailinfo                  verify-tag
+mailsplit                 web--browse
+merge                     whatchanged
+merge-base                worktree
+merge-file                write-tree
+merge-index
+
 ### vim入门
 Mac上自带vim，不需要安装。
 Windows上安装了的git-scm，也集成了vim，也不需要单独安装。
