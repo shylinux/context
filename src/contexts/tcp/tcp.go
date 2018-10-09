@@ -4,6 +4,7 @@ import (
 	"contexts"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -20,7 +21,9 @@ func (tcp *TCP) Read(b []byte) (n int, e error) {
 	m.Assert(tcp.Conn != nil)
 	n, e = tcp.Conn.Read(b)
 	m.Capi("nrecv", n)
-	m.Assert(e)
+	if e != io.EOF {
+		m.Assert(e)
+	}
 	return
 }
 func (tcp *TCP) Write(b []byte) (n int, e error) {
@@ -28,7 +31,9 @@ func (tcp *TCP) Write(b []byte) (n int, e error) {
 	m.Assert(tcp.Conn != nil)
 	n, e = tcp.Conn.Write(b)
 	m.Capi("nsend", n)
-	m.Assert(e)
+	if e != io.EOF {
+		m.Assert(e)
+	}
 	return
 }
 

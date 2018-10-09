@@ -100,7 +100,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) {
 				m.Sess("nfs").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "远程主机")
-					// sub.Spawn().Cmd("pwd", "init")
+					sub.Spawn().Cmd("pwd", "")
 					return sub
 				}, m.Meta["detail"])
 				if !m.Caps("domain") {
@@ -123,21 +123,62 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					domain := ""
 					if len(arg) > 1 && arg[0] == "domain" {
 						domain, arg = arg[1], arg[2:]
-						domain = strings.TrimPrefix(strings.TrimPrefix(domain, m.Cap("domain")), ".")
-					}
+						if d := strings.TrimPrefix(domain, m.Cap("domain")); len(d) > 0 && d[0] == '.' {
+							domain = d[1:]
+						} else if d == "" {
+							domain = d
+						}
 
-					if m.Has("send_code") {
-						msg := m.Spawn().Cmd(arg)
-						m.Copy(msg, "result").Copy(msg, "append")
+						if domain == "" {
+							msg := m.Spawn().Cmd(arg)
+							m.Copy(msg, "result").Copy(msg, "append")
+							return
+						}
 					} else {
-						msg := m.Spawn(ssh.Message().Source())
-						msg.Cmd("send", arg)
-						m.Copy(msg, "result").Copy(msg, "append")
+						if m.Has("send_code") {
+							msg := m.Spawn().Cmd(arg)
+							m.Copy(msg, "result").Copy(msg, "append")
+						} else {
+							msg := m.Spawn(ssh.Message().Source())
+							msg.Cmd("send", arg)
+							m.Copy(msg, "result").Copy(msg, "append")
+						}
 						return
 					}
 
-					return
+					miss := true
+					host := strings.SplitN(domain, ".", 2)
+					m.Travel(func(m *ctx.Message, i int) bool {
+						if i == 0 {
+							return true
+						}
+						if m.Cap("hostname") == host[0] {
+							if len(host) > 1 {
+								ssh, ok := m.Target().Server.(*SSH)
+								m.Assert(ok)
 
+								msg := m.Spawn(ssh.Message().Source())
+								msg.Cmd("send", "domain", host[1], arg)
+								m.Copy(msg, "result").Copy(msg, "append")
+							} else {
+								msg := m.Spawn()
+								msg.Cmd("send", arg)
+								m.Copy(msg, "result").Copy(msg, "append")
+							}
+
+							miss = false
+							return false
+						}
+						return true
+					}, c)
+
+					if miss {
+						msg := m.Spawn(c.Message().Source())
+						msg.Cmd("send", "domain", domain, arg)
+						m.Copy(msg, "result").Copy(msg, "append")
+					}
+
+					return
 					if domain != "" {
 						domain_miss := true
 						host := strings.SplitN(domain, ".", 2)

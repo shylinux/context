@@ -127,6 +127,7 @@ set keywordprg=man\ -a
 autocmd BufNewFile,BufReadPost *.shy set filetype=shy
 autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s
 autocmd BufNewFile,BufReadPost *.conf set filetype=nginx
+autocmd BufNewFile,BufReadPost *.go set foldmethod=syntax
 
 command! RR wa | source ~/.vimrc |e
 
