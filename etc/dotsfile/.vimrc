@@ -48,9 +48,12 @@ Plug 'vim-syntastic/syntastic'
 let g:syntastic_quiet_messages = { "regex": [
             \ "Missing module docstring",
             \ "Missing class docstring",
+            \ "Missing method docstring",
             \ "Missing function docstring",
             \ "Wrong continued indentation",
             \ "Line Too Long",
+            \ "Invalid variable name",
+            \ "Too many instance attributes",
             \ "defined outside __init__",
          \ ] }
 

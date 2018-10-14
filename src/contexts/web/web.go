@@ -393,19 +393,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"from": "root", "to": []interface{}{},
 					"template": "userinfo", "title": "userinfo",
 				},
-				//聊天服务
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "aaa", "detail": []interface{}{"lark"},
-					"template": "detail", "title": "list_lark",
-					// "option": map[string]interface{}{"auto_refresh": true},
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "aaa", "detail": []interface{}{"lark"},
-					"template": "detail", "title": "send_lark",
-					"option": map[string]interface{}{"ninput": 2},
-				},
 				//文件服务
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
@@ -421,42 +408,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"from": "root", "to": []interface{}{},
 					"template": "create", "title": "create",
 				},
-				//格式转换
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "cli", "detail": []interface{}{"time"},
-					"template": "detail", "title": "time",
-					"option": map[string]interface{}{"refresh": true, "ninput": 1},
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "nfs", "detail": []interface{}{"pwd"},
-					"template": "detail", "title": "pwd",
-					"option": map[string]interface{}{"refresh": true},
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "nfs", "detail": []interface{}{"json"},
-					"template": "detail", "title": "json",
-					"option": map[string]interface{}{"ninput": 1},
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "cli", "detail": []interface{}{"system", "tmux", "show-buffer"},
-					"template": "detail", "title": "buffer",
-					"option": map[string]interface{}{"ninput": 1},
-				},
+				//会话服务
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
 					"module": "cli", "command": "system",
 					"argument": []interface{}{"tmux", "show-buffer"},
 					"template": "result", "title": "buffer",
-				},
-				map[string]interface{}{
-					"from": "root", "to": []interface{}{},
-					"module": "web", "command": "/share",
-					"argument": []interface{}{},
-					"template": "share", "title": "share",
 				},
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
@@ -470,11 +427,36 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"argument": []interface{}{"tmux", "list-sessions"},
 					"template": "result", "title": "session",
 				},
+				//格式转换
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "cli", "detail": []interface{}{"time"},
+					"template": "detail", "title": "time",
+					"option": map[string]interface{}{"refresh": true, "ninput": 1},
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "nfs", "detail": []interface{}{"json"},
+					"template": "detail", "title": "json",
+					"option": map[string]interface{}{"ninput": 1},
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "nfs", "detail": []interface{}{"pwd"},
+					"template": "detail", "title": "pwd",
+					"option": map[string]interface{}{"refresh": true},
+				},
 				map[string]interface{}{
 					"from": "root", "to": []interface{}{},
 					"module": "nfs", "command": "git",
 					"argument": []interface{}{},
 					"template": "result", "title": "git",
+				},
+				map[string]interface{}{
+					"from": "root", "to": []interface{}{},
+					"module": "web", "command": "/share",
+					"argument": []interface{}{},
+					"template": "share", "title": "share",
 				},
 			},
 			"notice": []interface{}{
@@ -1207,7 +1189,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if m.Options("sessid") {
 				if aaa := m.Sess("aaa").Cmd("login", m.Option("sessid")); aaa.Results(0) {
 					m.Append("redirect", m.Option("referer"))
-					m.Append("username", aaa.Cap("username"))
+					m.Append("username", aaa.Result(0))
 					return
 				}
 			}
