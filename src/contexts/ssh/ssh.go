@@ -4,13 +4,10 @@ import (
 	"contexts"
 	"fmt"
 	"strings"
-	"time"
 )
 
 type SSH struct {
-	nfs  *ctx.Context
 	peer map[string]*ctx.Message
-
 	*ctx.Context
 }
 
@@ -24,175 +21,120 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	ssh.Caches["hostname"] = &ctx.Cache{Name: "hostname", Value: "", Help: "主机数量"}
-	if ssh.Context == Index {
-		Pulse = m
-	}
 	return ssh
 }
 func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
-	ssh.nfs = m.Source()
 	m.Cap("stream", m.Source().Name)
 	return false
 }
 func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
 	return false
-	switch ssh.Context {
-	case m.Target():
-	case m.Source():
-	}
-	if m.Target() == Index {
-		go func() {
-			m.Target().Begin(m)
-			m.Sess("nfs", "nfs")
-			for !m.Caps("stream") {
-				time.Sleep(time.Second * time.Duration(m.Confi("interval")))
-				go ssh.Message().Spawn(m.Target()).Copy(ssh.Message(), "detail").Cmd()
-				time.Sleep(time.Second * time.Duration(m.Confi("interval")))
-			}
-		}()
-		return false
-	}
-	return true
-}
-func Done(m *ctx.Message, lock chan bool) {
-	m.Log("lock", "done before %v", m.Meta["detail"])
-	if m.Options("stdio") {
-		lock <- true
-	}
-	m.Log("lock", "done after %v", m.Meta["detail"])
-}
-func Wait(m *ctx.Message, lock chan bool) {
-	m.Log("lock", "wait before %v", m.Meta["detail"])
-	if m.Options("stdio") {
-		<-lock
-	}
-	m.Log("lock", "wait after %v", m.Meta["detail"])
 }
 
-var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Caches: map[string]*ctx.Cache{
 		"nhost":  &ctx.Cache{Name: "主机数量", Value: "0", Help: "主机数量"},
 		"domain": &ctx.Cache{Name: "domain", Value: "", Help: "主机域名"},
-
-		"route": &ctx.Cache{Name: "route", Value: "com", Help: "主机数量"},
-		"count": &ctx.Cache{Name: "count", Value: "3", Help: "主机数量"},
-		"share": &ctx.Cache{Name: "share", Value: "root", Help: "主机数量"},
-		"level": &ctx.Cache{Name: "level", Value: "root", Help: "主机数量"},
 	},
 	Configs: map[string]*ctx.Config{
 		"hostname": &ctx.Config{Name: "hostname", Value: "com", Help: "主机数量"},
 
-		"interval":    &ctx.Config{Name: "interval", Value: "3", Help: "主机数量"},
 		"domain.json": &ctx.Config{Name: "domain.json", Value: "var/domain.json", Help: "主机数量"},
 		"domain.png":  &ctx.Config{Name: "domain.png", Value: "var/domain.png", Help: "主机数量"},
-
-		"mdb": &ctx.Config{Name: "mdb", Value: "mdb.chat", Help: "主机数量"},
-		"uid": &ctx.Config{Name: "uid", Value: "", Help: "主机数量"},
-
-		"type": &ctx.Config{Name: "type", Value: "terminal", Help: "主机数量"},
-		"kind": &ctx.Config{Name: "kind", Value: "terminal", Help: "主机数量"},
-		"name": &ctx.Config{Name: "name", Value: "vps", Help: "主机数量"},
-		"mark": &ctx.Config{Name: "mark", Value: "com", Help: "主机数量"},
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) {
-				m.Sess("nfs").Call(func(sub *ctx.Message) *ctx.Message {
-					sub.Start(fmt.Sprintf("host%d", Pulse.Capi("nhost", 1)), "远程主机")
-					sub.Spawn().Cmd("pwd", "")
-					return sub
-				}, m.Meta["detail"])
-				if !m.Caps("domain") {
-					m.Cap("domain", m.Cap("hostname", m.Conf("hostname")))
-				}
-				// m.Spawn(m.Target()).Cmd("save")
+			m.Sess("nfs").Call(func(sub *ctx.Message) *ctx.Message {
+				sub.Start(fmt.Sprintf("host%d", m.Capi("nhost", 1)), "远程主机")
+				sub.Spawn().Cmd("pwd", "")
+				return sub
+			}, m.Meta["detail"])
+			if !m.Caps("domain") {
+				m.Cap("domain", m.Cap("hostname", m.Conf("hostname")))
 			}
+			// m.Spawn(m.Target()).Cmd("save")
 		}},
 		"dial": &ctx.Command{Name: "dial address [security [protocol]]", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*SSH); m.Assert(ok) {
-				m.Sess("nfs").CallBack(true, func(sub *ctx.Message) *ctx.Message {
-					sub.Target().Start(sub)
-					return sub
-				}, m.Meta["detail"])
+			m.Sess("nfs").CallBack(true, func(sub *ctx.Message) *ctx.Message {
+				sub.Target().Start(sub)
+				return sub
+			}, m.Meta["detail"])
+		}},
+		"send": &ctx.Command{Name: "send [domain str] cmd arg...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) {
+				origin, domain := "", ""
+				if len(arg) > 1 && arg[0] == "domain" {
+					origin, arg = arg[1], arg[2:]
+					if d := strings.TrimPrefix(origin, m.Cap("domain")); len(d) > 0 && d[0] == '.' {
+						domain = d[1:]
+					} else if d == "" {
+						domain = d
+					} else {
+						domain = origin
+					}
+
+					if domain == "" { //本地执行
+						msg := m.Spawn().Cmd(arg)
+						m.Copy(msg, "result").Copy(msg, "append")
+						return
+					}
+				} else {
+					if m.Has("send_code") { //本地执行
+						msg := m.Spawn().Cmd(arg)
+						m.Copy(msg, "result").Copy(msg, "append")
+					} else { //对端执行
+						msg := m.Spawn(ssh.Message().Source())
+						msg.Cmd("send", arg)
+						m.Copy(msg, "result").Copy(msg, "append")
+					}
+					return
+				}
+
+				match := false
+				host := strings.SplitN(domain, ".", 2)
+				m.Travel(func(m *ctx.Message, i int) bool {
+					if i == 0 {
+						return true
+					}
+					if m.Cap("hostname") == host[0] || "*" == host[0] {
+						ssh, ok := m.Target().Server.(*SSH)
+						m.Assert(ok)
+						msg := m.Spawn(ssh.Message().Source())
+
+						if len(host) > 1 {
+							msg.Cmd("send", "domain", host[1], arg)
+						} else {
+							msg.Cmd("send", arg)
+						}
+						m.Copy(msg, "result").Copy(msg, "append")
+
+						if !match {
+							match = !m.Appends("domain_miss")
+						}
+						return host[0] == "*"
+					}
+					return true
+				}, c)
+
+				if match {
+					return
+				}
+				if m.Target() == c && m.Has("send_code") {
+					m.Appends("domain_miss", true)
+					return
+				}
+				if m.Cap("domain") == m.Conf("hostname") {
+					m.Appends("domain_miss", true)
+					return
+				}
+
+				// 向上路由
+				msg := m.Spawn(c.Message().Source())
+				msg.Cmd("send", "domain", origin, arg)
+				m.Copy(msg, "result").Copy(msg, "append")
 			}
 		}},
-		"send": &ctx.Command{Name: "send [domain str] cmd arg...", Help: "远程执行",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) {
-					origin, domain := "", ""
-					if len(arg) > 1 && arg[0] == "domain" {
-						origin, arg = arg[1], arg[2:]
-						if d := strings.TrimPrefix(origin, m.Cap("domain")); len(d) > 0 && d[0] == '.' {
-							domain = d[1:]
-						} else if d == "" {
-							domain = d
-						} else {
-							domain = origin
-						}
-
-						if domain == "" { //本地执行
-							msg := m.Spawn().Cmd(arg)
-							m.Copy(msg, "result").Copy(msg, "append")
-							return
-						}
-					} else {
-						if m.Has("send_code") { //本地执行
-							msg := m.Spawn().Cmd(arg)
-							m.Copy(msg, "result").Copy(msg, "append")
-						} else { //对端执行
-							msg := m.Spawn(ssh.Message().Source())
-							msg.Cmd("send", arg)
-							m.Copy(msg, "result").Copy(msg, "append")
-						}
-						return
-					}
-
-					match := false
-					host := strings.SplitN(domain, ".", 2)
-					m.Travel(func(m *ctx.Message, i int) bool {
-						if i == 0 {
-							return true
-						}
-						if m.Cap("hostname") == host[0] || "*" == host[0] {
-							ssh, ok := m.Target().Server.(*SSH)
-							m.Assert(ok)
-							msg := m.Spawn(ssh.Message().Source())
-
-							if len(host) > 1 {
-								msg.Cmd("send", "domain", host[1], arg)
-							} else {
-								msg.Cmd("send", arg)
-							}
-							m.Copy(msg, "result").Copy(msg, "append")
-
-							if !match {
-								match = !m.Appends("domain_miss")
-							}
-							return host[0] == "*"
-						}
-						return true
-					}, c)
-
-					if match {
-						return
-					}
-					if m.Target() == c && m.Has("send_code") {
-						m.Appends("domain_miss", true)
-						return
-					}
-					if m.Cap("domain") == m.Conf("hostname") {
-						m.Appends("domain_miss", true)
-						return
-					}
-
-					// 向上路由
-					msg := m.Spawn(c.Message().Source())
-					msg.Cmd("send", "domain", origin, arg)
-					m.Copy(msg, "result").Copy(msg, "append")
-				}
-			}},
-		"pwd": &ctx.Command{Name: "pwd", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"pwd": &ctx.Command{Name: "pwd [hostname]", Help: "主机域名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) == 0 {
 				m.Echo(m.Cap("domain"))
 				return
@@ -309,100 +251,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Copy(msg, "result").Copy(msg, "append")
 				}
 			}},
-		"close": &ctx.Command{Name: "close", Help: "连接断开", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Target().Close(m)
-		}},
-		"list": &ctx.Command{Name: "list", Help: "连接断开", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			domain := m.Cap("domain")
-			m.Travel(func(m *ctx.Message, i int) bool {
-				if m.Confs("domains") {
-					m.Echo("%s: %s.%s\n", m.Target().Name, domain, m.Conf("domains"))
-				}
-				return true
-			}, c)
-		}},
 		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			json := m.Sess("nfs")
 			json.Put("option", "data", map[string]string{"domain": m.Cap("domain")})
 			json.Cmd("json", m.Conf("domain.json"))
 			m.Sess("nfs").Cmd("genqr", m.Conf("domain.png"), json.Result(0))
 
-		}},
-		"who": &ctx.Command{Name: "who", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			aaa := m.Sess("aaa")
-			if aaa != nil {
-				m.Echo(aaa.Cap("group"))
-			}
-
-		}},
-		"good": &ctx.Command{Name: "good context|command|config|cache args", Help: "设备注册", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) {
-			if len(arg) == 0 {
-				m.Append("share", m.Cap("share"))
-				m.Append("level", m.Cap("level"))
-				m.Append("type", m.Conf("type"))
-				m.Append("value", m.Cap("domain"))
-				m.Append("kind", m.Conf("kind"))
-				m.Append("name", m.Cap("domain"))
-				m.Append("mark", m.Conf("mark"))
-				m.Append("count", m.Cap("count"))
-				m.Back(m)
-				return
-			}
-			cmds := m.Option("cmds")
-
-			if arg[0] == "context" {
-				if len(arg) > 1 {
-					cmds = arg[1]
-				}
-
-				m.Travel(func(msg *ctx.Message, i int) bool {
-					current := msg.Target()
-					if _, ok := current.Index[cmds]; ok {
-
-					} else if cmds != "" && cmds != "root" {
-						return true
-					}
-
-					m.Add("append", "name", current.Name)
-					m.Add("append", "help", current.Help)
-					return true
-				}, ctx.Index)
-				return
-			}
-
-			if len(arg) > 2 {
-				cmds = arg[2]
-			}
-			current := m.Sess(arg[1], arg[1], "search").Target()
-			if x, ok := current.Index[cmds]; ok {
-				current = x
-			} else if cmds != "" && cmds != "root" {
-				return
-			}
-
-			switch arg[0] {
-			case "command":
-
-				for k, x := range current.Commands {
-					m.Add("append", "key", k)
-					m.Add("append", "name", x.Name)
-					m.Add("append", "help", x.Help)
-				}
-			case "config":
-				for k, x := range current.Configs {
-					m.Add("append", "key", k)
-					m.Add("append", "name", x.Name)
-					m.Add("append", "value", x.Value)
-					m.Add("append", "help", x.Help)
-				}
-			case "cache":
-				for k, x := range current.Caches {
-					m.Add("append", "key", k)
-					m.Add("append", "name", x.Name)
-					m.Add("append", "value", x.Value)
-					m.Add("append", "help", x.Help)
-				}
-			}
 		}},
 	},
 }

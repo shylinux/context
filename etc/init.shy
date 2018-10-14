@@ -1,4 +1,3 @@
-login root root
 ~aaa
 	# login load var/login.txt
 ~file1

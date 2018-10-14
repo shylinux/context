@@ -231,7 +231,7 @@ type Config struct {
 }
 type Command struct {
 	Name string
-	Help string
+	Help interface{}
 	Form map[string]int
 	Hand func(m *Message, c *Context, key string, arg ...string)
 
@@ -870,12 +870,15 @@ func (m *Message) Put(meta string, key string, value interface{}) *Message {
 	}
 	return m
 }
-func (m *Message) Has(key string) bool {
-	if _, ok := m.Data[key]; ok {
-		return true
-	}
-	if _, ok := m.Meta[key]; ok {
-		return true
+func (m *Message) Has(key ...string) bool {
+	switch len(key) {
+	case 1:
+		if _, ok := m.Data[key[0]]; ok {
+			return true
+		}
+		if _, ok := m.Meta[key[0]]; ok {
+			return true
+		}
 	}
 	return false
 }
