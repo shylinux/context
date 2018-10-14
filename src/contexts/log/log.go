@@ -1,7 +1,7 @@
 package log // {{{
 // }}}
 import ( // {{{
-	"contexts"
+	"contexts/ctx"
 	"fmt"
 	"os"
 	"strings"

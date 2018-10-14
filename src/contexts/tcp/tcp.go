@@ -1,7 +1,7 @@
 package tcp
 
 import (
-	"contexts"
+	"contexts/ctx"
 	"crypto/tls"
 	"fmt"
 	"io"

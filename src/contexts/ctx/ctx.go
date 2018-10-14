@@ -334,6 +334,10 @@ func (c *Context) Start(m *Message, arg ...string) bool {
 
 	m.Sess("log", m.Sess("log"))
 	m.Sess("lex", m.Sess("lex"))
+	if c.Name == "aaa" {
+		debug.PrintStack()
+		panic(1)
+	}
 
 	running := make(chan bool)
 	go m.TryCatch(m, true, func(m *Message) {
@@ -3393,8 +3397,6 @@ func Start(args ...string) {
 	Pulse.Options("log", true)
 	log := Pulse.Sess("log", false)
 	log.target.Start(log)
-	aaa := Pulse.Sess("aaa", false)
-	aaa.target.Start(aaa, "lark")
 
 	Pulse.Options("terminal_color", true)
 	Pulse.Sess("cli", false).Cmd("source", "stdio")

@@ -1,5 +1,5 @@
 
-BENCH=src/example/bench.go
+BENCH=src/examples/bench.go
 
 install:
 	@go get github.com/go-sql-driver/mysql

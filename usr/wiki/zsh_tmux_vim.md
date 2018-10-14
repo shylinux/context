@@ -1407,7 +1407,7 @@ $ git submodule update --init --recursive
 不论是用vundle安装或手动下载，都需要进入插件目录进行编译安装。
 ```
 $ cd ~/.vim/bundle/YouCompleteMe
-$ ./install.py --clang-completer
+$ ./install.py --clang-completer --gocompleter
 ```
 Ubuntu上如果没有cmake还需要安装一下。
 ```

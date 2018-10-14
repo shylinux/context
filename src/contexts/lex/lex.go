@@ -1,7 +1,7 @@
 package lex // {{{
 // }}}
 import ( // {{{
-	"contexts"
+	"contexts/ctx"
 	"fmt"
 	"strconv"
 )

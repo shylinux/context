@@ -1,7 +1,7 @@
 package cli // {{{
 // }}}
 import ( // {{{
-	"contexts"
+	"contexts/ctx"
 
 	"fmt"
 	"regexp"

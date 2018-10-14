@@ -1,27 +1,21 @@
 package web
 
 import (
-	"bufio"
-	"contexts"
-	"github.com/gomarkdown/markdown"
-	"path/filepath"
-	"runtime"
-
+	"bytes"
+	"contexts/ctx"
 	"encoding/json"
-	"encoding/xml"
+	"fmt"
 	"html/template"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
-	"path"
-
-	"bytes"
-	"mime/multipart"
-
-	"fmt"
-	"io"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -29,14 +23,14 @@ import (
 type MUX interface {
 	Handle(string, http.Handler)
 	HandleFunc(string, func(http.ResponseWriter, *http.Request))
-	Trans(*ctx.Message, string, func(*ctx.Message, *ctx.Context, string, ...string))
+	HandleCmd(*ctx.Message, string, func(*ctx.Message, *ctx.Context, string, ...string))
+	ServeHTTP(http.ResponseWriter, *http.Request)
 }
 type WEB struct {
+	client *http.Client
+
 	*http.ServeMux
 	*http.Server
-
-	client *http.Client
-	cookie map[string]*http.Cookie
 
 	*ctx.Context
 }
@@ -83,7 +77,7 @@ func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string {
 
 	return strings.Join(adds, "")
 }
-func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) {
+func (web *WEB) HandleCmd(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.Context, string, ...string)) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		msg := m.Spawn()
 		msg.TryCatch(msg, true, func(msg *ctx.Message) {
@@ -121,6 +115,12 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 			}
 			msg.Option("record_count", count)
 
+			if r.ParseForm(); len(r.PostForm) > 0 {
+				for k, v := range r.PostForm {
+					m.Log("info", "%s: %v", k, v)
+				}
+				m.Log("info", "")
+			}
 			for _, v := range r.Cookies() {
 				msg.Option(v.Name, v.Value)
 			}
@@ -133,10 +133,10 @@ func (web *WEB) Trans(m *ctx.Message, key string, hand func(*ctx.Message, *ctx.C
 			hand(msg, msg.Target(), msg.Option("path"))
 
 			switch {
-			case msg.Has("directory"):
-				http.ServeFile(w, r, msg.Append("directory"))
 			case msg.Has("redirect"):
 				http.Redirect(w, r, msg.Append("redirect"), http.StatusFound)
+			case msg.Has("directory"):
+				http.ServeFile(w, r, msg.Append("directory"))
 			case msg.Has("template"):
 				msg.Spawn().Cmd("/render", msg.Meta["template"])
 			case msg.Has("append"):
@@ -159,13 +159,6 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.Log("info", "")
 	}
 
-	if r.ParseForm(); len(r.PostForm) > 0 {
-		for k, v := range r.PostForm {
-			m.Log("info", "%s: %v", k, v)
-		}
-		m.Log("info", "")
-	}
-
 	if r.URL.Path == "/" && m.Confs("root_index") {
 		http.Redirect(w, r, m.Conf("root_index"), http.StatusFound)
 	} else {
@@ -179,61 +172,49 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.Log("info", "")
 	}
 }
+
 func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
 	s := new(WEB)
 	s.Context = c
-	s.cookie = web.cookie
 	return s
 }
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	web.Caches["route"] = &ctx.Cache{Name: "请求路径", Value: "/" + web.Context.Name + "/", Help: "请求路径"}
-	web.Caches["register"] = &ctx.Cache{Name: "已初始化(yes/no)", Value: "no", Help: "模块是否已初始化"}
-	web.Caches["master"] = &ctx.Cache{Name: "服务入口(yes/no)", Value: "no", Help: "服务入口"}
-	web.Caches["directory"] = &ctx.Cache{Name: "服务目录", Value: "usr", Help: "服务目录"}
-	if len(arg) > 0 {
-		m.Cap("directory", arg[0])
-	}
-
+	web.Configs["logheaders"] = &ctx.Config{Name: "logheaders(yes/no)", Value: "no", Help: "日志输出报文头"}
+	web.Configs["root_index"] = &ctx.Config{Name: "root_index", Value: "/wiki/", Help: "默认路由"}
+	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: m.Confx("directory", arg, 0), Help: "服务目录"}
+	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "模块路由"}
+	web.Caches["register"] = &ctx.Cache{Name: "register(yes/no)", Value: "no", Help: "是否已初始化"}
+	web.Caches["master"] = &ctx.Cache{Name: "master(yes/no)", Value: "no", Help: "服务入口"}
 	web.ServeMux = http.NewServeMux()
-	if mux, ok := m.Target().Server.(MUX); ok {
-		for k, x := range web.Commands {
-			if k[0] == '/' {
-				mux.Trans(m, k, x.Hand)
-			}
-		}
-	}
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
-	if len(arg) > 0 {
-		m.Cap("directory", arg[0])
-	}
+	m.Cap("directory", m.Confx("directory", arg, 0))
 
 	m.Travel(func(m *ctx.Message, i int) bool {
-		if h, ok := m.Target().Server.(http.Handler); ok && m.Cap("register") == "no" {
+		if h, ok := m.Target().Server.(MUX); ok && m.Cap("register") == "no" {
 			m.Cap("register", "yes")
-			m.Capi("nroute", 1)
 
-			p, i := m.Target(), 0
-			m.BackTrace(func(m *ctx.Message) bool {
-				p = m.Target()
-				if i++; i == 2 {
-					return false
-				}
-				return true
-			})
-
+			p := m.Target().Context()
 			if s, ok := p.Server.(MUX); ok {
-				m.Log("info", "route %s -> %s", m.Cap("route"), m.Target().Name)
+				m.Log("info", "route: /%s <- /%s", p.Name, m.Target().Name)
 				s.Handle(m.Cap("route"), http.StripPrefix(path.Dir(m.Cap("route")), h))
 			}
 
-			if s, ok := m.Target().Server.(MUX); ok && m.Cap("directory") != "" {
-				m.Log("info", "dir / -> [%s]", m.Cap("directory"))
-				s.Handle("/", http.FileServer(http.Dir(m.Cap("directory"))))
+			for k, x := range m.Target().Commands {
+				if k[0] == '/' {
+					m.Log("info", "route: %s", k)
+					h.HandleCmd(m, k, x.Hand)
+					m.Capi("nroute", 1)
+				}
+			}
+
+			if m.Cap("directory") != "" {
+				m.Log("info", "route: %s <- [%s]\n", m.Cap("route"), m.Cap("directory"))
+				h.Handle("/", http.FileServer(http.Dir(m.Cap("directory"))))
 			}
 		}
 		return true
@@ -247,24 +228,6 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	web.Configs["upload_main"] = &ctx.Config{Name: "upload_main", Value: "main.html", Help: "上传文件框架"}
 	web.Configs["travel_tmpl"] = &ctx.Config{Name: "travel_tmpl", Value: "travel.html", Help: "浏览模块模板"}
 	web.Configs["travel_main"] = &ctx.Config{Name: "travel_main", Value: "main.html", Help: "浏览模块框架"}
-
-	web.Caches["address"] = &ctx.Cache{Name: "服务地址", Value: ":9191", Help: "服务地址"}
-	web.Caches["protocol"] = &ctx.Cache{Name: "服务协议", Value: "http", Help: "服务协议"}
-	if len(arg) > 1 {
-		m.Cap("address", arg[1])
-	}
-	if len(arg) > 2 {
-		m.Cap("protocol", arg[2])
-	}
-
-	m.Cap("master", "yes")
-	m.Cap("stream", m.Cap("address"))
-	m.Log("info", "address [%s]", m.Cap("address"))
-	m.Log("info", "protocol [%s]", m.Cap("protocol"))
-	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
-
-	web.Configs["logheaders"] = &ctx.Config{Name: "日志输出报文头(yes/no)", Value: "no", Help: "日志输出报文头"}
-	m.Capi("nserve", 1)
 
 	// yac := m.Sess("tags", m.Sess("yac").Cmd("scan"))
 	// yac.Cmd("train", "void", "void", "[\t ]+")
@@ -280,17 +243,21 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	// yac.Cmd("train", "code", "variable", "struct", "key", "key", "other")
 	// yac.Cmd("train", "code", "define", "#define", "key", "other")
 	//
-	if m.Cap("protocol") == "https" {
-		web.Caches["cert"] = &ctx.Cache{Name: "服务证书", Value: m.Conf("cert"), Help: "服务证书"}
-		web.Caches["key"] = &ctx.Cache{Name: "服务密钥", Value: m.Conf("key"), Help: "服务密钥"}
+
+	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: m.Confx("protocol", arg, 2), Help: "服务协议"}
+	web.Caches["address"] = &ctx.Cache{Name: "address", Value: m.Confx("address", arg, 1), Help: "服务地址"}
+	m.Log("info", "%d %s://%s", m.Capi("nserve", 1), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
+	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
+
+	if m.Caps("master", true); m.Cap("protocol") == "https" {
+		web.Caches["cert"] = &ctx.Cache{Name: "cert", Value: m.Confx("cert", arg, 3), Help: "服务证书"}
+		web.Caches["key"] = &ctx.Cache{Name: "key", Value: m.Confx("key", arg, 4), Help: "服务密钥"}
 		m.Log("info", "cert [%s]", m.Cap("cert"))
 		m.Log("info", "key [%s]", m.Cap("key"))
-
 		web.Server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
 	} else {
 		web.Server.ListenAndServe()
 	}
-
 	return true
 }
 func (web *WEB) Close(m *ctx.Message, arg ...string) bool {
@@ -307,17 +274,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"cmd":      &ctx.Config{Name: "cmd", Value: "tmux", Help: "路由数量"},
-		"cert":     &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
-		"key":      &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
-		"record":   &ctx.Config{Name: "record", Value: map[string]interface{}{}, Help: "访问记录"},
-		"lark_msg": &ctx.Config{Name: "lark_msg", Value: []interface{}{}, Help: "聊天记录"},
-		"wiki_dir": &ctx.Config{Name: "wiki_dir", Value: "usr/wiki", Help: "路由数量"},
-		"wiki_list_show": &ctx.Config{Name: "wiki_list_show", Value: map[string]interface{}{
-			"md": true,
-		}, Help: "路由数量"},
-		"which":        &ctx.Config{Name: "which", Value: "redis.note", Help: "路由数量"},
-		"root_index":   &ctx.Config{Name: "root_index", Value: "/wiki/", Help: "路由数量"},
+		"brow_home": &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "服务"},
+		"directory": &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
+		"address":   &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
+		"protocol":  &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
+		"cert":      &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
+		"key":       &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+
+		"record":       &ctx.Config{Name: "record", Value: map[string]interface{}{}, Help: "访问记录"},
 		"auto_create":  &ctx.Config{Name: "auto_create(true/false)", Value: "true", Help: "路由数量"},
 		"refresh_time": &ctx.Config{Name: "refresh_time(ms)", Value: "1000", Help: "路由数量"},
 		"define": &ctx.Config{Name: "define", Value: map[string]interface{}{
@@ -491,64 +455,51 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "资源列表"},
 	},
 	Commands: map[string]*ctx.Command{
-		"client": &ctx.Command{
-			Name: "client address [output [editor]]",
-			Help: "添加请求配置, address: 默认地址, output: 输出路径, editor: 编辑器",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if _, e := m.Target().Server.(*WEB); m.Assert(e) {
-					if len(arg) == 0 {
-						return
+		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, e := m.Target().Server.(*WEB); m.Assert(e) && len(arg) > 0 {
+				uri, e := url.Parse(arg[0])
+				m.Assert(e)
+				m.Conf("method", "method", "GET", "请求方法")
+				m.Conf("protocol", "protocol", uri.Scheme, "服务协议")
+				m.Conf("hostname", "hostname", uri.Host, "服务主机")
+
+				dir, file := path.Split(uri.EscapedPath())
+				m.Conf("path", "path", dir, "服务路由")
+				m.Conf("file", "file", file, "服务文件")
+				m.Conf("query", "query", uri.RawQuery, "服务参数")
+
+				if m.Conf("output", "output", "stdout", "文件缓存"); len(arg) > 1 {
+					m.Conf("output", arg[1])
+				}
+				if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
+					m.Conf("editor", arg[2])
+				}
+			}
+		}},
+		"cookie": &ctx.Command{Name: "cookie [create]|[name [value]]", Help: "读写浏览器的Cookie, create: 创建cookiejar, name: 变量名, value: 变量值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*WEB); m.Assert(ok) {
+				switch len(arg) {
+				case 0:
+					for k, v := range m.Confv("cookie").(map[string]interface{}) {
+						m.Echo("%s: %v\n", k, v.(*http.Cookie).Value)
 					}
-
-					uri, e := url.Parse(arg[0])
-					m.Assert(e)
-					m.Conf("method", "method", "GET", "请求方法")
-					m.Conf("protocol", "protocol", uri.Scheme, "服务协议")
-					m.Conf("hostname", "hostname", uri.Host, "服务主机")
-
-					dir, file := path.Split(uri.EscapedPath())
-					m.Conf("path", "path", dir, "服务路由")
-					m.Conf("file", "file", file, "服务文件")
-					m.Conf("query", "query", uri.RawQuery, "服务参数")
-
-					if m.Conf("output", "output", "stdout", "文件缓存"); len(arg) > 1 {
-						m.Conf("output", arg[1])
+				case 1:
+					if arg[0] == "create" {
+						m.Target().Configs["cookie"] = &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "cookie"}
+						break
 					}
-					if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
-						m.Conf("editor", arg[2])
+					if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
+						m.Echo("%s", v.Value)
+					}
+				default:
+					if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
+						v.Value = arg[1]
+					} else {
+						m.Confv("cookie", arg[0], &http.Cookie{Name: arg[0], Value: arg[1]})
 					}
 				}
-			}},
-		"cookie": &ctx.Command{
-			Name: "cookie [create]|[name [value]]",
-			Help: "读写请求的Cookie, name: 变量名, value: 变量值",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-					switch len(arg) {
-					case 0:
-						for k, v := range web.cookie {
-							m.Echo("%s: %v\n", k, v.Value)
-						}
-					case 1:
-						if arg[0] == "create" {
-							web.cookie = make(map[string]*http.Cookie)
-							break
-						}
-						if v, ok := web.cookie[arg[0]]; ok {
-							m.Echo("%s", v.Value)
-						}
-					default:
-						if web.cookie == nil {
-							web.cookie = make(map[string]*http.Cookie)
-						}
-						if v, ok := web.cookie[arg[0]]; ok {
-							v.Value = arg[1]
-						} else {
-							web.cookie[arg[0]] = &http.Cookie{Name: arg[0], Value: arg[1]}
-						}
-					}
-				}
-			}},
+			}
+		}},
 		"get": &ctx.Command{
 			Name: "get [method GET|POST] [file name filename] url arg...",
 			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
@@ -671,18 +622,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Log("info", "content-type: %s", contenttype)
 					}
 
-					for _, v := range web.cookie {
-						req.AddCookie(v)
+					for _, v := range m.Confv("cookie").(map[string]interface{}) {
+						req.AddCookie(v.(*http.Cookie))
 					}
 
 					res, e := web.client.Do(req)
 					m.Assert(e)
 
-					if web.cookie == nil {
-						web.cookie = make(map[string]*http.Cookie)
-					}
 					for _, v := range res.Cookies() {
-						web.cookie[v.Name] = v
+						m.Confv("cookie", v.Name, v)
 						m.Log("info", "set-cookie %s: %v", v.Name, v.Value)
 					}
 
@@ -810,72 +758,61 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 			}},
-		"post": &ctx.Command{Name: "post", Help: "访问服务",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				msg := m.Spawn().Cmd("get", "method", "POST", arg)
-				m.Copy(msg, "result").Copy(msg, "append")
-			}},
-		"brow": &ctx.Command{Name: "brow url", Help: "浏览器网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			url := fmt.Sprintf("http://localhost:9094") //{{{
-			if len(arg) > 0 {
-				url = arg[0]
-			}
+		"post": &ctx.Command{Name: "post", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			msg := m.Spawn().Cmd("get", "method", "POST", arg)
+			m.Copy(msg, "result").Copy(msg, "append")
+		}},
+		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			url := m.Confx("brow_home", arg, 0)
 			switch runtime.GOOS {
 			case "windows":
-				m.Find("cli").Cmd("system", "explorer", url)
+				m.Sess("cli").Cmd("system", "explorer", url)
 			case "darwin":
-				m.Find("cli").Cmd("system", "open", url)
+				m.Sess("cli").Cmd("system", "open", url)
 			case "linux":
 				m.Spawn().Cmd("open", url)
 			}
-
 		}},
-		"serve": &ctx.Command{
-			Name: "serve [directory [address [protocol]]]",
-			Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http)",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Set("detail", arg...).Target().Start(m)
-			}},
-		"route": &ctx.Command{
-			Name: "route script|template|directory route content",
-			Help: "添加响应, script: 脚本响应, template: 模板响应, directory: 目录响应, route: 请求路由, content: 响应内容",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if mux, ok := m.Target().Server.(MUX); m.Assert(ok) {
-					switch len(arg) {
-					case 0:
-						for k, v := range m.Target().Commands {
-							if k[0] == '/' {
-								m.Echo("%s: %s\n", k, v.Name)
-							}
-						}
-					case 1:
-						for k, v := range m.Target().Commands {
-							if k == arg[0] {
-								m.Echo("%s: %s\n%s", k, v.Name, v.Help)
-							}
-						}
-					case 3:
-						switch arg[0] {
-						case "script":
-							mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
-								msg := m.Find("cli").Cmd("source", arg[2])
-								m.Copy(msg, "result").Copy(msg, "append")
-							})
-						case "template":
-							mux.Trans(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
-								w := m.Optionv("response").(http.ResponseWriter)
-								if _, e := os.Stat(arg[2]); e == nil {
-									template.Must(template.ParseGlob(arg[2])).Execute(w, m)
-								} else {
-									template.Must(template.New("temp").Parse(arg[2])).Execute(w, m)
-								}
-							})
-						case "directory":
-							mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
+		"serve": &ctx.Command{Name: "serve [directory [address [protocol [cert [key]]]]", Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http), cert: 服务证书, key: 服务密钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Set("detail", arg...).Target().Start(m)
+		}},
+		"route": &ctx.Command{Name: "route script|template|directory route content", Help: "添加响应, script: 脚本响应, template: 模板响应, directory: 目录响应, route: 请求路由, content: 响应内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if mux, ok := m.Target().Server.(MUX); m.Assert(ok) {
+				switch len(arg) {
+				case 0:
+					for k, v := range m.Target().Commands {
+						if k[0] == '/' {
+							m.Echo("%s: %s\n", k, v.Name)
 						}
 					}
+				case 1:
+					for k, v := range m.Target().Commands {
+						if k == arg[0] {
+							m.Echo("%s: %s\n%s", k, v.Name, v.Help)
+						}
+					}
+				case 3:
+					switch arg[0] {
+					case "script":
+						mux.HandleCmd(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+							msg := m.Sess("cli").Cmd("source", arg[2])
+							m.Copy(msg, "result").Copy(msg, "append")
+						})
+					case "template":
+						mux.HandleCmd(m, arg[1], func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+							w := m.Optionv("response").(http.ResponseWriter)
+							if _, e := os.Stat(arg[2]); e == nil {
+								template.Must(template.ParseGlob(arg[2])).Execute(w, m)
+							} else {
+								template.Must(template.New("temp").Parse(arg[2])).Execute(w, m)
+							}
+						})
+					case "directory":
+						mux.Handle(arg[1]+"/", http.StripPrefix(arg[1], http.FileServer(http.Dir(arg[2]))))
+					}
 				}
-			}},
+			}
+		}},
 		"upload": &ctx.Command{Name: "upload file", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn(m.Target())
 			msg.Cmd("get", "/upload", "method", "POST", "file", "file", arg[0])
@@ -1309,317 +1246,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 		}},
-		"/blog": &ctx.Command{Name: "/blog", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if m.Has("title") && m.Has("content") {
-			}
-
-			m.Echo("blog service")
-
-		}},
-		"/wiki_tags": &ctx.Command{Name: "/wiki_tags ", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if len(arg) > 0 {
-				m.Option("dir", arg[0])
-			}
-
-			yac := m.Find("yac.parse4", true)
-
-			msg := m.Sess("nfs").Cmd("dir", path.Join(m.Conf("wiki_dir"), "src", m.Option("dir")), "dir_name", "path")
-			for _, v := range msg.Meta["filename"] {
-				name := strings.TrimSpace(v)
-				es := strings.Split(name, ".")
-				switch es[len(es)-1] {
-				case "pyc", "o", "gz", "tar":
-					continue
-				case "c":
-				case "py":
-				case "h":
-				default:
-					continue
-				}
-
-				f, e := os.Open(name)
-				m.Assert(e)
-				defer f.Close()
-
-				bio := bufio.NewScanner(f)
-				for line := 1; bio.Scan(); line++ {
-					yac.Options("silent", true)
-					l := yac.Cmd("parse", "code", "void", bio.Text())
-
-					key := ""
-					switch l.Result(1) {
-					case "struct":
-						switch l.Result(2) {
-						case "struct", "}":
-							key = l.Result(3)
-						case "typedef":
-							if l.Result(3) == "struct" {
-								key = l.Result(5)
-							}
-						}
-					case "function":
-						switch l.Result(3) {
-						case "*":
-							key = l.Result(4)
-						default:
-							key = l.Result(3)
-						}
-					case "variable":
-						switch l.Result(2) {
-						case "struct":
-							key = l.Result(4)
-						}
-					case "define":
-						key = l.Result(3)
-					}
-					if key != "" {
-						m.Confv("define", strings.Join([]string{key, "position", "-2"}, "."), map[string]interface{}{
-							"file": strings.TrimPrefix(name, m.Confx("wiki_dir")+"/src"),
-							"line": line,
-							"type": l.Result(1),
-						})
-					}
-
-					yac.Meta = nil
-				}
-			}
-		}},
-		"/wiki_body": &ctx.Command{Name: "/wiki_body", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			which := path.Join(m.Conf("wiki_dir"), m.Confx("which"))
-			st, _ := os.Stat(which)
-			if ls, e := ioutil.ReadFile(which); e == nil {
-				pre := false
-				es := strings.Split(m.Confx("which"), ".")
-				if len(es) > 0 {
-					switch es[len(es)-1] {
-					case "md":
-						m.Option("modify_count", 1)
-						m.Option("modify_time", st.ModTime().Format("2006/01/02 15:03:04"))
-
-						switch v := m.Confv("record", []interface{}{m.Option("path"), "local", "modify_count"}).(type) {
-						case int:
-							if m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}).(string) != m.Option("modify_time") {
-								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}, m.Option("modify_time"))
-								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_count"}, v+1)
-							}
-							m.Option("modify_count", v+1)
-						case float64:
-							if m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}).(string) != m.Option("modify_time") {
-								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_time"}, m.Option("modify_time"))
-								m.Confv("record", []interface{}{m.Option("path"), "local", "modify_count"}, v+1)
-							}
-							m.Option("modify_count", v+1)
-						case nil:
-							m.Confv("record", []interface{}{m.Option("path"), "local"}, map[string]interface{}{
-								"modify_count": m.Optioni("modify_count"),
-								"modify_time":  m.Option("modify_time"),
-							})
-						default:
-							m.Log("fuck", "5")
-						}
-
-						ls = markdown.ToHTML(ls, nil, nil)
-					default:
-						pre = true
-					}
-				}
-
-				if pre {
-					m.Option("nline", bytes.Count(ls, []byte("\n")))
-					m.Option("nbyte", len(ls))
-					m.Add("append", "code", string(ls))
-					m.Add("append", "body", "")
-				} else {
-					m.Add("append", "body", string(ls))
-					m.Add("append", "code", "")
-				}
-				return
-			}
-
-			if m.Options("query") {
-				if v, ok := m.Confv("define", m.Option("query")).(map[string]interface{}); ok {
-					for _, val := range v["position"].([]interface{}) {
-						value := val.(map[string]interface{})
-						m.Add("append", "name", fmt.Sprintf("src/%v#hash_%v", value["file"], value["line"]))
-					}
-					return
-				}
-				msg := m.Sess("nfs").Cmd("dir", path.Join(m.Conf("wiki_dir"), m.Option("dir")), "dir_name", "path")
-				for _, v := range msg.Meta["filename"] {
-					name := strings.TrimPrefix(strings.TrimSpace(v), m.Conf("wiki_dir"))
-					es := strings.Split(name, ".")
-					switch es[len(es)-1] {
-					case "pyc", "o", "gz", "tar":
-						continue
-					}
-					if strings.Contains(name, m.Option("query")) {
-						m.Add("append", "name", name)
-					}
-				}
-				return
-			}
-
-			msg := m.Spawn().Cmd("/wiki_list")
-			m.Copy(msg, "append").Copy(msg, "option")
-		}},
-		"/wiki_list": &ctx.Command{Name: "/wiki_list", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			ls, e := ioutil.ReadDir(path.Join(m.Conf("wiki_dir"), m.Option("which")))
-			m.Option("dir", m.Option("which"))
-			if e != nil {
-				dir, _ := path.Split(m.Option("which"))
-				m.Option("dir", dir)
-				ls, e = ioutil.ReadDir(path.Join(m.Conf("wiki_dir"), dir))
-			}
-
-			parent, _ := path.Split(strings.TrimSuffix(m.Option("dir"), "/"))
-			m.Option("parent", parent)
-			for _, l := range ls {
-				if l.Name()[0] == '.' {
-					continue
-				}
-				if !l.IsDir() {
-					es := strings.Split(l.Name(), ".")
-					if len(es) > 0 {
-						if show, ok := m.Confv("wiki_list_show", es[len(es)-1]).(bool); !ok || !show {
-							continue
-						}
-					}
-				}
-
-				m.Add("append", "name", l.Name())
-				m.Add("append", "time", l.ModTime().Format("2006-01-02 15:04:05"))
-				if l.IsDir() {
-					m.Add("append", "pend", "/")
-				} else {
-					m.Add("append", "pend", "")
-				}
-				m.Option("time_layout", "2006-01-02 15:04:05")
-				m.Sort("time", "time_r")
-			}
-		}},
-		"/wiki/": &ctx.Command{Name: "/wiki", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Option("which", strings.TrimPrefix(key, "/wiki/"))
-			if f, e := os.Stat(path.Join(m.Conf("wiki_dir"), m.Option("which"))); e == nil && !f.IsDir() && (strings.HasSuffix(m.Option("which"), ".json") || strings.HasSuffix(m.Option("which"), ".js") || strings.HasSuffix(m.Option("which"), ".css")) {
-				m.Append("directory", path.Join(m.Conf("wiki_dir"), m.Option("which")))
-				return
-			}
-
-			m.Append("template", "wiki")
-		}},
-		"/wx/": &ctx.Command{Name: "/wx/", Help: "微信", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if !m.Sess("aaa").Cmd("wx").Results(0) {
-				return
-			}
-			if m.Has("echostr") {
-				m.Echo(m.Option("echostr"))
-				return
-			}
-			r := m.Optionv("request").(*http.Request)
-
-			switch r.Header.Get("Content-Type") {
-			case "text/xml":
-				type Article struct {
-					XMLName     xml.Name `xml:"item"`
-					PicUrl      string
-					Title       string
-					Description string
-					Url         string
-				}
-				type WXMsg struct {
-					XMLName      xml.Name `xml:"xml"`
-					ToUserName   string
-					FromUserName string
-					CreateTime   int32
-					MsgId        int64
-					MsgType      string
-
-					Event    string
-					EventKey string
-
-					Content string
-
-					Format      string
-					Recognition string
-
-					PicUrl  string
-					MediaId string
-
-					Location_X float64
-					Location_Y float64
-					Scale      int64
-					Label      string
-
-					ArticleCount int
-					Articles     struct {
-						XMLName  xml.Name `xml:"Articles"`
-						Articles []*Article
-					}
-				}
-
-				var data WXMsg
-
-				b, e := ioutil.ReadAll(r.Body)
-				e = xml.Unmarshal(b, &data)
-
-				// de := xml.NewDecoder(r.Body)
-				// e := de.Decode(&data)
-				m.Assert(e)
-
-				var echo WXMsg
-				echo.FromUserName = data.ToUserName
-				echo.ToUserName = data.FromUserName
-				echo.CreateTime = data.CreateTime
-
-				fs, e := ioutil.ReadDir("usr/wiki")
-				m.Assert(e)
-				msg := m.Spawn()
-				for _, f := range fs {
-					if !strings.HasSuffix(f.Name(), ".md") {
-						continue
-					}
-					msg.Add("append", "name", f.Name())
-					msg.Add("append", "title", strings.TrimSuffix(f.Name(), ".md")+"源码解析")
-					msg.Add("append", "time", f.ModTime().Format("01/02 15:03"))
-				}
-				msg.Option("time_layout", "01/02 15:03")
-				msg.Sort("time", "time_r")
-
-				articles := []*Article{}
-				articles = append(articles, &Article{PicUrl: "http://mmbiz.qpic.cn/mmbiz_jpg/sCJZHmp0V0doWEFBe6gS2HjgB0abiaK7H5WjkXGTvAI0CkCFrVJDEBBbJX8Kz0VegZ54ZoCo4We0sKJUOTuf1Tw/0",
-					Title: "wiki首页", Description: "技术文章", Url: "https://shylinux.com/wiki/"})
-				for i, v := range msg.Meta["title"] {
-					if i > 6 {
-						continue
-					}
-
-					articles = append(articles, &Article{PicUrl: "http://mmbiz.qpic.cn/mmbiz_jpg/sCJZHmp0V0doWEFBe6gS2HjgB0abiaK7H5WjkXGTvAI0CkCFrVJDEBBbJX8Kz0VegZ54ZoCo4We0sKJUOTuf1Tw/0",
-						Title: msg.Meta["time"][i] + " " + v, Description: "技术文章", Url: "https://shylinux.com/wiki/" + msg.Meta["name"][i]})
-				}
-
-				switch data.MsgType {
-				case "event":
-					echo.MsgType = "news"
-					echo.Articles.Articles = articles
-					echo.ArticleCount = len(echo.Articles.Articles)
-				case "text":
-					echo.MsgType = "news"
-					echo.Articles.Articles = articles
-					echo.ArticleCount = len(echo.Articles.Articles)
-				case "voice":
-					echo.MsgType = "text"
-					echo.Content = "你好"
-				case "image":
-					echo.MsgType = "text"
-					echo.Content = "你好"
-				case "location":
-					echo.MsgType = "text"
-					echo.Content = "你好"
-				}
-
-				b, e = xml.Marshal(echo)
-				m.Echo(string(b))
-			}
-		}},
 		"user": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			aaa := m.Sess("aaa")
 			m.Spawn().Cmd("get", fmt.Sprintf("%suser/get", aaa.Conf("wx_api")), "access_token", aaa.Cap("access_token"))
@@ -1634,25 +1260,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			msg.Cmd("get", "method", "POST", "evaluating_add/", "questions", qs)
 			m.Add("append", "hi", "hello")
-		}},
-		"/lark": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request)
-			w := m.Optionv("response").(http.ResponseWriter)
-
-			data := map[string]interface{}{}
-			switch r.Header.Get("Content-Type") {
-			case "application/json":
-				b, e := ioutil.ReadAll(r.Body)
-				e = json.Unmarshal(b, &data)
-				m.Assert(e)
-			}
-
-			if _, ok := data["challenge"]; ok {
-				w.Header().Set("Content-Type", "application/javascript")
-				fmt.Fprintf(w, "{\"challenge\": \"%s\"}", data["challenge"])
-				return
-			}
-			m.Confv("lark_msg", "-1", data)
 		}},
 		"/lookup": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) > 0 {

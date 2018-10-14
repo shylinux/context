@@ -1,7 +1,7 @@
 package ssh
 
 import (
-	"contexts"
+	"contexts/ctx"
 	"fmt"
 	"strings"
 )
