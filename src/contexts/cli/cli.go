@@ -73,10 +73,12 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	s.Message = m
 	s.target = c
 	s.alias = map[string][]string{
-		"~": []string{"context"},
-		"!": []string{"message"},
-		"@": []string{"config"},
-		"$": []string{"cache"},
+		"~":  []string{"context"},
+		"!":  []string{"message"},
+		":":  []string{"command"},
+		"::": []string{"command", "list"},
+		"@":  []string{"config"},
+		"$":  []string{"cache"},
 	}
 
 	return s

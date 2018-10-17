@@ -28,7 +28,6 @@ type MUX interface {
 }
 type WEB struct {
 	client *http.Client
-
 	*http.ServeMux
 	*http.Server
 
@@ -274,12 +273,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"brow_home": &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "服务"},
-		"directory": &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
-		"address":   &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
-		"protocol":  &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
-		"cert":      &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
-		"key":       &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"body_response": &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
+		"method":        &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
+		"brow_home":     &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "服务"},
+		"directory":     &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
+		"address":       &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
+		"protocol":      &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
+		"cert":          &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
+		"key":           &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
 
 		"record":       &ctx.Config{Name: "record", Value: map[string]interface{}{}, Help: "访问记录"},
 		"auto_create":  &ctx.Config{Name: "auto_create(true/false)", Value: "true", Help: "路由数量"},
@@ -456,64 +457,57 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, e := m.Target().Server.(*WEB); m.Assert(e) && len(arg) > 0 {
-				uri, e := url.Parse(arg[0])
-				m.Assert(e)
-				m.Conf("method", "method", "GET", "请求方法")
-				m.Conf("protocol", "protocol", uri.Scheme, "服务协议")
-				m.Conf("hostname", "hostname", uri.Host, "服务主机")
+			uri, e := url.Parse(arg[0])
+			m.Assert(e)
+			m.Conf("method", "method", "GET", "请求方法")
+			m.Conf("protocol", "protocol", uri.Scheme, "服务协议")
+			m.Conf("hostname", "hostname", uri.Host, "服务主机")
 
-				dir, file := path.Split(uri.EscapedPath())
-				m.Conf("path", "path", dir, "服务路由")
-				m.Conf("file", "file", file, "服务文件")
-				m.Conf("query", "query", uri.RawQuery, "服务参数")
+			dir, file := path.Split(uri.EscapedPath())
+			m.Conf("path", "path", dir, "服务路由")
+			m.Conf("file", "file", file, "服务文件")
+			m.Conf("query", "query", uri.RawQuery, "服务参数")
 
-				if m.Conf("output", "output", "stdout", "文件缓存"); len(arg) > 1 {
-					m.Conf("output", arg[1])
-				}
-				if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
-					m.Conf("editor", arg[2])
-				}
+			if m.Conf("output", "output", "stdout", "文件缓存"); len(arg) > 1 {
+				m.Conf("output", arg[1])
+			}
+			if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
+				m.Conf("editor", arg[2])
 			}
 		}},
 		"cookie": &ctx.Command{Name: "cookie [create]|[name [value]]", Help: "读写浏览器的Cookie, create: 创建cookiejar, name: 变量名, value: 变量值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-				switch len(arg) {
-				case 0:
-					for k, v := range m.Confv("cookie").(map[string]interface{}) {
-						m.Echo("%s: %v\n", k, v.(*http.Cookie).Value)
-					}
-				case 1:
-					if arg[0] == "create" {
-						m.Target().Configs["cookie"] = &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "cookie"}
-						break
-					}
-					if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
-						m.Echo("%s", v.Value)
-					}
-				default:
-					if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
-						v.Value = arg[1]
-					} else {
-						m.Confv("cookie", arg[0], &http.Cookie{Name: arg[0], Value: arg[1]})
-					}
+			switch len(arg) {
+			case 0:
+				for k, v := range m.Confv("cookie").(map[string]interface{}) {
+					m.Echo("%s: %v\n", k, v.(*http.Cookie).Value)
+				}
+			case 1:
+				if arg[0] == "create" {
+					m.Target().Configs["cookie"] = &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "cookie"}
+					break
+				}
+				if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
+					m.Echo("%s", v.Value)
+				}
+			default:
+				if m.Confv("cookie") == nil {
+					m.Target().Configs["cookie"] = &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "cookie"}
+				}
+				if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
+					v.Value = arg[1]
+				} else {
+					m.Confv("cookie", arg[0], &http.Cookie{Name: arg[0], Value: arg[1]})
 				}
 			}
 		}},
-		"get": &ctx.Command{
-			Name: "get [method GET|POST] [file name filename] url arg...",
-			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "headers": 2, "file": 2, "body_type": 1, "body": 1, "fields": 1, "value": 1, "json_route": 1, "json_key": 1},
+		"get": &ctx.Command{Name: "get [method GET|POST] url arg...",
+			Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
+			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-					if web.client == nil {
-						web.client = &http.Client{}
-					}
-
-					if m.Has("value") {
-						args := strings.Split(m.Option("value"), " ")
+					if m.Has("path_value") {
 						values := []interface{}{}
-						for _, v := range args {
+						for _, v := range strings.Split(m.Option("path_value"), " ") {
 							if len(v) > 1 && v[0] == '$' {
 								values = append(values, m.Cap(v[1:]))
 							} else {
@@ -525,107 +519,39 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					method := m.Confx("method")
 					uri := web.Merge(m, arg[0], arg[1:]...)
-					m.Log("info", "%s %s", method, uri)
-					m.Echo("%s: %s\n", method, uri)
+					body, _ := m.Optionv("body").(io.Reader)
 
-					var body io.Reader
-					index := strings.Index(uri, "?")
-					contenttype := ""
-
-					switch method {
-					case "POST":
-						if m.Options("file") {
-							file, e := os.Open(m.Meta["file"][1])
-							m.Assert(e)
-							defer file.Close()
-
-							if m.Option("body_type") == "json" {
-								contenttype = "application/json"
-								body = file
-								break
-							}
-							buf := &bytes.Buffer{}
-							writer := multipart.NewWriter(buf)
-
-							part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
-							m.Assert(e)
-							io.Copy(part, file)
-
-							for i := 0; i < len(arg)-1; i += 2 {
-								value := arg[i+1]
-								if len(arg[i+1]) > 1 {
-									switch arg[i+1][0] {
-									case '$':
-										value = m.Cap(arg[i+1][1:])
-									case '@':
-										value = m.Conf(arg[i+1][1:])
-									}
-								}
-								writer.WriteField(arg[i], value)
-							}
-
-							contenttype = writer.FormDataContentType()
-							body = buf
-							writer.Close()
-						} else if m.Option("body_type") == "json" {
-							if m.Options("body") {
-								data := []interface{}{}
-								for _, v := range arg[1:] {
-									if len(v) > 1 && v[0] == '$' {
-										v = m.Cap(v[1:])
-									}
-									data = append(data, v)
-								}
-								body = strings.NewReader(fmt.Sprintf(m.Option("body"), data...))
-							} else {
-								data := map[string]interface{}{}
-								for i := 1; i < len(arg)-1; i += 2 {
-									switch arg[i+1] {
-									case "false":
-										data[arg[i]] = false
-									case "true":
-										data[arg[i]] = true
-									default:
-										if len(arg[i+1]) > 1 && arg[i+1][0] == '$' {
-											data[arg[i]] = m.Cap(arg[i+1][1:])
-										} else {
-											data[arg[i]] = arg[i+1]
-										}
-									}
-								}
-
-								b, e := json.Marshal(data)
-								m.Assert(e)
-								body = bytes.NewReader(b)
-							}
-
-							contenttype = "application/json"
-							if index > -1 {
-								uri = uri[:index]
-							}
-
-						} else if index > 0 {
-							contenttype = "application/x-www-form-urlencoded"
-							body = strings.NewReader(uri[index+1:])
-							uri = uri[:index]
+					if method == "POST" && body == nil {
+						if index := strings.Index(uri, "?"); index > 0 {
+							uri, body = uri[:index], strings.NewReader(uri[index+1:])
 						}
 					}
 
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
+
 					for i := 0; i < len(m.Meta["headers"]); i += 2 {
 						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
 					}
-
-					if len(contenttype) > 0 {
-						req.Header.Set("Content-Type", contenttype)
-						m.Log("info", "content-type: %s", contenttype)
+					if m.Options("content_type") {
+						req.Header.Set("Content-Type", m.Option("content_type"))
+					}
+					switch cs := m.Confv("cookie").(type) {
+					case map[string]interface{}:
+						for _, v := range cs {
+							req.AddCookie(v.(*http.Cookie))
+						}
 					}
 
-					for _, v := range m.Confv("cookie").(map[string]interface{}) {
-						req.AddCookie(v.(*http.Cookie))
+					m.Log("info", "%s %s", req.Method, req.URL)
+					m.Echo("%s: %s\n", req.Method, req.URL)
+					for k, v := range req.Header {
+						m.Log("fuck", "%s: %s", k, v)
 					}
 
+					if web.client == nil {
+						web.client = &http.Client{}
+					}
 					res, e := web.client.Do(req)
 					m.Assert(e)
 
@@ -634,134 +560,94 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Log("info", "set-cookie %s: %v", v.Name, v.Value)
 					}
 
-					if m.Confs("logheaders") {
-						for k, v := range res.Header {
-							m.Log("info", "%s: %v", k, v)
-						}
-					}
-
-					if m.Confs("output") {
-						if _, e := os.Stat(m.Conf("output")); e == nil {
-							name := path.Join(m.Conf("output"), fmt.Sprintf("%d", time.Now().Unix()))
-							f, e := os.Create(name)
-							m.Assert(e)
-							io.Copy(f, res.Body)
-							if m.Confs("editor") {
-								cmd := exec.Command(m.Conf("editor"), name)
-								cmd.Stdin = os.Stdin
-								cmd.Stdout = os.Stdout
-								cmd.Stderr = os.Stderr
-								cmd.Run()
-							} else {
-								m.Echo("write to %s\n", name)
-							}
-							return
-						}
-					}
-
 					buf, e := ioutil.ReadAll(res.Body)
 					m.Assert(e)
 
+					var result interface{}
 					ct := res.Header.Get("Content-Type")
-					if len(ct) >= 16 && ct[:16] == "application/json" {
-						var result interface{}
+					switch {
+					case strings.HasPrefix(ct, "application/json"):
 						json.Unmarshal(buf, &result)
-						m.Option("response_json", result)
-						if m.Has("json_route") {
-							routes := strings.Split(m.Option("json_route"), ".")
-							for _, k := range routes {
-								if len(k) > 0 && k[0] == '$' {
-									k = m.Cap(k[1:])
-								}
-								switch r := result.(type) {
-								case map[string]interface{}:
-									result = r[k]
-								}
-							}
-						}
-
-						fields := map[string]bool{}
-						for _, k := range strings.Split(m.Option("fields"), " ") {
-							if k == "" {
-								continue
-							}
-							if fields[k] = true; len(fields) == 1 {
-								m.Meta["append"] = append(m.Meta["append"], "index")
-							}
-							m.Meta["append"] = append(m.Meta["append"], k)
-						}
-
-						if len(fields) > 0 {
-
-							switch ret := result.(type) {
-							case map[string]interface{}:
-								m.Append("index", "0")
-								for k, v := range ret {
-									switch value := v.(type) {
-									case string:
-										m.Append(k, strings.Replace(value, "\n", " ", -1))
-									case float64:
-										m.Append(k, fmt.Sprintf("%d", int(value)))
-									default:
-										if _, ok := fields[k]; ok {
-											m.Append(k, fmt.Sprintf("%v", value))
-										}
-									}
-								}
-							case []interface{}:
-								for i, r := range ret {
-									m.Add("append", "index", i)
-									if rr, ok := r.(map[string]interface{}); ok {
-										for k, v := range rr {
-											switch value := v.(type) {
-											case string:
-												if _, ok := fields[k]; len(fields) == 0 || ok {
-													m.Add("append", k, strings.Replace(value, "\n", " ", -1))
-												}
-											case float64:
-												if _, ok := fields[k]; len(fields) == 0 || ok {
-													m.Add("append", k, fmt.Sprintf("%d", int64(value)))
-												}
-											case bool:
-												if _, ok := fields[k]; len(fields) == 0 || ok {
-													m.Add("append", k, fmt.Sprintf("%v", value))
-												}
-											case map[string]interface{}:
-												for kk, vv := range value {
-													key := k + "." + kk
-													if _, ok := fields[key]; len(fields) == 0 || ok {
-														m.Add("append", key, strings.Replace(fmt.Sprintf("%v", vv), "\n", " ", -1))
-													}
-												}
-											default:
-												if _, ok := fields[k]; ok {
-													m.Add("append", k, fmt.Sprintf("%v", value))
-												}
-											}
-										}
-									}
-								}
-
-								if m.Has("json_key") {
-									m.Sort(m.Option("json_key"))
-								}
-								m.Meta["index"] = nil
-								for i, _ := range ret {
-									m.Add("append", "index", i)
-								}
-							}
-						}
+					default:
+						result = string(buf)
 					}
-
-					if m.Table(); len(m.Meta["append"]) == 0 {
-						m.Echo("%s", string(buf))
-					}
+					m.Target().Configs[m.Confx("body_response")] = &ctx.Config{Value: result}
+					m.Echo(string(buf))
 				}
 			}},
-		"post": &ctx.Command{Name: "post", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			msg := m.Spawn().Cmd("get", "method", "POST", arg)
-			m.Copy(msg, "result").Copy(msg, "append")
-		}},
+		"post": &ctx.Command{Name: "post [file fieldname filename]", Help: "post请求",
+			Form: map[string]int{"file": 2, "content_type": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				msg := m.Spawn()
+				if m.Has("file") {
+					file, e := os.Open(m.Meta["file"][1])
+					m.Assert(e)
+					defer file.Close()
+
+					buf := &bytes.Buffer{}
+					writer := multipart.NewWriter(buf)
+					writer.SetBoundary(fmt.Sprintf("\r\n--%s--\r\n", writer.Boundary()))
+					part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+					m.Assert(e)
+					io.Copy(part, file)
+
+					// for i := 0; i < len(arg)-1; i += 2 {
+					// 	value := arg[i+1]
+					// 	if len(arg[i+1]) > 1 {
+					// 		switch arg[i+1][0] {
+					// 		case '$':
+					// 			value = m.Cap(arg[i+1][1:])
+					// 		case '@':
+					// 			value = m.Conf(arg[i+1][1:])
+					// 		}
+					// 	}
+					// 	writer.WriteField(arg[i], value)
+					// }
+
+					writer.Close()
+					msg.Optionv("body", buf)
+					msg.Option("content_type", writer.FormDataContentType())
+					msg.Option("headers", "Content-Length", buf.Len())
+				} else if m.Option("content_type") == "json" {
+					data := map[string]interface{}{}
+					for i := 1; i < len(arg)-1; i += 2 {
+						switch arg[i+1] {
+						case "false":
+							data[arg[i]] = false
+						case "true":
+							data[arg[i]] = true
+						default:
+							if len(arg[i+1]) > 1 && arg[i+1][0] == '$' {
+								data[arg[i]] = m.Cap(arg[i+1][1:])
+							} else {
+								data[arg[i]] = arg[i+1]
+							}
+						}
+					}
+					b, e := json.Marshal(data)
+					m.Assert(e)
+					msg.Optionv("body", bytes.NewReader(b))
+					msg.Option("content_type", "application/json")
+					arg = arg[:1]
+				} else if m.Option("content_type") == "json_fmt" {
+					data := []interface{}{}
+					for _, v := range arg[2:] {
+						if len(v) > 1 && v[0] == '$' {
+							v = m.Cap(v[1:])
+						} else if len(v) > 1 && v[0] == '@' {
+							v = m.Cap(v[1:])
+						}
+						data = append(data, v)
+					}
+					msg.Optionv("body", strings.NewReader(fmt.Sprintf(arg[1], data...)))
+					msg.Option("content_type", "application/json")
+					arg = arg[:1]
+				} else {
+					msg.Option("content_type", "application/x-www-form-urlencoded")
+				}
+				msg.Cmd("get", "method", "POST", arg)
+				m.Copy(msg, "result").Copy(msg, "append")
+			}},
 		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			url := m.Confx("brow_home", arg, 0)
 			switch runtime.GOOS {
@@ -1220,31 +1106,31 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if len(m.Meta["append"]) > 0 {
 				meta["append"] = m.Meta["append"]
 				for _, v := range m.Meta["append"] {
-					m.Log("json", "won %v %v", v, m.Meta[v])
 					if _, ok := m.Data[v]; ok {
 						meta[v] = m.Data[v]
-						m.Log("json", "1won %v %v", v, meta[v])
-						m.Log("json", "1won %v %v", v, meta[v], m.Meta[v])
 					} else if _, ok := m.Meta[v]; ok {
-						m.Log("json", "2won %v %v", v, meta[v])
 						meta[v] = m.Meta[v]
 					}
-					m.Log("json", "won %v %v", v, meta[v])
 				}
 			}
 
 			if b, e := json.Marshal(meta); m.Assert(e) {
 				w.Header().Set("Content-Type", "application/javascript")
-				m.Log("json", "won %v", string(b))
 				w.Write(b)
 			}
-
 		}},
 		"/paste": &ctx.Command{Name: "/paste", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if login := m.Spawn().Cmd("/login"); login.Has("redirect") {
 				m.Sess("cli").Cmd("system", "tmux", "set-buffer", "-b", "0", m.Option("content"))
 			}
 
+		}},
+		"/upload": &ctx.Command{Name: "/upload", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
+			f, h, e := r.FormFile("file")
+			lf, e := os.Create(fmt.Sprintf("tmp/%s", h.Filename))
+			m.Assert(e)
+			io.Copy(lf, f)
 		}},
 		"user": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			aaa := m.Sess("aaa")
@@ -1293,6 +1179,264 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Appendv("lists", lists)
 			m.Log("log", "%v", lists)
 		}},
+		"old_get": &ctx.Command{
+			Name: "get [method GET|POST] [file name filename] url arg...",
+			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
+			Form: map[string]int{"method": 1, "content_type": 1, "headers": 2, "file": 2, "body_type": 1, "body": 1, "fields": 1, "value": 1, "json_route": 1, "json_key": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
+					if web.client == nil {
+						web.client = &http.Client{}
+					}
+
+					if m.Has("value") {
+						args := strings.Split(m.Option("value"), " ")
+						values := []interface{}{}
+						for _, v := range args {
+							if len(v) > 1 && v[0] == '$' {
+								values = append(values, m.Cap(v[1:]))
+							} else {
+								values = append(values, v)
+							}
+						}
+						arg[0] = fmt.Sprintf(arg[0], values...)
+					}
+
+					method := m.Confx("method")
+					uri := web.Merge(m, arg[0], arg[1:]...)
+					m.Log("info", "%s %s", method, uri)
+					m.Echo("%s: %s\n", method, uri)
+
+					var body io.Reader
+					index := strings.Index(uri, "?")
+					content_type := ""
+
+					switch method {
+					case "POST":
+						if m.Options("file") {
+							file, e := os.Open(m.Meta["file"][1])
+							m.Assert(e)
+							defer file.Close()
+
+							if m.Option("body_type") == "json" {
+								content_type = "application/json"
+								body = file
+								break
+							}
+							buf := &bytes.Buffer{}
+							writer := multipart.NewWriter(buf)
+
+							part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+							m.Assert(e)
+							io.Copy(part, file)
+
+							for i := 0; i < len(arg)-1; i += 2 {
+								value := arg[i+1]
+								if len(arg[i+1]) > 1 {
+									switch arg[i+1][0] {
+									case '$':
+										value = m.Cap(arg[i+1][1:])
+									case '@':
+										value = m.Conf(arg[i+1][1:])
+									}
+								}
+								writer.WriteField(arg[i], value)
+							}
+
+							content_type = writer.FormDataContentType()
+							body = buf
+							writer.Close()
+						} else if m.Option("body_type") == "json" {
+							if m.Options("body") {
+								data := []interface{}{}
+								for _, v := range arg[1:] {
+									if len(v) > 1 && v[0] == '$' {
+										v = m.Cap(v[1:])
+									}
+									data = append(data, v)
+								}
+								body = strings.NewReader(fmt.Sprintf(m.Option("body"), data...))
+							} else {
+								data := map[string]interface{}{}
+								for i := 1; i < len(arg)-1; i += 2 {
+									switch arg[i+1] {
+									case "false":
+										data[arg[i]] = false
+									case "true":
+										data[arg[i]] = true
+									default:
+										if len(arg[i+1]) > 1 && arg[i+1][0] == '$' {
+											data[arg[i]] = m.Cap(arg[i+1][1:])
+										} else {
+											data[arg[i]] = arg[i+1]
+										}
+									}
+								}
+
+								b, e := json.Marshal(data)
+								m.Assert(e)
+								body = bytes.NewReader(b)
+							}
+
+							content_type = "application/json"
+							if index > -1 {
+								uri = uri[:index]
+							}
+
+						} else if index > 0 {
+							content_type = "application/x-www-form-urlencoded"
+							body = strings.NewReader(uri[index+1:])
+							uri = uri[:index]
+						}
+					}
+
+					req, e := http.NewRequest(method, uri, body)
+					m.Assert(e)
+					for i := 0; i < len(m.Meta["headers"]); i += 2 {
+						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
+					}
+
+					if len(content_type) > 0 {
+						req.Header.Set("Content-Type", content_type)
+						m.Log("info", "content-type: %s", content_type)
+					}
+
+					for _, v := range m.Confv("cookie").(map[string]interface{}) {
+						req.AddCookie(v.(*http.Cookie))
+					}
+
+					res, e := web.client.Do(req)
+					m.Assert(e)
+
+					for _, v := range res.Cookies() {
+						m.Confv("cookie", v.Name, v)
+						m.Log("info", "set-cookie %s: %v", v.Name, v.Value)
+					}
+
+					if m.Confs("logheaders") {
+						for k, v := range res.Header {
+							m.Log("info", "%s: %v", k, v)
+						}
+					}
+
+					if m.Confs("output") {
+						if _, e := os.Stat(m.Conf("output")); e == nil {
+							name := path.Join(m.Conf("output"), fmt.Sprintf("%d", time.Now().Unix()))
+							f, e := os.Create(name)
+							m.Assert(e)
+							io.Copy(f, res.Body)
+							if m.Confs("editor") {
+								cmd := exec.Command(m.Conf("editor"), name)
+								cmd.Stdin = os.Stdin
+								cmd.Stdout = os.Stdout
+								cmd.Stderr = os.Stderr
+								cmd.Run()
+							} else {
+								m.Echo("write to %s\n", name)
+							}
+							return
+						}
+					}
+
+					buf, e := ioutil.ReadAll(res.Body)
+					m.Assert(e)
+
+					ct := res.Header.Get("Content-Type")
+					if len(ct) >= 16 && ct[:16] == "application/json" {
+						var result interface{}
+						json.Unmarshal(buf, &result)
+						m.Option("response_json", result)
+						if m.Has("json_route") {
+							routes := strings.Split(m.Option("json_route"), ".")
+							for _, k := range routes {
+								if len(k) > 0 && k[0] == '$' {
+									k = m.Cap(k[1:])
+								}
+								switch r := result.(type) {
+								case map[string]interface{}:
+									result = r[k]
+								}
+							}
+						}
+
+						fields := map[string]bool{}
+						for _, k := range strings.Split(m.Option("fields"), " ") {
+							if k == "" {
+								continue
+							}
+							if fields[k] = true; len(fields) == 1 {
+								m.Meta["append"] = append(m.Meta["append"], "index")
+							}
+							m.Meta["append"] = append(m.Meta["append"], k)
+						}
+
+						if len(fields) > 0 {
+
+							switch ret := result.(type) {
+							case map[string]interface{}:
+								m.Append("index", "0")
+								for k, v := range ret {
+									switch value := v.(type) {
+									case string:
+										m.Append(k, strings.Replace(value, "\n", " ", -1))
+									case float64:
+										m.Append(k, fmt.Sprintf("%d", int(value)))
+									default:
+										if _, ok := fields[k]; ok {
+											m.Append(k, fmt.Sprintf("%v", value))
+										}
+									}
+								}
+							case []interface{}:
+								for i, r := range ret {
+									m.Add("append", "index", i)
+									if rr, ok := r.(map[string]interface{}); ok {
+										for k, v := range rr {
+											switch value := v.(type) {
+											case string:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, strings.Replace(value, "\n", " ", -1))
+												}
+											case float64:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, fmt.Sprintf("%d", int64(value)))
+												}
+											case bool:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, fmt.Sprintf("%v", value))
+												}
+											case map[string]interface{}:
+												for kk, vv := range value {
+													key := k + "." + kk
+													if _, ok := fields[key]; len(fields) == 0 || ok {
+														m.Add("append", key, strings.Replace(fmt.Sprintf("%v", vv), "\n", " ", -1))
+													}
+												}
+											default:
+												if _, ok := fields[k]; ok {
+													m.Add("append", k, fmt.Sprintf("%v", value))
+												}
+											}
+										}
+									}
+								}
+
+								if m.Has("json_key") {
+									m.Sort(m.Option("json_key"))
+								}
+								m.Meta["index"] = nil
+								for i, _ := range ret {
+									m.Add("append", "index", i)
+								}
+							}
+						}
+					}
+
+					if m.Table(); len(m.Meta["append"]) == 0 {
+						m.Echo("%s", string(buf))
+					}
+				}
+			}},
 	},
 }
 

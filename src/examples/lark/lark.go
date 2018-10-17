@@ -9,10 +9,6 @@ import (
 	"net/http"
 )
 
-type LARK struct {
-	web.WEB
-}
-
 var Index = &ctx.Context{Name: "lark", Help: "会议中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
@@ -42,7 +38,7 @@ var Index = &ctx.Context{Name: "lark", Help: "会议中心",
 }
 
 func init() {
-	lark := &LARK{}
+	lark := &web.WEB{}
 	lark.Context = Index
 	web.Index.Register(Index, lark)
 }

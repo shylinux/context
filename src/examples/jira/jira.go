@@ -5,10 +5,6 @@ import (
 	"contexts/web"
 )
 
-type JIRA struct {
-	web.WEB
-}
-
 var Index = &ctx.Context{Name: "jira", Help: "任务中心",
 	Caches:  map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{},
@@ -20,7 +16,7 @@ var Index = &ctx.Context{Name: "jira", Help: "任务中心",
 }
 
 func init() {
-	jira := &JIRA{}
+	jira := &web.WEB{}
 	jira.Context = Index
 	web.Index.Register(Index, jira)
 }

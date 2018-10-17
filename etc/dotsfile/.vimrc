@@ -8,14 +8,14 @@
 "加载插件"{{{
 call plug#begin()
 Plug 'vim-scripts/tComment'
+Plug 'gcmt/taboo.vim'
+Plug 'vim-scripts/tComment'
 Plug 'tpope/vim-fugitive'
 Plug 'airblade/vim-gitgutter'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'ntpeters/vim-better-whitespace'
 Plug 'easymotion/vim-easymotion'
-nmap t ;;t
-nmap T ;;T
 
 Plug 'vim-scripts/taglist.vim'
 let g:Tlist_WinWidth=45
@@ -55,12 +55,14 @@ let g:syntastic_quiet_messages = { "regex": [
             \ "Invalid variable name",
             \ "Too many instance attributes",
             \ "defined outside __init__",
+            \ "Catching too general exception Exception",
          \ ] }
 
 Plug 'Valloric/YouCompleteMe'
 let g:syntastic_enable_signs = 1
 let g:ycm_confirm_extra_conf=0
 nnoremap gd :YcmCompleter GoToDeclaration<CR>
+nnoremap gD :YcmCompleter GoToReferences<CR>
 
 Plug 'benmills/vimux'
 let mapleader=";"
@@ -126,13 +128,14 @@ cnoremap jk <CR>
 "}}}
 " 编程配置{{{
 set keywordprg=man\ -a
+set splitbelow
+set splitright
 
+autocmd BufReadPost * normal `"
 autocmd BufNewFile,BufReadPost *.shy set filetype=shy
 autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s
 autocmd BufNewFile,BufReadPost *.conf set filetype=nginx
-autocmd BufNewFile,BufReadPost *.go set foldmethod=syntax
 
 command! RR wa | source ~/.vimrc |e
-
 source ~/.vim_local
 "}}}

@@ -39,6 +39,8 @@ func Trans(arg ...interface{}) []string {
 			ls = append(ls, fmt.Sprintf("%t", val))
 		case int, int8, int16, int32, int64:
 			ls = append(ls, fmt.Sprintf("%d", val))
+		case float64:
+			ls = append(ls, fmt.Sprintf("%d", int(val)))
 		case []interface{}:
 			for _, v := range val {
 				switch val := v.(type) {
@@ -68,15 +70,15 @@ func Trans(arg ...interface{}) []string {
 	return ls
 }
 func Chain(m *Message, data interface{}, args ...interface{}) interface{} {
-	if len(args) == 1 {
-		if arg, ok := args[0].([]string); ok {
-			args = args[:0]
-			for _, v := range arg {
-				args = append(args, v)
-			}
-		}
-	}
-
+	// if len(args) == 1 {
+	// 	if arg, ok := args[0].([]string); ok {
+	// 		args = args[:0]
+	// 		for _, v := range arg {
+	// 			args = append(args, v)
+	// 		}
+	// 	}
+	// }
+	//
 	root := data
 	for i := 0; i < len(args); i += 2 {
 		var parent interface{}
@@ -2132,6 +2134,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"table_compact": &Config{Name: "table_compact", Value: "false", Help: "命令列表帮助"},
 		"table_col_sep": &Config{Name: "table_col_sep", Value: "\t", Help: "命令列表帮助"},
 		"table_row_sep": &Config{Name: "table_row_sep", Value: "\n", Help: "命令列表帮助"},
+
+		"page_offset": &Config{Name: "page_offset", Value: "0", Help: "列表偏移"},
+		"page_limit":  &Config{Name: "page_limit", Value: "10", Help: "列表大小"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -2846,7 +2851,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								}
 							}
 							if cache_name != "" && li > -1 {
-								m.Echo(m.Cap(cache_name, msg.Meta[cache_index][li]))
+								// m.Echo(m.Cap(cache_name, msg.Meta[cache_index][li]))
+								m.Echo(m.Cap(cache_name, fmt.Sprint(msg.Confv(m.Confx("body_response"), cache_index))))
 							} else {
 								m.Copy(msg, "result").Copy(msg, "append")
 							}
@@ -2942,7 +2948,19 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"config": &Command{
 			Name: "config [all] [save|load file key...] [delete] [pop index] key [value...]|key name value help",
 			Help: "查看、读写、添加配置变量",
+			Form: map[string]int{
+				"chains": 1, "fields": 1,
+				"where_field": 1, "where_value": 1,
+				"sort_field": 1, "sort_order": 1,
+				"page_limit": 1, "page_offset": 1,
+				"select": 3,
+			},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
+				offset, e := strconv.Atoi(m.Confx("page_offset"))
+				m.Assert(e)
+				limit, e := strconv.Atoi(m.Confx("page_limit"))
+				m.Assert(e)
+
 				all := false
 				if len(arg) > 0 && arg[0] == "all" {
 					arg, all = arg[1:], true
@@ -2977,7 +2995,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					de.Decode(&save)
 				}
 
-				sort := "string"
+				sort_field := m.Option("sort_field")
+				sort_order := m.Option("sort_order")
 				m.BackTrace(func(m *Message) bool {
 					for k, v := range m.target.Configs {
 						switch action {
@@ -3033,31 +3052,70 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								if k != arg[0] {
 									continue
 								}
-								switch val := v.Value.(type) {
-								case map[string]string:
-									for k, _ := range val {
-										m.Add("append", "key", k)
-										m.Add("append", "val", m.Conf(arg[0], k))
+
+								value := m.Confv(arg[0])
+								if m.Options("chains") {
+									value = m.Confv(arg[0], strings.Split(m.Option("chains"), "."))
+								}
+
+								fields := map[string]bool{}
+								for _, k := range strings.Split(m.Option("fields"), " ") {
+									if k == "" {
+										continue
 									}
+									if fields[k] = true; len(fields) == 1 {
+										m.Meta["append"] = append(m.Meta["append"], "index")
+									}
+									m.Meta["append"] = append(m.Meta["append"], k)
+								}
+								m.Log("fuck", "what %v", fields)
+
+								switch val := value.(type) {
 								case map[string]interface{}:
-									for k, _ := range val {
-										m.Add("append", "key", k)
-										m.Add("append", "val", m.Conf(arg[0], k))
+									m.Add("append", "index", "0")
+									for k, v := range val {
+										if len(fields) == 0 || fields[k] {
+											m.Add("append", k, v)
+										}
 									}
-								case []string:
-									sort = "int"
-									for i, _ := range val {
-										m.Add("append", "key", i)
-										m.Add("append", "val", m.Conf(arg[0], k))
+									m.Log("fuck", "what %v", m.Meta)
+								case map[string]string:
+									m.Add("append", "index", "0")
+									for k, v := range val {
+										if len(fields) == 0 || fields[k] {
+											m.Add("append", k, v)
+										}
 									}
 								case []interface{}:
-									sort = "int"
-									for i, _ := range val {
-										m.Add("append", "key", i)
-										m.Add("append", "val", m.Conf(arg[0], k))
+									n := 0
+									for i, value := range val {
+										switch val := value.(type) {
+										case map[string]interface{}:
+											if m.Options("where_field") && m.Options("where_value") {
+												if !strings.Contains(fmt.Sprintf("%v", val[m.Option("where_field")]), m.Option("where_value")) {
+													continue
+												}
+											}
+											n++
+											if n <= offset || n > offset+limit {
+												continue
+											}
+
+											m.Add("append", "index", i)
+											for k, v := range val {
+												if len(fields) == 0 || fields[k] {
+													m.Add("append", k, v)
+												}
+											}
+										}
 									}
-								case string:
-									m.Echo(m.Conf(arg[0]))
+								case []string:
+									for i, v := range val {
+										m.Add("append", "index", i)
+										m.Add("append", "value", v)
+									}
+								default:
+									m.Echo("%v", Trans(val)[0])
 								}
 							default:
 								m.Echo("%v", m.Confv(arg[0], arg[1:]))
@@ -3066,7 +3124,18 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 					}
 					return all
-				}).Sort("key", sort).Table()
+				})
+
+				if m.Sort(sort_field, sort_order); m.Has("index") {
+					for i := 0; i < len(m.Meta["index"]); i++ {
+						m.Meta["index"][i] = fmt.Sprintf("%d", i+offset)
+					}
+				}
+				if m.Has("select") {
+					m.Echo(m.Cap(m.Meta["select"][2], m.Meta[m.Meta["select"][1]][m.Optioni("select")]))
+				} else {
+					m.Table()
+				}
 
 				switch action {
 				case "save":
@@ -3082,13 +3151,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Assert(e)
 					m.Echo("%s", string(buf))
 				}
-
 			}},
 		"cache": &Command{
 			Name: "cache [all|key [value]|key = value|key name value help|delete key]",
 			Help: "查看、读写、赋值、新建、删除缓存变量",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				switch len(arg) { //{{{
+				switch len(arg) {
 				case 0:
 					for k, v := range m.target.Caches {
 						m.Add("append", "key", k)
