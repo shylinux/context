@@ -56,6 +56,7 @@ let g:syntastic_quiet_messages = { "regex": [
             \ "Too many instance attributes",
             \ "defined outside __init__",
             \ "Catching too general exception Exception",
+            \ "Exactly one space required before assignment",
          \ ] }
 
 Plug 'Valloric/YouCompleteMe'
