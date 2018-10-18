@@ -274,6 +274,21 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					})
 				}
 			}},
+		"set": &ctx.Command{Name: "set table [field value] where condition", Help: "查看或选择数据库信息", Form: map[string]int{"where": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
+				sql := []string{"update", arg[0], "set"}
+				for i := 1; i < len(arg)-1; i += 2 {
+					sql = append(sql, fmt.Sprintf("%s='%s'", arg[i], arg[i+1]))
+					if i < len(arg)-2 {
+						sql = append(sql, ",")
+					}
+				}
+				sql = append(sql, fmt.Sprintf("where %s", m.Option("where")))
+				m.Spawn().Cmd("exec", strings.Join(sql, " "))
+				msg := m.Spawn().Cmd("show", arg[0], "where", m.Option("where"))
+				m.Copy(msg, "result").Copy(msg, "append")
+			}
+		}},
 	},
 }
 

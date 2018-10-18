@@ -57,6 +57,8 @@ let g:syntastic_quiet_messages = { "regex": [
             \ "defined outside __init__",
             \ "Catching too general exception Exception",
             \ "Exactly one space required before assignment",
+            \ "Too many lines in module",
+            \ "Invalid constant name",
          \ ] }
 
 Plug 'Valloric/YouCompleteMe'
@@ -136,6 +138,7 @@ autocmd BufReadPost * normal `"
 autocmd BufNewFile,BufReadPost *.shy set filetype=shy
 autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s
 autocmd BufNewFile,BufReadPost *.conf set filetype=nginx
+autocmd BufNewFile,BufReadPost *.go set foldmethod=syntax
 
 command! RR wa | source ~/.vimrc |e
 source ~/.vim_local

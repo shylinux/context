@@ -3013,15 +3013,17 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				save := map[string]interface{}{}
 				if action == "load" {
 					f, e := os.Open(which)
-					m.Assert(e)
+					if e != nil {
+						return
+					}
 					defer f.Close()
 
 					de := json.NewDecoder(f)
 					de.Decode(&save)
 				}
 
-				sort_field := m.Option("sort_field")
-				sort_order := m.Option("sort_order")
+				// sort_field := m.Option("sort_field")
+				// sort_order := m.Option("sort_order")
 				m.BackTrace(func(m *Message) bool {
 					for k, v := range m.target.Configs {
 						switch action {
@@ -3093,17 +3095,20 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 									}
 									m.Meta["append"] = append(m.Meta["append"], k)
 								}
-								m.Log("fuck", "what %v", fields)
 
 								switch val := value.(type) {
 								case map[string]interface{}:
 									m.Add("append", "index", "0")
 									for k, v := range val {
 										if len(fields) == 0 || fields[k] {
-											m.Add("append", k, v)
+											switch value := v.(type) {
+											case float64:
+												m.Add("append", k, fmt.Sprintf("%d", int(value)))
+											default:
+												m.Add("append", k, fmt.Sprintf("%v", value))
+											}
 										}
 									}
-									m.Log("fuck", "what %v", m.Meta)
 								case map[string]string:
 									m.Add("append", "index", "0")
 									for k, v := range val {
@@ -3151,16 +3156,17 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					return all
 				})
 
-				if m.Sort(sort_field, sort_order); m.Has("index") {
-					for i := 0; i < len(m.Meta["index"]); i++ {
-						m.Meta["index"][i] = fmt.Sprintf("%d", i+offset)
-					}
-				}
-				if m.Has("select") {
-					m.Echo(m.Cap(m.Meta["select"][2], m.Meta[m.Meta["select"][1]][m.Optioni("select")]))
-				} else {
-					m.Table()
-				}
+				m.Table()
+				// if m.Sort(sort_field, sort_order); m.Has("index") {
+				// 	for i := 0; i < len(m.Meta["index"]); i++ {
+				// 		m.Meta["index"][i] = fmt.Sprintf("%d", i+offset)
+				// 	}
+				// }
+				// if m.Has("select") {
+				// 	m.Echo(m.Cap(m.Meta["select"][2], m.Meta[m.Meta["select"][1]][m.Optioni("select")]))
+				// } else {
+				// 	m.Table()
+				// }
 
 				switch action {
 				case "save":
@@ -3456,7 +3462,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Echo(arg[0], values...)
 				m.Append("format", m.Result(0))
 			}},
-		"select": &Command{Name: "select key value", Form: map[string]int{"order": 2, "limit": 1, "offset": 1}, Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
+		"select": &Command{Name: "select key value", Form: map[string]int{"order": 2, "limit": 1, "offset": 1, "vertical": 1}, Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.Spawn()
 			offset := 0
 			limit := 10
@@ -3481,6 +3487,20 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 			if m.Set("append").Copy(msg, "append"); m.Has("order") {
 				m.Sort(m.Option("order"), m.Meta["order"][1])
+			}
+			if m.Has("vertical") {
+				msg := m.Spawn()
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				sort.Strings(m.Meta["append"])
+				for i := 0; i < nrow; i++ {
+					for _, k := range m.Meta["append"] {
+						msg.Add("append", "field", k)
+						msg.Add("append", "value", m.Meta[k][i])
+					}
+					msg.Add("append", "field", "")
+					msg.Add("append", "value", "")
+				}
+				m.Set("append").Copy(msg, "append")
 			}
 			m.Table()
 		}},
