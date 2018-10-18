@@ -1,6 +1,7 @@
 package ctx
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1349,6 +1350,12 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 			if x, ok := s.Commands[key]; ok && x.Hand != nil {
 				m.TryCatch(m, true, func(m *Message) {
 					m.Log("cmd", "%s:%s %v %v", s.Name, c.Name, m.Meta["detail"], m.Meta["option"])
+					rest := []string{}
+					for i := 0; i < len(arg); i++ {
+						if arg[i] == "|" {
+							arg, rest = arg[:i], arg[i+1:]
+						}
+					}
 
 					if args := []string{}; x.Form != nil {
 						for i := 0; i < len(arg); i++ {
@@ -1369,7 +1376,11 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 					}
 
 					x.Hand(m, s, key, arg...)
-					m.Hand = true
+
+					if m.Hand = true; len(rest) > 0 {
+						msg := m.Spawn().Copy(m, "option").Copy(m, "append").Cmd(rest)
+						m.Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
+					}
 				})
 				return m
 			}
@@ -2759,8 +2770,18 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}},
 		"command": &Command{
 			Name: "command [all|add cmd arg...|list [begin [end]]|test [begin [end]]|delete cmd]",
-			Help: "查看或修改命令",
-			Form: map[string]int{"list_name": 1, "list_help": 1, "list_cache": 2, "list_index": 1, "condition": -1},
+			Help: []string{
+				"查看或修改命令",
+				"list_export filename",
+			},
+			Form: map[string]int{
+				"list_name":   1,
+				"list_help":   1,
+				"list_cache":  2,
+				"list_index":  1,
+				"condition":   -1,
+				"list_export": 1,
+			},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				if len(arg) == 0 {
 					keys := []string{}
@@ -2822,8 +2843,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.target.Commands[m.Cap("list_count")] = &Command{
 						Name: strings.Join(arg[1:], " "),
 						Help: m.Confx("list_help"),
-						Hand: func(m *Message, c *Context, key string, args ...string) {
-							m.Log("fcuK", "wat %v %v", args, list_index)
+						Hand: func(cmd *Message, c *Context, key string, args ...string) {
 							li := list_index
 							if li == -1 {
 								if len(args) > 0 {
@@ -2835,7 +2855,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							list := []string{}
 							j := 0
 							for i := 1; i < len(arg); i++ {
-								if arg[i] == "_" && m.Assert(j < len(args)) {
+								if arg[i] == "_" && cmd.Assert(j < len(args)) {
 									list = append(list, args[j])
 									j++
 									continue
@@ -2844,17 +2864,22 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							}
 							list = append(list, args[j:]...)
 
-							msg := m.Spawn().Cmd(list)
+							msg := cmd.Spawn().Cmd(list)
 							if len(msg.Meta["append"]) > 0 {
 								for i, _ := range msg.Meta[msg.Meta["append"][0]] {
-									m.Add("append", "index", i)
+									cmd.Add("append", "index", i)
 								}
 							}
 							if cache_name != "" && li > -1 {
-								// m.Echo(m.Cap(cache_name, msg.Meta[cache_index][li]))
-								m.Echo(m.Cap(cache_name, fmt.Sprint(msg.Confv(m.Confx("body_response"), cache_index))))
+								// cmd.Echo(cmd.Cap(cache_name, msg.Meta[cache_index][li]))
+								cmd.Echo(cmd.Cap(cache_name, fmt.Sprint(msg.Confv(cmd.Confx("body_response"), cache_index))))
 							} else {
-								m.Copy(msg, "result").Copy(msg, "append")
+								cmd.Copy(msg, "result").Copy(msg, "append")
+								if m.Has("list_export") {
+									export := cmd.Spawn()
+									export.Copy(cmd, "option").Copy(cmd, "append")
+									export.Cmd("export", m.Option("list_export"))
+								}
 							}
 						},
 					}
@@ -3431,6 +3456,116 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Echo(arg[0], values...)
 				m.Append("format", m.Result(0))
 			}},
+		"select": &Command{Name: "select key value", Form: map[string]int{"order": 2, "limit": 1, "offset": 1}, Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			msg := m.Spawn()
+			offset := 0
+			limit := 10
+			if m.Has("limit") {
+				limit = m.Optioni("limit")
+			}
+			if m.Has("offset") {
+				offset = m.Optioni("offset")
+			}
+			n := 0
+
+			nrow := len(m.Meta[m.Meta["append"][0]])
+			for i := 0; i < nrow; i++ {
+				if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
+					if n++; offset < n && n <= offset+limit {
+						for _, k := range m.Meta["append"] {
+							msg.Add("append", k, m.Meta[k][i])
+						}
+					}
+				}
+			}
+
+			if m.Set("append").Copy(msg, "append"); m.Has("order") {
+				m.Sort(m.Option("order"), m.Meta["order"][1])
+			}
+			m.Table()
+		}},
+		"import": &Command{Name: "import filename", Help: "导入数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			f, e := os.Open(arg[0])
+			m.Assert(e)
+			defer f.Close()
+
+			switch {
+			case strings.HasSuffix(arg[0], ".json"):
+				var data interface{}
+				de := json.NewDecoder(f)
+				de.Decode(&data)
+				m.Optionv("data", data)
+
+				switch d := data.(type) {
+				case []interface{}:
+					for _, value := range d {
+						switch val := value.(type) {
+						case map[string]interface{}:
+							for k, v := range val {
+								m.Add("append", k, v)
+							}
+						}
+					}
+				}
+			case strings.HasSuffix(arg[0], ".csv"):
+				r := csv.NewReader(f)
+				l, e := r.Read()
+				m.Assert(e)
+				m.Meta["append"] = l
+
+				for {
+					l, e := r.Read()
+					if e != nil {
+						break
+					}
+					for i, v := range l {
+						m.Add("append", m.Meta["append"][i], v)
+					}
+				}
+			}
+			m.Table()
+		}},
+		"export": &Command{Name: "export filename", Help: "导出数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			f, e := os.Create(arg[0])
+			m.Assert(e)
+			defer f.Close()
+
+			switch {
+			case strings.HasSuffix(arg[0], ".json"):
+				data := []interface{}{}
+
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					line := map[string]interface{}{}
+					for _, k := range m.Meta["append"] {
+						line[k] = m.Meta[k][i]
+					}
+					data = append(data, line)
+				}
+				en := json.NewEncoder(f)
+				en.SetIndent("", "  ")
+				en.Encode(data)
+
+			case strings.HasSuffix(arg[0], ".csv"):
+				w := csv.NewWriter(f)
+
+				line := []string{}
+				for _, v := range m.Meta["append"] {
+					line = append(line, v)
+				}
+				w.Write(line)
+
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					line := []string{}
+					for _, k := range m.Meta["append"] {
+						line = append(line, m.Meta[k][i])
+					}
+					w.Write(line)
+				}
+				w.Flush()
+			}
+		}},
 	},
 }
 

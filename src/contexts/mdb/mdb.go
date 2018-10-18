@@ -3,19 +3,14 @@ package mdb
 import (
 	"contexts/ctx"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"os"
-	"strconv"
 	"strings"
 )
 
 type MDB struct {
 	*sql.DB
-
-	db    []string
-	table []string
-
 	*ctx.Context
 }
 
@@ -29,13 +24,15 @@ func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"driver":   &ctx.Cache{Name: "数据库驱动(mysql)", Value: m.Confx("driver", arg, 5), Help: "数据库驱动"},
 	}
 	c.Configs = map[string]*ctx.Config{
-		"table":  &ctx.Config{Name: "关系表", Value: "", Help: "关系表"},
+		"dbs":    &ctx.Config{Name: "dbs", Value: []string{}, Help: "关系表"},
+		"tables": &ctx.Config{Name: "dbs", Value: []string{}, Help: "关系表"},
+		"table":  &ctx.Config{Name: "关系表", Value: "0", Help: "关系表"},
 		"field":  &ctx.Config{Name: "字段名", Value: "", Help: "字段名"},
 		"where":  &ctx.Config{Name: "条件", Value: "", Help: "条件"},
 		"group":  &ctx.Config{Name: "聚合", Value: "", Help: "聚合"},
 		"order":  &ctx.Config{Name: "排序", Value: "", Help: "排序"},
-		"limit":  &ctx.Config{Name: "分页", Value: "", Help: "分页"},
-		"offset": &ctx.Config{Name: "偏移", Value: "", Help: "偏移"},
+		"limit":  &ctx.Config{Name: "分页", Value: "10", Help: "分页"},
+		"offset": &ctx.Config{Name: "偏移", Value: "0", Help: "偏移"},
 		"parse":  &ctx.Config{Name: "解析", Value: "", Help: "解析"},
 	}
 
@@ -43,11 +40,9 @@ func (mdb *MDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	s.Context = c
 	return s
 }
-
 func (mdb *MDB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return mdb
 }
-
 func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool {
 	db, e := sql.Open(m.Cap("driver"), fmt.Sprintf("%s:%s@%s(%s)/%s",
 		m.Cap("username"), m.Cap("password"), m.Cap("protocol"), m.Cap("address"), m.Cap("database")))
@@ -56,7 +51,6 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool {
 	m.Log("info", "mdb open %s", m.Cap("database"))
 	return false
 }
-
 func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool {
 	switch mdb.Context {
 	case m.Target():
@@ -65,7 +59,6 @@ func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool {
 	return false
 }
 
-var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 	Caches: map[string]*ctx.Cache{
 		"nsource": &ctx.Cache{Name: "数据源数量", Value: "0", Help: "已打开数据库的数量"},
@@ -82,11 +75,19 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"csv_row_sep": &ctx.Config{Name: "记录分隔符", Value: "\n", Help: "记录分隔符"},
 	},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{
-			Name: "open [database [username [password [address [protocol [driver]]]]]]",
+		"open": &ctx.Command{Name: "open [database [username [password [address [protocol [driver]]]]]]",
 			Help: "open打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 服务地址, protocol: 服务协议, driver: 数据库类型",
+			Form: map[string]int{"dbname": 1, "dbhelp": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				m.Start(fmt.Sprintf("db%d", m.Capi("nsource", 1)), "数据源", arg...)
+				dbname := fmt.Sprintf("db%d", m.Capi("nsource", 1))
+				dbhelp := "数据源"
+				if m.Has("dbname") {
+					dbname = m.Option("dbname")
+				}
+				if m.Has("dbhelp") {
+					dbname = m.Option("dbhelp")
+				}
+				m.Start(dbname, dbhelp, arg...)
 			}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 操作参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
@@ -131,6 +132,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 					for i, k := range cols {
 						switch b := vals[i].(type) {
+						case nil:
+							m.Add("append", k, "")
 						case []byte:
 							m.Add("append", k, string(b))
 						case int64:
@@ -152,67 +155,49 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
 				if len(arg) == 0 {
 					msg := m.Spawn().Cmd("query", "show databases")
-					mdb.db = []string{}
+					dbs := []string{}
 					for i, v := range msg.Meta[msg.Meta["append"][0]] {
-						mdb.db = append(mdb.db, v)
+						dbs = append(dbs, v)
 						m.Echo("%d: %s\n", i, v)
 					}
+					m.Target().Configs["dbs"].Value = dbs
 					return
 				}
 
-				db := arg[0]
-				if i, e := strconv.Atoi(arg[0]); e == nil && i < len(mdb.db) {
-					db = mdb.db[i]
-				}
+				db := m.Confv("dbs", arg[0]).(string)
 				m.Assert(m.Spawn().Cmd("exec", fmt.Sprintf("use %s", db)))
 				m.Echo(m.Cap("database", db))
 			}
 		}},
-		"table": &ctx.Command{Name: "table [which [field]]", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
+		"tab": &ctx.Command{Name: "tab[which [field]]", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 				if len(arg) == 0 {
 					msg := m.Spawn().Cmd("query", "show tables")
-					mdb.table = []string{}
+					tables := []string{}
 					for i, v := range msg.Meta[msg.Meta["append"][0]] {
-						mdb.table = append(mdb.table, v)
+						tables = append(tables, v)
 						m.Echo("%d: %s\n", i, v)
 					}
+					m.Target().Configs["tables"].Value = tables
 					return
 				}
 
-				table := arg[0]
-				if i, e := strconv.Atoi(arg[0]); e == nil && i < len(mdb.table) {
-					table = mdb.table[i]
-				}
+				table := m.Confv("tables", arg[0]).(string)
 
 				msg := m.Spawn().Cmd("query", fmt.Sprintf("desc %s", table))
-				if len(arg) == 1 {
-					for _, v := range msg.Meta[msg.Meta["append"][0]] {
-						m.Echo("%s\n", v)
-					}
-					return
-				}
-
-				for i, v := range msg.Meta[msg.Meta["append"][0]] {
-					if v == arg[1] {
-						for _, k := range msg.Meta["append"] {
-							m.Echo("%s: %s\n", k, msg.Meta[k][i])
-						}
-					}
-				}
+				m.Copy(msg, "append")
+				m.Table()
 			}
 		}},
 		"show": &ctx.Command{Name: "show table fields...",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
 			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "other": -1,
-				"extras": 1, "extra_field": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2,
-				"save": 1, "export": 2,
-			},
+				"extra_field": 1, "extra_chains": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
+				if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 					table := m.Confx("table", arg, 0)
-					if i, e := strconv.Atoi(table); e == nil && i < len(mdb.table) {
-						table = mdb.table[i]
+					if v := m.Confv("tables", table); v != nil {
+						table = v.(string)
 					}
 
 					fields := []string{"*"}
@@ -243,26 +228,39 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 					msg := m.Spawn().Cmd("query", fmt.Sprintf("select %s from %s %s %s %s %s %s", field, table, where, group, order, limit, offset), other)
 					m.Copy(msg, "append")
-					if m.Optioni("query", msg.Code()); !m.Options("save") {
-						m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
+
+					m.Target().Configs["template_value"] = &ctx.Config{}
+					if m.Has("extra_field") && len(m.Meta[m.Option("extra_field")]) > 0 {
+						format := "%v"
+						if m.Has("extra_format") {
+							format = m.Option("extra_format")
+						}
+						for i := 0; i < len(m.Meta[m.Option("extra_field")]); i++ {
+							json.Unmarshal([]byte(m.Meta[m.Option("extra_field")][i]), &m.Target().Configs["template_value"].Value)
+							switch v := m.Confv("template_value", m.Option("extra_chains")).(type) {
+							default:
+								m.Meta[m.Option("extra_field")][i] = fmt.Sprintf(format, v)
+							}
+						}
 					}
+
+					if m.Has("trans_field") {
+						trans := map[string]string{}
+						for i := 0; i < len(m.Meta["trans_map"]); i += 2 {
+							trans[m.Meta["trans_map"][i]] = m.Meta["trans_map"][i+1]
+						}
+						for i := 0; i < len(m.Meta[m.Option("trans_field")]); i++ {
+							if t, ok := trans[m.Meta[m.Option("trans_field")][i]]; ok {
+								m.Meta[m.Option("trans_field")][i] = t
+							}
+						}
+					}
+
+					m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
 
 					m.Table(func(maps map[string]string, lists []string, line int) bool {
 						for i, v := range lists {
-							if m.Options("save") {
-								key := m.Meta["append"][i]
-								value := maps[key]
-								if key == m.Option("trans_field") {
-									for i := 0; i < len(m.Meta["trans_map"])-1; i += 2 {
-										if value == m.Meta["trans_map"][i] {
-											value = m.Meta["trans_map"][i+1]
-											break
-										}
-									}
-								}
-
-								m.Echo(value)
-							} else if line == -1 {
+							if line == -1 {
 								m.Color(32, v)
 							} else {
 								m.Echo(v)
@@ -274,33 +272,6 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						m.Echo(m.Conf("csv_row_sep"))
 						return true
 					})
-
-					if m.Options("export") {
-						f, e := os.Create(m.Option("export"))
-						m.Assert(e)
-						defer f.Close()
-
-						m.Table(func(maps map[string]string, lists []string, line int) bool {
-							if line > -1 {
-								args := []interface{}{}
-								for i := 0; i < len(lists); i++ {
-									args = append(args, maps[m.Meta["append"][i]])
-								}
-								f.WriteString(fmt.Sprintf(m.Meta["export"][1], args...))
-							}
-							return true
-						})
-					}
-
-					if m.Options("save") {
-						f, e := os.Create(m.Option("save"))
-						m.Assert(e)
-						defer f.Close()
-
-						for _, v := range m.Meta["result"] {
-							f.WriteString(v)
-						}
-					}
 				}
 			}},
 	},

@@ -133,7 +133,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool { // {{{
 		yac.Cmd("train", "stm", "goto", "goto", "exp", "opt{", "exp", "}", "exp")
 		yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
 
-		yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
+		yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\|", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
 		yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
 		yac.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
 
