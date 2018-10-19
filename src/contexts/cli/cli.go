@@ -769,6 +769,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					msg.Copy(m, "target").Detail(-1, "system")
 					msg.Cmd()
 				}
+				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
 				m.Copy(msg, "result").Copy(msg, "append")
 				m.Capi("last_msg", 0, msg.Code())
 				m.Capi("ps_count", 1)

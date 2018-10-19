@@ -2327,7 +2327,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Color(31, "option(%d): %v\n", len(msg.Meta["option"]), msg.Meta["option"])
 					for _, k := range msg.Meta["option"] {
 						if v, ok := msg.Data[k]; ok {
-							m.Echo(" %s: %v\n", k, v)
+							m.Echo(" %s: %#v\n", k, v)
 						} else {
 							m.Echo(" %s(%d): %v\n", k, len(msg.Meta[k]), msg.Meta[k])
 						}
