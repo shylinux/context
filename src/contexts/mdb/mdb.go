@@ -238,6 +238,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						for i := 0; i < len(m.Meta[m.Option("extra_field")]); i++ {
 							json.Unmarshal([]byte(m.Meta[m.Option("extra_field")][i]), &m.Target().Configs["template_value"].Value)
 							switch v := m.Confv("template_value", m.Option("extra_chains")).(type) {
+							case float64:
+								m.Meta[m.Option("extra_field")][i] = fmt.Sprintf(format, int(v))
 							default:
 								m.Meta[m.Option("extra_field")][i] = fmt.Sprintf(format, v)
 							}
