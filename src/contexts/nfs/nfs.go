@@ -68,8 +68,8 @@ func dir(m *ctx.Message, name string, level int, deep bool, fields []string) {
 		switch k {
 		case "filename":
 			m.Add("append", "filename", "..")
-		case "dir":
-			m.Add("append", "dir", "true")
+		case "is_dir":
+			m.Add("append", "is_dir", "true")
 		case "size":
 			m.Add("append", "size", 0)
 		case "line":
@@ -130,8 +130,8 @@ func dir(m *ctx.Message, name string, level int, deep bool, fields []string) {
 					switch k {
 					case "filename":
 						m.Add("append", "filename", filename)
-					case "dir":
-						m.Add("append", "dir", f.IsDir())
+					case "is_dir":
+						m.Add("append", "is_dir", f.IsDir())
 					case "size":
 						m.Add("append", "size", f.Size())
 					case "line":
@@ -803,11 +803,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"buf_size": &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
 		"qr_size":  &ctx.Config{Name: "qr_size", Value: "256", Help: "生成二维码的图片的大小"},
 
-		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
-		"dir_info":   &ctx.Config{Name: "dir_info(sizes/lines/files/dirs)", Value: "sizes lines files dirs", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
+		"dir_root":   &ctx.Config{Name: "dir_root", Value: "usr", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
 		"dir_deep":   &ctx.Config{Name: "dir_deep(yes/no)", Value: "yes", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir)", Value: "file", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
-		"dir_field":  &ctx.Config{Name: "dir_field", Value: "filename line size time", Help: "表格排序字段"},
+		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
+		"dir_info":   &ctx.Config{Name: "dir_info(sizes/lines/files/dirs)", Value: "sizes lines files dirs", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
+		"dir_field":  &ctx.Config{Name: "dir_field", Value: "filename is_dir line size time", Help: "表格排序字段"},
 		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
 		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
 
@@ -1078,13 +1079,16 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			if len(arg) == 1 {
 				var data interface{}
 				e := json.Unmarshal([]byte(arg[0]), &data)
+				if e != nil {
+					return
+				}
 				m.Assert(e)
 
 				buf, e := json.MarshalIndent(data, "", "  ")
 				m.Assert(e)
-				m.Echo("'")
+				// m.Echo("'")
 				m.Echo(string(buf))
-				m.Echo("'")
+				// m.Echo("'")
 				return
 			}
 
@@ -1122,10 +1126,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"pwd": &ctx.Command{Name: "pwd", Help: "查看当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if m.Options("dir") {
 				m.Echo(m.Option("dir"))
-				m.Add("append", "hi", "hello")
-				m.Add("append", "he", "hello")
-				m.Add("append", "hi", "world")
-				m.Add("append", "he", "world")
 				return
 			}
 			if len(arg) > 0 {
@@ -1134,20 +1134,31 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			wd, e := os.Getwd()
 			m.Assert(e)
 			m.Echo(wd)
-			m.Append("hi", "hello")
 		}},
 		"dir": &ctx.Command{
-			Name: "dir dir [dir_deep yes|no] [dir_info info] [dir_name name|tree|path|full] [dir_type file|dir] [sort_field name] [sort_order type]",
+			Name: "dir dir [dir_deep yes|no] [dir_info info] [dir_name name|tree|path|full] [dir_type both|file|dir] [sort_field name] [sort_order type]",
 			Help: "查看目录, dir: 目录名, dir_info: 显示统计信息, dir_name: 文件名类型, dir_type: 文件类型, sort_field: 排序字段, sort_order: 排序类型",
-			Form: map[string]int{"dir_field": 1, "dir_deep": 1, "dir_info": 1, "dir_name": 1, "dir_type": 1, "sort_field": 1, "sort_order": 1},
+			Form: map[string]int{
+				"dir_root":   1,
+				"dir_deep":   1,
+				"dir_type":   1,
+				"dir_name":   1,
+				"dir_info":   1,
+				"dir_link":   1,
+				"dir_field":  1,
+				"sort_field": 1,
+				"sort_order": 1,
+			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				d := "./" + m.Option("dir")
 				if len(arg) > 0 {
-					d = arg[0]
+					m.Option("dir", arg[0])
 				}
+				m.Option("dir", path.Clean(m.Option("dir")))
+				d := path.Join(m.Confx("dir_root"), m.Option("dir"))
 				if s, e := os.Stat(d); m.Assert(e) && !s.IsDir() {
 					d = path.Dir(d)
 				}
+
 				fields := strings.Split(m.Confx("dir_field"), " ")
 
 				trip := 0
@@ -1170,22 +1181,30 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						key := m.Meta["append"][i]
 						switch key {
 						case "filename":
+							v = maps[key]
 							if line > -1 && trip > 0 && trip <= len(v) {
 								v = v[trip:]
-								m.Meta["filename"][line] = v
+								if m.Options("dir_link") {
+									m.Meta["filename"][line] = fmt.Sprintf(m.Option("dir_link"), maps["is_dir"], v)
+								} else {
+									m.Meta["filename"][line] = v
+								}
 							}
-						case "dir":
-							continue
+							if line > -1 {
+								if m.Options("dir_link") {
+									m.Meta["filename"][line] = fmt.Sprintf(m.Option("dir_link"), maps["is_dir"], v)
+								}
+							}
 						}
-						m.Echo("%s\t", v)
 					}
-					m.Echo("\n")
 					return true
 				})
+				if !m.Options("dir_link") {
+					m.Table()
+				}
 				for _, v := range info {
 					m.Echo("%s: %s\n", v, m.Option(v))
 				}
-
 			}},
 		"git": &ctx.Command{
 			Name: "git branch|status|diff|log|info arg... [dir path]...",

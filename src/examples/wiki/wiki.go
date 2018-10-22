@@ -1,19 +1,24 @@
 package wiki
 
 import (
+	"os/exec"
+	"time"
+
 	"bufio"
+	"bytes"
 	"contexts/ctx"
 	"contexts/web"
+	"encoding/json"
 	"encoding/xml"
-	"github.com/gomarkdown/markdown"
-	"io/ioutil"
-	"net/http"
-	"path"
-
-	"bytes"
-
 	"fmt"
+	"github.com/gomarkdown/markdown"
+	"io"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -342,6 +347,264 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				m.Echo(string(b))
 			}
 		}},
+		"old_get": &ctx.Command{
+			Name: "get [method GET|POST] [file name filename] url arg...",
+			Help: "访问服务, method: 请求方法, file: 发送文件, url: 请求地址, arg: 请求参数",
+			Form: map[string]int{"method": 1, "content_type": 1, "headers": 2, "file": 2, "body_type": 1, "body": 1, "fields": 1, "value": 1, "json_route": 1, "json_key": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if web, ok := m.Target().Server.(*web.WEB); m.Assert(ok) {
+					if web.Client == nil {
+						web.Client = &http.Client{}
+					}
+
+					if m.Has("value") {
+						args := strings.Split(m.Option("value"), " ")
+						values := []interface{}{}
+						for _, v := range args {
+							if len(v) > 1 && v[0] == '$' {
+								values = append(values, m.Cap(v[1:]))
+							} else {
+								values = append(values, v)
+							}
+						}
+						arg[0] = fmt.Sprintf(arg[0], values...)
+					}
+
+					method := m.Confx("method")
+					uri := web.Merge(m, arg[0], arg[1:]...)
+					m.Log("info", "%s %s", method, uri)
+					m.Echo("%s: %s\n", method, uri)
+
+					var body io.Reader
+					index := strings.Index(uri, "?")
+					content_type := ""
+
+					switch method {
+					case "POST":
+						if m.Options("file") {
+							file, e := os.Open(m.Meta["file"][1])
+							m.Assert(e)
+							defer file.Close()
+
+							if m.Option("body_type") == "json" {
+								content_type = "application/json"
+								body = file
+								break
+							}
+							buf := &bytes.Buffer{}
+							writer := multipart.NewWriter(buf)
+
+							part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+							m.Assert(e)
+							io.Copy(part, file)
+
+							for i := 0; i < len(arg)-1; i += 2 {
+								value := arg[i+1]
+								if len(arg[i+1]) > 1 {
+									switch arg[i+1][0] {
+									case '$':
+										value = m.Cap(arg[i+1][1:])
+									case '@':
+										value = m.Conf(arg[i+1][1:])
+									}
+								}
+								writer.WriteField(arg[i], value)
+							}
+
+							content_type = writer.FormDataContentType()
+							body = buf
+							writer.Close()
+						} else if m.Option("body_type") == "json" {
+							if m.Options("body") {
+								data := []interface{}{}
+								for _, v := range arg[1:] {
+									if len(v) > 1 && v[0] == '$' {
+										v = m.Cap(v[1:])
+									}
+									data = append(data, v)
+								}
+								body = strings.NewReader(fmt.Sprintf(m.Option("body"), data...))
+							} else {
+								data := map[string]interface{}{}
+								for i := 1; i < len(arg)-1; i += 2 {
+									switch arg[i+1] {
+									case "false":
+										data[arg[i]] = false
+									case "true":
+										data[arg[i]] = true
+									default:
+										if len(arg[i+1]) > 1 && arg[i+1][0] == '$' {
+											data[arg[i]] = m.Cap(arg[i+1][1:])
+										} else {
+											data[arg[i]] = arg[i+1]
+										}
+									}
+								}
+
+								b, e := json.Marshal(data)
+								m.Assert(e)
+								body = bytes.NewReader(b)
+							}
+
+							content_type = "application/json"
+							if index > -1 {
+								uri = uri[:index]
+							}
+
+						} else if index > 0 {
+							content_type = "application/x-www-form-urlencoded"
+							body = strings.NewReader(uri[index+1:])
+							uri = uri[:index]
+						}
+					}
+
+					req, e := http.NewRequest(method, uri, body)
+					m.Assert(e)
+					for i := 0; i < len(m.Meta["headers"]); i += 2 {
+						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
+					}
+
+					if len(content_type) > 0 {
+						req.Header.Set("Content-Type", content_type)
+						m.Log("info", "content-type: %s", content_type)
+					}
+
+					for _, v := range m.Confv("cookie").(map[string]interface{}) {
+						req.AddCookie(v.(*http.Cookie))
+					}
+
+					res, e := web.Client.Do(req)
+					m.Assert(e)
+
+					for _, v := range res.Cookies() {
+						m.Confv("cookie", v.Name, v)
+						m.Log("info", "set-cookie %s: %v", v.Name, v.Value)
+					}
+
+					if m.Confs("logheaders") {
+						for k, v := range res.Header {
+							m.Log("info", "%s: %v", k, v)
+						}
+					}
+
+					if m.Confs("output") {
+						if _, e := os.Stat(m.Conf("output")); e == nil {
+							name := path.Join(m.Conf("output"), fmt.Sprintf("%d", time.Now().Unix()))
+							f, e := os.Create(name)
+							m.Assert(e)
+							io.Copy(f, res.Body)
+							if m.Confs("editor") {
+								cmd := exec.Command(m.Conf("editor"), name)
+								cmd.Stdin = os.Stdin
+								cmd.Stdout = os.Stdout
+								cmd.Stderr = os.Stderr
+								cmd.Run()
+							} else {
+								m.Echo("write to %s\n", name)
+							}
+							return
+						}
+					}
+
+					buf, e := ioutil.ReadAll(res.Body)
+					m.Assert(e)
+
+					ct := res.Header.Get("Content-Type")
+					if len(ct) >= 16 && ct[:16] == "application/json" {
+						var result interface{}
+						json.Unmarshal(buf, &result)
+						m.Option("response_json", result)
+						if m.Has("json_route") {
+							routes := strings.Split(m.Option("json_route"), ".")
+							for _, k := range routes {
+								if len(k) > 0 && k[0] == '$' {
+									k = m.Cap(k[1:])
+								}
+								switch r := result.(type) {
+								case map[string]interface{}:
+									result = r[k]
+								}
+							}
+						}
+
+						fields := map[string]bool{}
+						for _, k := range strings.Split(m.Option("fields"), " ") {
+							if k == "" {
+								continue
+							}
+							if fields[k] = true; len(fields) == 1 {
+								m.Meta["append"] = append(m.Meta["append"], "index")
+							}
+							m.Meta["append"] = append(m.Meta["append"], k)
+						}
+
+						if len(fields) > 0 {
+
+							switch ret := result.(type) {
+							case map[string]interface{}:
+								m.Append("index", "0")
+								for k, v := range ret {
+									switch value := v.(type) {
+									case string:
+										m.Append(k, strings.Replace(value, "\n", " ", -1))
+									case float64:
+										m.Append(k, fmt.Sprintf("%d", int(value)))
+									default:
+										if _, ok := fields[k]; ok {
+											m.Append(k, fmt.Sprintf("%v", value))
+										}
+									}
+								}
+							case []interface{}:
+								for i, r := range ret {
+									m.Add("append", "index", i)
+									if rr, ok := r.(map[string]interface{}); ok {
+										for k, v := range rr {
+											switch value := v.(type) {
+											case string:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, strings.Replace(value, "\n", " ", -1))
+												}
+											case float64:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, fmt.Sprintf("%d", int64(value)))
+												}
+											case bool:
+												if _, ok := fields[k]; len(fields) == 0 || ok {
+													m.Add("append", k, fmt.Sprintf("%v", value))
+												}
+											case map[string]interface{}:
+												for kk, vv := range value {
+													key := k + "." + kk
+													if _, ok := fields[key]; len(fields) == 0 || ok {
+														m.Add("append", key, strings.Replace(fmt.Sprintf("%v", vv), "\n", " ", -1))
+													}
+												}
+											default:
+												if _, ok := fields[k]; ok {
+													m.Add("append", k, fmt.Sprintf("%v", value))
+												}
+											}
+										}
+									}
+								}
+
+								if m.Has("json_key") {
+									m.Sort(m.Option("json_key"))
+								}
+								m.Meta["index"] = nil
+								for i, _ := range ret {
+									m.Add("append", "index", i)
+								}
+							}
+						}
+					}
+
+					if m.Table(); len(m.Meta["append"]) == 0 {
+						m.Echo("%s", string(buf))
+					}
+				}
+			}},
 	},
 }
 

@@ -1,14 +1,2 @@
-~aaa
-	# login load var/login.txt
-~file1
-	history load var/history.txt
-
 source etc/local.shy
-
-~shell1
-	alias import nfs
-	alias send send
-	alias open open
-	alias dial dial
-	alias pwd pwd
 
