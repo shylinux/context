@@ -69,7 +69,9 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 			return time.Unix(int64(n), 0).Format("15:03:04")
 		}},
 	}
-	c.Configs = map[string]*ctx.Config{}
+	c.Configs = map[string]*ctx.Config{
+		"right": &ctx.Config{Name: "right", Value: map[string]interface{}{}, Help: "用户权限"},
+	}
 
 	s := new(AAA)
 	s.Context = c
@@ -153,6 +155,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							}
 							return true
 						}, c)
+
 						if m.Results(0) {
 							return
 						}
@@ -173,18 +176,26 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							}
 							return true
 						}, c)
+
 						if m.Results(0) {
+							m.Append("sessid", m.Result(0))
+							return
+						}
+						if arg[0] == "" {
 							return
 						}
 
 						m.Start(fmt.Sprintf("user%d", m.Capi("nuser", 1)), "密码登录", "password", arg[0])
 						m.Cap("password", "password", aaa.Password(arg[1]), "密码登录")
+						m.Append("sessid", m.Cap("sessid"))
 						m.Echo(m.Cap("sessid"))
 						return
 					case 1:
+						m.Sess("login", nil)
 						m.Travel(func(m *ctx.Message, n int) bool {
 							if n > 0 && m.Cap("sessid") == arg[0] {
 								if int64(m.Capi("expire_time")) > time.Now().Unix() {
+									m.Sess("login", m.Target().Message())
 									m.Echo(m.Cap("stream"))
 								} else {
 									m.Target().Close(m)
@@ -205,6 +216,92 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 				}
 			}},
+		"right": &ctx.Command{Name: "right [user [check|owner|share group [order] [add|del]]]", Form: map[string]int{"from": 1}, Help: "权限管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Travel(func(m *ctx.Message, n int) bool {
+				if n == 0 {
+					return true
+				}
+				if len(arg) == 0 {
+					m.Add("append", "user", m.Cap("stream"))
+					m.Add("append", "right", m.Confv("right"))
+					return true
+				}
+				if m.Cap("stream") == arg[0] {
+					if len(arg) == 1 { //查看所有权
+						for k, v := range m.Confv("right").(map[string]interface{}) {
+							m.Add("append", "group", k)
+							m.Add("append", "right", v)
+						}
+						return true
+					}
+					if arg[1] == "check" { //权限检查
+						if from := m.Confv("right", []interface{}{"right", "role"}); from != nil && from.(string) == "root" {
+							m.Echo("root")
+						}
+						if len(arg) == 2 {
+							return false
+						}
+						if from := m.Confv("right", []interface{}{arg[2], "right", "role"}); from != nil && from.(string) == "owner" {
+							m.Echo("owner")
+						}
+						if len(arg) == 3 {
+							return false
+						}
+						if from := m.Confv("right", []interface{}{arg[2], arg[3], "right", "role"}); from != nil && from.(string) == "share" {
+							m.Echo("share")
+						}
+						return false
+					}
+					if len(arg) == 2 { //分配人事权
+						if m.Option("from") != "root" {
+							return false
+						}
+						switch arg[1] {
+						case "add":
+							m.Confv("right", []interface{}{"right", "role"}, "root")
+							m.Confv("right", []interface{}{"right", "from"}, m.Option("from"))
+						case "del":
+							m.Confv("right", []interface{}{"right", "role"}, "")
+						}
+						return true
+					}
+					if len(arg) == 3 { //查看使用权
+						for k, v := range m.Confv("right", arg[2]).(map[string]interface{}) {
+							m.Add("append", "order", k)
+							m.Add("append", "right", v)
+						}
+						return true
+					}
+					switch arg[1] {
+					case "owner": //分配所有权
+						if m.Cmd("right", m.Option("from"), "check").Result(0) == "" {
+							return false
+						}
+						switch arg[3] {
+						case "add":
+							m.Confv("right", []interface{}{arg[2], "right", "role"}, "owner")
+							m.Confv("right", []interface{}{arg[2], "right", "from"}, m.Option("from"))
+						case "del":
+							m.Confv("right", []interface{}{arg[2], "right", "role"}, "")
+						}
+					case "share": //分配使用权
+						if m.Cmd("right", m.Option("from"), "check", arg[2]).Result(0) == "" {
+							return false
+						}
+						switch arg[4] {
+						case "add":
+							m.Confv("right", []interface{}{arg[2], arg[3], "right", "role"}, "share")
+							m.Confv("right", []interface{}{arg[2], arg[3], "right", "from"}, m.Option("from"))
+						case "del":
+							m.Confv("right", []interface{}{arg[2], arg[3], "right", "role"}, "")
+						}
+					}
+					return false
+				}
+				return true
+			}, c)
+			m.Table()
+		}},
 		"cert": &ctx.Command{Name: "cert [filename]", Help: "导出证书", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.certificate != nil {
 				certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: aaa.certificate.Raw}))

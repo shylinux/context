@@ -27,8 +27,8 @@ type MUX interface {
 type WEB struct {
 	*http.Client
 	*http.ServeMux
-	*http.Server
-	*template.Template
+	server   *http.Server
+	template *template.Template
 
 	*ctx.Context
 }
@@ -80,7 +80,9 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 		m.TryCatch(m.Spawn(), true, func(msg *ctx.Message) {
 			msg.Add("option", "method", r.Method).Add("option", "path", r.URL.Path)
 
+			msg.Option("remote_addr", r.RemoteAddr)
 			msg.Option("referer", r.Header.Get("Referer"))
+			msg.Option("accept", r.Header.Get("Accept"))
 
 			if r.ParseForm(); len(r.PostForm) > 0 {
 				for k, v := range r.PostForm {
@@ -101,11 +103,11 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 
 			switch {
 			case msg.Has("redirect"):
-				http.Redirect(w, r, msg.Append("redirect"), http.StatusFound)
+				http.Redirect(w, r, msg.Append("redirect"), http.StatusTemporaryRedirect)
 			case msg.Has("directory"):
 				http.ServeFile(w, r, msg.Append("directory"))
-			case msg.Has("template"):
-				msg.Spawn().Cmd("/render", msg.Meta["template"])
+			case msg.Has("componet"):
+				msg.Spawn().Add("option", "componet_group", msg.Meta["componet"]).Cmd("/render")
 			case msg.Has("append"):
 				meta := map[string]interface{}{}
 				if len(msg.Meta["result"]) > 0 {
@@ -208,16 +210,16 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: m.Confx("protocol", arg, 2), Help: "服务协议"}
 	web.Caches["address"] = &ctx.Cache{Name: "address", Value: m.Confx("address", arg, 1), Help: "服务地址"}
 	m.Log("info", "%d %s://%s", m.Capi("nserve", 1), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
-	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
+	web.server = &http.Server{Addr: m.Cap("address"), Handler: web}
 
 	if m.Caps("master", true); m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "cert", Value: m.Confx("cert", arg, 3), Help: "服务证书"}
 		web.Caches["key"] = &ctx.Cache{Name: "key", Value: m.Confx("key", arg, 4), Help: "服务密钥"}
 		m.Log("info", "cert [%s]", m.Cap("cert"))
 		m.Log("info", "key [%s]", m.Cap("key"))
-		web.Server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
+		web.server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
 	} else {
-		web.Server.ListenAndServe()
+		web.server.ListenAndServe()
 	}
 	return true
 }
@@ -244,16 +246,192 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"cert":          &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":           &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
 
-		"template_dir":  &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "路由数量"},
-		"template_file": &ctx.Config{Name: "template_file", Value: "usr/template", Help: "路由数量"},
-		"template": &ctx.Config{Name: "template", Value: map[string]interface{}{
-			"index": []interface{}{
+		"web_site": &ctx.Config{Name: "web_site", Value: []interface{}{
+			map[string]interface{}{"_name": "MDN", "site": "https://developer.mozilla.org"},
+			map[string]interface{}{"_name": "github", "site": "https://github.com"},
+		}, Help: "web_site"},
+		"template_dir": &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板路径"},
+
+		"componet_context": &ctx.Config{Name: "component_context", Value: "nfs", Help: "默认模块"},
+		"componet_command": &ctx.Config{Name: "component_command", Value: "pwd", Help: "默认命令"},
+		"componet_group":   &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
+		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+			"login": []interface{}{
 				map[string]interface{}{
-					"name": "message", "title": "message",
-					"context": "nfs", "command": "pwd",
+					"template": "head", "name": "head", "help": "head",
+					"context": "", "command": "", "arguments": []interface{}{},
+				},
+				map[string]interface{}{
+					"template": "componet", "name": "login", "help": "login",
+					"context": "aaa", "command": "login", "arguments": []interface{}{"@username", "@password"},
+					"inputs": []interface{}{
+						map[string]interface{}{
+							"type": "text", "name": "username",
+							"label": "username", "value": "",
+						},
+						map[string]interface{}{
+							"type": "password", "name": "password",
+							"label": "password", "value": "",
+						},
+						map[string]interface{}{
+							"type": "button", "name": "string",
+							"label": "string", "value": "login",
+						},
+					},
+					"display_append": "",
+					"display_result": "",
+					"result_reload":  "10",
+				},
+				map[string]interface{}{
+					"template": "tail", "name": "tail", "help": "tail",
+					"context": "", "command": "", "arguments": []interface{}{},
 				},
 			},
-		}, Help: "路由数量"},
+			"index": []interface{}{
+				map[string]interface{}{
+					"template": "head", "name": "head", "help": "head",
+					"context": "", "command": "", "arguments": []interface{}{},
+				},
+				map[string]interface{}{
+					"template": "clipboard", "name": "clipbaord", "help": "clipbaord",
+					"context": "", "command": "", "arguments": []interface{}{},
+				},
+				map[string]interface{}{
+					"template": "componet", "name": "message", "help": "message",
+					"context": "cli", "command": "buffer", "arguments": []interface{}{},
+					"inputs": []interface{}{
+						map[string]interface{}{
+							"type": "text", "name": "limit",
+							"label": "limit", "value": "3",
+						},
+						map[string]interface{}{
+							"type": "button", "name": "string",
+							"label": "string", "value": "refresh",
+						},
+					},
+				},
+				map[string]interface{}{
+					"template": "componet", "name": "time", "help": "time",
+					"context": "cli", "command": "time",
+					"arguments": []interface{}{"@string"},
+					"inputs": []interface{}{
+						map[string]interface{}{
+							"type": "text", "name": "time_format",
+							"label": "format", "value": "2006-01-02 15:04:05",
+						},
+						map[string]interface{}{
+							"type": "text", "name": "string",
+							"label": "string", "value": "",
+						},
+						map[string]interface{}{
+							"type": "button", "name": "button",
+							"label": "string", "value": "refresh",
+						},
+					},
+				},
+				map[string]interface{}{
+					"template": "componet", "name": "json", "help": "json",
+					"context": "nfs", "command": "json",
+					"arguments": []interface{}{"@string"},
+					"inputs": []interface{}{
+						map[string]interface{}{
+							"type": "text", "name": "string",
+							"label": "string", "value": "",
+						},
+						map[string]interface{}{
+							"type": "button", "name": "button",
+							"label": "string", "value": "refresh",
+						},
+					},
+				},
+				map[string]interface{}{
+					"template": "componet", "name": "dir", "help": "dir",
+					"context": "nfs", "command": "dir",
+					"arguments": []interface{}{"@dir",
+						"dir_deep", "no",
+						"dir_name", "name",
+						"dir_link", "<a class='download' data-type='%s'>%s<a>",
+						"dir_info", "",
+					},
+					"inputs": []interface{}{
+						map[string]interface{}{
+							"type": "text", "name": "dir",
+							"label": "dir", "value": "",
+						},
+						map[string]interface{}{
+							"type": "choice", "name": "dir_type",
+							"label": "dir_type", "value": "both",
+							"choice": []interface{}{
+								map[string]interface{}{
+									"name": "both", "value": "both",
+								},
+								map[string]interface{}{
+									"name": "file", "value": "file",
+								},
+								map[string]interface{}{
+									"name": "dir", "value": "dir",
+								},
+							},
+						},
+						map[string]interface{}{
+							"type": "choice", "name": "sort_field",
+							"label": "sort_field", "value": "time",
+							"choice": []interface{}{
+								map[string]interface{}{
+									"name": "filename", "value": "filename",
+								},
+								map[string]interface{}{
+									"name": "line", "value": "line",
+								},
+								map[string]interface{}{
+									"name": "size", "value": "size",
+								},
+								map[string]interface{}{
+									"name": "time", "value": "time",
+								},
+							},
+						},
+						map[string]interface{}{
+							"type": "choice", "name": "sort_order",
+							"label": "sort_order", "value": "time",
+							"choice": []interface{}{
+								map[string]interface{}{
+									"name": "str", "value": "str",
+								},
+								map[string]interface{}{
+									"name": "str_r", "value": "str_r",
+								},
+								map[string]interface{}{
+									"name": "int", "value": "int",
+								},
+								map[string]interface{}{
+									"name": "int_r", "value": "int_r",
+								},
+								map[string]interface{}{
+									"name": "time", "value": "time",
+								},
+								map[string]interface{}{
+									"name": "time_r", "value": "time_r",
+								},
+							},
+						},
+					},
+				},
+				map[string]interface{}{
+					"template": "componet", "name": "web_site", "help": "web_site",
+					"context": "web", "command": "config",
+					"arguments": []interface{}{
+						"web_site",
+						"format_field", "site", "<a href='%s'>%s<a>",
+					},
+					"display_result": "",
+				},
+				map[string]interface{}{
+					"template": "tail", "name": "tail", "help": "tail",
+					"context": "", "command": "", "arguments": []interface{}{},
+				},
+			},
+		}, Help: "组件列表"},
 	},
 	Commands: map[string]*ctx.Command{
 		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -517,54 +695,247 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 		}},
-		"/demo": &ctx.Command{Name: "/demo template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Append("template", "index")
-		}},
-		"template": &ctx.Command{Name: "template [file directory]|[name content]", Help: "添加模块, content: 模板内容, directory: 模板目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"template": &ctx.Command{Name: "template [file [directory]]|[name [content]]", Help: "添加模板, content: 模板内容, directory: 模板目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				if len(arg) == 0 {
-					for _, v := range web.Template.Templates() {
+					for _, v := range web.template.Templates() {
 						m.Add("append", "name", v.Name())
 					}
 					m.Sort("name").Table()
 					return
 				}
 
-				if web.Template == nil {
-					web.Template = template.New("render").Funcs(ctx.CGI)
+				if web.template == nil {
+					web.template = template.New("render").Funcs(ctx.CGI)
 				}
 
 				dir := path.Join(m.Confx("template_dir", arg, 1), arg[0])
-				if t, e := web.Template.ParseGlob(dir); e == nil {
-					web.Template = t
+				if t, e := web.template.ParseGlob(dir); e == nil {
+					web.template = t
 				} else {
+					m.Log("info", "%s", e)
 					if len(arg) > 1 {
-						web.Template = template.Must(web.Template.New(arg[0]).Parse(arg[1]))
+						web.template = template.Must(web.template.New(arg[0]).Parse(arg[1]))
 					} else {
-						buf := bytes.NewBuffer(make([]byte, 1024))
-						tmpl, e := web.Template.Clone()
+						tmpl, e := web.template.Clone()
 						m.Assert(e)
+						tmpl.Funcs(ctx.CGI)
+
+						buf := bytes.NewBuffer(make([]byte, 1024))
 						tmpl.ExecuteTemplate(buf, arg[0], m)
 						m.Echo(string(buf.Bytes()))
 					}
 				}
 			}
 		}},
-		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-				w := m.Optionv("response").(http.ResponseWriter)
-				w.Header().Add("Content-Type", "text/html")
-				tmpl, e := web.Template.Clone()
-				m.Assert(e)
-
-				for _, v := range m.Confv("template", arg[0]).([]interface{}) {
-					//执行命令
-					val := v.(map[string]interface{})
-					if _, ok := val["command"]; ok {
-						msg := m.Find(val["context"].(string)).Cmd(val["command"], val["argument"])
-						msg.Option("title", val["title"])
-						m.Assert(tmpl.ExecuteTemplate(w, val["name"].(string), msg))
+		"componet": &ctx.Command{Name: "componet [group [order [arg...]]]", Help: "添加组件, group: 组件分组, arg...: 组件参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			switch len(arg) {
+			case 0:
+				for k, v := range m.Confv("componet").(map[string]interface{}) {
+					for i, val := range v.([]interface{}) {
+						value := val.(map[string]interface{})
+						m.Add("append", "group", k)
+						m.Add("append", "order", i)
+						m.Add("append", "name", value["name"])
+						m.Add("append", "help", value["help"])
+						m.Add("append", "context", value["context"])
+						m.Add("append", "command", value["command"])
 					}
+				}
+				m.Sort("group").Table()
+			case 1:
+				for i, val := range m.Confv("componet", arg[0]).([]interface{}) {
+					value := val.(map[string]interface{})
+					m.Add("append", "order", i)
+					m.Add("append", "name", value["name"])
+					m.Add("append", "help", value["help"])
+					m.Add("append", "context", value["context"])
+					m.Add("append", "command", value["command"])
+				}
+				m.Table()
+			case 2:
+				value := m.Confv("componet", []interface{}{arg[0], arg[1]}).(map[string]interface{})
+				for k, v := range value {
+					m.Add("append", k, v)
+				}
+				m.Table()
+			default:
+				if com, ok := m.Confv("componet", []interface{}{arg[0], arg[1]}).(map[string]interface{}); ok {
+					for i := 2; i < len(arg)-1; i += 2 {
+						com[arg[i]] = arg[i+1]
+					}
+				} else {
+					m.Confv("componet", []interface{}{arg[0], arg[1]}, map[string]interface{}{
+						"name": arg[2], "help": arg[3],
+						"context": m.Confx("componet_context", arg, 4),
+						"command": m.Confx("componet_command", arg, 5),
+					})
+					break
+				}
+			}
+		}},
+		"session": &ctx.Command{Name: "session", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			sessid := m.Option("sessid")
+			if sessid == "" && m.Options("username") && m.Options("password") {
+				sessid = m.Sess("aaa").Cmd("login", m.Option("username"), m.Option("password")).Result(0)
+			}
+			if sessid == "" && m.Options("remote_addr") {
+				sessid = m.Sess("aaa").Cmd("login", "ip", m.Option("remote_addr")).Result(0)
+			}
+
+			login := m.Sess("aaa").Cmd("login", sessid).Sess("login", false)
+			m.Appendv("login", login)
+			m.Echo(sessid)
+		}},
+		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*WEB); m.Assert(ok) {
+				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
+				list := []interface{}{}
+
+				// tmpl, e := web.template.Clone()
+				// m.Assert(e)
+				// tmpl.Funcs(ctx.CGI)
+				//
+
+				tmpl := template.New("render").Funcs(ctx.CGI)
+				tmpl.ParseGlob("/Users/shaoying/context/usr/template/common/base.tmpl")
+
+				w := m.Optionv("response").(http.ResponseWriter)
+				if accept_json {
+					w.Header().Add("Content-Type", "application/json")
+				} else {
+					w.Header().Add("Content-Type", "text/html")
+				}
+
+				if m.Option("componet_group") == "" {
+					m.Option("componet_group", m.Conf("componet_group"))
+				}
+				group := m.Option("componet_group")
+
+				right := false
+				if group == "login" {
+					right = true
+				}
+
+				login := m
+				login = nil
+
+				for count := 0; count == 0; {
+					order := -1
+					if m.Option("componet_order") != "" {
+						order = m.Optioni("componet_order")
+					}
+
+					if !right {
+						login = m.Spawn().Cmd("session").Appendv("login").(*ctx.Message)
+					}
+					if !right && login != nil {
+						if role := login.Confv("right", []interface{}{"right", "role"}); role != nil && role.(string) == "root" {
+							right = true
+						}
+					}
+					if !right && login != nil {
+						if role := login.Confv("right", []interface{}{group, "right", "role"}); role != nil && role.(string) == "owner" {
+							right = true
+						}
+					}
+
+					for i, v := range m.Confv("componet", group).([]interface{}) {
+						if order != -1 && i != order {
+							continue
+						}
+
+						val := v.(map[string]interface{})
+
+						order_right := right
+						if !order_right && login != nil {
+							if role := login.Confv("right", []interface{}{group, val["name"], "right", "role"}); role != nil && role.(string) == "share" {
+								order_right = true
+							}
+						}
+						if !order_right {
+							continue
+						}
+
+						msg := m.Find(val["context"].(string))
+						if msg == nil {
+							if !accept_json {
+								m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), m))
+							}
+							continue
+						}
+						count++
+
+						msg.Option("componet_order", i)
+
+						for k, v := range val {
+							if msg.Option(k) != "" {
+								continue
+							}
+							switch value := v.(type) {
+							case []string:
+								msg.Add("option", k, value)
+							case string:
+								msg.Add("option", k, value)
+							default:
+								msg.Put("option", k, value)
+							}
+						}
+
+						args := []string{}
+						if val["arguments"] != nil {
+							for _, v := range val["arguments"].([]interface{}) {
+								switch value := v.(type) {
+								case string:
+									if len(value) > 1 && value[0] == '$' {
+										args = append(args, msg.Cap(value[1:]))
+									} else if len(value) > 1 && value[0] == '@' {
+										args = append(args, msg.Confx(value[1:]))
+									} else {
+										args = append(args, value)
+									}
+								}
+							}
+						}
+						if val["inputs"] != nil {
+							for _, v := range val["inputs"].([]interface{}) {
+								value := v.(map[string]interface{})
+								if msg.Option(value["name"].(string)) == "" {
+									msg.Add("option", value["name"].(string), value["value"])
+								}
+							}
+						}
+
+						if msg.Cmd(val["command"], args); accept_json {
+							list = append(list, msg.Meta)
+						} else {
+							m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))
+						}
+
+						if msg.Appends("sessid") {
+							http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Append("sessid")})
+							m.Append("page_redirect", fmt.Sprintf("/render?componet_group=%s&componet_order=%s",
+								m.Option("componet_group", m.Option("last_componet_group")),
+								m.Option("componet_order", m.Option("last_componet_order"))))
+							return
+						}
+					}
+
+					if count == 0 {
+						m.Option("last_componet_group", m.Option("componet_group"))
+						m.Option("last_componet_order", m.Option("componet_order"))
+						m.Option("componet_group", "login")
+						m.Option("componet_order", "-1")
+						group = m.Option("componet_group")
+						order = -1
+						right = true
+					}
+				}
+
+				if accept_json {
+					en := json.NewEncoder(w)
+					en.SetIndent("", "  ")
+					en.Encode(list)
 				}
 			}
 		}},

@@ -709,7 +709,14 @@ func (m *Message) Search(key string, root ...bool) []*Message {
 }
 func (m *Message) Sess(key string, arg ...interface{}) *Message {
 	spawn := true
-	if _, ok := m.Sessions[key]; !ok && len(arg) > 0 {
+	if len(arg) > 0 {
+		switch v := arg[0].(type) {
+		case bool:
+			spawn, arg = v, arg[1:]
+		}
+	}
+
+	if len(arg) > 0 {
 		if m.Sessions == nil {
 			m.Sessions = make(map[string]*Message)
 		}
@@ -747,13 +754,9 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 				m.Sessions[key] = m.Search(value, root)[0]
 			}
 			return m.Sessions[key]
-		}
-	}
-
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case bool:
-			spawn = v
+		case nil:
+			m.Sessions[key] = nil
+			return nil
 		}
 	}
 
@@ -1077,6 +1080,14 @@ func (m *Message) Sort(key string, arg ...string) *Message {
 		for j := i + 1; j < len(table); j++ {
 			result := false
 			switch cmp {
+			case "str":
+				if table[i][key] > table[j][key] {
+					result = true
+				}
+			case "str_r":
+				if table[i][key] < table[j][key] {
+					result = true
+				}
 			case "int":
 				a, e := strconv.Atoi(table[i][key])
 				m.Assert(e)
@@ -1091,14 +1102,6 @@ func (m *Message) Sort(key string, arg ...string) *Message {
 				b, e := strconv.Atoi(table[j][key])
 				m.Assert(e)
 				if a < b {
-					result = true
-				}
-			case "string":
-				if table[i][key] > table[j][key] {
-					result = true
-				}
-			case "string_r":
-				if table[i][key] < table[j][key] {
 					result = true
 				}
 			case "time":
@@ -1964,16 +1967,18 @@ var CGI = template.FuncMap{
 				m.Assert(e)
 				index = i
 			}
+
 			if len(arg) == 2 {
 				return m.Detail(index)
 			}
+
 			return m.Detail(index, arg[2])
 		case map[string][]string:
 			return strings.Join(m["detail"], "")
 		case []string:
 			return strings.Join(m, "")
 		default:
-			return fmt.Sprintf("%v", arg[0])
+			return m
 		}
 		return ""
 	},
@@ -2016,7 +2021,7 @@ var CGI = template.FuncMap{
 		case []string:
 			return strings.Join(m, "")
 		default:
-			return fmt.Sprintf("%v", arg[0])
+			return m
 		}
 		return ""
 	},
@@ -2040,16 +2045,18 @@ var CGI = template.FuncMap{
 				m.Assert(e)
 				index = i
 			}
+
 			if len(arg) == 2 {
 				return m.Result(index)
 			}
+
 			return m.Result(index, arg[2])
 		case map[string][]string:
 			return strings.Join(m["result"], "")
 		case []string:
 			return strings.Join(m, "")
 		default:
-			return fmt.Sprintf("%v", arg[0])
+			return m
 		}
 		return ""
 	},
@@ -2092,11 +2099,55 @@ var CGI = template.FuncMap{
 		case []string:
 			return strings.Join(m, "")
 		default:
-			return fmt.Sprintf("%v", arg[0])
+			return m
 		}
 		return ""
 	},
-	"unscaped": func(str string) interface{} {
+	"table": func(arg ...interface{}) []interface{} {
+		if len(arg) == 0 {
+			return []interface{}{}
+		}
+
+		switch m := arg[0].(type) {
+		case *Message:
+			if len(m.Meta["append"]) == 0 {
+				return []interface{}{}
+			}
+			if len(arg) == 1 {
+				data := []interface{}{}
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					line := map[string]string{}
+					for _, k := range m.Meta["append"] {
+						line[k] = m.Meta[k][i]
+						if len(m.Meta[k]) != i {
+							continue
+						}
+					}
+					data = append(data, line)
+				}
+
+				return data
+			}
+		case map[string][]string:
+			if len(arg) == 1 {
+				data := []interface{}{}
+				nrow := len(m[m["append"][0]])
+
+				for i := 0; i < nrow; i++ {
+					line := map[string]string{}
+					for _, k := range m["append"] {
+						line[k] = m[k][i]
+					}
+					data = append(data, line)
+				}
+
+				return data
+			}
+		}
+		return []interface{}{}
+	},
+	"unescape": func(str string) interface{} {
 		return template.HTML(str)
 	},
 
@@ -2978,7 +3029,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				"where_field": 1, "where_value": 1,
 				"sort_field": 1, "sort_order": 1,
 				"page_limit": 1, "page_offset": 1,
-				"select": 3,
+				"format_field": 2,
+				"select":       3,
 			},
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
 				offset, e := strconv.Atoi(m.Confx("page_offset"))
@@ -3020,6 +3072,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 					de := json.NewDecoder(f)
 					de.Decode(&save)
+				}
+
+				format_field := m.Option("format_field")
+				format_str := "%s"
+				if format_field != "" {
+					format_str = m.Meta["format_field"][1]
 				}
 
 				// sort_field := m.Option("sort_field")
@@ -3113,7 +3171,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 									m.Add("append", "index", "0")
 									for k, v := range val {
 										if len(fields) == 0 || fields[k] {
-											m.Add("append", k, v)
+											if k == format_field {
+												m.Add("append", k, fmt.Sprintf(format_str, v))
+											} else {
+												m.Add("append", k, v)
+											}
 										}
 									}
 								case []interface{}:
@@ -3134,7 +3196,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 											m.Add("append", "index", i)
 											for k, v := range val {
 												if len(fields) == 0 || fields[k] {
-													m.Add("append", k, v)
+													if k == format_field {
+														m.Add("append", k, fmt.Sprintf(format_str, v, v))
+													} else {
+														m.Add("append", k, v)
+													}
 												}
 											}
 										}
@@ -3142,11 +3208,18 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								case []string:
 									for i, v := range val {
 										m.Add("append", "index", i)
-										m.Add("append", "value", v)
+										if k == format_field {
+											m.Add("append", k, fmt.Sprintf(format_str, v, v))
+										} else {
+											m.Add("append", k, v)
+										}
 									}
 								default:
 									m.Echo("%v", Trans(val)[0])
 								}
+							case 3:
+								m.Echo("%v", m.Confv(arg[0], strings.Split(arg[1], "."), arg[2]))
+
 							default:
 								m.Echo("%v", m.Confv(arg[0], arg[1:]))
 								return false
