@@ -112,7 +112,8 @@ set autowrite
 set encoding=utf-8
 set mouse=a
 
-colorscheme elflord
+" colorscheme darkblue
+" colorscheme default
 set t_Co=256
 "}}}
 "映射快捷键"{{{
@@ -120,6 +121,7 @@ nnoremap <C-H> <C-W>h
 nnoremap <C-J> <C-W>j
 nnoremap <C-K> <C-W>k
 nnoremap <C-L> <C-W>l
+nnoremap <C-M> :make<CR>
 nnoremap <Space> :
 
 nnoremap j gj
@@ -143,4 +145,17 @@ autocmd BufNewFile,BufReadPost *.go set foldmethod=syntax
 
 command! RR wa | source ~/.vimrc |e
 source ~/.vim_local
+
+let g:colorscheme=1
+let g:colorlist = [ "ron", "torte", "darkblue", "peachpuff" ]
+function ColorNext()
+    if g:colorscheme >= len(g:colorlist)
+        let g:colorscheme = 0
+    endif
+    let g:scheme = g:colorlist[g:colorscheme]
+    exec "colorscheme " . g:scheme
+    let g:colorscheme = g:colorscheme+1
+endfunction
+call ColorNext()
+command! NN call ColorNext()<CR>
 "}}}
