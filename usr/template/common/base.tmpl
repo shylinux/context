@@ -74,7 +74,7 @@
 {{end}}
 
 {{define "componet"}}
-<fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "context"}}.{{option .Meta "command"}}</legend>
+<fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "help"}}({{option .Meta "command"}}.{{option .Meta "context"}})</legend>
     <form class="option {{option .Meta "name"}}"
           data-last_componet_group="{{option . "last_componet_group"|meta}}"
           data-last_componet_order="{{option . "last_componet_order"|meta}}"

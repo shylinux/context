@@ -798,7 +798,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				//
 
 				tmpl := template.New("render").Funcs(ctx.CGI)
-				tmpl.ParseGlob("/Users/shaoying/context/usr/template/common/base.tmpl")
+				tmpl.ParseGlob("/home/shaoying/context/usr/template/common/base.tmpl")
 
 				w := m.Optionv("response").(http.ResponseWriter)
 				if accept_json {

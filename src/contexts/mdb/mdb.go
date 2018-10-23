@@ -192,7 +192,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"show": &ctx.Command{Name: "show table fields...",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
 			Form: map[string]int{"where": 1, "group": 1, "order": 1, "limit": 1, "offset": 1, "other": -1,
-				"extra_field": 1, "extra_chains": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2},
+				"extra_field": 1, "extra_fields": 1, "extra_chains": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 					table := m.Confx("table", arg, 0)
@@ -237,7 +237,23 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						}
 						for i := 0; i < len(m.Meta[m.Option("extra_field")]); i++ {
 							json.Unmarshal([]byte(m.Meta[m.Option("extra_field")][i]), &m.Target().Configs["template_value"].Value)
-							switch v := m.Confv("template_value", m.Option("extra_chains")).(type) {
+							if m.Options("extra_chains") {
+								m.Target().Configs["template_value"].Value = m.Confv("template_value", m.Option("extra_chains"))
+							}
+							fields = strings.Split(m.Option("extra_fields"), " ")
+							switch v := m.Confv("template_value").(type) {
+							case map[string]interface{}:
+								for _, k := range fields {
+									if k == "" {
+										continue
+									}
+									if val, ok := v[k]; ok {
+										m.Add("append", k, fmt.Sprintf(format, val))
+									} else {
+										m.Add("append", k, fmt.Sprintf(format, ""))
+									}
+								}
+								m.Meta[m.Option("extra_field")][i] = ""
 							case float64:
 								m.Meta[m.Option("extra_field")][i] = fmt.Sprintf(format, int(v))
 							default:
