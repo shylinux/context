@@ -216,6 +216,19 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 				}
 			}},
+		"userinfo": &ctx.Command{Name: "userinfo sessid", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Travel(func(m *ctx.Message, n int) bool {
+				if m.Cap("sessid") == arg[0] {
+					m.Append("method", m.Cap("method"))
+					m.Append("stream", m.Cap("stream"))
+					m.Append("sessid", m.Cap("sessid"))
+					m.Append("login_time", m.Cap("login_time"))
+					m.Append("expire_time", m.Cap("expire_time"))
+				}
+				return true
+			})
+			m.Table()
+		}},
 		"right": &ctx.Command{Name: "right [user [check|owner|share group [order] [add|del]]]", Form: map[string]int{"from": 1}, Help: "权限管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Travel(func(m *ctx.Message, n int) bool {
 				if n == 0 {

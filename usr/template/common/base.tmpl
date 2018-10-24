@@ -61,6 +61,8 @@
 <body onkeyup="return onaction(event, 'keymap')">
 {{end}}
 
+{{define "void"}}{{end}}
+
 {{define "detail"}}{{detail .}}{{end}}
 {{define "option"}}{{option .}}{{end}}
 {{define "append"}}{{append .}}{{end}}
@@ -73,8 +75,18 @@
 </fieldset>
 {{end}}
 
+{{define "upload"}}
+<fieldset><legend>clipboard</legend>
+    <form
+        >
+        <file></file>
+    </form>
+</fieldset>
+{{end}}
+
 {{define "componet"}}
 <fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "help"}}({{option .Meta "command"}}.{{option .Meta "context"}})</legend>
+    {{$form_type := option . "form_type"|meta}}
     <form class="option {{option .Meta "name"}}"
           data-last_componet_group="{{option . "last_componet_group"|meta}}"
           data-last_componet_order="{{option . "last_componet_order"|meta}}"
@@ -82,6 +94,9 @@
           data-componet_order="{{option . "componet_order"|meta}}"
           data-componet_name="{{option . "name"|meta}}"
           data-componet_help="{{option . "help"|meta}}"
+          {{if eq $form_type "upload"}}
+              method="POST" action="/upload" enctype="multipart/form-data"
+          {{end}}
           >
           <input style="display:none"></input>
           {{range $index, $input := option . "inputs"}}
@@ -89,6 +104,10 @@
                   {{$type := index $input "type"}}
                   {{if eq $type "button"}}
                       <input type="button" name="{{index $input "name"}}" value="{{index $input "value"}}" onclick="return onaction(event, 'command')">
+                  {{else if eq $type "submit"}}
+                      <input type="submit" value="{{index $input "value"}}">
+                  {{else if eq $type "file"}}
+                      <input type="file" name="{{index $input "name"}}">
                   {{else if eq $type "choice"}}
                       {{$default_value := index $input "value"}}
                       <label>{{index $input "label"}} : </label>
@@ -104,7 +123,12 @@
                       </select>
                   {{else}}
                       <label>{{index $input "label"}} : </label>
-                      <input name="{{index $input "name"}}" value="{{index $input "value"}}" onkeyup="return onaction(event, 'input')" list="clipstack">
+                      <input
+                          name="{{index $input "name"}}"
+                          value="{{index $input "value"}}"
+                          list="clipstack"
+                          onclick="return onaction(event, 'click')"
+                          onkeyup="return onaction(event, 'input')">
                   {{end}}
               </div>
           {{end}}

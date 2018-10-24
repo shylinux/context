@@ -84,6 +84,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("referer", r.Header.Get("Referer"))
 			msg.Option("accept", r.Header.Get("Accept"))
 
+			r.ParseMultipartForm(int64(m.Confi("multipart_bsize")))
 			if r.ParseForm(); len(r.PostForm) > 0 {
 				for k, v := range r.PostForm {
 					m.Log("info", "%s: %v", k, v)
@@ -147,10 +148,10 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.URL.Path == "/" && m.Confs("root_index") {
-		http.Redirect(w, r, m.Conf("root_index"), http.StatusFound)
-	} else {
-		web.ServeMux.ServeHTTP(w, r)
+		r.URL.Path = m.Conf("root_index")
 	}
+
+	web.ServeMux.ServeHTTP(w, r)
 
 	if m.Confs("logheaders") {
 		for k, v := range w.Header() {
@@ -169,7 +170,7 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	web.Configs["root_index"] = &ctx.Config{Name: "root_index", Value: "", Help: "默认路由"}
+	web.Configs["root_index"] = &ctx.Config{Name: "root_index", Value: "/render", Help: "默认路由"}
 	web.Configs["logheaders"] = &ctx.Config{Name: "logheaders(yes/no)", Value: "no", Help: "日志输出报文头"}
 	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: m.Confx("directory", arg, 0), Help: "服务目录"}
 	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "模块路由"}
@@ -237,14 +238,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"body_response": &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
-		"method":        &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
-		"brow_home":     &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "服务"},
-		"directory":     &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
-		"address":       &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
-		"protocol":      &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
-		"cert":          &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
-		"key":           &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
+		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
+		"method":          &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
+		"brow_home":       &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "服务"},
+		"directory":       &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
+		"address":         &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
+		"protocol":        &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
+		"cert":            &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
+		"key":             &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
 
 		"web_site": &ctx.Config{Name: "web_site", Value: []interface{}{
 			map[string]interface{}{"_name": "MDN", "site": "https://developer.mozilla.org"},
@@ -258,11 +260,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"login": []interface{}{
 				map[string]interface{}{
-					"template": "head", "name": "head", "help": "head",
-					"context": "", "command": "", "arguments": []interface{}{},
+					"name": "head", "help": "head", "template": "head",
 				},
 				map[string]interface{}{
-					"template": "componet", "name": "login", "help": "login",
+					"name": "userinfo", "help": "userinfo",
+					"context": "aaa", "command": "userinfo", "arguments": []interface{}{"@sessid"},
+				},
+				map[string]interface{}{
+					"name": "login", "help": "login", "template": "componet",
 					"context": "aaa", "command": "login", "arguments": []interface{}{"@username", "@password"},
 					"inputs": []interface{}{
 						map[string]interface{}{
@@ -283,21 +288,20 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"result_reload":  "10",
 				},
 				map[string]interface{}{
-					"template": "tail", "name": "tail", "help": "tail",
-					"context": "", "command": "", "arguments": []interface{}{},
+					"name": "tail", "help": "tail", "template": "tail",
 				},
 			},
 			"index": []interface{}{
 				map[string]interface{}{
-					"template": "head", "name": "head", "help": "head",
+					"name": "head", "help": "head", "template": "head",
 					"context": "", "command": "", "arguments": []interface{}{},
 				},
 				map[string]interface{}{
-					"template": "clipboard", "name": "clipbaord", "help": "clipbaord",
+					"name": "clipbaord", "help": "clipbaord", "template": "clipboard",
 					"context": "", "command": "", "arguments": []interface{}{},
 				},
 				map[string]interface{}{
-					"template": "componet", "name": "message", "help": "message",
+					"name": "message", "help": "message", "template": "componet",
 					"context": "cli", "command": "buffer", "arguments": []interface{}{},
 					"inputs": []interface{}{
 						map[string]interface{}{
@@ -311,9 +315,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					},
 				},
 				map[string]interface{}{
-					"template": "componet", "name": "time", "help": "time",
-					"context": "cli", "command": "time",
-					"arguments": []interface{}{"@string"},
+					"name": "time", "help": "time", "template": "componet",
+					"context": "cli", "command": "time", "arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
 						map[string]interface{}{
 							"type": "text", "name": "time_format",
@@ -330,7 +333,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					},
 				},
 				map[string]interface{}{
-					"template": "componet", "name": "json", "help": "json",
+					"name": "json", "help": "json", "template": "componet",
 					"context": "nfs", "command": "json",
 					"arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
@@ -345,7 +348,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					},
 				},
 				map[string]interface{}{
-					"template": "componet", "name": "dir", "help": "dir",
+					"name": "dir", "help": "dir", "template": "componet",
 					"context": "nfs", "command": "dir",
 					"arguments": []interface{}{"@dir",
 						"dir_deep", "no",
@@ -353,6 +356,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						"dir_link", "<a class='download' data-type='%s'>%s<a>",
 						"dir_info", "",
 					},
+					"form_type": "upload",
 					"inputs": []interface{}{
 						map[string]interface{}{
 							"type": "text", "name": "dir",
@@ -379,6 +383,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							"choice": []interface{}{
 								map[string]interface{}{
 									"name": "filename", "value": "filename",
+								},
+								map[string]interface{}{
+									"name": "is_dir", "value": "is_dir",
 								},
 								map[string]interface{}{
 									"name": "line", "value": "line",
@@ -415,10 +422,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								},
 							},
 						},
+						map[string]interface{}{
+							"type": "file", "name": "upload",
+							"label": "upload", "value": "upload",
+						},
+						map[string]interface{}{
+							"type": "submit", "name": "submit",
+							"label": "submit", "value": "submit",
+						},
 					},
 				},
 				map[string]interface{}{
-					"template": "componet", "name": "web_site", "help": "web_site",
+					"name": "web_site", "help": "web_site", "template": "componet",
 					"context": "web", "command": "config",
 					"arguments": []interface{}{
 						"web_site",
@@ -427,7 +442,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"display_result": "",
 				},
 				map[string]interface{}{
-					"template": "tail", "name": "tail", "help": "tail",
+					"name": "tail", "help": "tail", "template": "tail",
 					"context": "", "command": "", "arguments": []interface{}{},
 				},
 			},
@@ -787,6 +802,22 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Appendv("login", login)
 			m.Echo(sessid)
 		}},
+		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
+			f, h, e := r.FormFile("upload")
+			m.Assert(e)
+			defer f.Close()
+
+			p := path.Join(m.Conf("directory"), m.Option("dir"), h.Filename)
+			o, e := os.Create(p)
+			m.Assert(e)
+			defer o.Close()
+
+			io.Copy(o, f)
+			m.Log("upload", "file(%d): %s", h.Size, p)
+			m.Append("redirect", m.Option("referer"))
+		}},
+
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
@@ -796,9 +827,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				// m.Assert(e)
 				// tmpl.Funcs(ctx.CGI)
 				//
-
 				tmpl := template.New("render").Funcs(ctx.CGI)
-				tmpl.ParseGlob("/home/shaoying/context/usr/template/common/base.tmpl")
+				tmpl.ParseGlob(fmt.Sprintf("%s/context/usr/template/common/base.tmpl", os.Getenv("HOME")))
 
 				w := m.Optionv("response").(http.ResponseWriter)
 				if accept_json {
@@ -810,42 +840,33 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if m.Option("componet_group") == "" {
 					m.Option("componet_group", m.Conf("componet_group"))
 				}
+
 				group := m.Option("componet_group")
-
-				right := false
-				if group == "login" {
-					right = true
-				}
-
+				order := m.Option("componet_order")
+				right := group == "login"
 				login := m
 				login = nil
 
-				for count := 0; count == 0; {
-					order := -1
-					if m.Option("componet_order") != "" {
-						order = m.Optioni("componet_order")
+				if !right {
+					login = m.Spawn().Cmd("session").Appendv("login").(*ctx.Message)
+				}
+				if !right && login != nil {
+					if role := login.Confv("right", []interface{}{"right", "role"}); role != nil && role.(string) == "root" {
+						right = true
 					}
+				}
+				if !right && login != nil {
+					if role := login.Confv("right", []interface{}{group, "right", "role"}); role != nil && role.(string) == "owner" {
+						right = true
+					}
+				}
 
-					if !right {
-						login = m.Spawn().Cmd("session").Appendv("login").(*ctx.Message)
-					}
-					if !right && login != nil {
-						if role := login.Confv("right", []interface{}{"right", "role"}); role != nil && role.(string) == "root" {
-							right = true
-						}
-					}
-					if !right && login != nil {
-						if role := login.Confv("right", []interface{}{group, "right", "role"}); role != nil && role.(string) == "owner" {
-							right = true
-						}
-					}
-
-					for i, v := range m.Confv("componet", group).([]interface{}) {
-						if order != -1 && i != order {
+				for count := 0; count == 0; group, order, right = "login", "", true {
+					for _, v := range m.Confv("componet", group).([]interface{}) {
+						val := v.(map[string]interface{})
+						if order != "" && val["name"].(string) != order {
 							continue
 						}
-
-						val := v.(map[string]interface{})
 
 						order_right := right
 						if !order_right && login != nil {
@@ -857,16 +878,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							continue
 						}
 
-						msg := m.Find(val["context"].(string))
+						context := m.Cap("module")
+						if val["context"] != nil {
+							context = val["context"].(string)
+						}
+
+						msg := m.Find(context)
 						if msg == nil {
-							if !accept_json {
+							if !accept_json && val["template"] != nil {
 								m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), m))
 							}
 							continue
 						}
 						count++
 
-						msg.Option("componet_order", i)
+						msg.Option("componet_order", val["name"].(string))
 
 						for k, v := range val {
 							if msg.Option(k) != "" {
@@ -887,13 +913,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							for _, v := range val["arguments"].([]interface{}) {
 								switch value := v.(type) {
 								case string:
-									if len(value) > 1 && value[0] == '$' {
-										args = append(args, msg.Cap(value[1:]))
-									} else if len(value) > 1 && value[0] == '@' {
-										args = append(args, msg.Confx(value[1:]))
-									} else {
-										args = append(args, value)
-									}
+									args = append(args, m.Parse(value))
 								}
 							}
 						}
@@ -906,29 +926,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 
-						if msg.Cmd(val["command"], args); accept_json {
+						if val["command"] != nil {
+							msg.Cmd(val["command"], args)
+						}
+
+						if accept_json {
 							list = append(list, msg.Meta)
-						} else {
+						} else if val["template"] != nil {
 							m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))
 						}
 
-						if msg.Appends("sessid") {
+						if msg.Detail(0) == "login" && msg.Appends("sessid") {
 							http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Append("sessid")})
-							m.Append("page_redirect", fmt.Sprintf("/render?componet_group=%s&componet_order=%s",
-								m.Option("componet_group", m.Option("last_componet_group")),
-								m.Option("componet_order", m.Option("last_componet_order"))))
+							m.Append("page_refresh", "10")
 							return
 						}
-					}
-
-					if count == 0 {
-						m.Option("last_componet_group", m.Option("componet_group"))
-						m.Option("last_componet_order", m.Option("componet_order"))
-						m.Option("componet_group", "login")
-						m.Option("componet_order", "-1")
-						group = m.Option("componet_group")
-						order = -1
-						right = true
 					}
 				}
 

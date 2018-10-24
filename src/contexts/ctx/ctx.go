@@ -1332,6 +1332,15 @@ func (m *Message) Appendv(key string, arg ...interface{}) interface{} {
 	return nil
 }
 
+func (m *Message) Parse(arg string) string {
+	if len(arg) > 1 && arg[0] == '$' {
+		return m.Cap(arg[1:])
+	}
+	if len(arg) > 1 && arg[0] == '@' {
+		return m.Confx(arg[1:])
+	}
+	return arg
+}
 func (m *Message) Wait() bool {
 	if m.target.exit != nil {
 		return <-m.target.exit

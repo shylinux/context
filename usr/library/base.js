@@ -65,6 +65,20 @@ function send_command(form, cb) {
 }
 function onaction(event, action) {
     switch (action) {
+        case "click":
+            if (event.target.nodeName == "INPUT") {
+                if (event.altKey) {
+                    event.target.focus()
+                    event.target.select()
+                    console.log("fuck")
+                        console.log(document.execCommand("paste"))
+    // var clipboard = document.querySelector("#clipboard")
+    // clipboard.value = text
+    // clipboard.select()
+    // document.execCommand("copy")
+                }
+            }
+            break
         case "command":
             send_command(event.target.form)
             break
@@ -148,10 +162,15 @@ function init_download(event) {
     if (!option) {
         return
     }
+
+    document.querySelector("form.option.dir input[name=dir]").value = context.Search("download_dir")
+
     option["dir"].value && send_command(option)
 
     var append = document.querySelector("table.append.dir")
+    append.onchange = 
     append.onclick = function(event) {
+        console.log(event)
         if (event.target.tagName == "A") {
             if (event.target.dataset.type != "true") {
                 location.href = option["dir"].value+"/"+event.target.innerText
@@ -170,6 +189,7 @@ function init_download(event) {
             var sort_order = option["sort_order"]
             switch (event.target.innerText) {
                 case "filename":
+                case "is_dir":
                     sort_order.value = (sort_order.value == "str")? "str_r": "str"
                     break
                 case "line":
