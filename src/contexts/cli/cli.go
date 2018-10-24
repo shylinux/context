@@ -813,6 +813,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"tmux": &ctx.Command{Name: "tmux", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Copy(m.Spawn().Cmd("system", "tmux", arg), "result")
 		}},
+		"exit": &ctx.Command{Name: "exit code", Help: "exit", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			code := 0
+			if len(arg) > 0 {
+				i, e := strconv.Atoi(arg[0])
+				m.Assert(e)
+				code = i
+			}
+			os.Exit(code)
+		}},
 		"buffer": &ctx.Command{Name: "buffer", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			bufs := strings.Split(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n")
 
@@ -829,10 +838,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if len(bs) > 1 {
 					m.Add("append", "buffer", bs[0][:len(bs[0])])
 					m.Add("append", "length", bs[1][:len(bs[1])-6])
-					m.Add("append", "string", bs[2][1:len(bs[2])-1])
+					m.Add("append", "strings", bs[2][1:len(bs[2])-1])
 				}
 			}
-			m.Echo(m.Append("string"))
+			m.Echo(m.Append("strings"))
 		}},
 	},
 	Index: map[string]*ctx.Context{

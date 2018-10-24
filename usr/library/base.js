@@ -68,14 +68,9 @@ function onaction(event, action) {
         case "click":
             if (event.target.nodeName == "INPUT") {
                 if (event.altKey) {
-                    event.target.focus()
-                    event.target.select()
                     console.log("fuck")
-                        console.log(document.execCommand("paste"))
-    // var clipboard = document.querySelector("#clipboard")
-    // clipboard.value = text
-    // clipboard.select()
-    // document.execCommand("copy")
+                    var board = document.querySelector("#clipboard")
+                    event.target.value = board.value
                 }
             }
             break
@@ -179,7 +174,7 @@ function init_download(event) {
 
             option["dir"].value = option["dir"].value+"/"+event.target.innerText
             send_command(option, function(msg) {
-                option["dir"].value = msg.dir.join("")
+                context.Cookie("download_dir", option["dir"].value = msg.dir.join(""))
             })
         } else if (event.target.tagName == "TD") {
             copy_to_clipboard(event.target.innerText)

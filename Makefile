@@ -20,6 +20,9 @@ install_all: install
 build:
 	go build $(BENCH)
 
+run:
+	etc/run.sh
+
 win64:
 	GOARCH=amd64 GOOS=windows go build $(BENCH)
 	mv bench.exe bench_1.0_win64.exe

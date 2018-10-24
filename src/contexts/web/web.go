@@ -238,6 +238,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"login_right":     &ctx.Config{Name: "login_right", Value: "1", Help: "缓存大小"},
 		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
 		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
 		"method":          &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
@@ -309,8 +310,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							"label": "limit", "value": "3",
 						},
 						map[string]interface{}{
-							"type": "button", "name": "string",
-							"label": "string", "value": "refresh",
+							"type": "button", "name": "refresh",
+							"label": "refresh", "value": "refresh",
 						},
 					},
 				},
@@ -844,6 +845,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				group := m.Option("componet_group")
 				order := m.Option("componet_order")
 				right := group == "login"
+				if !right {
+					right = !m.Confs("login_right")
+				}
 				login := m
 				login = nil
 
