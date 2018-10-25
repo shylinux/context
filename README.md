@@ -1,5 +1,15 @@
 ## 0 context简介
-context: 终端工具链，各种实用的功能模块，通过简洁的接口，自由的组合在一起。
+context: 为代码提供自由的运行环境，干掉各种库依赖、包依赖、接口依赖、服务依赖、配置依赖、逻辑依赖。
+
+// TODO: 代码已重构多次，文档比较落后，近期会整理文档。
+
+// TODO: zsh tmux docker git vim
+
+// TODO: linux nginx python redis mysql
+
+// TODO: code wiki jira lark mall
+
+终端工具链，各种实用的功能模块，通过简洁的接口，自由的组合在一起。
 
 作为一个工具箱，内置各种实用工具，通过灵活的配置，打造个性化的工具链。
 
