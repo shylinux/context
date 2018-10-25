@@ -21,7 +21,7 @@ build:
 	go build $(BENCH)
 
 run:
-	etc/run.sh
+	etc/run.sh 2>var/error.log
 
 win64:
 	GOARCH=amd64 GOOS=windows go build $(BENCH)

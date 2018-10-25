@@ -63,14 +63,27 @@ function send_command(form, cb) {
         typeof(cb) == "function" && cb(msg)
     })
 }
+function check_argument(form, target) {
+    for (var i = 0; i < form.length-1; i++) {
+        if (form[i] == target) {
+            if (form[i+1].type == "button") {
+                form[i+1].click()
+            } else {
+                form[i+1].focus()
+            }
+            return false
+        }
+    }
+    send_command(form)
+}
 function onaction(event, action) {
     switch (action) {
         case "click":
             if (event.target.nodeName == "INPUT") {
                 if (event.altKey) {
-                    console.log("fuck")
                     var board = document.querySelector("#clipboard")
                     event.target.value = board.value
+                    check_argument(event.target.form, event.target)
                 }
             }
             break
@@ -80,13 +93,7 @@ function onaction(event, action) {
         case "input":
             switch (event.key) {
                 case "Enter":
-                    var form = event.target.form
-                    for (var i = 0; i < form.length; i++) {
-                        if (form[i] == event.target) {
-                            continue
-                        }
-                        (i == form.length-1)? send_command(form): form[i+1].focus()
-                    }
+                    check_argument(event.target.form, event.target)
                     break
                 case "Escape":
                     event.target.value = ""

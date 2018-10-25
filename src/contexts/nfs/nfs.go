@@ -131,6 +131,8 @@ func dir(m *ctx.Message, name string, level int, deep bool, fields []string) {
 					case "filename":
 						m.Add("append", "filename", filename)
 					case "is_dir":
+						f, e := os.Stat(filename)
+						m.Assert(e)
 						m.Add("append", "is_dir", f.IsDir())
 					case "size":
 						m.Add("append", "size", f.Size())
