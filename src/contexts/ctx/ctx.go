@@ -2367,7 +2367,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Echo("%d", m.Spawn().code)
 				return
 			}
-			msg := m.Sess("cli", false)
+			msg := m.Search(m.Cap("ps_target"))[0]
+			msg = msg.target.message
 			if len(arg) > 0 {
 				if code, e := strconv.Atoi(arg[0]); e == nil {
 					if msg = m.root.Tree(code); msg != nil {

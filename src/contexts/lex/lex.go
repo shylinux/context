@@ -30,18 +30,17 @@ type LEX struct {
 	state map[State]*State
 	char  map[byte][]byte
 
-	*ctx.Message
 	*ctx.Context
 }
 
-func (lex *LEX) index(hash string, h string) int {
+func (lex *LEX) index(m *ctx.Message, hash string, h string) int {
 	which := lex.page
 	if hash == "nhash" {
 		which = lex.hash
 	}
 
 	if x, e := strconv.Atoi(h); e == nil {
-		lex.Assert(hash != "npage" || x < lex.Capi("npage"))
+		m.Assert(hash != "npage" || x < m.Capi("npage"))
 		return x
 	}
 
@@ -49,8 +48,8 @@ func (lex *LEX) index(hash string, h string) int {
 		return x
 	}
 
-	which[h] = lex.Capi(hash, 1)
-	lex.Assert(hash != "npage" || lex.Capi("npage") < lex.Capi("nlang"))
+	which[h] = m.Capi(hash, 1)
+	m.Assert(hash != "npage" || m.Capi("npage") < m.Capi("nlang"))
 	return which[h]
 }
 func (lex *LEX) charset(c byte) []byte {
@@ -59,12 +58,12 @@ func (lex *LEX) charset(c byte) []byte {
 	}
 	return []byte{c}
 }
-func (lex *LEX) train(page int, hash int, seed []byte) int {
+func (lex *LEX) train(m *ctx.Message, page int, hash int, seed []byte) int {
 
 	ss := []int{page}
-	cn := make([]bool, lex.Capi("ncell"))
-	cc := make([]byte, 0, lex.Capi("ncell"))
-	sn := make([]bool, lex.Capi("nline"))
+	cn := make([]bool, m.Capi("ncell"))
+	cc := make([]byte, 0, m.Capi("ncell"))
+	sn := make([]bool, m.Capi("nline"))
 
 	points := []*Point{}
 
@@ -122,8 +121,8 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 			cc = append(cc, seed[p])
 		}
 
-		lex.Log("debug", "page: \033[31m%d %v\033[0m", len(ss), ss)
-		lex.Log("debug", "cell: \033[32m%d %v\033[0m", len(cc), cc)
+		m.Log("debug", "page: \033[31m%d %v\033[0m", len(ss), ss)
+		m.Log("debug", "cell: \033[32m%d %v\033[0m", len(cc), cc)
 
 		flag := '\000'
 		if p+1 < len(seed) {
@@ -142,9 +141,9 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 				if lex.mat[s][c] != nil {
 					*state = *lex.mat[s][c]
 				} else {
-					lex.Capi("nnode", 1)
+					m.Capi("nnode", 1)
 				}
-				lex.Log("debug", "GET(%d,%d): %v", s, c, state)
+				m.Log("debug", "GET(%d,%d): %v", s, c, state)
 
 				switch flag {
 				case '+':
@@ -157,9 +156,9 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 				}
 
 				if state.next == 0 {
-					if line == 0 || !lex.Confs("compact") {
+					if line == 0 || !m.Confs("compact") {
 						lex.mat = append(lex.mat, make(map[byte]*State))
-						line = lex.Capi("nline", 1) - 1
+						line = m.Capi("nline", 1) - 1
 						sn = append(sn, false)
 					}
 					state.next = line
@@ -168,7 +167,7 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 
 				lex.mat[s][c] = state
 				points = append(points, &Point{s, c})
-				lex.Log("debug", "SET(%d,%d): %v(%s,%s)", s, c, state, lex.Cap("nnode"), lex.Cap("nreal"))
+				m.Log("debug", "SET(%d,%d): %v(%s,%s)", s, c, state, m.Cap("nnode"), m.Cap("nreal"))
 			}
 		}
 
@@ -181,12 +180,12 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 	}
 
 	for _, s := range ss {
-		if s < lex.Capi("nlang") || s >= len(lex.mat) {
+		if s < m.Capi("nlang") || s >= len(lex.mat) {
 			continue
 		}
 
 		if len(lex.mat[s]) == 0 {
-			lex.Log("debug", "DEL: %d-%d", lex.Capi("nline")-1, lex.Capi("nline", 0, s))
+			m.Log("debug", "DEL: %d-%d", m.Capi("nline")-1, m.Capi("nline", 0, s))
 			lex.mat = lex.mat[:s]
 		}
 	}
@@ -197,17 +196,17 @@ func (lex *LEX) train(page int, hash int, seed []byte) int {
 			*state = *lex.mat[p.s][p.c]
 
 			if state.next == s {
-				lex.Log("debug", "GET(%d, %d): %v", p.s, p.c, state)
+				m.Log("debug", "GET(%d, %d): %v", p.s, p.c, state)
 				if state.hash = hash; state.next >= len(lex.mat) {
 					state.next = 0
 				}
 				lex.mat[p.s][p.c] = state
-				lex.Log("debug", "SET(%d, %d): %v", p.s, p.c, state)
+				m.Log("debug", "SET(%d, %d): %v", p.s, p.c, state)
 			}
 
 			if x, ok := lex.state[*state]; !ok {
 				lex.state[*state] = lex.mat[p.s][p.c]
-				lex.Capi("nreal", 1)
+				m.Capi("nreal", 1)
 			} else {
 				lex.mat[p.s][p.c] = x
 			}
@@ -232,7 +231,7 @@ func (lex *LEX) parse(m *ctx.Message, page int, line []byte) (hash int, rest []b
 		}
 
 		state := lex.mat[s][c]
-		lex.Log("debug", "(%d,%d): %v", s, c, state)
+		m.Log("debug", "(%d,%d): %v", s, c, state)
 		if state == nil {
 			s, star, pos = star, 0, pos-1
 			continue
@@ -259,8 +258,8 @@ func (lex *LEX) parse(m *ctx.Message, page int, line []byte) (hash int, rest []b
 	rest = line[pos:]
 	return
 }
+
 func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	lex.Message = m
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
 
@@ -269,8 +268,6 @@ func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	lex.Message = m
-
 	lex.Caches["ncell"] = &ctx.Cache{Name: "字符上限", Value: "128", Help: "字符集合的最大数量"}
 	lex.Caches["nlang"] = &ctx.Cache{Name: "词法上限", Value: "64", Help: "词法集合的最大数量"}
 
@@ -285,16 +282,16 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	lex.Configs["compact"] = &ctx.Config{Name: "紧凑模式", Value: "true", Help: "词法状态的共用"}
 
 	if len(arg) > 0 {
-		if _, e := strconv.Atoi(arg[0]); lex.Assert(e) {
-			lex.Cap("nlang", arg[0])
-			lex.Cap("nline", arg[0])
+		if _, e := strconv.Atoi(arg[0]); m.Assert(e) {
+			m.Cap("nlang", arg[0])
+			m.Cap("nline", arg[0])
 		}
 	}
 
 	lex.page = map[string]int{"nil": 0}
 	lex.hash = map[string]int{"nil": 0}
 
-	lex.mat = make([]map[byte]*State, lex.Capi("nlang"))
+	lex.mat = make([]map[byte]*State, m.Capi("nlang"))
 	lex.state = make(map[State]*State)
 
 	lex.char = map[byte][]byte{
@@ -309,7 +306,6 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return lex
 }
 func (lex *LEX) Start(m *ctx.Message, arg ...string) bool {
-	lex.Message = m
 	return false
 }
 func (lex *LEX) Close(m *ctx.Message, arg ...string) bool {
@@ -324,7 +320,10 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 	Caches: map[string]*ctx.Cache{
 		"nmat": &ctx.Cache{Name: "nmat", Value: "0", Help: "nmat"},
 	},
-	Configs: map[string]*ctx.Config{},
+	Configs: map[string]*ctx.Config{
+		"npage": &ctx.Config{Name: "npage", Value: "1", Help: "npage"},
+		"nhash": &ctx.Config{Name: "nhash", Value: "1", Help: "npage"},
+	},
 	Commands: map[string]*ctx.Command{
 		"spawn": &ctx.Command{Name: "spawn", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*LEX); m.Assert(ok) {
@@ -333,37 +332,34 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 		}},
 		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
-				page, hash := 1, 1
-				if len(arg) > 2 {
-					page = lex.index("npage", arg[2])
-					m.Assert(page < m.Capi("nlang"), "词法集合过多")
-				}
-				if len(arg) > 1 {
-					hash = lex.index("nhash", arg[1])
-				}
-
+				page := lex.index(m, "npage", m.Confx("npage", arg, 2))
+				hash := lex.index(m, "nhash", m.Confx("nhash", arg, 1))
 				if lex.mat[page] == nil {
 					lex.mat[page] = map[byte]*State{}
 				}
 
-				m.Result(0, lex.train(page, hash, []byte(arg[0])))
+				m.Result(0, lex.train(m, page, hash, []byte(arg[0])))
 				lex.seed = append(lex.seed, &Seed{page, hash, arg[0]})
-				lex.Cap("stream", fmt.Sprintf("%d,%s,%s", lex.Capi("nseed", 1), lex.Cap("npage"), lex.Cap("nhash")))
+				m.Cap("stream", fmt.Sprintf("%d,%s,%s", m.Capi("nseed", 1), m.Cap("npage"), m.Cap("nhash")))
 			}
 		}},
 		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
-				page := 1
-				if len(arg) > 1 {
-					page = lex.index("npage", arg[1])
-				}
-
+				page := lex.index(m, "npage", m.Confx("npage", arg, 1))
 				hash, rest, word := lex.parse(m, page, []byte(arg[0]))
 				m.Result(0, hash, string(rest), string(word))
 			}
 		}},
-		"show": &ctx.Command{Name: "show info", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"show": &ctx.Command{Name: "show seed|page|hash|mat", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
+				if len(arg) == 0 {
+					m.Append("seed", len(lex.seed))
+					m.Append("page", len(lex.page))
+					m.Append("hash", len(lex.hash))
+					m.Append("node", len(lex.state))
+					m.Table()
+					return
+				}
 				switch arg[0] {
 				case "seed":
 					for _, v := range lex.seed {
@@ -391,7 +387,6 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 							if s == nil {
 								m.Add("append", fmt.Sprintf("%c", j), "")
 							} else {
-								// m.Add("append", fmt.Sprintf("%c", j), fmt.Sprintf("(%t,%d,%d)", s.star, s.next, s.hash))
 								star := 0
 								if s.star {
 									star = 1
@@ -406,7 +401,11 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 					for i := 0; i < ncol-1; i++ {
 						for j := i + 1; j < ncol; j++ {
 							same := true
+							void := true
 							for n := 0; n < nrow; n++ {
+								if m.Meta[m.Meta["append"][i]][n] != "" {
+									void = false
+								}
 								if m.Meta[m.Meta["append"][i]][n] != m.Meta[m.Meta["append"][j]][n] {
 									same = false
 									break
@@ -414,9 +413,11 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 							}
 
 							if same {
-								key = m.Meta["append"][i] + m.Meta["append"][j]
-								m.Meta[key] = m.Meta[m.Meta["append"][i]]
-								m.Meta["append"][i] = key
+								if !void {
+									key = m.Meta["append"][i] + m.Meta["append"][j]
+									m.Meta[key] = m.Meta[m.Meta["append"][i]]
+									m.Meta["append"][i] = key
+								}
 								for k := j; k < ncol-1; k++ {
 									m.Meta["append"][k] = m.Meta["append"][k+1]
 								}

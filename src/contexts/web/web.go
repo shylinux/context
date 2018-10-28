@@ -288,46 +288,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"display_result": "",
 					"result_reload":  "10",
 				},
-				map[string]interface{}{
-					"name": "tail", "help": "tail", "template": "tail",
+				map[string]interface{}{"name": "tail", "help": "tail", "template": "tail",
+					"context": "", "command": "", "arguments": []interface{}{},
 				},
 			},
 			"index": []interface{}{
-				map[string]interface{}{
-					"name": "head", "help": "head", "template": "head",
+				map[string]interface{}{"name": "head", "help": "head", "template": "head",
 					"context": "", "command": "", "arguments": []interface{}{},
 				},
-				map[string]interface{}{
-					"name": "clipbaord", "help": "clipbaord", "template": "clipboard",
+				map[string]interface{}{"name": "clipbaord", "help": "clipbaord", "template": "clipboard",
 					"context": "", "command": "", "arguments": []interface{}{},
 				},
-				map[string]interface{}{
-					"name": "matrix", "help": "matrix", "template": "componet",
-					"context": "lex", "command": "show", "arguments": []interface{}{"@info"},
-					"inputs": []interface{}{
-						map[string]interface{}{
-							"type": "choice", "name": "info",
-							"label": "info", "value": "seed",
-							"choice": []interface{}{
-								map[string]interface{}{
-									"name": "seed", "value": "seed",
-								},
-								map[string]interface{}{
-									"name": "page", "value": "page",
-								},
-								map[string]interface{}{
-									"name": "hash", "value": "hash",
-								},
-								map[string]interface{}{
-									"name": "mat", "value": "mat",
-								},
-							},
-						},
-					},
-					"display_result": "",
-				},
-				map[string]interface{}{
-					"name": "message", "help": "message", "template": "componet",
+				map[string]interface{}{"name": "buffer", "help": "buffer", "template": "componet",
 					"context": "cli", "command": "buffer", "arguments": []interface{}{},
 					"inputs": []interface{}{
 						map[string]interface{}{
@@ -335,13 +307,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							"label": "limit", "value": "3",
 						},
 						map[string]interface{}{
+							"type": "text", "name": "index",
+							"label": "index", "value": "0",
+						},
+						map[string]interface{}{
 							"type": "button", "name": "refresh",
 							"label": "refresh", "value": "refresh",
 						},
 					},
 				},
-				map[string]interface{}{
-					"name": "time", "help": "time", "template": "componet",
+				map[string]interface{}{"name": "command", "help": "command", "template": "componet",
+					"context": "cli.shell1", "command": "parse", "arguments": []interface{}{"@cmd"},
+					"inputs": []interface{}{
+						map[string]interface{}{
+							"type": "text", "name": "cmd",
+							"label": "cmd", "value": "",
+							"class": "cmd", "clipstack": "clistack",
+						},
+					},
+				},
+				map[string]interface{}{"name": "time", "help": "time", "template": "componet",
 					"context": "cli", "command": "time", "arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
 						map[string]interface{}{
@@ -358,8 +343,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						},
 					},
 				},
-				map[string]interface{}{
-					"name": "json", "help": "json", "template": "componet",
+				map[string]interface{}{"name": "json", "help": "json", "template": "componet",
 					"context": "nfs", "command": "json",
 					"arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
@@ -373,8 +357,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						},
 					},
 				},
-				map[string]interface{}{
-					"name": "dir", "help": "dir", "template": "componet",
+				map[string]interface{}{"name": "dir", "help": "dir", "template": "componet",
 					"context": "nfs", "command": "dir",
 					"arguments": []interface{}{"@dir",
 						"dir_deep", "no",
@@ -426,7 +409,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						},
 						map[string]interface{}{
 							"type": "choice", "name": "sort_order",
-							"label": "sort_order", "value": "time",
+							"label": "sort_order", "value": "time_r",
 							"choice": []interface{}{
 								map[string]interface{}{
 									"name": "str", "value": "str",
@@ -458,8 +441,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						},
 					},
 				},
-				map[string]interface{}{
-					"name": "web_site", "help": "web_site", "template": "componet",
+				map[string]interface{}{"name": "web_site", "help": "web_site", "template": "componet",
 					"context": "web", "command": "config",
 					"arguments": []interface{}{
 						"web_site",
@@ -467,8 +449,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					},
 					"display_result": "",
 				},
-				map[string]interface{}{
-					"name": "tail", "help": "tail", "template": "tail",
+				map[string]interface{}{"name": "tail", "help": "tail", "template": "tail",
 					"context": "", "command": "", "arguments": []interface{}{},
 				},
 			},

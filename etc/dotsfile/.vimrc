@@ -8,14 +8,15 @@
 "加载插件"{{{
 call plug#begin()
 Plug 'vim-scripts/tComment'
-Plug 'gcmt/taboo.vim'
-Plug 'vim-scripts/tComment'
 Plug 'tpope/vim-fugitive'
 Plug 'airblade/vim-gitgutter'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'ntpeters/vim-better-whitespace'
 Plug 'easymotion/vim-easymotion'
+
+Plug 'gcmt/taboo.vim'
+set sessionoptions+=tabpages,globals
 
 Plug 'vim-scripts/taglist.vim'
 let g:Tlist_WinWidth=45

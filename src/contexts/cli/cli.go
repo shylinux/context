@@ -841,7 +841,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Add("append", "strings", bs[2][1:len(bs[2])-1])
 				}
 			}
-			m.Echo(m.Append("strings"))
+
+			if m.Option("index") == "" {
+				m.Option("index", 0)
+			}
+			m.Echo(m.Spawn().Cmd("system", "tmux", "show-buffer", "-b", m.Optioni("index")).Result(0))
+		}},
+		"parse": &ctx.Command{Name: "parse arg...", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
+				switch msg.Cmd().Detail(0) {
+				case "cmd":
+					m.Set("append").Copy(msg, "append").Set("result").Copy(msg, "result")
+				}
+				return nil
+			}, "parse", "line", "void", arg)
+			m.Option("ps_target", m.Cap("ps_target"))
 		}},
 	},
 	Index: map[string]*ctx.Context{

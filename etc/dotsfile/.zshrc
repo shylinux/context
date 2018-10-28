@@ -95,14 +95,14 @@ export EDITOR=vim
 alias RR="source ~/.zshrc"
 
 alias t='tmux'
-alias v='vim'
+alias d='docker'
 alias g='git'
+alias v='vim'
 
 bindkey -e
 bindkey jk accept-line
 bindkey "^N" down-line-or-beginning-search
 bindkey "^P" up-line-or-beginning-search
-
 bindkey -M vicmd j down-line-or-beginning-search
 bindkey -M vicmd k up-line-or-beginning-search
 

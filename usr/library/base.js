@@ -16,14 +16,14 @@ function insert_before(self, element, html) {
 }
 
 function copy_to_clipboard(text) {
-    var clipboard = document.querySelector("#clipboard")
+    var clipboard = document.querySelector(".clipboard")
     clipboard.value = text
     clipboard.select()
     document.execCommand("copy")
     clipboard.blur()
 
     var clipstack = document.querySelector("#clipstack")
-    insert_child(clipstack, "option").value = clipboard.value
+    insert_child(clipstack, "option").value = text
     clipstack.childElementCount > 3 && clipstack.removeChild(clipstack.lastElementChild)
 }
 function send_command(form, cb) {
@@ -78,10 +78,13 @@ function check_argument(form, target) {
 }
 function onaction(event, action) {
     switch (action) {
+        case "submit":
+            return false
+            break
         case "click":
             if (event.target.nodeName == "INPUT") {
                 if (event.altKey) {
-                    var board = document.querySelector("#clipboard")
+                    var board = document.querySelector(".clipboard")
                     event.target.value = board.value
                     check_argument(event.target.form, event.target)
                 }
@@ -93,15 +96,94 @@ function onaction(event, action) {
         case "input":
             switch (event.key) {
                 case "Enter":
+                    var history = JSON.parse(event.target.dataset["history"] || "[]")
+                    if (history.length == 0 || event.target.value != history[history.length-1]) {
+                        history.push(event.target.value)
+                        var clistack = document.querySelector("#clistack")
+                        insert_child(clistack, "option").value = event.target.value
+                    }
                     check_argument(event.target.form, event.target)
+                    event.target.dataset["history"] = JSON.stringify(history)
+                    event.target.dataset["history_last"] = history.length-1
+                    console.log(history.length)
                     break
                 case "Escape":
-                    event.target.value = ""
-                    event.target.blur()
+                    if (event.target.value) {
+                        event.target.value = ""
+                    } else {
+                        event.target.blur()
+                    }
                     break
+                case "w":
+                    if (event.ctrlKey) {
+                        var value = event.target.value
+                        var space = value.length > 0 && value[value.length-1] == ' '
+                        for (var i = value.length-1; i > -1; i--) {
+                            if (space) {
+                                if (value[i] != ' ') {
+                                    break
+                                }
+                            } else {
+                                if (value[i] == ' ') {
+                                    break
+                                }
+                            }
+                        }
+                        event.target.value = value.substr(0, i+1)
+                        break
+                    }
+                case "u":
+                    if (event.ctrlKey && event.key == "u") {
+                        event.target.value = ""
+                        break
+                    }
+                case "p":
+                    if (event.ctrlKey && event.key == "p") {
+                        var history = JSON.parse(event.target.dataset["history"] || "[]")
+                        var last = event.target.dataset["history_last"]
+                        console.log(last)
+                        event.target.value = history[last--]
+                        event.target.dataset["history_last"] = (last + history.length) % history.length
+                        return false
+                        break
+                    }
+                case "n":
+                    if (event.ctrlKey && event.key == "n") {
+                        var history = JSON.parse(event.target.dataset["history"] || "[]")
+                        var last = event.target.dataset["history_last"]
+                        last = (last +1) % history.length
+                        console.log(last)
+                        event.target.value = history[last]
+                        event.target.dataset["history_last"] = last
+                        break
+                    }
+                case "j":
+                    if (event.ctrlKey && event.key == "j") {
+                        var history = JSON.parse(event.target.dataset["history"] || "[]")
+                        if (history.length == 0 || event.target.value != history[history.length-1]) {
+                            history.push(event.target.value)
+                            var clistack = document.querySelector("#clistack")
+                            insert_child(clistack, "option").value = event.target.value
+                        }
+                        check_argument(event.target.form, event.target)
+                        event.target.dataset["history"] = JSON.stringify(history)
+                        event.target.dataset["history_last"] = history.length-1
+                        break
+                    }
+                default:
+                    console.log(event)
+                    if (event.target.dataset["last_char"] == "j" && event.key == "k") {
+                        if (event.target.value) {
+                            event.target.value = ""
+                        } else {
+                            event.target.blur()
+                        }
+                    }
+                    event.target.dataset["last_char"] = event.key
             }
             break
         case "keymap":
+            break
             switch (event.key) {
                 case "g":
                     document.querySelectorAll("form.option label.keymap").forEach(function(item) {
