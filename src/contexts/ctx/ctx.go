@@ -3546,6 +3546,19 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}},
 		"select": &Command{Name: "select key value", Form: map[string]int{"order": 2, "limit": 1, "offset": 1, "vertical": 1}, Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.Spawn()
+			nrow := len(m.Meta[m.Meta["append"][0]])
+			for i := 0; i < nrow; i++ {
+				if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
+					for _, k := range m.Meta["append"] {
+						msg.Add("append", k, m.Meta[k][i])
+					}
+				}
+			}
+
+			if m.Set("append").Copy(msg, "append"); m.Has("order") {
+				m.Sort(m.Option("order"), m.Meta["order"][1])
+			}
+
 			offset := 0
 			limit := 10
 			if m.Has("limit") {
@@ -3554,22 +3567,17 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			if m.Has("offset") {
 				offset = m.Optioni("offset")
 			}
-			n := 0
-
-			nrow := len(m.Meta[m.Meta["append"][0]])
-			for i := 0; i < nrow; i++ {
-				if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
-					if n++; offset < n && n <= offset+limit {
-						for _, k := range m.Meta["append"] {
-							msg.Add("append", k, m.Meta[k][i])
-						}
-					}
-				}
+			nrow = len(m.Meta[m.Meta["append"][0]])
+			if offset > nrow {
+				offset = nrow
+			}
+			if limit+offset > nrow {
+				limit = nrow - offset
+			}
+			for _, k := range m.Meta["append"] {
+				m.Meta[k] = m.Meta[k][offset : offset+limit]
 			}
 
-			if m.Set("append").Copy(msg, "append"); m.Has("order") {
-				m.Sort(m.Option("order"), m.Meta["order"][1])
-			}
 			if m.Has("vertical") {
 				msg := m.Spawn()
 				nrow := len(m.Meta[m.Meta["append"][0]])
@@ -3584,6 +3592,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 				m.Set("append").Copy(msg, "append")
 			}
+
 			m.Table()
 		}},
 		"import": &Command{Name: "import filename", Help: "导入数据", Hand: func(m *Message, c *Context, key string, arg ...string) {

@@ -302,6 +302,31 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					"context": "", "command": "", "arguments": []interface{}{},
 				},
 				map[string]interface{}{
+					"name": "matrix", "help": "matrix", "template": "componet",
+					"context": "lex", "command": "show", "arguments": []interface{}{"@info"},
+					"inputs": []interface{}{
+						map[string]interface{}{
+							"type": "choice", "name": "info",
+							"label": "info", "value": "seed",
+							"choice": []interface{}{
+								map[string]interface{}{
+									"name": "seed", "value": "seed",
+								},
+								map[string]interface{}{
+									"name": "page", "value": "page",
+								},
+								map[string]interface{}{
+									"name": "hash", "value": "hash",
+								},
+								map[string]interface{}{
+									"name": "mat", "value": "mat",
+								},
+							},
+						},
+					},
+					"display_result": "",
+				},
+				map[string]interface{}{
 					"name": "message", "help": "message", "template": "componet",
 					"context": "cli", "command": "buffer", "arguments": []interface{}{},
 					"inputs": []interface{}{
@@ -912,20 +937,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 
-						args := []string{}
-						if val["arguments"] != nil {
-							for _, v := range val["arguments"].([]interface{}) {
-								switch value := v.(type) {
-								case string:
-									args = append(args, m.Parse(value))
-								}
-							}
-						}
 						if val["inputs"] != nil {
 							for _, v := range val["inputs"].([]interface{}) {
 								value := v.(map[string]interface{})
 								if msg.Option(value["name"].(string)) == "" {
 									msg.Add("option", value["name"].(string), value["value"])
+								}
+							}
+						}
+
+						args := []string{}
+						if val["arguments"] != nil {
+							for _, v := range val["arguments"].([]interface{}) {
+								switch value := v.(type) {
+								case string:
+									args = append(args, msg.Parse(value))
 								}
 							}
 						}
