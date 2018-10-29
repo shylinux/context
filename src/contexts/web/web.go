@@ -260,68 +260,35 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"componet_group":   &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"login": []interface{}{
-				map[string]interface{}{
-					"name": "head", "help": "head", "template": "head",
-				},
-				map[string]interface{}{
-					"name": "userinfo", "help": "userinfo",
+				map[string]interface{}{"name": "head", "template": "head"},
+				map[string]interface{}{"name": "userinfo", "help": "userinfo",
 					"context": "aaa", "command": "userinfo", "arguments": []interface{}{"@sessid"},
 				},
-				map[string]interface{}{
-					"name": "login", "help": "login", "template": "componet",
+				map[string]interface{}{"name": "login", "help": "login", "template": "componet",
 					"context": "aaa", "command": "login", "arguments": []interface{}{"@username", "@password"},
 					"inputs": []interface{}{
-						map[string]interface{}{
-							"type": "text", "name": "username",
-							"label": "username", "value": "",
-						},
-						map[string]interface{}{
-							"type": "password", "name": "password",
-							"label": "password", "value": "",
-						},
-						map[string]interface{}{
-							"type": "button", "name": "string",
-							"label": "string", "value": "login",
-						},
+						map[string]interface{}{"type": "text", "name": "username", "label": "username"},
+						map[string]interface{}{"type": "password", "name": "password", "label": "password"},
+						map[string]interface{}{"type": "button", "label": "login"},
 					},
-					"display_append": "",
-					"display_result": "",
-					"result_reload":  "10",
+					"display_append": "", "display_result": "", "result_reload": "10",
 				},
-				map[string]interface{}{"name": "tail", "help": "tail", "template": "tail",
-					"context": "", "command": "", "arguments": []interface{}{},
-				},
+				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
 			"index": []interface{}{
-				map[string]interface{}{"name": "head", "help": "head", "template": "head",
-					"context": "", "command": "", "arguments": []interface{}{},
-				},
-				map[string]interface{}{"name": "clipbaord", "help": "clipbaord", "template": "clipboard",
-					"context": "", "command": "", "arguments": []interface{}{},
-				},
+				map[string]interface{}{"name": "head", "template": "head"},
+				map[string]interface{}{"name": "clipbaord", "help": "clipbaord", "template": "clipboard"},
 				map[string]interface{}{"name": "buffer", "help": "buffer", "template": "componet",
-					"context": "cli", "command": "buffer", "arguments": []interface{}{},
-					"inputs": []interface{}{
-						map[string]interface{}{
-							"type": "text", "name": "limit",
-							"label": "limit", "value": "3",
-						},
-						map[string]interface{}{
-							"type": "text", "name": "index",
-							"label": "index", "value": "0",
-						},
-						map[string]interface{}{
-							"type": "button", "name": "refresh",
-							"label": "refresh", "value": "refresh",
-						},
+					"context": "cli", "command": "tmux", "arguments": []interface{}{"buffer"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "limit", "label": "limit", "value": "3"},
+						map[string]interface{}{"type": "text", "name": "index", "label": "index"},
+						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
 				},
 				map[string]interface{}{"name": "command", "help": "command", "template": "componet",
-					"context": "cli.shell1", "command": "parse", "arguments": []interface{}{"@cmd"},
+					"context": "cli.shell1", "command": "source", "arguments": []interface{}{"@cmd"},
 					"inputs": []interface{}{
-						map[string]interface{}{
-							"type": "text", "name": "cmd",
-							"label": "cmd", "value": "",
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "pwd",
 							"class": "cmd", "clipstack": "clistack",
 						},
 					},
@@ -329,129 +296,65 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				map[string]interface{}{"name": "time", "help": "time", "template": "componet",
 					"context": "cli", "command": "time", "arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
-						map[string]interface{}{
-							"type": "text", "name": "time_format",
+						map[string]interface{}{"type": "text", "name": "time_format",
 							"label": "format", "value": "2006-01-02 15:04:05",
 						},
-						map[string]interface{}{
-							"type": "text", "name": "string",
-							"label": "string", "value": "",
-						},
-						map[string]interface{}{
-							"type": "button", "name": "button",
-							"label": "string", "value": "refresh",
-						},
+						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
+						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
 				},
 				map[string]interface{}{"name": "json", "help": "json", "template": "componet",
-					"context": "nfs", "command": "json",
-					"arguments": []interface{}{"@string"},
+					"context": "nfs", "command": "json", "arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
-						map[string]interface{}{
-							"type": "text", "name": "string",
-							"label": "string", "value": "",
-						},
-						map[string]interface{}{
-							"type": "button", "name": "button",
-							"label": "string", "value": "refresh",
-						},
+						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
+						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
 				},
 				map[string]interface{}{"name": "dir", "help": "dir", "template": "componet",
-					"context": "nfs", "command": "dir",
-					"arguments": []interface{}{"@dir",
-						"dir_deep", "no",
-						"dir_name", "name",
+					"context": "nfs", "command": "dir", "arguments": []interface{}{"@dir",
+						"dir_deep", "no", "dir_name", "name", "dir_info", "",
 						"dir_link", "<a class='download' data-type='%s'>%s<a>",
-						"dir_info", "",
 					},
 					"form_type": "upload",
 					"inputs": []interface{}{
-						map[string]interface{}{
-							"type": "text", "name": "dir",
-							"label": "dir", "value": "",
-						},
-						map[string]interface{}{
-							"type": "choice", "name": "dir_type",
-							"label": "dir_type", "value": "both",
-							"choice": []interface{}{
-								map[string]interface{}{
-									"name": "both", "value": "both",
-								},
-								map[string]interface{}{
-									"name": "file", "value": "file",
-								},
-								map[string]interface{}{
-									"name": "dir", "value": "dir",
-								},
+						map[string]interface{}{"type": "text", "name": "dir", "label": "dir"},
+						map[string]interface{}{"type": "choice", "name": "dir_type",
+							"label": "dir_type", "value": "both", "choice": []interface{}{
+								map[string]interface{}{"name": "both", "value": "both"},
+								map[string]interface{}{"name": "file", "value": "file"},
+								map[string]interface{}{"name": "dir", "value": "dir"},
 							},
 						},
-						map[string]interface{}{
-							"type": "choice", "name": "sort_field",
-							"label": "sort_field", "value": "time",
-							"choice": []interface{}{
-								map[string]interface{}{
-									"name": "filename", "value": "filename",
-								},
-								map[string]interface{}{
-									"name": "is_dir", "value": "is_dir",
-								},
-								map[string]interface{}{
-									"name": "line", "value": "line",
-								},
-								map[string]interface{}{
-									"name": "size", "value": "size",
-								},
-								map[string]interface{}{
-									"name": "time", "value": "time",
-								},
+						map[string]interface{}{"type": "choice", "name": "sort_field",
+							"label": "sort_field", "value": "time", "choice": []interface{}{
+								map[string]interface{}{"name": "filename", "value": "filename"},
+								map[string]interface{}{"name": "is_dir", "value": "is_dir"},
+								map[string]interface{}{"name": "line", "value": "line"},
+								map[string]interface{}{"name": "size", "value": "size"},
+								map[string]interface{}{"name": "time", "value": "time"},
 							},
 						},
-						map[string]interface{}{
-							"type": "choice", "name": "sort_order",
-							"label": "sort_order", "value": "time_r",
-							"choice": []interface{}{
-								map[string]interface{}{
-									"name": "str", "value": "str",
-								},
-								map[string]interface{}{
-									"name": "str_r", "value": "str_r",
-								},
-								map[string]interface{}{
-									"name": "int", "value": "int",
-								},
-								map[string]interface{}{
-									"name": "int_r", "value": "int_r",
-								},
-								map[string]interface{}{
-									"name": "time", "value": "time",
-								},
-								map[string]interface{}{
-									"name": "time_r", "value": "time_r",
-								},
+						map[string]interface{}{"type": "choice", "name": "sort_order",
+							"label": "sort_order", "value": "time_r", "choice": []interface{}{
+								map[string]interface{}{"name": "str", "value": "str"},
+								map[string]interface{}{"name": "str_r", "value": "str_r"},
+								map[string]interface{}{"name": "int", "value": "int"},
+								map[string]interface{}{"name": "int_r", "value": "int_r"},
+								map[string]interface{}{"name": "time", "value": "time"},
+								map[string]interface{}{"name": "time_r", "value": "time_r"},
 							},
 						},
-						map[string]interface{}{
-							"type": "file", "name": "upload",
-							"label": "upload", "value": "upload",
-						},
-						map[string]interface{}{
-							"type": "submit", "name": "submit",
-							"label": "submit", "value": "submit",
-						},
+						map[string]interface{}{"type": "file", "name": "upload"},
+						map[string]interface{}{"type": "submit", "value": "submit"},
 					},
 				},
 				map[string]interface{}{"name": "web_site", "help": "web_site", "template": "componet",
-					"context": "web", "command": "config",
-					"arguments": []interface{}{
-						"web_site",
-						"format_field", "site", "<a href='%s'>%s<a>",
+					"context": "web", "command": "config", "arguments": []interface{}{
+						"web_site", "format_field", "site", "<a href='%s'>%s<a>",
 					},
 					"display_result": "",
 				},
-				map[string]interface{}{"name": "tail", "help": "tail", "template": "tail",
-					"context": "", "command": "", "arguments": []interface{}{},
-				},
+				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
 		}, Help: "组件列表"},
 	},
@@ -921,7 +824,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						if val["inputs"] != nil {
 							for _, v := range val["inputs"].([]interface{}) {
 								value := v.(map[string]interface{})
-								if msg.Option(value["name"].(string)) == "" {
+								if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
 									msg.Add("option", value["name"].(string), value["value"])
 								}
 							}

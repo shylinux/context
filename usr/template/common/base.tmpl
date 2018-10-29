@@ -21,6 +21,11 @@
     }
 </style>
 <style>
+    textarea.clipboard {
+        color:white;
+        background-color:#272822;
+        width:600px;
+    }
     form.option div {
         float:left;
     }
@@ -28,8 +33,8 @@
         clear:both;
     }
     form.option label.keymap {
-        display:none;
         color:red;
+        display:none;
     }
     form.option label.keymap.show {
         display:inline;
@@ -38,9 +43,9 @@
         margin-right:10px;
     }
     form.option input.cmd {
-        padding-left:10px;
         color:white;
         background-color:#272822;
+        padding-left:10px;
         width:600px;
     }
     form.option select {
@@ -55,8 +60,8 @@
         cursor:pointer;
     }
     table.append th.order {
-        cursor:pointer;
         background-color:red;
+        cursor:pointer;
     }
     table.append td {
         font-family:monospace;
@@ -67,10 +72,11 @@
         color:white;
         font-size:14px;
         background-color:#272822;
+        overflow:scroll;
         padding:5px;
         border:solid 2px green;
         border-left:solid 4px green;
-        overflow:scroll;
+        margin:0;
     }
     code.result pre.clipboard {
         height:2em;
@@ -92,7 +98,7 @@
 <fieldset><legend>clipboard</legend>
     <datalist id="clipstack"></datalist>
     <datalist id="clistack"></datalist>
-    <input class="clipboard">
+    <textarea class="clipboard"></textarea>
 </fieldset>
 {{end}}
 
@@ -115,15 +121,17 @@
           {{range $index, $input := option . "inputs"}}
               <div>
                   {{$type := index $input "type"}}
+                  {{if index $input "label"}}
+                      <label>{{index $input "label"}} : </label>
+                  {{end}}
                   {{if eq $type "button"}}
-                      <input type="button" onclick="return onaction(event, 'command')" value="{{index $input "value"}}">
+                      <input type="button" onclick="return onaction(event, 'command')" value="{{index $input "label"}}">
                   {{else if eq $type "submit"}}
                       <input type="submit" value="{{index $input "value"}}">
                   {{else if eq $type "file"}}
                       <input type="file" name="{{index $input "name"}}">
                   {{else if eq $type "choice"}}
                       {{$default_value := index $input "value"}}
-                      <label>{{index $input "label"}} : </label>
                       <select name="{{index $input "name"}}" onchange="return onaction(event, 'command')">
                           {{range $index, $value := index $input "choice"}}
                               {{$val := index $value "value"}}
@@ -135,7 +143,6 @@
                           {{end}}
                       </select>
                   {{else}}
-                      <label>{{index $input "label"}} : </label>
                       <input
                           name="{{index $input "name"}}"
                           value="{{index $input "value"}}"

@@ -596,29 +596,29 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				nfs.Cap("termbox", "true")
 				nfs.Conf("color", "true")
 			}
-			if !m.Options("init.shy") {
-
-				for _, v := range []string{
-					// "say you are so pretty",
-					"context web serve ./ :9094",
-				} {
-					m.Back(m.Spawn(m.Source()).Set("detail", v))
-				}
-				for _, v := range []string{
-					"say you are so pretty",
-					"context web brow 'http://localhost:9094'",
-				} {
-					nfs.history = append(nfs.history, v)
-					m.Capi("nline", 1)
-				}
-				for _, v := range []string{
-					"say you are so pretty\n",
-					"your can brow 'http://localhost:9094'\n",
-					"press \"brow\" then press Enter\n",
-				} {
-					nfs.print(fmt.Sprintf(v))
-				}
-			}
+			// if !m.Options("init.shy") {
+			//
+			// 	for _, v := range []string{
+			// 		// "say you are so pretty",
+			// 		"context web serve ./ :9094",
+			// 	} {
+			// 		m.Back(m.Spawn(m.Source()).Set("detail", v))
+			// 	}
+			// 	for _, v := range []string{
+			// 		"say you are so pretty",
+			// 		"context web brow 'http://localhost:9094'",
+			// 	} {
+			// 		nfs.history = append(nfs.history, v)
+			// 		m.Capi("nline", 1)
+			// 	}
+			// 	for _, v := range []string{
+			// 		"say you are so pretty\n",
+			// 		"your can brow 'http://localhost:9094'\n",
+			// 		"press \"brow\" then press Enter\n",
+			// 	} {
+			// 		nfs.print(fmt.Sprintf(v))
+			// 	}
+			// }
 		}
 
 		line := ""
@@ -770,7 +770,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 	return true
 }
 func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
-	return false
 	switch nfs.Context {
 	case m.Target():
 		if nfs.in != nil {
@@ -823,8 +822,23 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"git_log_line": &ctx.Config{Name: "git_log", Value: "3", Help: "版本控制状态参数"},
 		"git_path":     &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
 		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff log", Help: "命令集合"},
+
+		"paths": &ctx.Config{Name: "paths", Value: []interface{}{""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
+		"prompt": &ctx.Command{Name: "prompt", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.in != nil {
+				nfs.prompt()
+			}
+		}},
+		"exist": &ctx.Command{Name: "exist file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			for _, v := range m.Confv("paths").([]interface{}) {
+				if _, e := os.Stat(path.Join(v.(string), arg[0])); e == nil {
+					m.Echo("true")
+					return
+				}
+			}
+		}},
 		"paths": &ctx.Command{
 			Name: "paths [add path]|[del index]|[set index path]|[index]",
 			Help: "设置文件搜索路径, add: 添加目录, del: 删除目录, set: 修改目录，index: 目录序号, path: 目录名",
@@ -862,13 +876,17 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			Name: "scan filename [nfs_name [nfs_help]]",
 			Help: "扫描文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
 					if arg[0] == "stdio" {
 						m.Optionv("in", os.Stdin)
 						m.Optionv("out", os.Stdout)
 					} else {
-						if f, e := nfs.open(arg[0]); m.Assert(e) {
-							m.Optionv("in", f)
+						for _, v := range m.Confv("paths").([]interface{}) {
+							if f, e := os.Open(path.Join(v.(string), arg[0])); e == nil {
+								m.Log("info", "scan: %s", path.Join(v.(string), arg[0]))
+								m.Optionv("in", f)
+								break
+							}
 						}
 					}
 
@@ -1263,7 +1281,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							continue
 						case "csv":
 							cmd := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d")
-							m.Log("fuck", "wh%v", cmd)
 							if out, e := cmd.CombinedOutput(); e != nil {
 								m.Echo("error: ")
 								m.Echo("%s\n", e)

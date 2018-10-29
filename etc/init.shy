@@ -1,2 +1,9 @@
 source etc/local.shy
 
+~nfs
+    config paths -2 /Users/shaoying
+
+~shell1
+    target web
+
+

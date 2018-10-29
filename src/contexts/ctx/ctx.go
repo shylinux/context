@@ -17,12 +17,20 @@ import (
 	"time"
 )
 
-func Right(str string) bool {
-	switch str {
-	case "", "0", "false", "off", "no", "error: ":
+func Right(arg interface{}) bool {
+	switch str := arg.(type) {
+	case nil:
 		return false
+	case bool:
+		return str
+	case string:
+		switch str {
+		case "", "0", "false", "off", "no", "error: ":
+			return false
+		}
+		return true
 	}
-	return true
+	return false
 }
 func Trans(arg ...interface{}) []string {
 	ls := []string{}
@@ -845,7 +853,9 @@ func (m *Message) Add(meta string, key string, value ...interface{}) *Message {
 func (m *Message) Set(meta string, arg ...string) *Message {
 	switch meta {
 	case "detail", "result":
-		delete(m.Meta, meta)
+		if m.Meta != nil {
+			delete(m.Meta, meta)
+		}
 	case "option", "append":
 		if len(arg) > 0 {
 			delete(m.Meta, arg[0])
@@ -1332,14 +1342,18 @@ func (m *Message) Appendv(key string, arg ...interface{}) interface{} {
 	return nil
 }
 
-func (m *Message) Parse(arg string) string {
-	if len(arg) > 1 && arg[0] == '$' {
-		return m.Cap(arg[1:])
+func (m *Message) Parse(arg interface{}) string {
+	switch str := arg.(type) {
+	case string:
+		if len(str) > 1 && str[0] == '$' {
+			return m.Cap(str[1:])
+		}
+		if len(str) > 1 && str[0] == '@' {
+			return m.Confx(str[1:])
+		}
+		return str
 	}
-	if len(arg) > 1 && arg[0] == '@' {
-		return m.Confx(arg[1:])
-	}
-	return arg
+	return ""
 }
 func (m *Message) Wait() bool {
 	if m.target.exit != nil {
@@ -3714,5 +3728,6 @@ func Start(args ...string) {
 	log.target.Start(log)
 
 	Pulse.Options("terminal_color", true)
+
 	Pulse.Sess("cli", false).Cmd("source", "stdio")
 }

@@ -1,6 +1,0 @@
-source etc/local_exit.shy
-~file1
-	history save var/history.txt
-~aaa
-	login save var/login.txt
-
