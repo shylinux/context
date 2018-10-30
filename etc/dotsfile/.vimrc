@@ -37,6 +37,13 @@ nnoremap <C-G> :Ag <C-R>=expand("<cword>")<CR><CR>
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
 nnoremap <C-N> :FZF -q <C-R>=expand("<cword>")<CR><CR>
 
+Plug 'benmills/vimux'
+let mapleader=";"
+nnoremap <Leader>; :VimuxPromptCommand<CR>
+" nnoremap <Leader>j :VimuxZoomRunner<CR>
+" nnoremap <Leader>l :VimuxRunLastCommand<CR>
+" nnoremap <Leader>vx :VimuxInterruptRunner<CR>
+
 Plug 'fatih/vim-go'
 Plug 'chr4/nginx.vim'
 Plug 'othree/html5.vim'
@@ -51,15 +58,22 @@ let g:syntastic_quiet_messages = { "regex": [
             \ "Missing class docstring",
             \ "Missing method docstring",
             \ "Missing function docstring",
-            \ "Wrong continued indentation",
-            \ "Line Too Long",
+            \ "Invalid class name",
+            \ "Invalid method name",
+            \ "Invalid function name",
+            \ "Invalid constant name",
             \ "Invalid variable name",
+            \ "Method could be a function",
             \ "Too many instance attributes",
+            \ "Wrong continued indentation",
+            \ "Too many lines in module",
+            \ "Too many arguments",
+            \ "Too many local variables",
+            \ "Too many branches",
+            \ "Too many statements",
+            \ "Line Too Long",
             \ "defined outside __init__",
             \ "Catching too general exception Exception",
-            \ "Exactly one space required before assignment",
-            \ "Too many lines in module",
-            \ "Invalid constant name",
          \ ] }
 
 Plug 'Valloric/YouCompleteMe'
@@ -67,13 +81,6 @@ let g:syntastic_enable_signs = 1
 let g:ycm_confirm_extra_conf=0
 nnoremap gd :YcmCompleter GoToDeclaration<CR>
 nnoremap gD :YcmCompleter GoToReferences<CR>
-
-Plug 'benmills/vimux'
-let mapleader=";"
-nnoremap <Leader>; :VimuxPromptCommand<CR>
-" nnoremap <Leader>j :VimuxZoomRunner<CR>
-" nnoremap <Leader>l :VimuxRunLastCommand<CR>
-" nnoremap <Leader>vx :VimuxInterruptRunner<CR>
 
 Plug 'vim-scripts/matrix.vim--Yang'
 call plug#end()
@@ -116,7 +123,7 @@ set mouse=a
 " colorscheme default
 set t_Co=256
 "}}}
-"映射快捷键"{{{
+"快捷键映射"{{{
 nnoremap <C-H> <C-W>h
 nnoremap <C-J> <C-W>j
 nnoremap <C-K> <C-W>k

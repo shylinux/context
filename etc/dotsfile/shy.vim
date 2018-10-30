@@ -10,38 +10,36 @@ syn match   shOperator			"\~[-_a-zA-Z0-9]\+\>"
 syn match   shShellVariables	"\$[-_a-zA-Z0-9]\+\>"
 syn match   shShellVariables	"@[-_a-zA-Z0-9]\+\>"
 
-syn keyword shStatement break cd chdir continue eval exec exit kill newgrp pwd read readonly return shift test trap ulimit umask wait
+syn keyword shStatement break cd chdir continue eval exec exit kill newgrp pwd read readonly shift trap ulimit umask wait
 
-syn keyword shStatement source return function
 syn keyword shStatement if else elif end for
-syn keyword shStatement let var
 
 " ctx command
-syn match   shStatement "\(^\|\t\|$(\)cache"
-syn match   shStatement "\(^\|\t\|$(\)config"
-syn match   shStatement "\(^\|\t\|$(\)detail"
-syn match   shStatement "\(^\|\t\|$(\)option"
-syn match   shStatement "\(^\|\t\|$(\)append"
-syn match   shStatement "\(^\|\t\|$(\)result"
-
+syn match   shStatement "\(^\|\t\|  \|$(\)cache"
+syn match   shStatement "\(^\|\t\|  \|$(\)config"
 " ctx command
-syn match   shCommand "\(^\|\t\|$(\)message"
-syn match   shCommand "\(^\|\t\|$(\)session"
-syn match   shCommand "\(^\|\t\|$(\)context"
-syn match   shCommand "\(^\|\t\|$(\)server"
-syn match   shCommand "\(^\|\t\|$(\)command"
-syn match   shCommand "\(^\|\t\|$(\)right"
+syn match   shCommand "\(^\|\t\|  \|$(\)command"
+" cli command
+syn match   shStatement "\(^\|\t\|  \|$(\)let"
+syn match   shStatement "\(^\|\t\|  \|$(\)var"
+syn match   shStatement "\(^\|\t\|  \|$(\)return"
+syn match   shStatement "\(^\|\t\|  \|$(\)source"
+syn match   shCommand "\(^\|\t\|  \|$(\)alias"
 
-" tcp command
-syn match   shCommand "\(^\|\t\|$(\)listen"
+" aaa command
+syn match   shCommand "\(^\|\t\|  \|$(\)login"
+syn match   shCommand "\(^\|\t\|  \|$(\)right"
 
 " web command
-syn match   shCommand "\(^\|\t\|$(\)serve"
-syn match   shCommand "\(^\|\t\|$(\)route"
+syn match   shCommand "\(^\|\t\|  \|$(\)serve"
+syn match   shCommand "\(^\|\t\|  \|$(\)route"
+syn match   shCommand "\(^\|\t\|  \|$(\)client"
+syn match   shCommand "\(^\|\t\|  \|$(\)cookie"
+syn match   shCommand "\(^\|\t\|  \|$(\)template"
 
-syn match   shCommand "\(^\|\t\|$(\)open"
-syn match   shCommand "\(^\|\t\|$(\)cookie"
-syn match   shCommand "\(^\|\t\|$(\)login"
+" mdb command
+syn match   shCommand "\(^\|\t\|  \|$(\)open"
+
 
 hi def link shComment			Comment
 hi def link shString			String

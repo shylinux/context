@@ -208,10 +208,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				if detail[0] != "context" {
-					target := cli.target
+					target := m.Cap("ps_target")
 					defer func() {
-						cli.target = target
-						m.Cap("ps_target", cli.target.Name)
+						m.Cap("ps_target", target)
 					}()
 				}
 
@@ -242,16 +241,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				if msg.Cmd(detail); msg.Hand {
-					cli.target = msg.Target()
-					m.Cap("ps_target", cli.target.Name)
+					m.Cap("ps_target", msg.Cap("module"))
 				} else {
 					msg.Copy(m, "target").Detail(-1, "system")
 					msg.Cmd()
 				}
 				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
 				m.Copy(msg, "result").Copy(msg, "append")
-				m.Capi("last_msg", 0, msg.Code())
-				m.Capi("ps_count", 1)
+				// m.Capi("last_msg", 0, msg.Code())
+				// m.Capi("ps_count", 1)
 			}
 		}},
 		"str": &ctx.Command{Name: "str word", Help: "解析字符串", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -556,7 +554,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			if len(arg) < 2 || arg[1] != "async" {
-				m.Wait()
+				if arg[0] == "stdio" && len(arg) > 1 {
+					fmt.Printf(m.Spawn().Cmd("source", arg[1]).Result(0))
+				} else {
+					m.Wait()
+				}
 				if arg[0] == "stdio" {
 					if m.Sess("nfs").Cmd("exist", m.Confx("exit.shy", arg, 2)).Results(0) {
 						m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("exit.shy"))

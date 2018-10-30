@@ -297,6 +297,15 @@ func (c *Context) Spawn(m *Message, name string, help string) *Context {
 		c.Register(s, nil)
 	}
 
+	item := []string{name}
+	for s := c; s != nil; s = s.context {
+		item = append(item, s.Name)
+	}
+	for i := 0; i < len(item)/2; i++ {
+		item[i], item[len(item)-i-1] = item[len(item)-i-1], item[i]
+	}
+	s.Caches["module"] = &Cache{Name: "module", Value: strings.Join(item, "."), Help: "模块域名"}
+	s.message = m
 	return s
 }
 func (c *Context) Begin(m *Message, arg ...string) *Context {
@@ -853,7 +862,7 @@ func (m *Message) Add(meta string, key string, value ...interface{}) *Message {
 func (m *Message) Set(meta string, arg ...string) *Message {
 	switch meta {
 	case "detail", "result":
-		if m.Meta != nil {
+		if m != nil && m.Meta != nil {
 			delete(m.Meta, meta)
 		}
 	case "option", "append":
@@ -1365,6 +1374,9 @@ func (m *Message) Start(name string, help string, arg ...string) bool {
 	return m.Set("detail", arg...).target.Spawn(m, name, help).Begin(m).Start(m)
 }
 func (m *Message) Cmd(args ...interface{}) *Message {
+	if m == nil {
+		return m
+	}
 	if len(args) > 0 {
 		m.Set("detail", Trans(args...)...)
 	}
@@ -1401,6 +1413,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 						arg = args
 					}
 
+					m.Hand = true
 					x.Hand(m, s, key, arg...)
 
 					if m.Hand = true; len(rest) > 0 {
@@ -3715,12 +3728,16 @@ func Start(args ...string) {
 	Pulse.Sess("log", "log")
 
 	if len(args) > 0 {
-		Pulse.Sess("cli", false).Conf("init.shy", args[0])
-		args = args[1:]
+		if Pulse.Sess("nfs").Cmd("exist", args[0]).Results(0) {
+			Pulse.Sess("cli", false).Conf("init.shy", args[0])
+			args = args[1:]
+		}
 	}
 	if len(args) > 0 {
-		Pulse.Sess("log", false).Conf("bench.log", args[0])
-		args = args[1:]
+		if Pulse.Sess("nfs").Cmd("exist", args[0]).Results(0) {
+			Pulse.Sess("log", false).Conf("bench.log", args[0])
+			args = args[1:]
+		}
 	}
 
 	Pulse.Options("log", true)
@@ -3728,6 +3745,5 @@ func Start(args ...string) {
 	log.target.Start(log)
 
 	Pulse.Options("terminal_color", true)
-
 	Pulse.Sess("cli", false).Cmd("source", "stdio")
 }
