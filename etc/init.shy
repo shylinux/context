@@ -1,9 +1,3 @@
 source etc/local.shy
-
-~nfs
-    config paths -2 /Users/shaoying
-
-~shell1
-    target web
-
-
+~stdio
+    config load var/history.json history

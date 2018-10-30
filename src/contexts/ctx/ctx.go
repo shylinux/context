@@ -406,7 +406,9 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 
 	if c.context != nil {
 		m.Log("close", "%d context %v", m.root.Capi("ncontext", -1)+1, arg)
-		delete(c.context.contexts, c.Name)
+		if c.Name != "stdio" {
+			delete(c.context.contexts, c.Name)
+		}
 		c.exit <- true
 	}
 	return true
@@ -520,7 +522,7 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message {
 				m.Put(meta, k, v)
 			}
 			if v, ok := msg.Meta[k]; ok {
-				m.Set(meta, k).Add(meta, k, v)
+				m.Add(meta, k, v)
 			}
 		}
 	}
@@ -1388,13 +1390,6 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 			if x, ok := s.Commands[key]; ok && x.Hand != nil {
 				m.TryCatch(m, true, func(m *Message) {
 					m.Log("cmd", "%s:%s %v %v", s.Name, c.Name, m.Meta["detail"], m.Meta["option"])
-					rest := []string{}
-					for i := 0; i < len(arg); i++ {
-						if arg[i] == "|" {
-							arg, rest = arg[:i], arg[i+1:]
-						}
-					}
-
 					if args := []string{}; x.Form != nil {
 						for i := 0; i < len(arg); i++ {
 							n, ok := x.Form[arg[i]]
@@ -1416,10 +1411,6 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 					m.Hand = true
 					x.Hand(m, s, key, arg...)
 
-					if m.Hand = true; len(rest) > 0 {
-						msg := m.Spawn().Copy(m, "option").Copy(m, "append").Cmd(rest)
-						m.Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
-					}
 				})
 				return m
 			}
@@ -3058,23 +3049,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 
 			}},
-		"config": &Command{
-			Name: "config [all] [save|load file key...] [delete] [pop index] key [value...]|key name value help",
-			Help: "查看、读写、添加配置变量",
-			Form: map[string]int{
-				"chains": 1, "fields": 1,
-				"where_field": 1, "where_value": 1,
-				"sort_field": 1, "sort_order": 1,
-				"page_limit": 1, "page_offset": 1,
-				"format_field": 2,
-				"select":       3,
-			},
+		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [create map|list|string key name help] [delete key]",
+			Help: "配置管理, export: 导出配置, save: 保存配置到文件, load: 从文件加载配置, create: 创建配置, delete: 删除配置",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				offset, e := strconv.Atoi(m.Confx("page_offset"))
-				m.Assert(e)
-				limit, e := strconv.Atoi(m.Confx("page_limit"))
-				m.Assert(e)
-
 				all := false
 				if len(arg) > 0 && arg[0] == "all" {
 					arg, all = arg[1:], true
@@ -3084,213 +3061,128 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				have := map[string]bool{}
 				if len(arg) > 0 {
 					switch arg[0] {
-					case "pop", "delete":
-						action, which, arg = arg[0], arg[1], arg[2:]
-					case "save", "load":
-						action, which, arg = arg[0], arg[1], arg[2:]
-						for _, v := range arg {
-							have[v] = true
-						}
 					case "export":
 						action, arg = arg[0], arg[1:]
 						for _, v := range arg {
 							have[v] = true
 						}
+					case "save", "load":
+						action, which, arg = arg[0], arg[1], arg[2:]
+						for _, v := range arg {
+							have[v] = true
+						}
+					case "create", "delete":
+						action, arg = arg[0], arg[1:]
 					}
 				}
 
-				save := map[string]interface{}{}
-				if action == "load" {
-					f, e := os.Open(which)
-					if e != nil {
-						return
+				if len(arg) == 0 || action != "" {
+					save := map[string]interface{}{}
+					if action == "load" {
+						f, e := os.Open(which)
+						if e != nil {
+							return
+						}
+						defer f.Close()
+
+						de := json.NewDecoder(f)
+						de.Decode(&save)
 					}
-					defer f.Close()
 
-					de := json.NewDecoder(f)
-					de.Decode(&save)
-				}
-
-				format_field := m.Option("format_field")
-				format_str := "%s"
-				if format_field != "" {
-					format_str = m.Meta["format_field"][1]
-				}
-
-				// sort_field := m.Option("sort_field")
-				// sort_order := m.Option("sort_order")
-				m.BackTrace(func(m *Message) bool {
-					for k, v := range m.target.Configs {
-						switch action {
-						case "save", "export":
-							if len(have) == 0 || have[k] {
-								save[k] = v.Value
-							}
-						case "load":
-							if x, ok := save[k]; ok && (len(have) == 0 || have[k]) {
-								v.Value = x
-							}
-						case "pop":
-							switch val := v.Value.(type) {
-							case map[string]string:
-								delete(val, which)
-							case map[string]interface{}:
-								delete(val, which)
-							case []string:
-								if i, e := strconv.Atoi(which); e == nil {
-									i = (i+2+len(val)+2)%(len(val)+2) - 2
-									if i > -1 {
-										m.Echo(val[i])
-										for i := i; i < len(val)-1; i++ {
-											val[i] = val[i+1]
-										}
-										val = val[:len(val)-1]
-									}
+					m.BackTrace(func(m *Message) bool {
+						for k, v := range m.target.Configs {
+							switch action {
+							case "export", "save":
+								if len(have) == 0 || have[k] {
+									save[k] = v.Value
 								}
-								v.Value = val
-							case []interface{}:
-								if i, e := strconv.Atoi(which); e == nil {
-									i = (i+2+len(val)+2)%(len(val)+2) - 2
-									if i > -1 {
-										for i := i; i < len(val)-1; i++ {
-											val[i] = val[i+1]
-										}
-										val = val[:len(val)-1]
-									}
+							case "load":
+								if x, ok := save[k]; ok && (len(have) == 0 || have[k]) {
+									v.Value = x
 								}
-								v.Value = val
-							}
-						case "delete":
-							if which == k {
-								delete(m.target.Configs, which)
-							}
-						default:
-							switch len(arg) {
-							case 0:
-								m.Add("append", "key", k)
-								m.Add("append", "value", m.Conf(k))
-								m.Add("append", "name", v.Name)
-							case 1:
-								if k != arg[0] {
-									continue
+							case "create":
+								m.Assert(k != arg[1], "%s exists", arg[1])
+							case "delete":
+								if k == arg[0] {
+									delete(m.target.Configs, k)
 								}
-
-								value := m.Confv(arg[0])
-								if m.Options("chains") {
-									value = m.Confv(arg[0], strings.Split(m.Option("chains"), "."))
-								}
-
-								fields := map[string]bool{}
-								for _, k := range strings.Split(m.Option("fields"), " ") {
-									if k == "" {
-										continue
-									}
-									if fields[k] = true; len(fields) == 1 {
-										m.Meta["append"] = append(m.Meta["append"], "index")
-									}
-									m.Meta["append"] = append(m.Meta["append"], k)
-								}
-
-								switch val := value.(type) {
-								case map[string]interface{}:
-									m.Add("append", "index", "0")
-									for k, v := range val {
-										if len(fields) == 0 || fields[k] {
-											switch value := v.(type) {
-											case float64:
-												m.Add("append", k, fmt.Sprintf("%d", int(value)))
-											default:
-												m.Add("append", k, fmt.Sprintf("%v", value))
-											}
-										}
-									}
-								case map[string]string:
-									m.Add("append", "index", "0")
-									for k, v := range val {
-										if len(fields) == 0 || fields[k] {
-											if k == format_field {
-												m.Add("append", k, fmt.Sprintf(format_str, v))
-											} else {
-												m.Add("append", k, v)
-											}
-										}
-									}
-								case []interface{}:
-									n := 0
-									for i, value := range val {
-										switch val := value.(type) {
-										case map[string]interface{}:
-											if m.Options("where_field") && m.Options("where_value") {
-												if !strings.Contains(fmt.Sprintf("%v", val[m.Option("where_field")]), m.Option("where_value")) {
-													continue
-												}
-											}
-											n++
-											if n <= offset || n > offset+limit {
-												continue
-											}
-
-											m.Add("append", "index", i)
-											for k, v := range val {
-												if len(fields) == 0 || fields[k] {
-													if k == format_field {
-														m.Add("append", k, fmt.Sprintf(format_str, v, v))
-													} else {
-														m.Add("append", k, v)
-													}
-												}
-											}
-										}
-									}
-								case []string:
-									for i, v := range val {
-										m.Add("append", "index", i)
-										if k == format_field {
-											m.Add("append", k, fmt.Sprintf(format_str, v, v))
-										} else {
-											m.Add("append", k, v)
-										}
-									}
-								default:
-									m.Echo("%v", Trans(val)[0])
-								}
-							case 3:
-								m.Echo("%v", m.Confv(arg[0], strings.Split(arg[1], "."), arg[2]))
-
+								fallthrough
 							default:
-								m.Echo("%v", m.Confv(arg[0], arg[1:]))
-								return false
+								m.Add("append", "key", k)
+								m.Add("append", "value", strings.Replace(strings.Replace(m.Conf(k), "\n", "\\n", -1), "\t", "\\t", -1))
+								m.Add("append", "name", v.Name)
 							}
 						}
+						switch action {
+						case "create":
+							var value interface{}
+							switch arg[0] {
+							case "map":
+								value = map[string]interface{}{}
+							case "list":
+								value = []interface{}{}
+							default:
+								value = ""
+							}
+							m.target.Configs[arg[1]] = &Config{Name: arg[2], Value: value, Help: arg[3]}
+						}
+						return all
+					})
+					m.Sort("key", "str").Table()
+
+					switch action {
+					case "save":
+						f, e := os.Create(which)
+						m.Assert(e)
+						defer f.Close()
+
+						buf, e := json.MarshalIndent(save, "", "  ")
+						m.Assert(e)
+						f.Write(buf)
+					case "export":
+						buf, e := json.MarshalIndent(save, "", "  ")
+						m.Assert(e)
+						m.Echo("%s", string(buf))
 					}
-					return all
-				})
+					return
+				}
 
-				m.Table()
-				// if m.Sort(sort_field, sort_order); m.Has("index") {
-				// 	for i := 0; i < len(m.Meta["index"]); i++ {
-				// 		m.Meta["index"][i] = fmt.Sprintf("%d", i+offset)
-				// 	}
-				// }
-				// if m.Has("select") {
-				// 	m.Echo(m.Cap(m.Meta["select"][2], m.Meta[m.Meta["select"][1]][m.Optioni("select")]))
-				// } else {
-				// 	m.Table()
-				// }
+				var value interface{}
+				if len(arg) > 2 {
+					value = m.Confv(arg[0], arg[1], arg[2])
+				} else if len(arg) > 1 {
+					value = m.Confv(arg[0], arg[1])
+				} else {
+					value = m.Confv(arg[0])
+				}
 
-				switch action {
-				case "save":
-					f, e := os.Create(which)
-					m.Assert(e)
-					defer f.Close()
-
-					buf, e := json.MarshalIndent(save, "", "  ")
-					m.Assert(e)
-					f.Write(buf)
-				case "export":
-					buf, e := json.MarshalIndent(save, "", "  ")
-					m.Assert(e)
-					m.Echo("%s", string(buf))
+				switch val := value.(type) {
+				case map[string]interface{}:
+					for k, v := range val {
+						m.Add("append", "key", k)
+						m.Add("append", "value", v)
+					}
+					m.Sort("key", "str").Table()
+				case map[string]string:
+					for k, v := range val {
+						m.Add("append", "key", k)
+						m.Add("append", "value", v)
+					}
+					m.Sort("key", "str").Table()
+				case []interface{}:
+					for i, v := range val {
+						m.Add("append", "index", i)
+						m.Add("append", "value", v)
+					}
+					m.Table()
+				case []string:
+					for i, v := range val {
+						m.Add("append", "index", i)
+						m.Add("append", "value", v)
+					}
+					m.Table()
+				default:
+					m.Echo("%v", value)
 				}
 			}},
 		"cache": &Command{
@@ -3572,13 +3464,81 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Echo(arg[0], values...)
 				m.Append("format", m.Result(0))
 			}},
-		"select": &Command{Name: "select key value", Form: map[string]int{"order": 2, "limit": 1, "offset": 1, "vertical": 1}, Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
+		"trans": &Command{Name: "trans key index", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			value := m.Data[(arg[0])]
+			if arg[1] != "" {
+				v := Chain(m, value, arg[1])
+				value = v
+			}
+			m.Log("fuck", "info %T", value)
+			m.Log("fuck", "info %v", value)
+
+			switch val := value.(type) {
+			case map[string]interface{}:
+				for k, v := range val {
+					m.Log("fuck", "info %v %v", k, v)
+					m.Add("append", "key", k)
+					m.Add("append", "value", v)
+				}
+				m.Sort("key", "str").Table()
+			case map[string]string:
+				for k, v := range val {
+					m.Add("append", "key", k)
+					m.Add("append", "value", v)
+				}
+				m.Sort("key", "str").Table()
+			case []interface{}:
+				for i, v := range val {
+					switch value := v.(type) {
+					case map[string]interface{}:
+						for k, v := range value {
+							m.Add("append", k, v)
+						}
+					default:
+						m.Add("append", "index", i)
+						m.Add("append", "value", v)
+					}
+				}
+				m.Table()
+			case []string:
+				for i, v := range val {
+					m.Add("append", "index", i)
+					m.Add("append", "value", v)
+				}
+				m.Table()
+			case float64:
+				m.Echo("%d", int(val))
+			case nil:
+				m.Echo("")
+			default:
+				m.Echo("%v", val)
+			}
+		}},
+		"select": &Command{Name: "select key value", Form: map[string]int{"parse": 2, "order": 2, "limit": 1, "offset": 1, "vertical": 0}, Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.Spawn()
+
 			nrow := len(m.Meta[m.Meta["append"][0]])
 			for i := 0; i < nrow; i++ {
 				if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
 					for _, k := range m.Meta["append"] {
-						msg.Add("append", k, m.Meta[k][i])
+						if m.Has("parse") && m.Option("parse") == k {
+							var value interface{}
+							m.Assert(json.Unmarshal([]byte(m.Meta[k][i]), &value))
+							if m.Meta["parse"][1] != "" {
+								value = Chain(m, value, m.Meta["parse"][1])
+							}
+
+							switch val := value.(type) {
+							case map[string]interface{}:
+								for k, v := range val {
+									msg.Add("append", k, v)
+								}
+							case []interface{}:
+							default:
+							}
+						} else {
+							msg.Add("append", k, m.Meta[k][i])
+						}
 					}
 				}
 			}
@@ -3610,6 +3570,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				msg := m.Spawn()
 				nrow := len(m.Meta[m.Meta["append"][0]])
 				sort.Strings(m.Meta["append"])
+				msg.Add("append", "field", "")
+				msg.Add("append", "value", "")
 				for i := 0; i < nrow; i++ {
 					for _, k := range m.Meta["append"] {
 						msg.Add("append", "field", k)
@@ -3728,16 +3690,12 @@ func Start(args ...string) {
 	Pulse.Sess("log", "log")
 
 	if len(args) > 0 {
-		if Pulse.Sess("nfs").Cmd("exist", args[0]).Results(0) {
-			Pulse.Sess("cli", false).Conf("init.shy", args[0])
-			args = args[1:]
-		}
+		Pulse.Sess("cli", false).Conf("init.shy", args[0])
+		args = args[1:]
 	}
 	if len(args) > 0 {
-		if Pulse.Sess("nfs").Cmd("exist", args[0]).Results(0) {
-			Pulse.Sess("log", false).Conf("bench.log", args[0])
-			args = args[1:]
-		}
+		Pulse.Sess("log", false).Conf("bench.log", args[0])
+		args = args[1:]
 	}
 
 	Pulse.Options("log", true)

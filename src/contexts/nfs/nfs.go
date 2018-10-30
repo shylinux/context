@@ -21,15 +21,13 @@ import (
 )
 
 type NFS struct {
-	in      *os.File
-	out     *os.File
-	history []string
-	pages   []string
-	width   int
-	height  int
+	in     *os.File
+	out    *os.File
+	pages  []string
+	width  int
+	height int
 
-	paths []string
-	io    io.ReadWriter
+	io io.ReadWriter
 
 	send chan *ctx.Message
 	recv chan *ctx.Message
@@ -49,9 +47,10 @@ func (nfs *NFS) open(name string) (*os.File, error) {
 		nfs.Message.Log("info", "open %s", name)
 		return os.Open(name)
 	}
-	for i := len(nfs.paths) - 1; i >= 0; i-- {
-		if f, e := os.Open(path.Join(nfs.paths[i], name)); e == nil {
-			nfs.Log("info", "open %s", path.Join(nfs.paths[i], name))
+	paths := nfs.Context.Message().Confv("paths").([]interface{})
+	for i := len(paths) - 1; i >= 0; i-- {
+		if f, e := os.Open(path.Join(paths[i].(string), name)); e == nil {
+			nfs.Log("info", "open %s", path.Join(paths[i].(string), name))
 			return f, e
 		}
 	}
@@ -355,7 +354,8 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 	back := buf
 
-	his := len(nfs.history)
+	history := nfs.Context.Message().Confv("history").([]interface{})
+	his := len(history)
 
 	tab := []string{}
 	tabi := 0
@@ -394,21 +394,21 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				return
 
 			case termbox.KeyCtrlP:
-				for i := 0; i < len(nfs.history); i++ {
-					his = (his + len(nfs.history) - 1) % len(nfs.history)
-					if strings.HasPrefix(nfs.history[his], string(buf)) {
+				for i := 0; i < len(history); i++ {
+					his = (his + len(history) - 1) % len(history)
+					if strings.HasPrefix(history[his].(string), string(buf)) {
 						rest = rest[:0]
-						rest = append(rest, []rune(nfs.history[his][len(buf):])...)
+						rest = append(rest, []rune(history[his].(string)[len(buf):])...)
 						break
 					}
 				}
 
 			case termbox.KeyCtrlN:
-				for i := 0; i < len(nfs.history); i++ {
-					his = (his + len(nfs.history) + 1) % len(nfs.history)
-					if strings.HasPrefix(nfs.history[his], string(buf)) {
+				for i := 0; i < len(history); i++ {
+					his = (his + len(history) + 1) % len(history)
+					if strings.HasPrefix(history[his].(string), string(buf)) {
 						rest = rest[:0]
-						rest = append(rest, []rune(nfs.history[his][len(buf):])...)
+						rest = append(rest, []rune(history[his].(string)[len(buf):])...)
 						break
 					}
 				}
@@ -546,7 +546,9 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 			"nwrite": &ctx.Cache{Name: "nwrite", Value: "0", Help: "nwrite"},
 			"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
 		}
-		c.Configs = map[string]*ctx.Config{}
+		c.Configs = map[string]*ctx.Config{
+			"history": &ctx.Config{Name: "history", Value: []interface{}{}, Help: "读取记录"},
+		}
 	} else {
 		c.Caches = map[string]*ctx.Cache{
 			"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
@@ -630,11 +632,12 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				line = line[:len(line)-1]
 				continue
 			}
-			nfs.history = append(nfs.history, line)
 			m.Capi("nline", 1)
+			m.Confv("history", -2, line)
+			history := m.Confv("history").([]interface{})
 
-			for i := len(nfs.history) - 1; i < len(nfs.history); i++ {
-				line = nfs.history[i]
+			for i := len(history) - 1; i < len(history); i++ {
+				line = history[i].(string)
 
 				msg := m.Spawn(m.Source()).Set("detail", line)
 				msg.Option("file_pos", i)
@@ -839,39 +842,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 			}
 		}},
-		"paths": &ctx.Command{
-			Name: "paths [add path]|[del index]|[set index path]|[index]",
-			Help: "设置文件搜索路径, add: 添加目录, del: 删除目录, set: 修改目录，index: 目录序号, path: 目录名",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-					if len(arg) == 0 {
-						for i, v := range nfs.paths {
-							m.Echo("%d: %s\n", i, v)
-						}
-						return
-					}
-					switch arg[0] {
-					case "add":
-						nfs.paths = append(nfs.paths, arg[1])
-					case "del":
-						if i, e := strconv.Atoi(arg[1]); e == nil && i < len(nfs.paths) {
-							for ; i < len(nfs.paths)-1; i++ {
-								nfs.paths[i] = nfs.paths[i+1]
-							}
-							nfs.paths = nfs.paths[:len(nfs.paths)-1]
-						}
-					case "set":
-						if i, e := strconv.Atoi(arg[1]); e == nil && i < len(nfs.paths) {
-							nfs.paths[i] = arg[2]
-							m.Echo("%d: %s\n", i, nfs.paths[i])
-						}
-					default:
-						if i, e := strconv.Atoi(arg[0]); e == nil && i < len(nfs.paths) {
-							m.Echo("%d: %s\n", i, nfs.paths[i])
-						}
-					}
-				}
-			}},
 		"scan": &ctx.Command{
 			Name: "scan filename [nfs_name [nfs_help]]",
 			Help: "扫描文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
@@ -890,97 +860,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						}
 					}
 
-					m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), key, arg[0])
-				}
-			}},
-		"history": &ctx.Command{
-			Name: "history [save|load filename [lines [pos]]] [find|search key]",
-			Help: "扫描记录, save: 保存记录, load: 加载记录, filename: 文件名, lines: 加载或保存记录数量, pos: 加载或保存的起始位置, find: 查找记录, search: 搜索记录, key: 查找或搜索的参数",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-					if len(arg) == 0 {
-						for i, v := range nfs.history {
-							m.Echo("%d: %s\n", i, v)
-						}
-						return
-					}
-					switch arg[0] {
-					case "load":
-						f, e := nfs.open(arg[1])
-						m.Assert(e)
-						defer f.Close()
-
-						pos, lines := 0, -1
-						if len(arg) > 3 {
-							i, e := strconv.Atoi(arg[3])
-							m.Assert(e)
-							pos = i
-
-						}
-						if len(arg) > 2 {
-							i, e := strconv.Atoi(arg[2])
-							m.Assert(e)
-							lines = i
-						}
-
-						bio := bufio.NewScanner(f)
-						for i := 0; bio.Scan(); i++ {
-							if i < pos {
-								continue
-							}
-							if lines != -1 && (i-pos) >= lines {
-								break
-							}
-							line := bio.Text()
-							for _, v := range nfs.history {
-								if line == v {
-									line = ""
-								}
-							}
-							if line != "" {
-								nfs.history = append(nfs.history, line)
-							}
-						}
-						m.Capi("nline", 0, len(nfs.history))
-					case "save":
-						f, e := os.Create(arg[1])
-						// f, e := os.OpenFile(arg[1], os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-						m.Assert(e)
-						defer f.Close()
-
-						pos, lines := 0, -1
-						if len(arg) > 3 {
-							i, e := strconv.Atoi(arg[3])
-							m.Assert(e)
-							pos = i
-
-						}
-						if len(arg) > 2 {
-							i, e := strconv.Atoi(arg[2])
-							m.Assert(e)
-							lines = i
-						}
-
-						for i, v := range nfs.history {
-							if i < pos {
-								continue
-							}
-							if lines != -1 && (i-pos) >= lines {
-								break
-							}
-							fmt.Fprintln(f, v)
-						}
-					case "find":
-						for i, v := range nfs.history {
-							if strings.HasPrefix(v, arg[1]) {
-								m.Echo("%d: %s\n", i, v)
-							}
-						}
-					case "search":
-					default:
-						if i, e := strconv.Atoi(arg[0]); e == nil && i < len(nfs.history) {
-							m.Echo(nfs.history[i])
-						}
+					if arg[0] == "stdio" {
+						m.Start("stdio", "stdio", key, arg[0])
+					} else {
+						m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), key, arg[0])
 					}
 				}
 			}},

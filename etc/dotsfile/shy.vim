@@ -6,7 +6,7 @@ syn match   shNumber			"-\=\<\d\+\>#\="
 syn match   shOperator			"=\|+\|-\|*\|/"
 syn match   shOperator			"<\|<=\|>\|>=\|!=\|=="
 syn match   shOperator			"\\"
-syn match   shOperator			"\~[-_a-zA-Z0-9]\+\>"
+syn match   shOperator			"\~[-_a-zA-Z0-9\.]\+\>"
 syn match   shShellVariables	"\$[-_a-zA-Z0-9]\+\>"
 syn match   shShellVariables	"@[-_a-zA-Z0-9]\+\>"
 

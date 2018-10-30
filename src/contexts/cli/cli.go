@@ -239,6 +239,28 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						msg = m.Spawn(cli.target)
 					}
 				}
+				msg.Copy(m, "append")
+				msg.Copy(m, "option")
+
+				args := []string{}
+				rest := []string{}
+				exports := []map[string]string{}
+				for i := 0; i < len(detail); i++ {
+					switch detail[i] {
+					case "<":
+						pipe := m.Spawn().Cmd("import", detail[i+1])
+						msg.Copy(pipe, "append")
+						i++
+					case ">":
+						exports = append(exports, map[string]string{"file": detail[i+1]})
+						i++
+					case "|":
+						detail, rest = detail[:i], detail[i+1:]
+					default:
+						args = append(args, detail[i])
+					}
+				}
+				detail = args
 
 				if msg.Cmd(detail); msg.Hand {
 					m.Cap("ps_target", msg.Cap("module"))
@@ -246,10 +268,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					msg.Copy(m, "target").Detail(-1, "system")
 					msg.Cmd()
 				}
+
+				for _, v := range exports {
+					m.Spawn().Copy(msg, "option").Copy(msg, "append").Cmd("export", v["file"])
+				}
+
+				if len(rest) > 0 {
+					pipe := m.Spawn().Copy(msg, "option").Copy(msg, "append").Cmd("cmd", rest)
+					msg.Set("result").Set("append").Copy(pipe, "result").Copy(pipe, "append")
+				}
+
 				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
 				m.Copy(msg, "result").Copy(msg, "append")
-				// m.Capi("last_msg", 0, msg.Code())
-				// m.Capi("ps_count", 1)
+				m.Capi("last_msg", 0, msg.Code())
+				m.Capi("ps_count", 1)
 			}
 		}},
 		"str": &ctx.Command{Name: "str word", Help: "解析字符串", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -519,7 +551,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				yac.Cmd("train", "stm", "echo", "echo", "rep{", "exp", "}")
 				yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
 
-				yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\|", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
+				yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\|", "\\<", "\\>", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
 				yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
 				yac.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
 
