@@ -279,6 +279,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			"index": []interface{}{
 				map[string]interface{}{"name": "head", "template": "head"},
 				map[string]interface{}{"name": "clipbaord", "help": "clipbaord", "template": "clipboard"},
+				map[string]interface{}{"name": "prompt", "help": "prompt", "template": "componet",
+					"context": "nfs.stdio", "command": "prompt", "arguments": []interface{}{"@string"},
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
+						map[string]interface{}{"type": "button", "label": "refresh"},
+					},
+				},
+				map[string]interface{}{"name": "exec", "help": "exec", "template": "componet",
+					"context": "nfs.stdio", "command": "exec", "arguments": []interface{}{"@string"},
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "string"},
+					},
+				},
+				map[string]interface{}{"name": "show", "help": "show", "template": "componet",
+					"context": "nfs.stdio", "command": "show", "arguments": []interface{}{"\n", "@string", "\n"},
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
+						map[string]interface{}{"type": "button", "label": "refresh"},
+					},
+				},
 				map[string]interface{}{"name": "buffer", "help": "buffer", "template": "componet",
 					"context": "cli", "command": "tmux", "arguments": []interface{}{"buffer"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "limit", "label": "limit", "value": "3"},

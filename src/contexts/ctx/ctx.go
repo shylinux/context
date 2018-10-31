@@ -227,6 +227,39 @@ func Chain(m *Message, data interface{}, args ...interface{}) interface{} {
 
 	return root
 }
+func Elect(last interface{}, args ...interface{}) string {
+	if len(args) > 0 {
+		switch arg := args[0].(type) {
+		case []string:
+			index := 0
+			if len(args) > 1 {
+				switch a := args[1].(type) {
+				case string:
+					i, e := strconv.Atoi(a)
+					if e == nil {
+						index = i
+					}
+				case int:
+					index = a
+				}
+			}
+
+			if 0 <= index && index < len(arg) && arg[index] != "" {
+				return arg[index]
+			}
+		case string:
+			if arg != "" {
+				return arg
+			}
+		}
+	}
+
+	switch l := last.(type) {
+	case string:
+		return l
+	}
+	return ""
+}
 
 type Cache struct {
 	Name  string
@@ -1381,6 +1414,8 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	}
 	if len(args) > 0 {
 		m.Set("detail", Trans(args...)...)
+		m.Log("what", "waht %v", m.Meta)
+		m.Log("what", "waht %v", len(m.Meta["detail"]))
 	}
 	key, arg := m.Meta["detail"][0], m.Meta["detail"][1:]
 
@@ -1430,6 +1465,12 @@ func (m *Message) Confx(key string, arg ...interface{}) string {
 
 	value := ""
 	switch v := arg[0].(type) {
+	case map[string]interface{}:
+		conf = v[key].(string)
+		m.Log("fuck", "conf %v", conf)
+		value = m.Option(key)
+		m.Log("fuck", "value %v", value)
+		arg = arg[1:]
 	case string:
 		value, arg = v, arg[1:]
 	case []string:

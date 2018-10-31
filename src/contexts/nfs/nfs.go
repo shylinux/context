@@ -3,6 +3,7 @@ package nfs
 import (
 	"bufio"
 	"contexts/ctx"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/nsf/termbox-go"
@@ -41,22 +42,25 @@ type NFS struct {
 	*ctx.Context
 }
 
-func open(m *ctx.Message, name string) (string, *os.File, error) {
-	if path.IsAbs(name) {
-		m.Log("info", "open %s", name)
-		f, e := os.Open(name)
-		return name, f, e
-	}
-	paths := m.Confv("paths").([]interface{})
-	for _, v := range paths {
-		p := path.Join(v.(string), name)
-		if f, e := os.Open(p); e == nil {
-			m.Log("info", "open %s", p)
-			return p, f, e
+func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
+	if !path.IsAbs(name) {
+		paths := m.Confv("paths").([]interface{})
+		for _, v := range paths {
+			p := path.Join(v.(string), name)
+			if s, e := os.Stat(p); e == nil && !s.IsDir() {
+				name = p
+				break
+			}
 		}
 	}
+
+	flag := os.O_RDONLY
+	if len(arg) > 0 {
+		flag = arg[0]
+	}
+
 	m.Log("info", "open %s", name)
-	f, e := os.Open(name)
+	f, e := os.OpenFile(name, flag, os.ModePerm)
 	return name, f, e
 }
 
@@ -810,15 +814,21 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"nfs_help": &ctx.Config{Name: "nfs_help", Value: "file", Help: "默认模块帮助"},
 
 		"buf_size": &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
+		"dir_conf": &ctx.Config{Name: "dir_conf", Value: map[string]interface{}{
+			"dir_root": "usr",
+		}, Help: "读取文件的缓存区的大小"},
 
-		"dir_root":   &ctx.Config{Name: "dir_root", Value: "usr", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
 		"dir_deep":   &ctx.Config{Name: "dir_deep(yes/no)", Value: "yes", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir)", Value: "file", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
+		"dir_field":  &ctx.Config{Name: "dir_field", Value: "filename is_dir line size time", Help: "表格排序字段"},
 		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 		"dir_info":   &ctx.Config{Name: "dir_info(sizes/lines/files/dirs)", Value: "sizes lines files dirs", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
-		"dir_field":  &ctx.Config{Name: "dir_field", Value: "filename is_dir line size time", Help: "表格排序字段"},
 		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
 		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
+
+		"git_conf": &ctx.Config{Name: "git_conf", Value: map[string]interface{}{
+			"dir_root": "usr",
+		}, Help: "读取文件的缓存区的大小"},
 
 		"git_branch":   &ctx.Config{Name: "git_branch", Value: "--list", Help: "版本控制状态参数"},
 		"git_status":   &ctx.Config{Name: "git_status", Value: "-sb", Help: "版本控制状态参数"},
@@ -873,10 +883,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 		"scan": &ctx.Command{Name: "scan file name", Help: "扫描文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-				name := fmt.Sprintf("file%d", m.Capi("nfile", 1))
-				if len(arg) > 1 {
-					name = arg[1]
-				}
 				help := fmt.Sprintf("scan %s", arg[0])
 
 				if arg[0] == "stdio" {
@@ -888,28 +894,55 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 				if p, f, e := open(m, arg[0]); m.Assert(e) {
 					m.Optionv("in", f)
-					m.Start(name, help, key, p)
+					m.Start(m.Confx("nfs_name", arg, 1), help, key, p)
 				}
 			}
 		}},
-		"prompt": &ctx.Command{Name: "prompt", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.in != nil {
+		"prompt": &ctx.Command{Name: "prompt arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
 				nfs.prompt()
+				for _, v := range arg {
+					nfs.out.WriteString(v)
+					m.Echo(v)
+				}
+			}
+		}},
+		"exec": &ctx.Command{Name: "exec cmd", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
+				nfs.prompt()
+				for _, v := range arg {
+					nfs.out.WriteString(v)
+				}
+				nfs.out.WriteString("\n")
+
+				msg := m.Find("cli.shell1").Cmd("source", arg)
+				for _, v := range msg.Meta["result"] {
+					nfs.out.WriteString(v)
+					m.Echo(v)
+				}
+				nfs.out.WriteString("\n")
+			}
+		}},
+		"show": &ctx.Command{Name: "show arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
+				for _, v := range arg {
+					nfs.out.WriteString(v)
+					m.Echo(v)
+				}
 			}
 		}},
 
-		"open": &ctx.Command{
-			Name: "open filename [nfs_name [nfs_help]]",
-			Help: "打开文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if m.Has("io") {
-				} else if f, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE, os.ModePerm); m.Assert(e) {
-					m.Put("option", "in", f).Put("option", "out", f)
-				}
-				m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), "open", arg[0])
-				m.Echo(m.Target().Name)
+		"open": &ctx.Command{Name: "open file name", Help: "打开文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			file := arg[0]
+			if m.Has("io") {
+			} else if p, f, e := open(m, file, os.O_RDWR|os.O_CREATE); m.Assert(e) {
+				m.Put("option", "in", f).Put("option", "out", f)
+				file = p
+			}
 
-			}},
+			m.Start(m.Confx("nfs_name", arg, 1), fmt.Sprintf("file %s", file), "open", file)
+			m.Echo(file)
+		}},
 		"read": &ctx.Command{Name: "read [buf_size [pos]]", Help: "读取文件, buf_size: 读取大小, pos: 读取位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.in != nil {
 				n, e := strconv.Atoi(m.Confx("buf_size", arg, 0))
@@ -975,8 +1008,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 		}},
 		"save": &ctx.Command{Name: "save file string...", Help: "保存文件, file: 保存的文件, string: 保存的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			p := path.Join(m.Confv("paths", 0).(string), arg[0])
-			if f, e := os.Create(p); m.Assert(e) {
+			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
 				defer f.Close()
 
 				for _, v := range arg[1:] {
@@ -987,8 +1019,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 		}},
 		"print": &ctx.Command{Name: "print file string...", Help: "输出文件, file: 输出的文件, string: 输出的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			p := path.Join(m.Confv("paths", 0).(string), arg[0])
-			if f, e := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); m.Assert(e) {
+			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_APPEND); m.Assert(e) {
 				defer f.Close()
 
 				for _, v := range arg[1:] {
@@ -1035,6 +1066,48 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 			}
 		}},
+		"json": &ctx.Command{Name: "json [key value]...", Help: "生成格式化内容, key: 参数名, value: 参数值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) == 1 {
+				var data interface{}
+				json.Unmarshal([]byte(arg[0]), &data)
+
+				buf, e := json.MarshalIndent(data, "", "  ")
+				m.Assert(e)
+				m.Echo(string(buf))
+				return
+			}
+
+			if len(arg) > 1 && arg[0] == "file" {
+				var data interface{}
+				f, e := os.Open(arg[1])
+				m.Assert(e)
+				d := json.NewDecoder(f)
+				d.Decode(&data)
+
+				buf, e := json.MarshalIndent(data, "", "  ")
+				m.Assert(e)
+				m.Echo(string(buf))
+				return
+			}
+
+			data := map[string]interface{}{}
+			for _, k := range m.Meta["option"] {
+				if v, ok := m.Data[k]; ok {
+					data[k] = v
+					continue
+				}
+				data[k] = m.Meta[k]
+			}
+
+			for i := 1; i < len(arg)-1; i += 2 {
+				data[arg[i]] = arg[i+1]
+			}
+
+			buf, e := json.Marshal(data)
+			m.Assert(e)
+			m.Echo(string(buf))
+
+		}},
 		"genqr": &ctx.Command{Name: "genqr [qr_size size] filename string...", Help: "生成二维码图片, qr_size: 图片大小, filename: 文件名, string: 输出内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if size, e := strconv.Atoi(m.Confx("qr_size")); m.Assert(e) {
 				p := path.Join(m.Confv("paths", 0).(string), arg[0])
@@ -1058,11 +1131,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				"sort_order": 1,
 			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if len(arg) > 0 {
-					m.Option("dir", arg[0])
-				}
-				m.Option("dir", path.Clean(m.Option("dir")))
-				d := path.Join(m.Confx("dir_root"), m.Option("dir"))
+				conf := m.Confv("dir_conf")
+
+				m.Option("dir", path.Clean(ctx.Elect(m.Option("dir"), arg, 0)))
+				d := path.Join(m.Confx("dir_root", conf), m.Option("dir"))
 				if s, e := os.Stat(d); m.Assert(e) && !s.IsDir() {
 					d = path.Dir(d)
 				}

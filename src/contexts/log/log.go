@@ -28,11 +28,10 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return log
 }
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
-	if f, e := os.Stat(m.Confx("bench.log", arg, 0)); e == nil && !f.IsDir() {
-		log.nfs = m.Sess("nfs").Cmd("append", m.Confx("bench.log", arg, 0), "", "日志文件")
-		log.out = log.nfs.Optionv("out").(*os.File)
-		fmt.Fprintln(log.out, "\n\n")
-	}
+	log.nfs = m.Sess("nfs").Cmd("open", m.Confx("bench.log", arg, 0))
+	log.out = log.nfs.Optionv("out").(*os.File)
+	log.out.Truncate(0)
+	fmt.Fprintln(log.out, "\n\n")
 	return false
 }
 func (log *LOG) Close(m *ctx.Message, arg ...string) bool {
