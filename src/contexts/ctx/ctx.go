@@ -2386,7 +2386,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				return
 			}
 			msg := m.Search(m.Cap("ps_target"))[0]
-			msg = msg.target.message
+			if msg != nil {
+				msg = msg.target.message
+			}
+			if msg == nil {
+				msg = m
+			}
+
 			if len(arg) > 0 {
 				if code, e := strconv.Atoi(arg[0]); e == nil {
 					if msg = m.root.Tree(code); msg != nil {
@@ -3665,6 +3671,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					w.Write(line)
 				}
 				w.Flush()
+			default:
+				for _, v := range m.Meta["result"] {
+					f.WriteString(v)
+				}
 			}
 		}},
 	},

@@ -270,7 +270,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				for _, v := range exports {
-					m.Spawn().Copy(msg, "option").Copy(msg, "append").Cmd("export", v["file"])
+					m.Spawn().Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
 				}
 
 				if len(rest) > 0 {
@@ -559,7 +559,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			if arg[0] != "stdio" {
-				if !m.Sess("nfs").Cmd("exist", arg[0]).Results(0) {
+				if !m.Sess("nfs").Cmd("path", arg[0]).Results(0) {
 					m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
 						switch msg.Cmd().Detail(0) {
 						case "cmd":
@@ -578,7 +578,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", key, arg[0])
 			if arg[0] == "stdio" {
-				if m.Sess("nfs").Cmd("exist", m.Confx("init.shy", arg, 1)).Results(0) {
+				if m.Sess("nfs").Cmd("path", m.Confx("init.shy", arg, 1)).Results(0) {
 					m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init.shy"))
 				}
 				m.Option("prompt", m.Conf("prompt"))
@@ -592,7 +592,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Wait()
 				}
 				if arg[0] == "stdio" {
-					if m.Sess("nfs").Cmd("exist", m.Confx("exit.shy", arg, 2)).Results(0) {
+					if m.Sess("nfs").Cmd("path", m.Confx("exit.shy", arg, 2)).Results(0) {
 						m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("exit.shy"))
 					}
 				}

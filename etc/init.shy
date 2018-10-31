@@ -1,3 +1,4 @@
 source etc/local.shy
+
 ~stdio
     config load var/history.json history

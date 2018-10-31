@@ -282,7 +282,7 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) {
 			data <- buf.Detail(0) + "; "
 			<-next
 			return nil
-		}, "scan", arg[1], "", "扫描文件")
+		}, "scan", arg[1:])
 		// m.Find("log").Cmd("silent", yac.Context.Name, "debug", true)
 		//解析循环
 		for m.Cap("stream", nfs.Target().Name); !m.Options("scan_end"); next <- true {

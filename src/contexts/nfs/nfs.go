@@ -3,7 +3,6 @@ package nfs
 import (
 	"bufio"
 	"contexts/ctx"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/nsf/termbox-go"
@@ -42,21 +41,25 @@ type NFS struct {
 	*ctx.Context
 }
 
-func (nfs *NFS) open(name string) (*os.File, error) {
+func open(m *ctx.Message, name string) (string, *os.File, error) {
 	if path.IsAbs(name) {
-		nfs.Message.Log("info", "open %s", name)
-		return os.Open(name)
+		m.Log("info", "open %s", name)
+		f, e := os.Open(name)
+		return name, f, e
 	}
-	paths := nfs.Context.Message().Confv("paths").([]interface{})
-	for i := len(paths) - 1; i >= 0; i-- {
-		if f, e := os.Open(path.Join(paths[i].(string), name)); e == nil {
-			nfs.Log("info", "open %s", path.Join(paths[i].(string), name))
-			return f, e
+	paths := m.Confv("paths").([]interface{})
+	for _, v := range paths {
+		p := path.Join(v.(string), name)
+		if f, e := os.Open(p); e == nil {
+			m.Log("info", "open %s", p)
+			return p, f, e
 		}
 	}
-	nfs.Log("info", "open %s", name)
-	return os.Open(name)
+	m.Log("info", "open %s", name)
+	f, e := os.Open(name)
+	return name, f, e
 }
+
 func dir(m *ctx.Message, name string, level int, deep bool, fields []string) {
 	back, e := os.Getwd()
 	m.Assert(e)
@@ -794,6 +797,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"nfile": &ctx.Cache{Name: "nfile", Value: "-1", Help: "已经打开的文件数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"qr_size": &ctx.Config{Name: "qr_size", Value: "256", Help: "二维码的默认大小"},
+
 		"pscolor": &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"},
 		"nfs_name": &ctx.Config{Name: "nfs_name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
 			if len(arg) > 0 {
@@ -805,7 +810,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"nfs_help": &ctx.Config{Name: "nfs_help", Value: "file", Help: "默认模块帮助"},
 
 		"buf_size": &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
-		"qr_size":  &ctx.Config{Name: "qr_size", Value: "256", Help: "生成二维码的图片的大小"},
 
 		"dir_root":   &ctx.Config{Name: "dir_root", Value: "usr", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
 		"dir_deep":   &ctx.Config{Name: "dir_deep(yes/no)", Value: "yes", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
@@ -829,44 +833,71 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"paths": &ctx.Config{Name: "paths", Value: []interface{}{""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
+		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
+				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
+					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
+					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
+						nfs, _ := sub.Target().Server.(*NFS)
+						sub1.Remote = make(chan bool, 1)
+						nfs.send <- sub1
+						<-sub1.Remote
+						return nil
+					})
+				}, m.Meta["detail"])
+			}
+
+		}},
+		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
+					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
+					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
+						nfs, _ := sub.Target().Server.(*NFS)
+						sub1.Remote = make(chan bool, 1)
+						nfs.send <- sub1
+						<-sub1.Remote
+						return nil
+					})
+				}, m.Meta["detail"])
+			}
+
+		}},
+		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.io != nil {
+				m.Remote = make(chan bool, 1)
+				nfs.send <- m
+				<-m.Remote
+			}
+		}},
+
+		"scan": &ctx.Command{Name: "scan file name", Help: "扫描文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				name := fmt.Sprintf("file%d", m.Capi("nfile", 1))
+				if len(arg) > 1 {
+					name = arg[1]
+				}
+				help := fmt.Sprintf("scan %s", arg[0])
+
+				if arg[0] == "stdio" {
+					m.Optionv("in", os.Stdin)
+					m.Optionv("out", os.Stdout)
+					m.Start(arg[0], help, key, arg[0])
+					return
+				}
+
+				if p, f, e := open(m, arg[0]); m.Assert(e) {
+					m.Optionv("in", f)
+					m.Start(name, help, key, p)
+				}
+			}
+		}},
 		"prompt": &ctx.Command{Name: "prompt", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.in != nil {
 				nfs.prompt()
 			}
 		}},
-		"exist": &ctx.Command{Name: "exist file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			for _, v := range m.Confv("paths").([]interface{}) {
-				if _, e := os.Stat(path.Join(v.(string), arg[0])); e == nil {
-					m.Echo("true")
-					return
-				}
-			}
-		}},
-		"scan": &ctx.Command{
-			Name: "scan filename [nfs_name [nfs_help]]",
-			Help: "扫描文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-					if arg[0] == "stdio" {
-						m.Optionv("in", os.Stdin)
-						m.Optionv("out", os.Stdout)
-					} else {
-						for _, v := range m.Confv("paths").([]interface{}) {
-							if f, e := os.Open(path.Join(v.(string), arg[0])); e == nil {
-								m.Log("info", "scan: %s", path.Join(v.(string), arg[0]))
-								m.Optionv("in", f)
-								break
-							}
-						}
-					}
 
-					if arg[0] == "stdio" {
-						m.Start("stdio", "stdio", key, arg[0])
-					} else {
-						m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), key, arg[0])
-					}
-				}
-			}},
 		"open": &ctx.Command{
 			Name: "open filename [nfs_name [nfs_help]]",
 			Help: "打开文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
@@ -876,18 +907,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Put("option", "in", f).Put("option", "out", f)
 				}
 				m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), "open", arg[0])
-				m.Echo(m.Target().Name)
-
-			}},
-		"append": &ctx.Command{
-			Name: "append filename [nfs_name [nfs_help]]",
-			Help: "打开文件, filename: 文件名, nfs_name: 模块名, nfs_help: 模块帮助",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				if m.Has("io") {
-				} else if f, e := os.OpenFile(arg[0], os.O_RDWR|os.O_CREATE|os.O_APPEND, os.ModePerm); m.Assert(e) {
-					m.Put("option", "in", f).Put("option", "out", f)
-				}
-				m.Start(m.Confx("nfs_name", arg, 1), m.Confx("nfs_help", arg, 2), "append", arg[0])
 				m.Echo(m.Target().Name)
 
 			}},
@@ -933,8 +952,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Echo(m.Cap("pos"))
 			}
 		}},
+
 		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if f, e := os.Open(arg[0]); m.Assert(e) {
+			if p, f, e := open(m, arg[0]); m.Assert(e) {
 				defer f.Close()
 
 				pos := 0
@@ -949,95 +969,80 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				buf := make([]byte, s)
 
 				if l, e := f.ReadAt(buf, int64(pos)); e == io.EOF || m.Assert(e) {
-					m.Log("info", "read %d", l)
+					m.Log("info", "load %s %d %d", p, l, pos)
 					m.Echo(string(buf[:l]))
 				}
 			}
 		}},
 		"save": &ctx.Command{Name: "save file string...", Help: "保存文件, file: 保存的文件, string: 保存的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if f, e := os.Create(arg[0]); m.Assert(e) {
+			p := path.Join(m.Confv("paths", 0).(string), arg[0])
+			if f, e := os.Create(p); m.Assert(e) {
 				defer f.Close()
 
 				for _, v := range arg[1:] {
-					fmt.Fprint(f, v)
+					n, e := fmt.Fprint(f, v)
+					m.Assert(e)
+					m.Log("info", "save %s %d", p, n)
 				}
 			}
 		}},
 		"print": &ctx.Command{Name: "print file string...", Help: "输出文件, file: 输出的文件, string: 输出的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if f, e := os.OpenFile(arg[0], os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); m.Assert(e) {
+			p := path.Join(m.Confv("paths", 0).(string), arg[0])
+			if f, e := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); m.Assert(e) {
 				defer f.Close()
 
 				for _, v := range arg[1:] {
-					fmt.Fprint(f, v)
+					n, e := fmt.Fprint(f, v)
+					m.Assert(e)
+					m.Log("info", "print %s %d", p, n)
 				}
-				fmt.Fprint(f, "\n")
+			}
+		}},
+
+		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) > 0 && arg[0] == "all" {
+				list := m.Confv("paths").([]interface{})
+				for i, v := range list {
+					m.Add("append", "index", i)
+					m.Add("append", "path", v)
+				}
+				m.Table()
+				return
+			} else if len(arg) > 1 {
+				m.Log("info", "paths %s %s", arg[0], arg[1])
+				m.Confv("paths", arg[0], arg[1])
+			} else if len(arg) > 0 {
+				m.Log("info", "paths 0 %s", arg[0])
+				m.Confv("paths", 0, arg[0])
+			}
+
+			p := m.Confv("paths", 0).(string)
+			if path.IsAbs(p) {
+				m.Echo("%s", p)
+				return
+			}
+
+			wd, e := os.Getwd()
+			m.Assert(e)
+			m.Echo("%s", path.Join(wd, p))
+		}},
+		"path": &ctx.Command{Name: "path file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			for _, v := range m.Confv("paths").([]interface{}) {
+				p := path.Join(v.(string), arg[0])
+				if _, e := os.Stat(p); e == nil {
+					m.Echo(p)
+					break
+				}
 			}
 		}},
 		"genqr": &ctx.Command{Name: "genqr [qr_size size] filename string...", Help: "生成二维码图片, qr_size: 图片大小, filename: 文件名, string: 输出内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if size, e := strconv.Atoi(m.Confx("qr_size")); m.Assert(e) {
-				qrcode.WriteFile(strings.Join(arg[1:], ""), qrcode.Medium, size, arg[0])
+				p := path.Join(m.Confv("paths", 0).(string), arg[0])
+				qrcode.WriteFile(strings.Join(arg[1:], ""), qrcode.Medium, size, p)
+				m.Log("info", "genqr %s", p)
 			}
 		}},
-		"json": &ctx.Command{Name: "json [key value]...", Help: "生成格式化内容, key: 参数名, value: 参数值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if len(arg) == 1 {
-				var data interface{}
-				e := json.Unmarshal([]byte(arg[0]), &data)
-				if e != nil {
-					return
-				}
-				m.Assert(e)
 
-				buf, e := json.MarshalIndent(data, "", "  ")
-				m.Assert(e)
-				// m.Echo("'")
-				m.Echo(string(buf))
-				// m.Echo("'")
-				return
-			}
-
-			if len(arg) > 1 && arg[0] == "file" {
-				var data interface{}
-				f, e := os.Open(arg[1])
-				m.Assert(e)
-				d := json.NewDecoder(f)
-				d.Decode(&data)
-
-				buf, e := json.MarshalIndent(data, "", "  ")
-				m.Assert(e)
-				m.Echo(string(buf))
-				return
-			}
-
-			data := map[string]interface{}{}
-			for _, k := range m.Meta["option"] {
-				if v, ok := m.Data[k]; ok {
-					data[k] = v
-					continue
-				}
-				data[k] = m.Meta[k]
-			}
-
-			for i := 1; i < len(arg)-1; i += 2 {
-				data[arg[i]] = arg[i+1]
-			}
-
-			buf, e := json.Marshal(data)
-			m.Assert(e)
-			m.Echo(string(buf))
-
-		}},
-		"pwd": &ctx.Command{Name: "pwd", Help: "查看当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if m.Options("dir") {
-				m.Echo(m.Option("dir"))
-				return
-			}
-			if len(arg) > 0 {
-				os.Chdir(arg[0])
-			}
-			wd, e := os.Getwd()
-			m.Assert(e)
-			m.Echo(wd)
-		}},
 		"dir": &ctx.Command{
 			Name: "dir dir [dir_deep yes|no] [dir_info info] [dir_name name|tree|path|full] [dir_type both|file|dir] [sort_field name] [sort_order type]",
 			Help: "查看目录, dir: 目录名, dir_info: 显示统计信息, dir_name: 文件名类型, dir_type: 文件类型, sort_field: 排序字段, sort_order: 排序类型",
@@ -1238,44 +1243,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					}
 				}
 			}},
-
-		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
-				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
-					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
-					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
-						nfs, _ := sub.Target().Server.(*NFS)
-						sub1.Remote = make(chan bool, 1)
-						nfs.send <- sub1
-						<-sub1.Remote
-						return nil
-					})
-				}, m.Meta["detail"])
-			}
-
-		}},
-		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
-				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
-					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
-					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
-						nfs, _ := sub.Target().Server.(*NFS)
-						sub1.Remote = make(chan bool, 1)
-						nfs.send <- sub1
-						<-sub1.Remote
-						return nil
-					})
-				}, m.Meta["detail"])
-			}
-
-		}},
-		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.io != nil {
-				m.Remote = make(chan bool, 1)
-				nfs.send <- m
-				<-m.Remote
-			}
-		}},
 	},
 }
 

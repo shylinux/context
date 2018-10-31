@@ -5,6 +5,7 @@ import (
 	"contexts/ctx"
 	"encoding/json"
 	"fmt"
+	// "github.com/PuerkitoBio/goquery"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -405,7 +406,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"get": &ctx.Command{Name: "get [method GET|POST] url arg...",
 			Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "trans": 1},
+			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "trans": 1, "parse": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 					if m.Has("path_value") {
