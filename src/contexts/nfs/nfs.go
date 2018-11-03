@@ -1133,6 +1133,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				conf := m.Confv("dir_conf")
 
+				m.Log("info", "option %s", m.Option("dir"))
+				if len(arg) > 0 {
+					m.Log("info", "arg0 %s", arg[0])
+				}
+				m.Log("info", "elect %s", ctx.Elect(m.Option("dir"), arg, 0))
+
 				m.Option("dir", path.Clean(ctx.Elect(m.Option("dir"), arg, 0)))
 				d := path.Join(m.Confx("dir_root", conf), m.Option("dir"))
 				if s, e := os.Stat(d); m.Assert(e) && !s.IsDir() {

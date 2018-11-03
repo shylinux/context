@@ -111,6 +111,9 @@
 {{define "componet"}}
 <fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "help"}}({{option .Meta "context"}}.{{option .Meta "command"}})</legend>
     {{$form_type := option . "form_type"|meta}}
+
+    {{if eq $form_type "upload"}}
+    {{end}}
     <form class="option {{option .Meta "name"}}"
           data-last_componet_group="{{option . "last_componet_group"|meta}}"
           data-last_componet_order="{{option . "last_componet_order"|meta}}"
@@ -120,8 +123,8 @@
           data-componet_help="{{option . "help"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
+             onsubmit="onaction(event,'upload')"
           {{end}}
-         onsubmit="onaction(event,'submit')"
           >
           <input style="display:none"></input>
           {{range $index, $input := option . "inputs"}}
@@ -165,6 +168,8 @@
           {{end}}
           <hr/>
     </form>
+    {{if eq $form_type "upload"}}
+    {{end}}
 
     {{if index .Meta "display_append"}}
         {{option .Meta "display_append"}}

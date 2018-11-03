@@ -480,7 +480,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							IsCA:         true,
 							KeyUsage:     x509.KeyUsageCertSign,
 						}
-						m.Log("fuck", "what %#v", template)
 						cert, e := x509.CreateCertificate(crand.Reader, &template, &template, &keys.PublicKey, keys)
 						m.Assert(e)
 
@@ -569,8 +568,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						}
 					case "check":
 						defer func() {
-							e := recover()
-							m.Log("fuck", "what %v", e)
+							recover()
 						}()
 
 						root, e := x509.ParseCertificate(aaa.Decode(arg[1]))
@@ -582,15 +580,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						// ee := cert.CheckSignatureFrom(root)
 						// m.Echo("%v", ee)
 						//
-						m.Log("fuck", "----")
 						pool := &x509.CertPool{}
-						m.Log("fuck", "----")
 						m.Echo("%c", pool)
-						m.Log("fuck", "----")
 						pool.AddCert(root)
-						m.Log("fuck", "----")
 						c, e := cert.Verify(x509.VerifyOptions{Roots: pool})
-						m.Log("fuck", "----")
 						m.Echo("%c", c)
 					}
 				}

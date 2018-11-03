@@ -1414,8 +1414,6 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	}
 	if len(args) > 0 {
 		m.Set("detail", Trans(args...)...)
-		m.Log("what", "waht %v", m.Meta)
-		m.Log("what", "waht %v", len(m.Meta["detail"]))
 	}
 	key, arg := m.Meta["detail"][0], m.Meta["detail"][1:]
 
@@ -1467,9 +1465,7 @@ func (m *Message) Confx(key string, arg ...interface{}) string {
 	switch v := arg[0].(type) {
 	case map[string]interface{}:
 		conf = v[key].(string)
-		m.Log("fuck", "conf %v", conf)
 		value = m.Option(key)
-		m.Log("fuck", "value %v", value)
 		arg = arg[1:]
 	case string:
 		value, arg = v, arg[1:]
@@ -3517,13 +3513,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				v := Chain(m, value, arg[1])
 				value = v
 			}
-			m.Log("fuck", "info %T", value)
-			m.Log("fuck", "info %v", value)
 
 			switch val := value.(type) {
 			case map[string]interface{}:
 				for k, v := range val {
-					m.Log("fuck", "info %v %v", k, v)
 					m.Add("append", "key", k)
 					m.Add("append", "value", v)
 				}

@@ -9,7 +9,6 @@ import (
 )
 
 type LOG struct {
-	nfs *ctx.Message
 	out *os.File
 	*ctx.Context
 }
@@ -17,6 +16,7 @@ type LOG struct {
 func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
+
 	s := new(LOG)
 	s.Context = c
 	return s
@@ -28,8 +28,7 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return log
 }
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
-	log.nfs = m.Sess("nfs").Cmd("open", m.Confx("bench.log", arg, 0))
-	log.out = log.nfs.Optionv("out").(*os.File)
+	log.out = m.Sess("nfs").Cmd("open", m.Confx("bench.log", arg, 0)).Optionv("out").(*os.File)
 	log.out.Truncate(0)
 	fmt.Fprintln(log.out, "\n\n")
 	return false
@@ -64,8 +63,6 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 		"log_name": &ctx.Config{Name: "log_name", Value: "dump", Help: "日志屏蔽类型"},
 	},
 	Commands: map[string]*ctx.Command{
-		"open": &ctx.Command{Name: "open file", Help: "打开日志文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-		}},
 		"log": &ctx.Command{Name: "log level string...", Help: "输出日志, level: 日志类型, string: 日志内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) && log.out != nil {
 				if m.Confs("silent", arg[0]) {
@@ -91,9 +88,6 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 					log.out.WriteString(fmt.Sprintf("%s%s %s\n", date, action, cmd))
 				}
 			}
-		}},
-		"pwd": &ctx.Command{Name: "pwd", Help: "打开日志文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Echo("nice")
 		}},
 	},
 }

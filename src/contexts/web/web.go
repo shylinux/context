@@ -279,37 +279,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			"index": []interface{}{
 				map[string]interface{}{"name": "head", "template": "head"},
 				map[string]interface{}{"name": "clipbaord", "help": "clipbaord", "template": "clipboard"},
-				map[string]interface{}{"name": "prompt", "help": "prompt", "template": "componet",
-					"context": "nfs.stdio", "command": "prompt", "arguments": []interface{}{"@string"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-						map[string]interface{}{"type": "button", "label": "refresh"},
-					},
-				},
-				map[string]interface{}{"name": "exec", "help": "exec", "template": "componet",
-					"context": "nfs.stdio", "command": "exec", "arguments": []interface{}{"@string"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "string"},
-					},
-				},
-				map[string]interface{}{"name": "show", "help": "show", "template": "componet",
-					"context": "nfs.stdio", "command": "show", "arguments": []interface{}{"\n", "@string", "\n"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-						map[string]interface{}{"type": "button", "label": "refresh"},
-					},
-				},
 				map[string]interface{}{"name": "buffer", "help": "buffer", "template": "componet",
 					"context": "cli", "command": "tmux", "arguments": []interface{}{"buffer"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "limit", "label": "limit", "value": "3"},
 						map[string]interface{}{"type": "text", "name": "index", "label": "index"},
 						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
+					"pre_run": true,
 				},
 				map[string]interface{}{"name": "command", "help": "command", "template": "componet",
 					"context": "cli.shell1", "command": "source", "arguments": []interface{}{"@cmd"},
 					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "cmd", "value": "pwd",
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "",
 							"class": "cmd", "clipstack": "clistack",
 						},
 					},
@@ -331,14 +312,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
 				},
+				map[string]interface{}{"name": "upload", "help": "upload", "template": "componet",
+					"form_type": "upload",
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "file", "name": "upload"},
+						map[string]interface{}{"type": "submit", "value": "submit"},
+					},
+					"display_result": "",
+				},
 				map[string]interface{}{"name": "dir", "help": "dir", "template": "componet",
 					"context": "nfs", "command": "dir", "arguments": []interface{}{"@dir",
 						"dir_deep", "no", "dir_name", "name", "dir_info", "",
 						"dir_link", "<a class='download' data-type='%s'>%s<a>",
 					},
-					"form_type": "upload",
+					"pre_run": true,
 					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "dir", "label": "dir"},
 						map[string]interface{}{"type": "choice", "name": "dir_type",
 							"label": "dir_type", "value": "both", "choice": []interface{}{
 								map[string]interface{}{"name": "both", "value": "both"},
@@ -365,8 +353,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								map[string]interface{}{"name": "time_r", "value": "time_r"},
 							},
 						},
-						map[string]interface{}{"type": "file", "name": "upload"},
-						map[string]interface{}{"type": "submit", "value": "submit"},
+						map[string]interface{}{"type": "text", "name": "dir", "label": "dir"},
 					},
 				},
 				map[string]interface{}{"name": "web_site", "help": "web_site", "template": "componet",
@@ -374,6 +361,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						"web_site", "format_field", "site", "<a href='%s'>%s<a>",
 					},
 					"display_result": "",
+				},
+				map[string]interface{}{"name": "prompt", "help": "prompt", "template": "componet",
+					"context": "nfs.stdio", "command": "prompt", "arguments": []interface{}{"@string"},
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
+						map[string]interface{}{"type": "button", "label": "refresh"},
+					},
+				},
+				map[string]interface{}{"name": "exec", "help": "exec", "template": "componet",
+					"context": "nfs.stdio", "command": "exec", "arguments": []interface{}{"@string"},
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "string"},
+					},
+				},
+				map[string]interface{}{"name": "show", "help": "show", "template": "componet",
+					"context": "nfs.stdio", "command": "show", "arguments": []interface{}{"\n", "@string", "\n"},
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
+						map[string]interface{}{"type": "button", "label": "refresh"},
+					},
 				},
 				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
@@ -470,7 +477,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Log("info", "%s %s", req.Method, req.URL)
 					m.Echo("%s: %s\n", req.Method, req.URL)
 					for k, v := range req.Header {
-						m.Log("fuck", "%s: %s", k, v)
+						m.Log("info", "%s: %s", k, v)
 					}
 
 					if web.Client == nil {
@@ -757,7 +764,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Log("upload", "file(%d): %s", h.Size, p)
 			m.Append("redirect", m.Option("referer"))
 		}},
-
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if _, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
@@ -870,8 +876,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 
-						if val["command"] != nil {
-							msg.Cmd(val["command"], args)
+						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
+							if val["command"] != nil {
+								msg.Cmd(val["command"], args)
+							}
 						}
 
 						if accept_json {

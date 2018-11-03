@@ -35,6 +35,10 @@ function send_command(form, cb) {
         data[form[i].name] = form[i].value
     }
 
+    if (data["dir"]) {
+        context.Cookie("dir", data["dir"])
+    }
+
     context.GET("", data, function(msg) {
         msg = msg[0]
 
@@ -79,7 +83,6 @@ function check_argument(form, target) {
 function onaction(event, action) {
     switch (action) {
         case "submit":
-            return false
             break
         case "click":
             if (event.target.nodeName == "INPUT") {
@@ -249,7 +252,7 @@ function init_download(event) {
 
     document.querySelector("form.option.dir input[name=dir]").value = context.Search("download_dir")
 
-    option["dir"].value && send_command(option)
+    option["dir"].value && option["dir"].value != context.Cookie("dir") && send_command(option)
 
     var append = document.querySelector("table.append.dir")
     append.onchange = 
