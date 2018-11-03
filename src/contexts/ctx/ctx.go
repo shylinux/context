@@ -2417,6 +2417,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 		}},
+
 		"message": &Command{Name: "message [code] [all]|[cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			if len(arg) > 0 && arg[0] == "spawn" {
 				m.Echo("%d", m.Spawn().code)
@@ -2696,6 +2697,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 
 		}},
+
 		"context": &Command{
 			Name: "context [[find [root|home]|search [root|home] [name|help] [magic|rand|first|last]] name] [list|info|cache|config|command|switch] [args]",
 			Help: "查找并操作模块，\n查找起点root:根模块、back:父模块、home:本模块，\n查找方法find:路径匹配、search:模糊匹配，\n查找对象name:支持点分和正则，\n操作类型show:显示信息、switch:切换为当前、start:启动模块、spawn:分裂子模块，args:启动参数",
@@ -3228,285 +3230,38 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Echo("%v", value)
 				}
 			}},
-		"cache": &Command{
-			Name: "cache [all|key [value]|key = value|key name value help|delete key]",
-			Help: "查看、读写、赋值、新建、删除缓存变量",
-			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				switch len(arg) {
-				case 0:
+		"cache": &Command{Name: "cache [all] |key [value]|key = value|key name value help|delete key]", Help: "查看、读写、赋值、新建、删除缓存变量", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				arg, all = arg[1:], true
+			}
+
+			switch len(arg) {
+			case 0:
+				m.BackTrace(func(m *Message) bool {
 					for k, v := range m.target.Caches {
 						m.Add("append", "key", k)
 						m.Add("append", "value", m.Cap(k))
 						m.Add("append", "name", v.Name)
 					}
-					m.Sort("key", "string").Table()
-					return
-				case 1:
-					if arg[0] == "all" {
-						keys := []string{}
-						values := map[string]*Cache{}
-						for s := m.target; s != nil; s = s.context {
-							for k, v := range s.Caches {
-								if _, ok := values[k]; !ok {
-									keys = append(keys, k)
-									values[k] = v
-								}
-							}
-						}
-						sort.Strings(keys)
-						for _, k := range keys {
-							m.Echo("%s(%s): %s\n", k, m.Cap(k), values[k].Name)
-						}
-						return
-					}
-				case 2:
-					if arg[0] == "delete" {
-						if _, ok := m.target.Caches[arg[1]]; ok {
-							delete(m.target.Caches, arg[1])
-						}
-						return
-					}
-					m.Cap(arg[0], arg[1])
-				case 3:
-					m.Cap(arg[0], arg[0], arg[2], arg[0])
-				default:
-					m.Cap(arg[0], arg[1:]...)
-				}
-				m.Echo("%s", m.Cap(arg[0]))
-
-			}},
-		"right": &Command{
-			Name: "right [share|add|del group [cache|config|command item]]",
-			Help: "用户组管理，查看、添加、删除用户组或是接口",
-			Form: map[string]int{"target": 1},
-			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				owner := m.target
-				if m.Has("target") {
-					owner = m.Find(m.Option("target")).target
-				}
-				index := owner.Index
-				if index == nil {
-					index = map[string]*Context{}
-					owner.Index = index
-				}
-
-				aaa := m.Sess("aaa", false)
-				if aaa.Cap("username") != aaa.Conf("rootname") {
-					owner = index[aaa.Cap("username")]
-					m.Assert(owner != nil)
-				}
-
-				share := owner
-				if len(arg) > 0 {
-					if owner.Index == nil {
-						owner.Index = map[string]*Context{}
-					}
-					if s, ok := owner.Index[arg[0]]; ok {
-						share = s
-					} else {
-						share = &Context{Name: arg[0], context: owner}
-						if _, ok = index[arg[0]]; m.Assert(!ok) {
-							owner.Index[arg[0]] = share
-							index[arg[0]] = share
-						}
-					}
-					arg = arg[1:]
-				}
-
-				if len(arg) == 0 {
-					for k, x := range share.Caches {
-						m.Add("append", "ccc", "cache")
-						m.Add("append", "key", k)
-						m.Add("append", "name", x.Name)
-						m.Add("append", "arg", "")
-						m.Add("append", "value", "")
-					}
-					for k, x := range share.Configs {
-						m.Add("append", "ccc", "config")
-						m.Add("append", "key", k)
-						m.Add("append", "name", x.Name)
-						m.Add("append", "arg", "")
-						m.Add("append", "value", "")
-					}
-					for k, x := range share.Commands {
-						m.Add("append", "ccc", "command")
-						m.Add("append", "key", k)
-						m.Add("append", "name", x.Name)
-
-						m.Add("append", "arg", "")
-						m.Add("append", "value", "")
-						for a, val := range x.Shares {
-							for _, v := range val {
-								m.Add("append", "ccc", "command")
-								m.Add("append", "key", k)
-								m.Add("append", "name", x.Name)
-
-								m.Add("append", "arg", a)
-								m.Add("append", "value", v)
-							}
-						}
-					}
-					for k, x := range share.Index {
-						m.Add("append", "ccc", "context")
-						m.Add("append", "key", k)
-						m.Add("append", "name", x.Name)
-						m.Add("append", "arg", x.context.Name)
-						m.Add("append", "value", "")
-					}
-					m.Table()
+					return all
+				})
+				m.Sort("key", "str").Table()
+				return
+			case 2:
+				if arg[0] == "delete" {
+					delete(m.target.Caches, arg[1])
 					return
 				}
+				m.Cap(arg[0], arg[1])
+			case 3:
+				m.Cap(arg[0], arg[0], arg[2], arg[0])
+			default:
+				m.Echo(m.Cap(arg[0], arg[1:]...))
+				return
+			}
+		}},
 
-				switch arg[0] {
-				case "check":
-					if len(arg) == 1 {
-						m.Echo("ok")
-						break
-					}
-					switch arg[1] {
-					case "cache":
-						if _, ok := share.Caches[arg[2]]; ok {
-							m.Echo("ok")
-							return
-						}
-					case "config":
-						if _, ok := share.Configs[arg[2]]; ok {
-							m.Echo("ok")
-							return
-						}
-					case "command":
-						if x, ok := share.Commands[arg[2]]; ok {
-							if len(arg) == 3 {
-								m.Echo("ok")
-								break
-							}
-							for i := 3; i < len(arg)-1; i += 2 {
-								if len(x.Shares[arg[i]]) > 0 {
-									match := false
-									for _, v := range x.Shares[arg[i]] {
-										ma, e := regexp.MatchString(v, arg[i+1])
-										m.Assert(e)
-										if ma {
-											match = ma
-											break
-										}
-									}
-									if !match {
-										m.Echo("no")
-										return
-									}
-								}
-							}
-							m.Echo("ok")
-						}
-					}
-				case "add":
-					switch arg[1] {
-					case "cache":
-						if x, ok := owner.Caches[arg[2]]; ok {
-							if share.Caches == nil {
-								share.Caches = map[string]*Cache{}
-							}
-							share.Caches[arg[2]] = x
-							m.Log("info", "%s.cache(%s)->%s", owner.Name, arg[2], share.Name)
-						}
-					case "config":
-						if x, ok := owner.Configs[arg[2]]; ok {
-							if share.Configs == nil {
-								share.Configs = map[string]*Config{}
-							}
-							share.Configs[arg[2]] = x
-						}
-						m.Log("info", "%s.config(%s)->%s", owner.Name, arg[2], share.Name)
-					case "command":
-						if _, ok := owner.Commands[arg[2]]; ok {
-							if share.Commands == nil {
-								share.Commands = map[string]*Command{}
-							}
-							if _, ok := share.Commands[arg[2]]; !ok {
-								share.Commands[arg[2]] = &Command{Shares: map[string][]string{}}
-							}
-							m.Log("info", "%s.command(%s)->%s", owner.Name, arg[2], share.Name)
-							for i := 3; i < len(arg)-1; i += 2 {
-								m.Log("info", "%s.command(%s, %s, %s)->%s", owner.Name, arg[2], arg[i], arg[i+1], share.Name)
-								share.Commands[arg[2]].Shares[arg[i]] = append(share.Commands[arg[2]].Shares[arg[i]], arg[i+1])
-							}
-						}
-					}
-				case "del":
-					switch arg[1] {
-					case "cache":
-						cs := []*Context{share}
-						for i := 0; i < len(cs); i++ {
-							for _, x := range cs[i].Index {
-								cs = append(cs, x)
-							}
-							delete(cs[i].Caches, arg[2])
-						}
-					case "config":
-						cs := []*Context{share}
-						for i := 0; i < len(cs); i++ {
-							for _, x := range cs[i].Index {
-								cs = append(cs, x)
-							}
-							delete(cs[i].Configs, arg[2])
-						}
-					case "command":
-						cs := []*Context{share}
-						for i := 0; i < len(cs); i++ {
-							for _, x := range cs[i].Index {
-								cs = append(cs, x)
-							}
-							if len(arg) == 3 {
-								delete(cs[i].Commands, arg[2])
-							} else if len(arg) == 4 {
-								delete(cs[i].Commands[arg[2]].Shares, arg[3])
-							} else if len(arg) == 5 {
-								delete(cs[i].Commands[arg[2]].Shares, arg[3])
-							}
-						}
-
-					}
-				case "show":
-					switch arg[1] {
-					case "cache":
-					case "config":
-					case "command":
-					case "context":
-						for friend, x := range share.Index {
-							for command, c := range x.Commands {
-								m.Add("append", "friend", friend)
-								m.Add("append", "key", command)
-								m.Add("append", "arg", "")
-								m.Add("append", "value", "")
-								for a, s := range c.Shares {
-									for _, v := range s {
-										m.Add("append", "friend", friend)
-										m.Add("append", "key", command)
-										m.Add("append", "arg", a)
-										m.Add("append", "value", v)
-									}
-								}
-							}
-						}
-					}
-				}
-			}},
-		"format": &Command{
-			Name: "format",
-			Help: "format",
-			Hand: func(m *Message, c *Context, key string, arg ...string) {
-				values := []interface{}{}
-				for _, v := range arg[1:] {
-					if v[0] == '$' {
-						values = append(values, m.Cap(v[1:]))
-					} else {
-						values = append(values, v)
-					}
-				}
-				m.Echo(arg[0], values...)
-				m.Append("format", m.Result(0))
-			}},
 		"trans": &Command{Name: "trans key index", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			value := m.Data[(arg[0])]
 			if arg[1] != "" {
