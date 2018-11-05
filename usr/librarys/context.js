@@ -126,3 +126,23 @@ context = {
         xhr.send();
     },
 }
+
+context.isMobile = navigator.userAgent.indexOf("Mobile") > -1
+
+function insert_child(parent, element, html, position) {
+    var elm = document.createElement(element)
+    html && (elm.innerHTML = html)
+    return parent.insertBefore(elm, position || parent.firstElementChild)
+}
+function append_child(parent, element, html) {
+    var elm = document.createElement(element)
+    html && (elm.innerHTML = html)
+    parent.append(elm)
+    return elm
+}
+function insert_before(self, element, html) {
+    var elm = document.createElement(element)
+    html && (elm.innerHTML = html)
+    return self.parentElement.insertBefore(elm, self)
+}
+

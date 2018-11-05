@@ -1,0 +1,198 @@
+{{define "head"}}
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=0.7">
+<title>{{option .Meta "page_title"}}</title>
+<style>
+    html, body {
+        height:100%;
+        width:100%;
+        margin:0px;
+        background-color:#d8d8d8;
+    }
+    fieldset {
+        margin-top:8px;
+    }
+    legend {
+        font-size:16px;
+        font-weight:bold;
+        font-family:monospace;
+    }
+</style>
+<style>
+    textarea.clipboard {
+        color:white;
+        background-color:#272822;
+        width:600px;
+    }
+    form.option div {
+        float:left;
+    }
+    form.option hr {
+        clear:both;
+    }
+    form.option label.keymap {
+        color:red;
+        display:none;
+    }
+    form.option label.keymap.show {
+        display:inline;
+    }
+    form.option input {
+        margin-right:10px;
+    }
+    form.option input.cmd {
+        color:white;
+        background-color:#272822;
+        padding-left:10px;
+        width:600px;
+    }
+    form.option.exec input {
+        color:white;
+        background-color:#272822;
+        padding-left:10px;
+        width:600px;
+    }
+    form.option select {
+        margin-right:10px;
+    }
+    table.append {
+        font-size:14px;
+    }
+    table.append th {
+        font-family:monospace;
+        background-color:lightgreen;
+        cursor:pointer;
+    }
+    table.append th.order {
+        background-color:red;
+        cursor:pointer;
+    }
+    table.append td {
+        font-family:monospace;
+        padding-left: 10px;
+        padding-right: 20px;
+    }
+    code.result pre {
+        color:white;
+        font-size:14px;
+        background-color:#272822;
+        overflow:scroll;
+        padding:5px;
+        border:solid 2px green;
+        border-left:solid 4px green;
+        margin:0;
+    }
+    code.result pre.clipboard {
+        height:2em;
+    }
+</style>
+
+</head>
+<body onkeyup="return onaction(event, 'keymap')">
+{{end}}
+
+{{define "void"}}{{end}}
+
+{{define "detail"}}{{detail .}}{{end}}
+{{define "option"}}{{option .}}{{end}}
+{{define "append"}}{{append .}}{{end}}
+{{define "result"}}{{result .}}{{end}}
+
+{{define "clipboard"}}
+<fieldset><legend>clipboard</legend>
+    <datalist id="clipstack"></datalist>
+    <datalist id="clistack"></datalist>
+    <textarea class="clipboard"></textarea>
+</fieldset>
+{{end}}
+
+{{define "componet"}}
+<fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "help"}}({{option .Meta "context"}}.{{option .Meta "command"}})</legend>
+    {{$form_type := option . "form_type"|meta}}
+
+    {{if eq $form_type "upload"}}
+    {{end}}
+    <form class="option {{option .Meta "name"}}"
+          data-last_componet_group="{{option . "last_componet_group"|meta}}"
+          data-last_componet_order="{{option . "last_componet_order"|meta}}"
+          data-componet_group="{{option . "componet_group"|meta}}"
+          data-componet_order="{{option . "componet_order"|meta}}"
+          data-componet_name="{{option . "name"|meta}}"
+          data-componet_help="{{option . "help"|meta}}"
+          {{if eq $form_type "upload"}}
+              method="POST" action="/upload" enctype="multipart/form-data"
+             onsubmit="onaction(event,'upload')"
+          {{end}}
+          >
+          <input style="display:none"></input>
+          {{range $index, $input := option . "inputs"}}
+              <div>
+                  {{$type := index $input "type"}}
+                  {{if index $input "label"}}
+                      <label>{{index $input "label"}} : </label>
+                  {{end}}
+                  {{if eq $type "button"}}
+                      <input type="button" onclick="return onaction(event, 'command')" value="{{index $input "label"}}">
+                  {{else if eq $type "submit"}}
+                      <input type="submit" value="{{index $input "value"}}">
+                  {{else if eq $type "file"}}
+                      <input type="file" name="{{index $input "name"}}">
+                  {{else if eq $type "choice"}}
+                      {{$default_value := index $input "value"}}
+                      <select name="{{index $input "name"}}" onchange="return onaction(event, 'command')">
+                          {{range $index, $value := index $input "choice"}}
+                              {{$val := index $value "value"}}
+                              {{if eq $default_value $val}}
+                                  <option value="{{index $value "value"}}" selected>{{index $value "name"}}</option>
+                              {{else}}
+                                  <option value="{{index $value "value"}}">{{index $value "name"}}</option>
+                              {{end}}
+                          {{end}}
+                      </select>
+                  {{else}}
+                      <input
+                          name="{{index $input "name"}}"
+                          value="{{index $input "value"}}"
+                          class="{{index $input "class"}}"
+                          {{if index $input "clipstack"}}
+                              list="{{index $input "clipstack"}}"
+                          {{else}}
+                              list="clipstack"
+                          {{end}}
+                          onclick="return onaction(event, 'click')"
+                          onkeyup="return onaction(event, 'input')">
+                  {{end}}
+              </div>
+          {{end}}
+          <hr/>
+    </form>
+    {{if eq $form_type "upload"}}
+    {{end}}
+
+    {{if index .Meta "display_append"}}
+        {{option .Meta "display_append"}}
+    {{else}}
+        <table class="append {{option .Meta "name"}}">
+            {{$msg := .}}
+            <tr>{{range $field := append .}}<th>{{$field}}</th>{{end}}</tr>
+            {{range $line := table .}}
+                <tr>{{range $field := append $msg}}<td>{{index $line $field|unescape}}</td>{{end}}</tr>
+            {{end}}
+        </table>
+    {{end}}
+
+    {{if index .Meta "display_result"}}
+        {{option .Meta "display_result"}}
+    {{else}}
+        <code class="result {{option .Meta "name"}}"><pre>{{result .Meta}}</pre></code>
+    {{end}}
+</fieldset>
+{{end}}
+
+{{define "tail"}}
+<script src="/librarys/context.js"></script>
+<script src="/librarys/code.js"></script>
+</body>
+{{end}}

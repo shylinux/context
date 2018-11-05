@@ -244,9 +244,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				args := []string{}
 				rest := []string{}
+				exec := true
+				execexec := false
 				exports := []map[string]string{}
 				for i := 0; i < len(detail); i++ {
 					switch detail[i] {
+					case "?":
+						if !ctx.Right(detail[i+1]) {
+							return
+						}
+						i++
+					case "??":
+						exec = false
+						execexec = execexec || ctx.Right(detail[i+1])
+						i++
 					case "<":
 						pipe := m.Spawn().Cmd("import", detail[i+1])
 						msg.Copy(pipe, "append")
@@ -254,12 +265,36 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					case ">":
 						exports = append(exports, map[string]string{"file": detail[i+1]})
 						i++
+					case ">$":
+						if i == len(detail)-2 {
+							exports = append(exports, map[string]string{"cache": detail[i+1], "index": "result"})
+							i += 1
+							break
+						}
+						exports = append(exports, map[string]string{"cache": detail[i+1], "index": detail[i+2]})
+						i += 2
+					case ">@":
+						if i == len(detail)-2 {
+							exports = append(exports, map[string]string{"config": detail[i+1], "index": "result"})
+							i += 1
+							break
+						}
+						exports = append(exports, map[string]string{"config": detail[i+1], "index": detail[i+2]})
+						i += 2
 					case "|":
 						detail, rest = detail[:i], detail[i+1:]
+					case "%":
+						rest = append(rest, "select")
+						detail, rest = detail[:i], append(rest, detail[i+1:]...)
 					default:
 						args = append(args, detail[i])
 					}
 				}
+
+				if !exec && !execexec {
+					return
+				}
+
 				detail = args
 
 				if msg.Cmd(detail); msg.Hand {
@@ -270,7 +305,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				for _, v := range exports {
-					m.Spawn().Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
+					m.Log("info", "export %v", v)
+					if v["file"] != "" {
+						m.Spawn().Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
+					}
+					if v["cache"] != "" {
+						if v["index"] == "result" {
+							m.Cap(v["cache"], strings.Join(msg.Meta["result"], ""))
+						} else {
+							m.Cap(v["cache"], msg.Append(v["index"]))
+						}
+					}
+					if v["config"] != "" {
+						if v["index"] == "result" {
+							m.Conf(v["config"], strings.Join(msg.Meta["result"], ""))
+						} else {
+							m.Conf(v["config"], msg.Append(v["index"]))
+						}
+					}
 				}
 
 				if len(rest) > 0 {
@@ -298,7 +350,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					case "$":
 						m.Echo(msg.Cap(arg[1]))
 					case "@":
-						m.Echo(msg.Conf(arg[1]))
+						value := msg.Option(arg[1])
+						if value == "" {
+							value = msg.Conf(arg[1])
+						}
+
+						m.Echo(value)
 					default:
 						m.Echo(arg[0]).Echo(arg[1])
 					}
@@ -551,7 +608,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				yac.Cmd("train", "stm", "echo", "echo", "rep{", "exp", "}")
 				yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
 
-				yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\|", "\\<", "\\>", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
+				yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\?\\?", "\\?", "<", ">$", ">@", ">", "\\|", "%", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
 				yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
 				yac.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
 

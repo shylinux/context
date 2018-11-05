@@ -1,0 +1,148 @@
+{{define "head"}}
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=0.7">
+<title>{{option .Meta "page_title"}}</title>
+<style>
+html, body {
+    height:100%;
+    width:100%;
+    margin:0px;
+    background-color:#d8d8d8;
+}
+header {
+    color:white;
+    font-size:20px;
+    font-family:monospace;
+    text-align:center;
+    background-color:#0747a6;
+    width:100%;
+    height:40px;
+}
+header .title {
+    padding:6px;
+}
+header .toggle {
+    cursor:pointer;
+    width:40px;
+    position:absolute;
+    left:20px;
+    top:5px;
+}
+header .toggle:hover {
+    background-color:blue;
+}
+header .search {
+    position:absolute;
+    right:20px;
+    top:5px;
+}
+header .search input {
+    font-size:14px;
+    background-color:#91d7f5;
+    padding:4px;
+    width:60px;
+}
+header .search input:focus {
+    width:120px;
+}
+
+nav {
+    float:left;
+    min-width:250px;
+    overflow:auto;
+}
+article {
+    float:left;
+    width:calc(100% - 250px);
+    min-width:600px;
+    overflow:auto;
+}
+
+.list li {
+    padding-top:10px;
+}
+.list li:hover {
+    background-color:green;
+}
+.list a {
+    text-decoration-line:none;
+}
+.toggle_menu {
+    width:100%;
+    cursor:pointer;
+    background-color:green;
+}
+.menu li {
+    padding-top:10px;
+}
+.menu a {
+    text-decoration-line:none;
+}
+.menu li:hover {
+    background-color:green;
+}
+.toggle_list {
+    width:100%;
+    cursor:pointer;
+    background-color:green;
+}
+.link a {
+    text-decoration-line:none;
+}
+.text {
+    margin:20px;
+}
+.mono {
+    font-family:monospace;
+}
+footer {
+    clear:both;
+}
+</style>
+</head>
+<body>
+{{end}}
+
+{{define "header"}}
+<header>
+    <div class="toggle" onclick="action(event, 'toggle_nav')">三</div>
+    <div class="search"><input type="text" placeholder="搜索"></div>
+    <div class="title">shylinux</div>
+</header>
+<nav>
+{{end}}
+
+{{define "list"}}
+<div class="toggle_menu" onclick="action(event, 'toggle_list')">文章</div>
+<ul class="list" hidden>
+{{range $i, $l := table .}}
+    <li>
+        <a href="?wiki_favor={{index $l "file"}}">{{index $l "file"}}</a><br/>
+        <span class="mono"> {{index $l "time"}} </span>
+    </li>
+{{end}}
+</ul>
+{{end}}
+
+{{define "text"}}
+<div class="toggle_menu" onclick="action(event, 'toggle_menu')">目录</div>
+<ul class="menu"></ul>
+</nav>
+<article>
+<div class="toggle_link" onclick="action(event, 'toggle_link')">参考链接</div>
+<ul class="link" hidden></ul>
+<div class="text">{{result .|meta|unescape}}</div>
+</article>
+{{end}}
+
+{{define "footer"}}
+<footer>shylinux</footer>
+{{end}}
+
+{{define "tail"}}
+<script src="/librarys/context.js"></script>
+<script src="/librarys/wiki.js"></script>
+</body>
+{{end}}

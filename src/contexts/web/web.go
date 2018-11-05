@@ -27,9 +27,10 @@ type MUX interface {
 }
 type WEB struct {
 	*http.Client
+
+	*http.Server
 	*http.ServeMux
-	server   *http.Server
-	template *template.Template
+	*template.Template
 
 	*ctx.Context
 }
@@ -173,15 +174,23 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	web.Configs["root_index"] = &ctx.Config{Name: "root_index", Value: "/render", Help: "默认路由"}
 	web.Configs["logheaders"] = &ctx.Config{Name: "logheaders(yes/no)", Value: "no", Help: "日志输出报文头"}
+	web.Configs["template_sub"] = &ctx.Config{Name: "template_sub", Value: web.Context.Name, Help: "模板文件"}
+
 	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: m.Confx("directory", arg, 0), Help: "服务目录"}
 	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "模块路由"}
 	web.Caches["register"] = &ctx.Cache{Name: "register(yes/no)", Value: "no", Help: "是否已初始化"}
 	web.Caches["master"] = &ctx.Cache{Name: "master(yes/no)", Value: "no", Help: "服务入口"}
+
 	web.ServeMux = http.NewServeMux()
+	web.Template = template.New("render").Funcs(ctx.CGI)
+	web.Template.ParseGlob(path.Join(m.Conf("template_dir"), "/*.tmpl"))
+	web.Template.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl"))
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	m.Cap("directory", m.Confx("directory", arg, 0))
+
+	render := m.Target().Commands["/render"]
 
 	m.Travel(func(m *ctx.Message, i int) bool {
 		if h, ok := m.Target().Server.(MUX); ok && m.Cap("register") == "no" {
@@ -193,10 +202,15 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 				s.Handle(m.Cap("route"), http.StripPrefix(path.Dir(m.Cap("route")), h))
 			}
 
+			if m.Target().Commands["/render"] == nil {
+				m.Target().Commands["/render"] = render
+			}
+
+			msg := m.Target().Message()
 			for k, x := range m.Target().Commands {
 				if k[0] == '/' {
 					m.Log("info", "route: %s", k)
-					h.HandleCmd(m, k, x)
+					h.HandleCmd(msg, k, x)
 					m.Capi("nroute", 1)
 				}
 			}
@@ -209,19 +223,23 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		return true
 	})
 
+	if len(arg) == 0 {
+		return false
+	}
+
 	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: m.Confx("protocol", arg, 2), Help: "服务协议"}
 	web.Caches["address"] = &ctx.Cache{Name: "address", Value: m.Confx("address", arg, 1), Help: "服务地址"}
 	m.Log("info", "%d %s://%s", m.Capi("nserve", 1), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
-	web.server = &http.Server{Addr: m.Cap("address"), Handler: web}
+	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
 
 	if m.Caps("master", true); m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "cert", Value: m.Confx("cert", arg, 3), Help: "服务证书"}
 		web.Caches["key"] = &ctx.Cache{Name: "key", Value: m.Confx("key", arg, 4), Help: "服务密钥"}
 		m.Log("info", "cert [%s]", m.Cap("cert"))
 		m.Log("info", "key [%s]", m.Cap("key"))
-		web.server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
+		web.Server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
 	} else {
-		web.server.ListenAndServe()
+		web.Server.ListenAndServe()
 	}
 	return true
 }
@@ -250,134 +268,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"cert":            &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":             &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
 
-		"web_site": &ctx.Config{Name: "web_site", Value: []interface{}{
-			map[string]interface{}{"_name": "MDN", "site": "https://developer.mozilla.org"},
-			map[string]interface{}{"_name": "github", "site": "https://github.com"},
-		}, Help: "web_site"},
-		"template_dir": &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板路径"},
-
+		"template_dir":     &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板路径"},
+		"template_debug":   &ctx.Config{Name: "template_debug", Value: "true", Help: "模板调试"},
 		"componet_context": &ctx.Config{Name: "component_context", Value: "nfs", Help: "默认模块"},
 		"componet_command": &ctx.Config{Name: "component_command", Value: "pwd", Help: "默认命令"},
 		"componet_group":   &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
-			"login": []interface{}{
-				map[string]interface{}{"name": "head", "template": "head"},
-				map[string]interface{}{"name": "userinfo", "help": "userinfo",
-					"context": "aaa", "command": "userinfo", "arguments": []interface{}{"@sessid"},
-				},
-				map[string]interface{}{"name": "login", "help": "login", "template": "componet",
-					"context": "aaa", "command": "login", "arguments": []interface{}{"@username", "@password"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "username", "label": "username"},
-						map[string]interface{}{"type": "password", "name": "password", "label": "password"},
-						map[string]interface{}{"type": "button", "label": "login"},
-					},
-					"display_append": "", "display_result": "", "result_reload": "10",
-				},
-				map[string]interface{}{"name": "tail", "template": "tail"},
-			},
 			"index": []interface{}{
 				map[string]interface{}{"name": "head", "template": "head"},
 				map[string]interface{}{"name": "clipbaord", "help": "clipbaord", "template": "clipboard"},
-				map[string]interface{}{"name": "buffer", "help": "buffer", "template": "componet",
-					"context": "cli", "command": "tmux", "arguments": []interface{}{"buffer"}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "limit", "label": "limit", "value": "3"},
-						map[string]interface{}{"type": "text", "name": "index", "label": "index"},
-						map[string]interface{}{"type": "button", "label": "refresh"},
-					},
-					"pre_run": true,
-				},
-				map[string]interface{}{"name": "command", "help": "command", "template": "componet",
-					"context": "cli.shell1", "command": "source", "arguments": []interface{}{"@cmd"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "cmd", "value": "",
-							"class": "cmd", "clipstack": "clistack",
-						},
-					},
-				},
 				map[string]interface{}{"name": "time", "help": "time", "template": "componet",
 					"context": "cli", "command": "time", "arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "time_format",
 							"label": "format", "value": "2006-01-02 15:04:05",
 						},
-						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-						map[string]interface{}{"type": "button", "label": "refresh"},
-					},
-				},
-				map[string]interface{}{"name": "json", "help": "json", "template": "componet",
-					"context": "nfs", "command": "json", "arguments": []interface{}{"@string"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-						map[string]interface{}{"type": "button", "label": "refresh"},
-					},
-				},
-				map[string]interface{}{"name": "upload", "help": "upload", "template": "componet",
-					"form_type": "upload",
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "file", "name": "upload"},
-						map[string]interface{}{"type": "submit", "value": "submit"},
-					},
-					"display_result": "",
-				},
-				map[string]interface{}{"name": "dir", "help": "dir", "template": "componet",
-					"context": "nfs", "command": "dir", "arguments": []interface{}{"@dir",
-						"dir_deep", "no", "dir_name", "name", "dir_info", "",
-						"dir_link", "<a class='download' data-type='%s'>%s<a>",
-					},
-					"pre_run": true,
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "choice", "name": "dir_type",
-							"label": "dir_type", "value": "both", "choice": []interface{}{
-								map[string]interface{}{"name": "both", "value": "both"},
-								map[string]interface{}{"name": "file", "value": "file"},
-								map[string]interface{}{"name": "dir", "value": "dir"},
-							},
-						},
-						map[string]interface{}{"type": "choice", "name": "sort_field",
-							"label": "sort_field", "value": "time", "choice": []interface{}{
-								map[string]interface{}{"name": "filename", "value": "filename"},
-								map[string]interface{}{"name": "is_dir", "value": "is_dir"},
-								map[string]interface{}{"name": "line", "value": "line"},
-								map[string]interface{}{"name": "size", "value": "size"},
-								map[string]interface{}{"name": "time", "value": "time"},
-							},
-						},
-						map[string]interface{}{"type": "choice", "name": "sort_order",
-							"label": "sort_order", "value": "time_r", "choice": []interface{}{
-								map[string]interface{}{"name": "str", "value": "str"},
-								map[string]interface{}{"name": "str_r", "value": "str_r"},
-								map[string]interface{}{"name": "int", "value": "int"},
-								map[string]interface{}{"name": "int_r", "value": "int_r"},
-								map[string]interface{}{"name": "time", "value": "time"},
-								map[string]interface{}{"name": "time_r", "value": "time_r"},
-							},
-						},
-						map[string]interface{}{"type": "text", "name": "dir", "label": "dir"},
-					},
-				},
-				map[string]interface{}{"name": "web_site", "help": "web_site", "template": "componet",
-					"context": "web", "command": "config", "arguments": []interface{}{
-						"web_site", "format_field", "site", "<a href='%s'>%s<a>",
-					},
-					"display_result": "",
-				},
-				map[string]interface{}{"name": "prompt", "help": "prompt", "template": "componet",
-					"context": "nfs.stdio", "command": "prompt", "arguments": []interface{}{"@string"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-						map[string]interface{}{"type": "button", "label": "refresh"},
-					},
-				},
-				map[string]interface{}{"name": "exec", "help": "exec", "template": "componet",
-					"context": "nfs.stdio", "command": "exec", "arguments": []interface{}{"@string"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "string"},
-					},
-				},
-				map[string]interface{}{"name": "show", "help": "show", "template": "componet",
-					"context": "nfs.stdio", "command": "show", "arguments": []interface{}{"\n", "@string", "\n"},
-					"inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
 						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
@@ -599,6 +504,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Spawn().Cmd("open", url)
 			}
 		}},
+
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol [cert [key]]]]", Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http), cert: 服务证书, key: 服务密钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Set("detail", arg...).Target().Start(m)
 		}},
@@ -660,26 +566,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"template": &ctx.Command{Name: "template [file [directory]]|[name [content]]", Help: "添加模板, content: 模板内容, directory: 模板目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				if len(arg) == 0 {
-					for _, v := range web.template.Templates() {
+					for _, v := range web.Template.Templates() {
 						m.Add("append", "name", v.Name())
 					}
 					m.Sort("name").Table()
 					return
 				}
 
-				if web.template == nil {
-					web.template = template.New("render").Funcs(ctx.CGI)
+				if web.Template == nil {
+					web.Template = template.New("render").Funcs(ctx.CGI)
 				}
 
 				dir := path.Join(m.Confx("template_dir", arg, 1), arg[0])
-				if t, e := web.template.ParseGlob(dir); e == nil {
-					web.template = t
+				if t, e := web.Template.ParseGlob(dir); e == nil {
+					web.Template = t
 				} else {
 					m.Log("info", "%s", e)
 					if len(arg) > 1 {
-						web.template = template.Must(web.template.New(arg[0]).Parse(arg[1]))
+						web.Template = template.Must(web.Template.New(arg[0]).Parse(arg[1]))
 					} else {
-						tmpl, e := web.template.Clone()
+						tmpl, e := web.Template.Clone()
 						m.Assert(e)
 						tmpl.Funcs(ctx.CGI)
 
@@ -765,16 +671,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Append("redirect", m.Option("referer"))
 		}},
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if _, ok := m.Target().Server.(*WEB); m.Assert(ok) {
+			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
 				list := []interface{}{}
 
-				// tmpl, e := web.template.Clone()
+				// tmpl, e := web.Template.Clone()
 				// m.Assert(e)
 				// tmpl.Funcs(ctx.CGI)
 				//
-				tmpl := template.New("render").Funcs(ctx.CGI)
-				tmpl.ParseGlob(fmt.Sprintf("%s/context/usr/template/common/base.tmpl", os.Getenv("HOME")))
+
+				tmpl := web.Template
+				if m.Confs("template_debug") {
+					tmpl = template.New("render").Funcs(ctx.CGI)
+					tmpl.ParseGlob(path.Join(m.Conf("template_dir"), "/*.tmpl"))
+					tmpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl"))
+				}
 
 				w := m.Optionv("response").(http.ResponseWriter)
 				if accept_json {
