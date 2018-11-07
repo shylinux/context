@@ -2945,6 +2945,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							}
 							list = append(list, v)
 						}
+						list = append(list, args...)
 
 						msg := cmd.Sess("cli").Cmd("source", strings.Join(list, " "))
 						cmd.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
@@ -3190,7 +3191,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 		}},
 		"select": &Command{Name: "select key value field",
-			Form: map[string]int{"parse": 2, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "vertical": 0},
+			Form: map[string]int{"parse": 2, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "trans_map": 3, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 				msg := m.Spawn()
 

@@ -5,7 +5,7 @@ function action(event, cmd) {
             nav.hidden = !nav.hidden
             var article = document.querySelector("article")
             if (!context.isMobile) {
-                article.style.width = nav.hidden? "80%": "calc(100% - 250px)"
+                article.style.width = nav.hidden? "80%": "calc(100% - 400px)"
             }
             break
         case "toggle_list":
@@ -143,12 +143,12 @@ window.onload = function() {
     init_link()
     init_code()
     var article = document.querySelector("article")
-    var mav = document.querySelector("nav")
-    alert(context.isMobile)
+    var nav = document.querySelector("nav")
     if (context.isMobile) {
         article.style.width = "100%"
     } else {
         article.style.maxHeight = "calc(100% - 80px)"
-        mav.style.maxHeight = "calc(100% - 80px)"
+        nav.style.maxHeight = "calc(100% - 80px)"
     }
+    article.style.width = nav.hidden? "80%": "calc(100% - 400px)"
 }
