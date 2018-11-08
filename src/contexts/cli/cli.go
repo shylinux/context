@@ -2,10 +2,15 @@ package cli
 
 import (
 	"contexts/ctx"
+	"io/ioutil"
+	"syscall"
+	"toolkit"
+
 	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -137,10 +142,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"time_close":  &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
 
 		"cmd_script": &ctx.Config{Name: "cmd_script", Value: map[string]interface{}{
-			".sh":  "bash",
-			".py":  "python",
-			".shy": "source",
+			"sh":  "bash",
+			"py":  "python",
+			"shy": "source",
 		}, Help: "系统命令超时"},
+
 		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "60s", Help: "系统命令超时"},
 		"cmd_combine": &ctx.Config{Name: "cmd_combine", Value: map[string]interface{}{
 			"vi":  map[string]interface{}{"active": true},
@@ -216,7 +222,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				msg := m
 				for k, v := range m.Confv("cmd_script").(map[string]interface{}) {
-					if strings.HasSuffix(detail[0], k) {
+					if strings.HasSuffix(detail[0], "."+k) {
 						detail = append([]string{v.(string)}, detail...)
 						msg = m.Spawn(cli.target)
 						break
@@ -307,7 +313,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				for _, v := range exports {
 					m.Log("info", "export %v", v)
 					if v["file"] != "" {
-						m.Spawn().Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
+						m.Sess("nfs").Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
 					}
 					if v["cache"] != "" {
 						if v["index"] == "result" {
@@ -327,7 +333,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				if len(rest) > 0 {
 					pipe := m.Spawn().Copy(msg, "option").Copy(msg, "append").Cmd("cmd", rest)
-					msg.Set("result").Set("append").Copy(pipe, "result").Copy(pipe, "append")
+
+					msg.Set("result").Set("append")
+					m.Log("fuck", "what %v", msg.Meta)
+					msg.Copy(pipe, "result").Copy(pipe, "append")
+					m.Log("fuck", "what %v", msg.Meta)
 				}
 
 				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
@@ -633,7 +643,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Copy(msg, "target")
 			}
 
-			m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", key, arg[0])
+			name := fmt.Sprintf("shell%d", m.Capi("nshell", 1))
+			if arg[0] == "stdio" {
+				name = "shy"
+			}
+
+			m.Start(name, "shell", key, arg[0])
+
 			if arg[0] == "stdio" {
 				if m.Sess("nfs").Cmd("path", m.Confx("init.shy", arg, 1)).Results(0) {
 					m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init.shy"))
@@ -846,6 +862,64 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}
 				}
 			}},
+		"sysinfo": &ctx.Command{Name: "sysinfo", Help: "sysinfo", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			sys := &syscall.Sysinfo_t{}
+			syscall.Sysinfo(sys)
+
+			d, e := time.ParseDuration(fmt.Sprintf("%ds", sys.Uptime))
+			m.Assert(e)
+			m.Append("NumCPU", runtime.NumCPU())
+			m.Append("uptime", d)
+			m.Append("procs", sys.Procs)
+
+			m.Append("total", kit.FmtSize(sys.Totalram))
+			m.Append("free", kit.FmtSize(sys.Freeram))
+			m.Append("mper", fmt.Sprintf("%d%%", sys.Freeram*100/sys.Totalram))
+
+			fs := &syscall.Statfs_t{}
+			syscall.Statfs("./", fs)
+			m.Append("blocks", kit.FmtSize(fs.Blocks*uint64(fs.Bsize)))
+			m.Append("bavail", kit.FmtSize(fs.Bavail*uint64(fs.Bsize)))
+			m.Append("bper", fmt.Sprintf("%d%%", fs.Bavail*100/fs.Blocks))
+
+			m.Append("files", fs.Files)
+			m.Append("ffree", fs.Ffree)
+			m.Append("fper", fmt.Sprintf("%d%%", fs.Ffree*100/fs.Files))
+
+			m.Table()
+		}},
+		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			mem := &runtime.MemStats{}
+			runtime.ReadMemStats(mem)
+			m.Append("NumGoroutine", runtime.NumGoroutine())
+			m.Append("NumGC", mem.NumGC)
+			m.Append("other", kit.FmtSize(mem.OtherSys))
+			m.Append("stack", kit.FmtSize(mem.StackSys))
+
+			m.Append("heapsys", kit.FmtSize(mem.HeapSys))
+			m.Append("heapinuse", kit.FmtSize(mem.HeapInuse))
+			m.Append("heapidle", kit.FmtSize(mem.HeapIdle))
+			m.Append("heapalloc", kit.FmtSize(mem.HeapAlloc))
+
+			m.Append("lookups", mem.Lookups)
+			m.Append("objects", mem.HeapObjects)
+			m.Table()
+		}},
+		"develop": &ctx.Command{Name: "develop", Help: "develop", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Append("nclient", strings.Count(m.Spawn().Cmd("system", "tmux", "list-clients").Result(0), "\n"))
+			m.Append("nsesion", strings.Count(m.Spawn().Cmd("system", "tmux", "list-sessions").Result(0), "\n"))
+			m.Append("nwindow", strings.Count(m.Spawn().Cmd("system", "tmux", "list-windows", "-a").Result(0), "\n"))
+			m.Append("npane", strings.Count(m.Spawn().Cmd("system", "tmux", "list-panes", "-a").Result(0), "\n"))
+
+			m.Append("ncommand", strings.Count(m.Spawn().Cmd("system", "tmux", "list-commands").Result(0), "\n"))
+			m.Append("nkey", strings.Count(m.Spawn().Cmd("system", "tmux", "list-keys").Result(0), "\n"))
+			m.Append("nbuffer", strings.Count(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n"))
+			nw, _ := ioutil.ReadFile("var/.nwrite")
+			m.Append("nwrite", string(nw))
+			nr, _ := ioutil.ReadFile("var/.nread")
+			m.Append("nread", string(nr))
+			m.Table()
+		}},
 
 		"label": &ctx.Command{Name: "label name", Help: "记录当前脚本的位置, name: 位置名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {

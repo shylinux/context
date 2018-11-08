@@ -3,6 +3,7 @@ package nfs
 import (
 	"bufio"
 	"contexts/ctx"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,6 +48,10 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 		paths := m.Confv("paths").([]interface{})
 		for _, v := range paths {
 			p := path.Join(v.(string), name)
+			if len(arg) > 0 {
+				name = p
+				break
+			}
 			if s, e := os.Stat(p); e == nil && !s.IsDir() {
 				name = p
 				break
@@ -1026,6 +1031,51 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					n, e := fmt.Fprint(f, v)
 					m.Assert(e)
 					m.Log("info", "print %s %d", p, n)
+				}
+			}
+		}},
+		"export": &ctx.Command{Name: "export filename", Help: "导出数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			_, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+			m.Assert(e)
+			defer f.Close()
+
+			switch {
+			case strings.HasSuffix(arg[0], ".json"):
+				data := []interface{}{}
+
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					line := map[string]interface{}{}
+					for _, k := range m.Meta["append"] {
+						line[k] = m.Meta[k][i]
+					}
+					data = append(data, line)
+				}
+				en := json.NewEncoder(f)
+				en.SetIndent("", "  ")
+				en.Encode(data)
+
+			case strings.HasSuffix(arg[0], ".csv"):
+				w := csv.NewWriter(f)
+
+				line := []string{}
+				for _, v := range m.Meta["append"] {
+					line = append(line, v)
+				}
+				w.Write(line)
+
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					line := []string{}
+					for _, k := range m.Meta["append"] {
+						line = append(line, m.Meta[k][i])
+					}
+					w.Write(line)
+				}
+				w.Flush()
+			default:
+				for _, v := range m.Meta["result"] {
+					f.WriteString(v)
 				}
 			}
 		}},

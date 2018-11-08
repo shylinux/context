@@ -3205,6 +3205,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								if m.Meta["parse"][1] != "" {
 									value = Chain(m, value, m.Meta["parse"][1])
 								}
+								m.Log("fuck", "what %v", value)
 
 								switch val := value.(type) {
 								case map[string]interface{}:
@@ -3281,7 +3282,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					return
 				}
 
-				m.Table()
+				m.Set("result").Table()
 			}},
 		"import": &Command{Name: "import filename", Help: "导入数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			f, e := os.Open(arg[0])
@@ -3323,51 +3324,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 			}
 			m.Table()
-		}},
-		"export": &Command{Name: "export filename", Help: "导出数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			f, e := os.Create(arg[0])
-			m.Assert(e)
-			defer f.Close()
-
-			switch {
-			case strings.HasSuffix(arg[0], ".json"):
-				data := []interface{}{}
-
-				nrow := len(m.Meta[m.Meta["append"][0]])
-				for i := 0; i < nrow; i++ {
-					line := map[string]interface{}{}
-					for _, k := range m.Meta["append"] {
-						line[k] = m.Meta[k][i]
-					}
-					data = append(data, line)
-				}
-				en := json.NewEncoder(f)
-				en.SetIndent("", "  ")
-				en.Encode(data)
-
-			case strings.HasSuffix(arg[0], ".csv"):
-				w := csv.NewWriter(f)
-
-				line := []string{}
-				for _, v := range m.Meta["append"] {
-					line = append(line, v)
-				}
-				w.Write(line)
-
-				nrow := len(m.Meta[m.Meta["append"][0]])
-				for i := 0; i < nrow; i++ {
-					line := []string{}
-					for _, k := range m.Meta["append"] {
-						line = append(line, m.Meta[k][i])
-					}
-					w.Write(line)
-				}
-				w.Flush()
-			default:
-				for _, v := range m.Meta["result"] {
-					f.WriteString(v)
-				}
-			}
 		}},
 	},
 }

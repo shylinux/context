@@ -56,7 +56,7 @@ context = {
 			return "";
 		}
 
-		document.cookie = key+"="+value;
+		document.cookie = key+"="+value+";path=/";
 		return this.Cookie(key);
 	},
     Cache: function(key, cb, sync) {

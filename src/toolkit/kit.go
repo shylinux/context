@@ -8,17 +8,17 @@ import (
 	"path"
 )
 
-func FmtSize(size int64) string {
-	if size > 1000000000 {
-		return fmt.Sprintf("%d.%dG", size/1000000000, size/100000000%100)
+func FmtSize(size uint64) string {
+	if size > 1<<30 {
+		return fmt.Sprintf("%d.%dG", size>>30, (size>>20)%1024*100/1024)
 	}
 
-	if size > 1000000 {
-		return fmt.Sprintf("%d.%dM", size/100000, size/100000%100)
+	if size > 1<<20 {
+		return fmt.Sprintf("%d.%dM", size>>20, (size>>10)%1024*100/1024)
 	}
 
-	if size > 1000 {
-		return fmt.Sprintf("%d.%dK", size/1000, size/100%100)
+	if size > 1<<10 {
+		return fmt.Sprintf("%d.%dK", size>>10, size%1024*100/1024)
 	}
 
 	return fmt.Sprintf("%dB", size)
