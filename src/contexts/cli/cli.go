@@ -891,7 +891,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			mem := &runtime.MemStats{}
 			runtime.ReadMemStats(mem)
-			m.Append("NumGoroutine", runtime.NumGoroutine())
+			m.Append("NumGo", runtime.NumGoroutine())
 			m.Append("NumGC", mem.NumGC)
 			m.Append("other", kit.FmtSize(mem.OtherSys))
 			m.Append("stack", kit.FmtSize(mem.StackSys))
