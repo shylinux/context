@@ -155,7 +155,7 @@ source ~/.vim_local
 
 let g:colorscheme=1
 let g:colorlist = [ "ron", "torte", "darkblue", "peachpuff" ]
-function ColorNext()
+function! ColorNext()
     if g:colorscheme >= len(g:colorlist)
         let g:colorscheme = 0
     endif
@@ -165,4 +165,15 @@ function ColorNext()
 endfunction
 call ColorNext()
 command! NN call ColorNext()<CR>
+
+" autocmd BufWritePost * call NCount("/home/shaoying/.nwrite")
+" autocmd BufReadPost * call NCount("/home/shaoying/.nread")
+function! NCount(filename)
+    let l:lines = readfile(a:filename)
+    if len(l:lines) == 0
+        let l:lines = [0]
+    endif
+    let l:nwrite = l:lines[0] + 1
+    call writefile([l:nwrite], a:filename)
+endfunction
 "}}}
