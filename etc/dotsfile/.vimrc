@@ -174,11 +174,10 @@ command! NN call ColorNext()<CR>
 " autocmd BufReadPost * call NCount("~/.nwrite")
 "
 
-let g:bench_code = "http://localhost:9094/code/"
-function! BenchCode(path, args)
-    exe "silent !bench web.get " . g:bench_code . a:path . " " . join(a:args, " ")
+function! BenchCode(cmd, arg)
+    exe "silent !bench web.code." . a:cmd . " " . join(a:arg, " ")
 endfunction
 
-autocmd FileReadPost * call BenchCode("counter", ["name", "nopen", "count", 1])
-autocmd FileWritePost * call BenchCode("counter", ["name", "nsave", "count", 1])
+" autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
+autocmd BufWritePost * call BenchCode("counter", ["nsave", 1])
 "}}}
