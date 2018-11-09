@@ -8,6 +8,7 @@ install:
 	@go get github.com/gomarkdown/markdown
 	go install $(BENCH)
 	@date
+	bench web.code.counter nmake 1
 
 install_all: install
 	touch etc/local.shy

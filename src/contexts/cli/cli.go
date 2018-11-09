@@ -883,7 +883,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Append("objects", mem.HeapObjects)
 			m.Table()
 		}},
-		"develop": &ctx.Command{Name: "develop", Help: "develop", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"windows": &ctx.Command{Name: "windows", Help: "windows", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Append("nclient", strings.Count(m.Spawn().Cmd("system", "tmux", "list-clients").Result(0), "\n"))
 			m.Append("nsession", strings.Count(m.Spawn().Cmd("system", "tmux", "list-sessions").Result(0), "\n"))
 			m.Append("nwindow", strings.Count(m.Spawn().Cmd("system", "tmux", "list-windows", "-a").Result(0), "\n"))

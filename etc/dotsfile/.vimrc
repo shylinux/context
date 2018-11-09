@@ -178,6 +178,6 @@ function! BenchCode(cmd, arg)
     exe "silent !bench web.code." . a:cmd . " " . join(a:arg, " ")
 endfunction
 
-" autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
+autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
 autocmd BufWritePost * call BenchCode("counter", ["nsave", 1])
 "}}}

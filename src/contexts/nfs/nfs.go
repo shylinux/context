@@ -1366,6 +1366,13 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							args = append(args, arg[1:]...)
 						}
 
+						switch c {
+						case "commit":
+							m.Find("web.code").Cmd("counter", "ncommit", 1)
+						case "push":
+							m.Find("web.code").Cmd("counter", "npush", 1)
+						}
+
 						m.Log("info", "cmd: %s %v", "git", ctx.Trans("-C", p, c, args))
 						msg := m.Sess("cli").Cmd("system", "git", "-C", p, c, args)
 						m.Copy(msg, "result").Copy(msg, "append")

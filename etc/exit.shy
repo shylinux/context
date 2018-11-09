@@ -1,0 +1,8 @@
+source etc/exit_local.shy
+
+~code
+    config save var/counter.json counter
+~stdio
+    config save var/history.json history
+return hello
+

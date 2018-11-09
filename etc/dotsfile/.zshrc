@@ -107,6 +107,6 @@ bindkey -M vicmd j down-line-or-beginning-search
 bindkey -M vicmd k up-line-or-beginning-search
 
 preexec() {
-    bench web.code.counter nexec 1
+    bench web.code.counter nexec 1 >/dev/null
 }
 
