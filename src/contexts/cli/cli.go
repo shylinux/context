@@ -885,13 +885,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"develop": &ctx.Command{Name: "develop", Help: "develop", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Append("nclient", strings.Count(m.Spawn().Cmd("system", "tmux", "list-clients").Result(0), "\n"))
-			m.Append("nsesion", strings.Count(m.Spawn().Cmd("system", "tmux", "list-sessions").Result(0), "\n"))
+			m.Append("nsession", strings.Count(m.Spawn().Cmd("system", "tmux", "list-sessions").Result(0), "\n"))
 			m.Append("nwindow", strings.Count(m.Spawn().Cmd("system", "tmux", "list-windows", "-a").Result(0), "\n"))
 			m.Append("npane", strings.Count(m.Spawn().Cmd("system", "tmux", "list-panes", "-a").Result(0), "\n"))
 
-			m.Append("ncommand", strings.Count(m.Spawn().Cmd("system", "tmux", "list-commands").Result(0), "\n"))
+			m.Append("nbuf", strings.Count(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n"))
+			m.Append("ncmd", strings.Count(m.Spawn().Cmd("system", "tmux", "list-commands").Result(0), "\n"))
 			m.Append("nkey", strings.Count(m.Spawn().Cmd("system", "tmux", "list-keys").Result(0), "\n"))
-			m.Append("nbuffer", strings.Count(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n"))
 			m.Table()
 		}},
 

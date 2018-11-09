@@ -13,6 +13,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"counter": &ctx.Config{Name: "counter", Value: map[string]interface{}{
 			"nopen": "0", "nsave": "0",
 		}, Help: "counter"},
+		"counter_service": &ctx.Config{Name: "counter_service", Value: "http://localhost:9094/code/counter", Help: "counter"},
 		"web_site": &ctx.Config{Name: "web_site", Value: []interface{}{
 			map[string]interface{}{"_name": "MDN", "site": "https://developer.mozilla.org"},
 			map[string]interface{}{"_name": "github", "site": "https://github.com"},
@@ -62,7 +63,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"pre_run":        true,
 					"display_result": "",
 				},
-				map[string]interface{}{"name": "develop", "help": "develop", "template": "componet",
+				map[string]interface{}{"name": "counter", "help": "counter", "template": "componet",
 					"context": "web.code", "command": "config", "arguments": []interface{}{"counter"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "button", "label": "refresh"},
@@ -163,6 +164,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					count += i
 				}
 				m.Log("info", "%v: %v", m.Option("name"), m.Confv("counter", m.Option("name"), fmt.Sprintf("%d", count)))
+				m.Echo("%d", count)
+			}
+		}},
+		"counter": &ctx.Command{Name: "counter name count", Help: "counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) > 1 {
+				m.Copy(m.Spawn().Cmd("get", m.Conf("counter_service"), "name", arg[0], "count", arg[1]), "result")
 			}
 		}},
 	},

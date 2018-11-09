@@ -182,7 +182,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					return
 				}
 
-				table := m.Confv("tables", arg[0]).(string)
+				table := arg[0]
+				switch v := m.Confv("tables", arg[0]).(type) {
+				case string:
+					table = v
+				}
 
 				msg := m.Spawn().Cmd("query", fmt.Sprintf("desc %s", table))
 				m.Copy(msg, "append")

@@ -3371,12 +3371,15 @@ func Start(args ...string) {
 	}
 
 	if len(args) > 0 {
+		Pulse.Options("log", false)
+
 		cmd := Pulse.Sess("cli", false).Cmd("source", args)
 		for _, v := range cmd.Meta["result"] {
 			fmt.Printf("%v", v)
 		}
 	} else {
 		Pulse.Options("log", true)
+
 		log := Pulse.Sess("log", false)
 		log.target.Start(log)
 
