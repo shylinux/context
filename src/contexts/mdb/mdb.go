@@ -199,6 +199,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				"extra_field": 2, "extra_fields": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
+
 					table := m.Confx("table", arg, 0)
 					if v := m.Confv("tables", table); v != nil {
 						table = v.(string)
