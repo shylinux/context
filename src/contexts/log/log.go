@@ -28,6 +28,10 @@ func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return log
 }
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
+	defer func() {
+		e := recover()
+		_ = e
+	}()
 	log.out = m.Sess("nfs").Cmd("open", m.Confx("bench.log", arg, 0)).Optionv("out").(*os.File)
 	log.out.Truncate(0)
 	fmt.Fprintln(log.out, "\n\n")

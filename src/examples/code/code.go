@@ -3,11 +3,16 @@ package code
 import (
 	"contexts/ctx"
 	"contexts/web"
+	"fmt"
+	"strconv"
 )
 
 var Index = &ctx.Context{Name: "code", Help: "代码中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
+		"counter": &ctx.Config{Name: "counter", Value: map[string]interface{}{
+			"nopen": "0", "nsave": "0",
+		}, Help: "counter"},
 		"web_site": &ctx.Config{Name: "web_site", Value: []interface{}{
 			map[string]interface{}{"_name": "MDN", "site": "https://developer.mozilla.org"},
 			map[string]interface{}{"_name": "github", "site": "https://github.com"},
@@ -51,6 +56,14 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				},
 				map[string]interface{}{"name": "develop", "help": "develop", "template": "componet",
 					"context": "cli", "command": "develop",
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "button", "label": "refresh"},
+					},
+					"pre_run":        true,
+					"display_result": "",
+				},
+				map[string]interface{}{"name": "develop", "help": "develop", "template": "componet",
+					"context": "web.code", "command": "config", "arguments": []interface{}{"counter"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
@@ -139,7 +152,20 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			},
 		}, Help: "组件列表"},
 	},
-	Commands: map[string]*ctx.Command{},
+	Commands: map[string]*ctx.Command{
+		"/counter": &ctx.Command{Name: "/counter", Help: "/counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if m.Has("name") && m.Has("count") {
+				count := m.Optioni("count")
+				switch v := m.Confv("counter", m.Option("name")).(type) {
+				case string:
+					i, e := strconv.Atoi(v)
+					m.Assert(e)
+					count += i
+				}
+				m.Log("info", "%v: %v", m.Option("name"), m.Confv("counter", m.Option("name"), fmt.Sprintf("%d", count)))
+			}
+		}},
+	},
 }
 
 func init() {

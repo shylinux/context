@@ -2,8 +2,6 @@ package cli
 
 import (
 	"contexts/ctx"
-	"io/ioutil"
-	"syscall"
 	"toolkit"
 
 	"fmt"
@@ -30,6 +28,57 @@ type CLI struct {
 	stack  []*Frame
 
 	*ctx.Context
+}
+
+func init_yac(m *ctx.Message) *ctx.Message {
+	yac := m.Sess("yac")
+	if yac.Cap("status") != "start" {
+		yac.Target().Start(yac)
+		yac.Cmd("train", "void", "void", "[\t ]+")
+
+		yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
+		yac.Cmd("train", "num", "num", "mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
+		yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
+		yac.Cmd("train", "exe", "exe", "mul{", "$", "@", "}", "key")
+
+		yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
+		yac.Cmd("train", "op1", "op1", "mul{", "-e", "-f", "-d", "}")
+		yac.Cmd("train", "op1", "op1", "mul{", "-", "+", "}")
+		yac.Cmd("train", "op2", "op2", "mul{", ":=", "=", "+=", "}")
+		yac.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "%", "}")
+		yac.Cmd("train", "op2", "op2", "mul{", "<", "<=", ">", ">=", "==", "!=", "}")
+		yac.Cmd("train", "op2", "op2", "mul{", "~", "!~", "}")
+
+		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "exe", "}")
+		yac.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
+		yac.Cmd("train", "map", "map", "key", ":", "\\[", "rep{", "key", "}", "\\]")
+		yac.Cmd("train", "exp", "exp", "\\{", "rep{", "map", "}", "\\}")
+		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "(", "exp", ")")
+
+		yac.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
+		yac.Cmd("train", "stm", "let", "let", "key", "opt{", "=", "exp", "}")
+		yac.Cmd("train", "stm", "var", "var", "key", "<-")
+		yac.Cmd("train", "stm", "var", "var", "key", "<-", "opt{", "exe", "}")
+		yac.Cmd("train", "stm", "let", "let", "key", "<-", "opt{", "exe", "}")
+
+		yac.Cmd("train", "stm", "if", "if", "exp")
+		yac.Cmd("train", "stm", "else", "else")
+		yac.Cmd("train", "stm", "end", "end")
+		yac.Cmd("train", "stm", "for", "for", "opt{", "exp", ";", "}", "exp")
+		yac.Cmd("train", "stm", "for", "for", "index", "exp", "opt{", "exp", "}", "exp")
+		yac.Cmd("train", "stm", "label", "label", "exp")
+		yac.Cmd("train", "stm", "goto", "goto", "exp", "opt{", "exp", "}", "exp")
+
+		yac.Cmd("train", "stm", "echo", "echo", "rep{", "exp", "}")
+		yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
+
+		yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\?\\?", "\\?", "<", ">$", ">@", ">", "\\|", "%", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
+		yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
+		yac.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
+
+		yac.Cmd("train", "line", "line", "opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}")
+	}
+	return yac
 }
 
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
@@ -342,8 +391,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
 				m.Copy(msg, "result").Copy(msg, "append")
-				m.Capi("last_msg", 0, msg.Code())
-				m.Capi("ps_count", 1)
+				// m.Capi("last_msg", 0, msg.Code())
+				// m.Capi("ps_count", 1)
 			}
 		}},
 		"str": &ctx.Command{Name: "str word", Help: "解析字符串", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -577,53 +626,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Add("append", "return", arg[1:])
 		}},
 		"source": &ctx.Command{Name: "source [stdio [init.shy [exit.shy]]]|[filename [async]]|string", Help: "解析脚本, filename: 文件名, async: 异步执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			yac := m.Sess("yac")
-			if yac.Cap("status") != "start" {
-				yac.Target().Start(yac)
-				yac.Cmd("train", "void", "void", "[\t ]+")
-
-				yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
-				yac.Cmd("train", "num", "num", "mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
-				yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
-				yac.Cmd("train", "exe", "exe", "mul{", "$", "@", "}", "key")
-
-				yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
-				yac.Cmd("train", "op1", "op1", "mul{", "-e", "-f", "-d", "}")
-				yac.Cmd("train", "op1", "op1", "mul{", "-", "+", "}")
-				yac.Cmd("train", "op2", "op2", "mul{", ":=", "=", "+=", "}")
-				yac.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "%", "}")
-				yac.Cmd("train", "op2", "op2", "mul{", "<", "<=", ">", ">=", "==", "!=", "}")
-				yac.Cmd("train", "op2", "op2", "mul{", "~", "!~", "}")
-
-				yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "exe", "}")
-				yac.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
-				yac.Cmd("train", "map", "map", "key", ":", "\\[", "rep{", "key", "}", "\\]")
-				yac.Cmd("train", "exp", "exp", "\\{", "rep{", "map", "}", "\\}")
-				yac.Cmd("train", "val", "val", "opt{", "op1", "}", "(", "exp", ")")
-
-				yac.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
-				yac.Cmd("train", "stm", "let", "let", "key", "opt{", "=", "exp", "}")
-				yac.Cmd("train", "stm", "var", "var", "key", "<-")
-				yac.Cmd("train", "stm", "var", "var", "key", "<-", "opt{", "exe", "}")
-				yac.Cmd("train", "stm", "let", "let", "key", "<-", "opt{", "exe", "}")
-
-				yac.Cmd("train", "stm", "if", "if", "exp")
-				yac.Cmd("train", "stm", "else", "else")
-				yac.Cmd("train", "stm", "end", "end")
-				yac.Cmd("train", "stm", "for", "for", "opt{", "exp", ";", "}", "exp")
-				yac.Cmd("train", "stm", "for", "for", "index", "exp", "opt{", "exp", "}", "exp")
-				yac.Cmd("train", "stm", "label", "label", "exp")
-				yac.Cmd("train", "stm", "goto", "goto", "exp", "opt{", "exp", "}", "exp")
-
-				yac.Cmd("train", "stm", "echo", "echo", "rep{", "exp", "}")
-				yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
-
-				yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\?\\?", "\\?", "<", ">$", ">@", ">", "\\|", "%", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
-				yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
-				yac.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
-
-				yac.Cmd("train", "line", "line", "opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}")
-			}
+			init_yac(m)
 
 			if arg[0] != "stdio" {
 				if !m.Sess("nfs").Cmd("path", arg[0]).Results(0) {
@@ -633,7 +636,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 							m.Set("append").Copy(msg, "append").Set("result").Copy(msg, "result")
 						}
 						return nil
-					}, "parse", "line", "void", arg)
+					}, "parse", "line", "void", strings.Join(arg, " "))
 					return
 				}
 			}
@@ -862,32 +865,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}
 				}
 			}},
-		"sysinfo": &ctx.Command{Name: "sysinfo", Help: "sysinfo", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			sys := &syscall.Sysinfo_t{}
-			syscall.Sysinfo(sys)
-
-			d, e := time.ParseDuration(fmt.Sprintf("%ds", sys.Uptime))
-			m.Assert(e)
-			m.Append("NumCPU", runtime.NumCPU())
-			m.Append("uptime", d)
-			m.Append("procs", sys.Procs)
-
-			m.Append("total", kit.FmtSize(sys.Totalram))
-			m.Append("free", kit.FmtSize(sys.Freeram))
-			m.Append("mper", fmt.Sprintf("%d%%", sys.Freeram*100/sys.Totalram))
-
-			fs := &syscall.Statfs_t{}
-			syscall.Statfs("./", fs)
-			m.Append("blocks", kit.FmtSize(fs.Blocks*uint64(fs.Bsize)))
-			m.Append("bavail", kit.FmtSize(fs.Bavail*uint64(fs.Bsize)))
-			m.Append("bper", fmt.Sprintf("%d%%", fs.Bavail*100/fs.Blocks))
-
-			m.Append("files", fs.Files)
-			m.Append("ffree", fs.Ffree)
-			m.Append("fper", fmt.Sprintf("%d%%", fs.Ffree*100/fs.Files))
-
-			m.Table()
-		}},
+		"sysinfo": &ctx.Command{Name: "sysinfo", Help: "sysinfo", Hand: sysinfo},
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			mem := &runtime.MemStats{}
 			runtime.ReadMemStats(mem)
@@ -914,10 +892,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Append("ncommand", strings.Count(m.Spawn().Cmd("system", "tmux", "list-commands").Result(0), "\n"))
 			m.Append("nkey", strings.Count(m.Spawn().Cmd("system", "tmux", "list-keys").Result(0), "\n"))
 			m.Append("nbuffer", strings.Count(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n"))
-			nw, _ := ioutil.ReadFile("var/.nwrite")
-			m.Append("nwrite", string(nw))
-			nr, _ := ioutil.ReadFile("var/.nread")
-			m.Append("nread", string(nr))
 			m.Table()
 		}},
 

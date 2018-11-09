@@ -940,9 +940,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"open": &ctx.Command{Name: "open file name", Help: "打开文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			file := arg[0]
 			if m.Has("io") {
-			} else if p, f, e := open(m, file, os.O_RDWR|os.O_CREATE); m.Assert(e) {
+			} else if p, f, e := open(m, file, os.O_RDWR|os.O_CREATE); e == nil {
 				m.Put("option", "in", f).Put("option", "out", f)
 				file = p
+			} else {
+				return
 			}
 
 			m.Start(m.Confx("nfs_name", arg, 1), fmt.Sprintf("file %s", file), "open", file)

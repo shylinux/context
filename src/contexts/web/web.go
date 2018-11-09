@@ -258,6 +258,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"login_right":     &ctx.Config{Name: "login_right", Value: "1", Help: "缓存大小"},
+		"log_uri":         &ctx.Config{Name: "log_uri", Value: "false", Help: "缓存大小"},
 		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
 		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
 		"method":          &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
@@ -380,7 +381,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					m.Log("info", "%s %s", req.Method, req.URL)
-					m.Echo("%s: %s\n", req.Method, req.URL)
+					if m.Confs("log_uri") {
+						m.Echo("%s: %s\n", req.Method, req.URL)
+					}
 					for k, v := range req.Header {
 						m.Log("info", "%s: %s", k, v)
 					}
@@ -389,6 +392,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						web.Client = &http.Client{}
 					}
 					res, e := web.Client.Do(req)
+					if e != nil {
+						return
+					}
 					m.Assert(e)
 
 					for _, v := range res.Cookies() {

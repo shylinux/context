@@ -166,14 +166,19 @@ endfunction
 call ColorNext()
 command! NN call ColorNext()<CR>
 
-" autocmd BufWritePost * call NCount("/home/shaoying/.nwrite")
-" autocmd BufReadPost * call NCount("/home/shaoying/.nread")
-function! NCount(filename)
-    let l:lines = readfile(a:filename)
-    if len(l:lines) == 0
-        let l:lines = [0]
-    endif
-    let l:nwrite = l:lines[0] + 1
-    call writefile([l:nwrite], a:filename)
+" function! NCount(filename)
+"     let l:filename = expand(a:filename)
+"     call writefile([exists(l:filename) ? 1: readfile(l:filename)[0]+1], l:filename)
+" endfunction
+" autocmd BufReadPost * call NCount("~/.nread")
+" autocmd BufReadPost * call NCount("~/.nwrite")
+"
+
+let g:bench_code = "http://localhost:9094/code/"
+function! BenchCode(path, args)
+    exe "silent !bench web.get " . g:bench_code . a:path . " " . join(a:args, " ")
 endfunction
+
+autocmd FileReadPost * call BenchCode("counter", ["name", "nopen", "count", 1])
+autocmd FileWritePost * call BenchCode("counter", ["name", "nsave", "count", 1])
 "}}}

@@ -3072,16 +3072,24 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				switch val := value.(type) {
 				case map[string]interface{}:
 					for k, v := range val {
-						m.Add("append", "key", k)
-						m.Add("append", "value", v)
+						m.Add("append", k, v)
 					}
-					m.Sort("key", "str").Table()
+					m.Table()
+					// for k, v := range val {
+					// 	m.Add("append", "key", k)
+					// 	m.Add("append", "value", v)
+					// }
+					// m.Sort("key", "str").Table()
 				case map[string]string:
 					for k, v := range val {
-						m.Add("append", "key", k)
-						m.Add("append", "value", v)
+						m.Add("append", k, v)
 					}
-					m.Sort("key", "str").Table()
+					m.Table()
+					// for k, v := range val {
+					// 	m.Add("append", "key", k)
+					// 	m.Add("append", "value", v)
+					// }
+					// m.Sort("key", "str").Table()
 				case []interface{}:
 					for i, v := range val {
 						switch value := v.(type) {
@@ -3343,23 +3351,35 @@ func Start(args ...string) {
 	Pulse.Sess("yac", "yac")
 	Pulse.Sess("cli", "cli")
 
+	Pulse.Sess("ssh", "ssh")
+	Pulse.Sess("mdb", "mdb")
 	Pulse.Sess("aaa", "aaa")
 	Pulse.Sess("web", "web")
 	Pulse.Sess("log", "log")
 
 	if len(args) > 0 {
-		Pulse.Sess("cli", false).Conf("init.shy", args[0])
-		args = args[1:]
+		if _, e := os.Stat(args[0]); e == nil {
+			Pulse.Sess("cli", false).Conf("init.shy", args[0])
+			args = args[1:]
+		}
 	}
 	if len(args) > 0 {
-		Pulse.Sess("log", false).Conf("bench.log", args[0])
-		args = args[1:]
+		if _, e := os.Stat(args[0]); e == nil {
+			Pulse.Sess("log", false).Conf("bench.log", args[0])
+			args = args[1:]
+		}
 	}
 
-	Pulse.Options("log", true)
-	log := Pulse.Sess("log", false)
-	log.target.Start(log)
+	if len(args) > 0 {
+		cmd := Pulse.Sess("cli", false).Cmd("source", args)
+		for _, v := range cmd.Meta["result"] {
+			fmt.Printf("%v", v)
+		}
+	} else {
+		Pulse.Options("log", true)
+		log := Pulse.Sess("log", false)
+		log.target.Start(log)
 
-	Pulse.Options("terminal_color", true)
-	Pulse.Sess("cli", false).Cmd("source", "stdio")
+		Pulse.Sess("cli", false).Cmd("source", "stdio")
+	}
 }
