@@ -262,7 +262,6 @@ func Elect(last interface{}, args ...interface{}) string {
 }
 
 func Array(m *Message, list []string, index int, arg ...interface{}) []string {
-	m.Log("fuck", "waht %v %v", list, index)
 	if len(arg) == 0 {
 		if -1 < index && index < len(list) {
 			return []string{list[index]}
@@ -862,6 +861,7 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 	return nil
 }
 func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
+	m.Log("fuck", "arg --- %v", arg)
 	if m.callback = cb; len(arg) > 0 || len(m.Meta["detail"]) > 0 {
 		m.Cmd(arg...)
 	}
@@ -3074,6 +3074,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					for k, v := range val {
 						m.Add("append", k, v)
 					}
+					sort.Strings(m.Meta["append"])
 					m.Table()
 					// for k, v := range val {
 					// 	m.Add("append", "key", k)
@@ -3084,6 +3085,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					for k, v := range val {
 						m.Add("append", k, v)
 					}
+					sort.Strings(m.Meta["append"])
 					m.Table()
 					// for k, v := range val {
 					// 	m.Add("append", "key", k)
@@ -3097,10 +3099,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							for k, v := range value {
 								m.Add("append", k, v)
 							}
+							sort.Strings(m.Meta["append"])
 						case map[string]string:
 							for k, v := range value {
 								m.Add("append", k, v)
 							}
+							sort.Strings(m.Meta["append"])
 						default:
 							m.Add("append", "index", i)
 							m.Add("append", "value", v)
@@ -3213,7 +3217,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								if m.Meta["parse"][1] != "" {
 									value = Chain(m, value, m.Meta["parse"][1])
 								}
-								m.Log("fuck", "what %v", value)
 
 								switch val := value.(type) {
 								case map[string]interface{}:
@@ -3336,7 +3339,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 	},
 }
 
-func Start(args ...string) {
+func Start() {
 	Index.root = Index
 	Pulse.root = Pulse
 
@@ -3345,44 +3348,20 @@ func Start(args ...string) {
 		m.target.Begin(m)
 	}
 
-	Pulse.Sess("tcp", "tcp")
-	Pulse.Sess("nfs", "nfs")
-	Pulse.Sess("lex", "lex")
-	Pulse.Sess("yac", "yac")
-	Pulse.Sess("cli", "cli")
-
-	Pulse.Sess("ssh", "ssh")
-	Pulse.Sess("mdb", "mdb")
-	Pulse.Sess("aaa", "aaa")
-	Pulse.Sess("web", "web")
-	Pulse.Sess("log", "log")
-
-	if len(args) > 0 {
-		if _, e := os.Stat(args[0]); e == nil {
-			Pulse.Sess("cli", false).Conf("init.shy", args[0])
-			args = args[1:]
-		}
+	for k, c := range Index.contexts {
+		Pulse.Sess(k, c)
 	}
+
+	args := os.Args[1:]
 	if len(args) > 0 {
-		if _, e := os.Stat(args[0]); e == nil {
+		if strings.HasSuffix(args[0], ".log") {
 			Pulse.Sess("log", false).Conf("bench.log", args[0])
 			args = args[1:]
 		}
 	}
 
-	if len(args) > 0 {
-		Pulse.Options("log", false)
-
-		cmd := Pulse.Sess("cli", false).Cmd("source", args)
-		for _, v := range cmd.Meta["result"] {
-			fmt.Printf("%v", v)
-		}
-	} else {
-		Pulse.Options("log", true)
-
-		log := Pulse.Sess("log", false)
-		log.target.Start(log)
-
-		Pulse.Sess("cli", false).Cmd("source", "stdio")
+	Pulse.Sess("yac", false).Cmd("init")
+	for _, v := range Pulse.Sess("cli", false).Cmd("source", args).Meta["result"] {
+		fmt.Printf("%v", v)
 	}
 }

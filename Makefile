@@ -46,17 +46,25 @@ DOTS=etc/dotsfile
 back_dotsfile:
 	cp ~/.zshrc $(DOTS)
 	cp ~/.tmux.conf $(DOTS)
+	cp ~/context/.git/hooks/post-commit $(DOTS)/git_hooks
 	cp ~/.vimrc $(DOTS)
 	cp ~/.vim/syntax/shy.vim $(DOTS)
-	git status -sb $(DOTS)
 
-load_dotsfile: ~/.zshrc ~/.tmux.conf ~/.vimrc ~/.vim/syntax/shy.vim
+load_dotsfile:\
+   	~/.zshrc\
+   	~/.tmux.conf\
+   	~/context/.git/hooks/post-commit\
+   	~/.vimrc\
+   	~/.vim/syntax/shy.vim
+
 ~/.zshrc: $(DOTS)/.zshrc
-	cp $(DOTS)/.zshrc ~/
+	cp $< $@
 ~/.tmux.conf: $(DOTS)/.tmux.conf
-	cp $(DOTS)/.tmux.conf ~/
+	cp $< $@
+~/context/.git/hooks/post-commit: $(DOTS)/git_hooks/post-commit
+	cp $< $@
 ~/.vimrc: $(DOTS)/.vimrc
-	cp $(DOTS)/.vimrc ~/
+	cp $< $@
 ~/.vim/syntax/shy.vim: $(DOTS)/shy.vim
-	cp $(DOTS)/shy.vim ~/.vim/syntax/
+	cp $< $@
 

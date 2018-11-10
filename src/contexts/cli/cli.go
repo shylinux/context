@@ -30,57 +30,6 @@ type CLI struct {
 	*ctx.Context
 }
 
-func init_yac(m *ctx.Message) *ctx.Message {
-	yac := m.Sess("yac")
-	if yac.Cap("status") != "start" {
-		yac.Target().Start(yac)
-		yac.Cmd("train", "void", "void", "[\t ]+")
-
-		yac.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
-		yac.Cmd("train", "num", "num", "mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
-		yac.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
-		yac.Cmd("train", "exe", "exe", "mul{", "$", "@", "}", "key")
-
-		yac.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
-		yac.Cmd("train", "op1", "op1", "mul{", "-e", "-f", "-d", "}")
-		yac.Cmd("train", "op1", "op1", "mul{", "-", "+", "}")
-		yac.Cmd("train", "op2", "op2", "mul{", ":=", "=", "+=", "}")
-		yac.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "%", "}")
-		yac.Cmd("train", "op2", "op2", "mul{", "<", "<=", ">", ">=", "==", "!=", "}")
-		yac.Cmd("train", "op2", "op2", "mul{", "~", "!~", "}")
-
-		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "exe", "}")
-		yac.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
-		yac.Cmd("train", "map", "map", "key", ":", "\\[", "rep{", "key", "}", "\\]")
-		yac.Cmd("train", "exp", "exp", "\\{", "rep{", "map", "}", "\\}")
-		yac.Cmd("train", "val", "val", "opt{", "op1", "}", "(", "exp", ")")
-
-		yac.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
-		yac.Cmd("train", "stm", "let", "let", "key", "opt{", "=", "exp", "}")
-		yac.Cmd("train", "stm", "var", "var", "key", "<-")
-		yac.Cmd("train", "stm", "var", "var", "key", "<-", "opt{", "exe", "}")
-		yac.Cmd("train", "stm", "let", "let", "key", "<-", "opt{", "exe", "}")
-
-		yac.Cmd("train", "stm", "if", "if", "exp")
-		yac.Cmd("train", "stm", "else", "else")
-		yac.Cmd("train", "stm", "end", "end")
-		yac.Cmd("train", "stm", "for", "for", "opt{", "exp", ";", "}", "exp")
-		yac.Cmd("train", "stm", "for", "for", "index", "exp", "opt{", "exp", "}", "exp")
-		yac.Cmd("train", "stm", "label", "label", "exp")
-		yac.Cmd("train", "stm", "goto", "goto", "exp", "opt{", "exp", "}", "exp")
-
-		yac.Cmd("train", "stm", "echo", "echo", "rep{", "exp", "}")
-		yac.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
-
-		yac.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\?\\?", "\\?", "<", ">$", ">@", ">", "\\|", "%", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
-		yac.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
-		yac.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
-
-		yac.Cmd("train", "line", "line", "opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}")
-	}
-	return yac
-}
-
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{
 		"level":    &ctx.Cache{Name: "level", Value: "0", Help: "嵌套层级"},
@@ -161,13 +110,13 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 		}
 
 		if m.Option("prompt", cmd.Cmd().Conf("prompt")); cmd.Has("return") {
-			m.Result(0, cmd.Meta["return"])
 			m.Options("scan_end", true)
 			m.Target().Close(m)
 		}
 		m.Optionv("ps_target", cli.target)
 		return nil
-	}, "scan", arg[1]).Target().Name)
+	}, "scan", arg).Target().Name)
+
 	return false
 }
 func (cli *CLI) Close(m *ctx.Message, arg ...string) bool {
@@ -175,6 +124,8 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool {
 	case m.Target():
 	case m.Source():
 	}
+	msg := cli.Message()
+	msg.Append("last_target", msg.Cap("ps_target"))
 	return true
 }
 
@@ -384,9 +335,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					pipe := m.Spawn().Copy(msg, "option").Copy(msg, "append").Cmd("cmd", rest)
 
 					msg.Set("result").Set("append")
-					m.Log("fuck", "what %v", msg.Meta)
 					msg.Copy(pipe, "result").Copy(pipe, "append")
-					m.Log("fuck", "what %v", msg.Meta)
 				}
 
 				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
@@ -623,56 +572,55 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Echo("%s", strings.Join(arg[1:], ""))
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, result: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if cli, ok := m.Target().Server.(*CLI); ok {
+				msg := cli.Message()
+				msg.Result(-2, arg[1:])
+			}
 			m.Add("append", "return", arg[1:])
 		}},
 		"source": &ctx.Command{Name: "source [stdio [init.shy [exit.shy]]]|[filename [async]]|string", Help: "解析脚本, filename: 文件名, async: 异步执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			init_yac(m)
-
-			if arg[0] != "stdio" {
-				if !m.Sess("nfs").Cmd("path", arg[0]).Results(0) {
-					m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
-						switch msg.Cmd().Detail(0) {
-						case "cmd":
-							m.Set("append").Copy(msg, "append").Set("result").Copy(msg, "result")
-						}
-						return nil
-					}, "parse", "line", "void", strings.Join(arg, " "))
-					return
-				}
-			}
-
 			if _, ok := m.Source().Server.(*CLI); ok {
 				msg := m.Spawn(c)
 				m.Copy(msg, "target")
 			}
 
-			name := fmt.Sprintf("shell%d", m.Capi("nshell", 1))
-			if arg[0] == "stdio" {
-				name = "shy"
-			}
+			if len(arg) == 0 || arg[0] == "stdio" {
+				m.Sess("log", false).Cmd("init")
 
-			m.Start(name, "shell", key, arg[0])
-
-			if arg[0] == "stdio" {
-				if m.Sess("nfs").Cmd("path", m.Confx("init.shy", arg, 1)).Results(0) {
-					m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init.shy"))
+				if m.Start("shy", "shell", "stdio"); m.Sess("nfs").Cmd("path", m.Confx("init.shy", arg, 1)).Results(0) {
+					msg := m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init.shy"))
+					m.Cap("ps_target", msg.Append("last_target"))
+					m.Option("prompt", m.Conf("prompt"))
+					m.Find("nfs.stdio").Cmd("prompt")
 				}
-				m.Option("prompt", m.Conf("prompt"))
-				m.Find("nfs.file1").Cmd("prompt")
+				if m.Wait(); m.Sess("nfs").Cmd("path", m.Confx("exit.shy", arg, 2)).Results(0) {
+					m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("exit.shy"))
+				}
+				return
 			}
 
-			if len(arg) < 2 || arg[1] != "async" {
-				if arg[0] == "stdio" && len(arg) > 1 {
-					fmt.Printf(m.Spawn().Cmd("source", arg[1]).Result(0))
-				} else {
+			if m.Sess("nfs").Cmd("path", arg[0]).Results(0) {
+				m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
+				if len(arg) < 2 || arg[1] != "async" {
 					m.Wait()
+				} else {
+					m.Options("async", true)
 				}
-				if arg[0] == "stdio" {
-					if m.Sess("nfs").Cmd("path", m.Confx("exit.shy", arg, 2)).Results(0) {
-						m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("exit.shy"))
-					}
+				return
+			}
+
+			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
+				switch msg.Cmd().Detail(0) {
+				case "cmd":
+					m.Set("append").Copy(msg, "append").Set("result").Copy(msg, "result")
 				}
-				m.Target().Close(m)
+				return nil
+			}, "parse", "line", "void", strings.Join(arg, " "))
+		}},
+		"arguments": &ctx.Command{Name: "arguments", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if cli, ok := m.Source().Server.(*CLI); ok {
+				msg := cli.Message().Spawn().Cmd("detail", arg)
+				m.Copy(msg, "append").Copy(msg, "result")
 			}
 		}},
 

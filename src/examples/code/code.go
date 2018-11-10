@@ -155,17 +155,22 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"/counter": &ctx.Command{Name: "/counter", Help: "/counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if m.Has("name") && m.Has("count") {
-				count := m.Optioni("count")
-				switch v := m.Confv("counter", m.Option("name")).(type) {
-				case string:
-					i, e := strconv.Atoi(v)
-					m.Assert(e)
-					count += i
-				}
-				m.Log("info", "%v: %v", m.Option("name"), m.Confv("counter", m.Option("name"), fmt.Sprintf("%d", count)))
-				m.Echo("%d", count)
+			if len(arg) > 0 {
+				m.Option("name", arg[0])
 			}
+			if len(arg) > 1 {
+				m.Option("count", arg[1])
+			}
+
+			count := m.Optioni("count")
+			switch v := m.Confv("counter", m.Option("name")).(type) {
+			case string:
+				i, e := strconv.Atoi(v)
+				m.Assert(e)
+				count += i
+			}
+			m.Log("info", "%v: %v", m.Option("name"), m.Confv("counter", m.Option("name"), fmt.Sprintf("%d", count)))
+			m.Echo("%d", count)
 		}},
 		"counter": &ctx.Command{Name: "counter name count", Help: "counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) > 1 {

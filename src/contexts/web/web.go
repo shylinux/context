@@ -140,9 +140,15 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 	})
 }
 func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	m := web.Message().Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
+	m := web.Message()
 
-	if m.Confs("logheaders") {
+	index := r.Header.Get("index_module") == ""
+	r.Header.Set("index_module", m.Cap("module"))
+
+	if index {
+		m.Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
+	}
+	if index && m.Confs("logheaders") {
 		for k, v := range r.Header {
 			m.Log("info", "%s: %v", k, v)
 		}
@@ -155,7 +161,7 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	web.ServeMux.ServeHTTP(w, r)
 
-	if m.Confs("logheaders") {
+	if index && m.Confs("logheaders") {
 		for k, v := range w.Header() {
 			m.Log("info", "%s: %v", k, v)
 		}

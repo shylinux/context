@@ -323,6 +323,51 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		"label":       &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
 	},
 	Commands: map[string]*ctx.Command{
+		"init": &ctx.Command{Name: "init", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Cmd("train", "void", "void", "[\t ]+")
+
+			m.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
+			m.Cmd("train", "num", "num", "mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}")
+			m.Cmd("train", "str", "str", "mul{", "\"[^\"]*\"", "'[^']*'", "}")
+			m.Cmd("train", "exe", "exe", "mul{", "$", "@", "}", "key")
+
+			m.Cmd("train", "op1", "op1", "mul{", "-z", "-n", "}")
+			m.Cmd("train", "op1", "op1", "mul{", "-e", "-f", "-d", "}")
+			m.Cmd("train", "op1", "op1", "mul{", "-", "+", "}")
+			m.Cmd("train", "op2", "op2", "mul{", ":=", "=", "+=", "}")
+			m.Cmd("train", "op2", "op2", "mul{", "+", "-", "*", "/", "%", "}")
+			m.Cmd("train", "op2", "op2", "mul{", "<", "<=", ">", ">=", "==", "!=", "}")
+			m.Cmd("train", "op2", "op2", "mul{", "~", "!~", "}")
+
+			m.Cmd("train", "val", "val", "opt{", "op1", "}", "mul{", "num", "key", "str", "exe", "}")
+			m.Cmd("train", "exp", "exp", "val", "rep{", "op2", "val", "}")
+			m.Cmd("train", "map", "map", "key", ":", "\\[", "rep{", "key", "}", "\\]")
+			m.Cmd("train", "exp", "exp", "\\{", "rep{", "map", "}", "\\}")
+			m.Cmd("train", "val", "val", "opt{", "op1", "}", "(", "exp", ")")
+
+			m.Cmd("train", "stm", "var", "var", "key", "opt{", "=", "exp", "}")
+			m.Cmd("train", "stm", "let", "let", "key", "opt{", "=", "exp", "}")
+			m.Cmd("train", "stm", "var", "var", "key", "<-")
+			m.Cmd("train", "stm", "var", "var", "key", "<-", "opt{", "exe", "}")
+			m.Cmd("train", "stm", "let", "let", "key", "<-", "opt{", "exe", "}")
+
+			m.Cmd("train", "stm", "if", "if", "exp")
+			m.Cmd("train", "stm", "else", "else")
+			m.Cmd("train", "stm", "end", "end")
+			m.Cmd("train", "stm", "for", "for", "opt{", "exp", ";", "}", "exp")
+			m.Cmd("train", "stm", "for", "for", "index", "exp", "opt{", "exp", "}", "exp")
+			m.Cmd("train", "stm", "label", "label", "exp")
+			m.Cmd("train", "stm", "goto", "goto", "exp", "opt{", "exp", "}", "exp")
+
+			m.Cmd("train", "stm", "echo", "echo", "rep{", "exp", "}")
+			m.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
+
+			m.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\?\\?", "\\?", "<", ">$", ">@", ">", "\\|", "%", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")
+			m.Cmd("train", "cmd", "cmd", "rep{", "word", "}")
+			m.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
+
+			m.Cmd("train", "line", "line", "opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}")
+		}},
 		"train": &ctx.Command{Name: "train page hash word...", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				page, ok := yac.page[arg[0]]

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 while true; do
-    bench && break
+    bench stdio && break
     echo "bench run error"
     echo "restarting..."
     sleep 3

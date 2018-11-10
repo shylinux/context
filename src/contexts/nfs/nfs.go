@@ -661,6 +661,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				}
 				if msg.Append("file_pos0") != "" {
 					i = msg.Appendi("file_pos0") - 1
+					msg.Append("file_pos0", "")
 				}
 			}
 			line = ""
@@ -897,7 +898,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					return
 				}
 
-				if p, f, e := open(m, arg[0]); m.Assert(e) {
+				if p, f, e := open(m, arg[0], os.O_RDWR); m.Assert(e) {
 					m.Optionv("in", f)
 					m.Start(m.Confx("nfs_name", arg, 1), help, key, p)
 				}

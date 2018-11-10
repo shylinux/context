@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	// 数据层
 	_ "contexts/mdb" //数据中心
 	_ "contexts/nfs" //存储中心
@@ -27,5 +26,5 @@ import (
 )
 
 func main() {
-	c.Start(os.Args[1:]...)
+	c.Start()
 }
