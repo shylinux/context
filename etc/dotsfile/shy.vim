@@ -23,6 +23,7 @@ syn match   shCommand "\(^\|\t\|  \|$(\)command"
 syn match   shStatement "\(^\|\t\|  \|$(\)let"
 syn match   shStatement "\(^\|\t\|  \|$(\)var"
 syn match   shStatement "\(^\|\t\|  \|$(\)return"
+syn match   shStatement "\(^\|\t\|  \|$(\)arguments"
 syn match   shStatement "\(^\|\t\|  \|$(\)source"
 syn match   shCommand "\(^\|\t\|  \|$(\)alias"
 

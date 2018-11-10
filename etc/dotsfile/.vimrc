@@ -166,16 +166,9 @@ endfunction
 call ColorNext()
 command! NN call ColorNext()<CR>
 
-" function! NCount(filename)
-"     let l:filename = expand(a:filename)
-"     call writefile([exists(l:filename) ? 1: readfile(l:filename)[0]+1], l:filename)
-" endfunction
-" autocmd BufReadPost * call NCount("~/.nread")
-" autocmd BufReadPost * call NCount("~/.nwrite")
-"
-
 function! BenchCode(cmd, arg)
-    exe "silent !bench web.code." . a:cmd . " " . join(a:arg, " ")
+    let l:line = "web.code." . a:cmd . " " . join(a:arg, " ")
+    exe "silent !bench " l:line
 endfunction
 
 autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
