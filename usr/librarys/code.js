@@ -156,11 +156,17 @@ function onaction(event, action) {
                 default:
                     console.log(event)
                     if (event.target.dataset["last_char"] == "j" && event.key == "k") {
-                        if (event.target.value) {
-                            event.target.value = ""
-                        } else {
-                            event.target.blur()
-                        }
+                        event.target.value = event.target.value.substr(0, event.target.value.length-2)
+                        check_argument(event.target.form, event.target)
+                        event.target.dataset["history"] = JSON.stringify(history)
+                        event.target.dataset["history_last"] = history.length-1
+                        console.log(history.length)
+                        break
+                        // if (event.target.value) {
+                        //     event.target.value = ""
+                        // } else {
+                        //     event.target.blur()
+                        // }
                     }
                     event.target.dataset["last_char"] = event.key
             }
@@ -296,6 +302,14 @@ function init_download(event) {
             } else {
                 option["dir"].value += name
             }
+            if (name.endsWith(".py")) {
+                var cmd = document.querySelector("form.option.command input[name=cmd]")
+                cmd.value = "run "+ name
+                cmd.focus()
+                if (!event.altKey) {
+                    return
+                }
+            }
             if (name.endsWith("/")) {
                 context.Cookie("download_dir", option["dir"].value)
             }
@@ -373,6 +387,36 @@ function init_context() {
         send_command(option)
     }
 }
+function init_context() {
+    var append = document.querySelector("table.append.command")
+    var option = document.querySelector("form.option.command")
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "clear",
+        "onclick": function(event) {
+            option["cmd"].value = ""
+            return true
+        }
+    })
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "exec",
+        "onclick": function(event) {
+            send_command(option)
+            return true
+        }
+    })
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "online",
+        "onclick": function(event) {
+            option["cmd"].value += " cmd_env IS_PROD_RUNTIME 1"
+            send_command(option)
+            option["cmd"].focus()
+            return true
+        }
+    })
+}
 
 window.onload = function() {
     init_option()
@@ -380,4 +424,5 @@ window.onload = function() {
     init_result()
     init_download()
     init_context()
+    init_command()
 }

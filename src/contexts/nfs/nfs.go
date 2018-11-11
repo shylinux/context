@@ -1039,8 +1039,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			_, f, e := open(m, name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 			m.Assert(e)
 			defer f.Close()
-			m.Log("fuck", "what %v", name)
-			m.Log("fuck", "what %v", m.Meta)
 
 			switch {
 			case strings.HasSuffix(arg[0], ".json"):
@@ -1081,8 +1079,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					f.WriteString(v)
 				}
 			}
-			m.Log("fuck", "what %v", name)
-			m.Log("fuck", "what %v", m.Meta)
 			m.Set("append").Set("result").Echo(name)
 		}},
 

@@ -118,7 +118,7 @@
 {{end}}
 
 {{define "componet"}}
-<fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "context"}}.{{option .Meta "command"}})</legend>
+<fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "context"}}.{{option .Meta "componet_cmd"}})</legend>
     {{$form_type := option . "form_type"|meta}}
 
     {{if eq $form_type "upload"}}

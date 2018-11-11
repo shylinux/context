@@ -861,7 +861,6 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 	return nil
 }
 func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
-	m.Log("fuck", "arg --- %v", arg)
 	if m.callback = cb; len(arg) > 0 || len(m.Meta["detail"]) > 0 {
 		m.Cmd(arg...)
 	}
@@ -2867,6 +2866,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					})
 					m.Table()
 				case "list":
+					if m.Cap("list_count") == "" {
+						break
+					}
 					begin, end := 0, m.Capi("list_count")
 					if len(arg) > 0 {
 						if n, e := strconv.Atoi(arg[0]); e == nil {
@@ -3051,7 +3053,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						// f, e := os.Create(which)
 						// m.Assert(e)
 						// defer f.Close()
-                        //
+						//
 						buf, e := json.MarshalIndent(save, "", "  ")
 						m.Assert(e)
 						m.Sess("nfs").Add("option", "data", string(buf)).Cmd("save", which)

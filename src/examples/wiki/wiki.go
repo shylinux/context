@@ -213,7 +213,6 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 								"modify_time":  m.Option("modify_time"),
 							})
 						default:
-							m.Log("fuck", "5")
 						}
 
 						ls = markdown.ToHTML(ls, nil, nil)

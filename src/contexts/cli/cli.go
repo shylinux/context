@@ -150,8 +150,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"shy": "source",
 		}, Help: "系统命令超时"},
 
-		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "60s", Help: "系统命令超时"},
 		"source_list": &ctx.Config{Name: "source_list", Value: []interface{}{}, Help: "系统命令超时"},
+		"system_env":  &ctx.Config{Name: "system_env", Value: map[string]interface{}{}, Help: "系统命令超时"},
+		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "60s", Help: "系统命令超时"},
 		"cmd_combine": &ctx.Config{Name: "cmd_combine", Value: map[string]interface{}{
 			"vi":  map[string]interface{}{"active": true},
 			"top": map[string]interface{}{"active": true},
@@ -614,8 +615,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			m.Confv("source_list", -1, map[string]interface{}{
-				"source_word": strings.Join(arg, " "),
 				"source_time": m.Time(),
+				"source_ctx":  m.Option("current_ctx"),
+				"source_cmd":  strings.Join(arg, " "),
 			})
 
 			if m.Options("current_ctx") {
@@ -638,7 +640,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"run": &ctx.Command{Name: "run", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			name := path.Join(m.Option("dir_root"), m.Option("download_dir"), arg[0])
-			msg := m.Spawn(c).Cmd("cmd", name)
+			msg := m.Spawn(c).Cmd("cmd", name, arg[1:])
 			m.Copy(msg, "append").Copy(msg, "result")
 		}},
 
@@ -751,7 +753,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
 			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
-			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1},
+			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				conf := map[string]interface{}{}
 				if m.Confv("cmd_combine", arg[0]) != nil {
@@ -778,6 +780,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if conf["path"] != nil {
 					cmd.Path = m.Parse(conf["path"])
 				}
+
+				for k, v := range m.Confv("system_env").(map[string]interface{}) {
+					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
+				}
 				if conf["env"] != nil {
 					for k, v := range conf["env"].(map[string]interface{}) {
 						cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
@@ -786,6 +792,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
 					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
 				}
+				m.Log("info", "cmd.env %v", cmd.Env)
+				for _, v := range os.Environ() {
+					cmd.Env = append(cmd.Env, v)
+				}
+
 				if conf["dir"] != nil {
 					cmd.Dir = m.Parse(conf["dir"])
 				}
@@ -803,11 +814,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				} else {
 					wait := make(chan bool, 1)
 					go func() {
-						if out, e := cmd.CombinedOutput(); e != nil {
-							m.Echo("error: ").Echo("%s\n", e)
-							m.Echo("%s\n", string(out))
+						if m.Has("cmd_error") {
+							if out, e := cmd.CombinedOutput(); e != nil {
+								m.Echo("error: ").Echo("%s\n", e)
+								m.Echo("%s\n", string(out))
+							} else {
+								m.Echo(string(out))
+							}
 						} else {
-							m.Echo(string(out))
+							if out, e := cmd.Output(); e != nil {
+								m.Echo("error: ").Echo("%s\n", e)
+								m.Echo("%s\n", string(out))
+							} else {
+								m.Echo(string(out))
+							}
 						}
 						wait <- true
 					}()
