@@ -199,6 +199,15 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				"extra_field": 2, "extra_fields": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
+					if len(arg) == 0 {
+						msg := m.Spawn().Cmd("query", "show tables")
+						for _, v := range msg.Meta[msg.Meta["append"][0]] {
+							m.Add("append", "table", v)
+						}
+						m.Table()
+						return
+					}
+
 					table := m.Confx("table", arg, 0)
 					if v := m.Confv("tables", table); v != nil {
 						table = v.(string)

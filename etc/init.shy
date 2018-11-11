@@ -4,5 +4,4 @@
     config load var/counter.json counter
 
 source etc/local.shy
-source etc/demo.shy
 ~shy

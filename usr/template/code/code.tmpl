@@ -118,18 +118,18 @@
 {{end}}
 
 {{define "componet"}}
-<fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "help"}}({{option .Meta "context"}}.{{option .Meta "command"}})</legend>
+<fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "context"}}.{{option .Meta "command"}})</legend>
     {{$form_type := option . "form_type"|meta}}
 
     {{if eq $form_type "upload"}}
     {{end}}
-    <form class="option {{option .Meta "name"}}"
+    <form class="option {{option .Meta "componet_name"}}"
           data-last_componet_group="{{option . "last_componet_group"|meta}}"
           data-last_componet_order="{{option . "last_componet_order"|meta}}"
           data-componet_group="{{option . "componet_group"|meta}}"
           data-componet_order="{{option . "componet_order"|meta}}"
-          data-componet_name="{{option . "name"|meta}}"
-          data-componet_help="{{option . "help"|meta}}"
+          data-componet_name="{{option . "componet_name"|meta}}"
+          data-componet_help="{{option . "componet_help"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
              onsubmit="onaction(event,'upload')"
@@ -183,7 +183,7 @@
     {{if index .Meta "display_append"}}
         {{option .Meta "display_append"}}
     {{else}}
-        <table class="append {{option .Meta "name"}}">
+        <table class="append {{option .Meta "componet_name"}}">
             {{$msg := .}}
             <tr>{{range $field := append .}}<th>{{$field}}</th>{{end}}</tr>
             {{range $line := table .}}
@@ -195,7 +195,7 @@
     {{if index .Meta "display_result"}}
         {{option .Meta "display_result"}}
     {{else}}
-        <code class="result {{option .Meta "name"}}"><pre>{{result .Meta}}</pre></code>
+        <code class="result {{option .Meta "componet_name"}}"><pre>{{result .Meta}}</pre></code>
     {{end}}
 </fieldset>
 {{end}}

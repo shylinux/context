@@ -2796,6 +2796,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					switch action {
 					case "cmd":
 						msg.Cmd(arg)
+						if !msg.Hand {
+							msg = msg.Sess("cli").Cmd("cmd", arg)
+						}
 						m.Copy(msg, "append").Copy(msg, "result")
 					case "switch":
 						m.target = msg.target
@@ -3045,13 +3048,15 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 					switch action {
 					case "save":
-						f, e := os.Create(which)
-						m.Assert(e)
-						defer f.Close()
-
+						// f, e := os.Create(which)
+						// m.Assert(e)
+						// defer f.Close()
+                        //
 						buf, e := json.MarshalIndent(save, "", "  ")
 						m.Assert(e)
-						f.Write(buf)
+						m.Sess("nfs").Add("option", "data", string(buf)).Cmd("save", which)
+
+						// f.Write(buf)
 					case "export":
 						buf, e := json.MarshalIndent(save, "", "  ")
 						m.Assert(e)

@@ -22,12 +22,13 @@ function send_command(form, cb) {
         msg = msg[0]
 
         var result = document.querySelector("code.result."+data["componet_name"]+" pre")
-        result && (result.innerHTML = (msg.result || []).join(""))
-
         var append = document.querySelector("table.append."+data["componet_name"])
-        append && (append.innerHTML = "")
+        if (msg && (msg.append || msg.result)) {
+            result && (result.innerHTML = (msg.result || []).join(""))
+            append && (append.innerHTML = "")
+        }
 
-        if (append && msg.append) {
+        if (append && msg && msg.append) {
             var tr = append_child(append, "tr")
             for (var i in msg.append) {
                 append_child(tr, "th", msg.append[i])
@@ -218,7 +219,13 @@ function init_append(event) {
 }
 function init_result(event) {
     var result = document.querySelectorAll("code.result pre").forEach(function(item) {
+        item.onselect = function(event) {
+            console.log(event)
+
+        }
         item.onclick = function(event) {
+            console.log(event)
+            return
             copy_to_clipboard(event.target.innerText)
         }
     })
@@ -284,7 +291,11 @@ function init_download(event) {
         if (event.target.tagName == "TD") {
             copy_to_clipboard(event.target.innerText.trim())
             var name = event.target.innerText.trim()
-            option["dir"].value += name
+            if (option["dir"].value && !option["dir"].value.endsWith("/")) {
+                option["dir"].value += "/"+name
+            } else {
+                option["dir"].value += name
+            }
             if (name.endsWith("/")) {
                 context.Cookie("download_dir", option["dir"].value)
             }
@@ -306,6 +317,59 @@ function init_download(event) {
             }
         }
 
+        send_command(option, function(){
+            option["dir"].value = context.Cookie("download_dir")
+        })
+    }
+}
+
+function init_context() {
+    var append = document.querySelector("table.append.ctx")
+    var option = document.querySelector("form.option.ctx")
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "ctx",
+        "onclick": function(event) {
+            option["ctx"].value = "ctx"
+            send_command(option)
+            context.Cookie("current_ctx", option["ctx"].value)
+            return true
+        }
+    })
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "shy",
+        "onclick": function(event) {
+            option["ctx"].value = "shy"
+            send_command(option)
+            context.Cookie("current_ctx", option["ctx"].value)
+            return true
+        }
+    })
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "mdb",
+        "onclick": function(event) {
+            option["ctx"].value = "mdb"
+            send_command(option)
+            context.Cookie("current_ctx", option["ctx"].value)
+            return true
+        }
+    })
+
+    option["ctx"].value = context.Cookie("current_ctx")
+    send_command(option)
+
+    append.onchange = append.onclick = function(event) {
+        console.log(event)
+        if (event.target.tagName == "TD") {
+            var name = event.target.innerText.trim()
+            copy_to_clipboard(name)
+            option["ctx"].value = name
+            context.Cookie("current_ctx", option["ctx"].value)
+        } else if (event.target.tagName == "TH") {
+        }
+
         send_command(option)
     }
 }
@@ -315,4 +379,5 @@ window.onload = function() {
     init_append()
     init_result()
     init_download()
+    init_context()
 }

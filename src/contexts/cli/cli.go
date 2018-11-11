@@ -2,6 +2,7 @@ package cli
 
 import (
 	"contexts/ctx"
+	"path"
 	"toolkit"
 
 	"fmt"
@@ -84,9 +85,10 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		":":  []string{"command"},
 		"::": []string{"command", "list"},
 
-		"pwd": []string{"nfs.pwd"},
-		"dir": []string{"nfs.dir"},
-		"git": []string{"nfs.git"},
+		"pwd":  []string{"nfs.pwd"},
+		"path": []string{"nfs.path"},
+		"dir":  []string{"nfs.dir"},
+		"git":  []string{"nfs.git"},
 	}
 
 	return s
@@ -139,8 +141,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"init.shy": &ctx.Config{Name: "init.shy", Value: "etc/init.shy", Help: "启动脚本"},
 		"exit.shy": &ctx.Config{Name: "exit.shy", Value: "etc/exit.shy", Help: "启动脚本"},
 
-		"time_unit":   &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
-		"time_close":  &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
+		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
+		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
 
 		"cmd_script": &ctx.Config{Name: "cmd_script", Value: map[string]interface{}{
 			"sh":  "bash",
@@ -149,6 +151,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}, Help: "系统命令超时"},
 
 		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "60s", Help: "系统命令超时"},
+		"source_list": &ctx.Config{Name: "source_list", Value: []interface{}{}, Help: "系统命令超时"},
 		"cmd_combine": &ctx.Config{Name: "cmd_combine", Value: map[string]interface{}{
 			"vi":  map[string]interface{}{"active": true},
 			"top": map[string]interface{}{"active": true},
@@ -610,6 +613,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}
 
+			m.Confv("source_list", -1, map[string]interface{}{
+				"source_word": strings.Join(arg, " "),
+				"source_time": m.Time(),
+			})
+
+			if m.Options("current_ctx") {
+				args := []string{"context", m.Option("current_ctx")}
+				arg = append(args, arg...)
+			}
 			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
 				switch msg.Cmd().Detail(0) {
 				case "cmd":
@@ -623,6 +635,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				msg := cli.Message().Spawn().Cmd("detail", arg)
 				m.Copy(msg, "append").Copy(msg, "result")
 			}
+		}},
+		"run": &ctx.Command{Name: "run", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			name := path.Join(m.Option("dir_root"), m.Option("download_dir"), arg[0])
+			msg := m.Spawn(c).Cmd("cmd", name)
+			m.Copy(msg, "append").Copy(msg, "result")
 		}},
 
 		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

@@ -84,6 +84,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, trip int, fields []s
 				continue
 			}
 
+			f, _ := os.Stat(f.Name())
 			if !(m.Confx("dir_type") == "file" && f.IsDir() ||
 				m.Confx("dir_type") == "dir" && !f.IsDir()) {
 				for _, field := range fields {
@@ -1009,6 +1010,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 		}},
 		"save": &ctx.Command{Name: "save file string...", Help: "保存文件, file: 保存的文件, string: 保存的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) == 1 && m.Has("data") {
+				arg = append(arg, m.Option("data"))
+			}
 			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
 				defer f.Close()
 

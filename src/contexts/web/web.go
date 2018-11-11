@@ -283,9 +283,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"componet_group":   &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
-				map[string]interface{}{"name": "head", "template": "head"},
-				map[string]interface{}{"name": "clipbaord", "help": "clipbaord", "template": "clipboard"},
-				map[string]interface{}{"name": "time", "help": "time", "template": "componet",
+				map[string]interface{}{"componet_name": "head", "template": "head"},
+				map[string]interface{}{"componet_name": "clipbaord", "componet_help": "clipbaord", "template": "clipboard"},
+				map[string]interface{}{"componet_name": "time", "componet_help": "time", "template": "componet",
 					"context": "cli", "command": "time", "arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "time_format",
@@ -295,7 +295,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						map[string]interface{}{"type": "button", "label": "refresh"},
 					},
 				},
-				map[string]interface{}{"name": "tail", "template": "tail"},
+				map[string]interface{}{"componet_name": "tail", "template": "tail"},
 			},
 		}, Help: "组件列表"},
 	},
@@ -617,8 +617,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						value := val.(map[string]interface{})
 						m.Add("append", "group", k)
 						m.Add("append", "order", i)
-						m.Add("append", "name", value["name"])
-						m.Add("append", "help", value["help"])
+						m.Add("append", "componet_name", value["componet_name"])
+						m.Add("append", "componet_help", value["componet_help"])
 						m.Add("append", "context", value["context"])
 						m.Add("append", "command", value["command"])
 					}
@@ -628,8 +628,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				for i, val := range m.Confv("componet", arg[0]).([]interface{}) {
 					value := val.(map[string]interface{})
 					m.Add("append", "order", i)
-					m.Add("append", "name", value["name"])
-					m.Add("append", "help", value["help"])
+					m.Add("append", "componet_name", value["componet_name"])
+					m.Add("append", "componet_help", value["componet_help"])
 					m.Add("append", "context", value["context"])
 					m.Add("append", "command", value["command"])
 				}
@@ -647,7 +647,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				} else {
 					m.Confv("componet", []interface{}{arg[0], arg[1]}, map[string]interface{}{
-						"name": arg[2], "help": arg[3],
+						"componet_name": arg[2], "componet_help": arg[3],
 						"context": m.Confx("componet_context", arg, 4),
 						"command": m.Confx("componet_command", arg, 5),
 					})
@@ -742,13 +742,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				for count := 0; count == 0; group, order, right = "login", "", true {
 					for _, v := range m.Confv("componet", group).([]interface{}) {
 						val := v.(map[string]interface{})
-						if order != "" && val["name"].(string) != order {
+						if order != "" && val["componet_name"].(string) != order {
 							continue
 						}
 
 						order_right := right
 						if !order_right && login != nil {
-							if role := login.Confv("right", []interface{}{group, val["name"], "right", "role"}); role != nil && role.(string) == "share" {
+							if role := login.Confv("right", []interface{}{group, val["componet_name"], "right", "role"}); role != nil && role.(string) == "share" {
 								order_right = true
 							}
 						}
@@ -770,7 +770,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 						count++
 
-						msg.Option("componet_order", val["name"].(string))
+						msg.Option("componet_order", val["componet_name"].(string))
 
 						for k, v := range val {
 							if msg.Option(k) != "" {
@@ -823,7 +823,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 						if msg.Appends("directory") {
-							m.Append("page_redirect", fmt.Sprintf("/download?file=%s", msg.Append("directory")))
+							m.Append("page_redirect", fmt.Sprintf("/download/%s", msg.Append("directory")))
 							return
 						}
 
