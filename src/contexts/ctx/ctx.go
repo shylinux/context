@@ -1197,17 +1197,17 @@ func (m *Message) Sort(key string, arg ...string) *Message {
 					result = true
 				}
 			case "time":
-				ti, e := time.ParseInLocation(m.Confx("time_layout"), table[i][key], time.Local)
+				ti, e := time.ParseInLocation(m.Confx("time_format"), table[i][key], time.Local)
 				m.Assert(e)
-				tj, e := time.ParseInLocation(m.Confx("time_layout"), table[j][key], time.Local)
+				tj, e := time.ParseInLocation(m.Confx("time_format"), table[j][key], time.Local)
 				m.Assert(e)
 				if tj.Before(ti) {
 					result = true
 				}
 			case "time_r":
-				ti, e := time.ParseInLocation(m.Confx("time_layout"), table[i][key], time.Local)
+				ti, e := time.ParseInLocation(m.Confx("time_format"), table[i][key], time.Local)
 				m.Assert(e)
-				tj, e := time.ParseInLocation(m.Confx("time_layout"), table[j][key], time.Local)
+				tj, e := time.ParseInLocation(m.Confx("time_format"), table[j][key], time.Local)
 				m.Assert(e)
 				if ti.Before(tj) {
 					result = true
@@ -2300,9 +2300,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"table_row_sep": &Config{Name: "table_row_sep", Value: "\n", Help: "命令列表帮助"},
 
 		"page_offset": &Config{Name: "page_offset", Value: "0", Help: "列表偏移"},
-		"page_limit":  &Config{Name: "page_limit", Value: "10", Help: "列表大小"},
+		"page_limit":  &Config{Name: "page_limit", Value: "100", Help: "列表大小"},
 
-		"time_layout": &Config{Name: "time_layout", Value: "2006/01/02 15:04:05", Help: "默认时间格式"},
+		"time_format": &Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 	},
 	Commands: map[string]*Command{
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) {
@@ -3203,7 +3203,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 		}},
 		"select": &Command{Name: "select key value field",
-			Form: map[string]int{"parse": 2, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "trans_map": 3, "vertical": 0},
+			Form: map[string]int{"parse": 2, "group": 1, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "trans_map": 3, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 				msg := m.Spawn()
 
@@ -3233,12 +3233,66 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				}
 
-				if m.Set("append").Copy(msg, "append"); m.Has("order") {
+				if m.Set("append"); m.Has("group") {
+
+					group := m.Option("group")
+
+					nrow := len(msg.Meta[msg.Meta["append"][0]])
+
+					for i := 0; i < nrow; i++ {
+						count := 1
+
+						if group != "" && msg.Meta[group][i] == "" {
+							msg.Add("append", "count", 0)
+							continue
+						}
+
+						for j := i + 1; j < nrow; j++ {
+							if group == "" || msg.Meta[group][i] == msg.Meta[group][j] {
+								count++
+								for _, k := range msg.Meta["append"] {
+									if k == "count" {
+										continue
+									}
+									if k == group {
+										continue
+									}
+									m, e := strconv.Atoi(msg.Meta[k][i])
+									if e != nil {
+										continue
+									}
+									n, e := strconv.Atoi(msg.Meta[k][j])
+									if e != nil {
+										continue
+									}
+									msg.Meta[k][i] = fmt.Sprintf("%d", m+n)
+
+								}
+
+								if group != "" {
+									msg.Meta[group][j] = ""
+								}
+							}
+						}
+
+						msg.Add("append", "count", count)
+						for _, k := range msg.Meta["append"] {
+							m.Add("append", k, msg.Meta[k][i])
+						}
+						if group == "" {
+							break
+						}
+					}
+				} else {
+					m.Copy(msg, "append")
+				}
+
+				if m.Has("order") {
 					m.Sort(m.Meta["order"][1], m.Option("order"))
 				}
 
 				offset := 0
-				limit := 10
+				limit := m.Confi("page_limit")
 				if m.Has("limit") {
 					limit = m.Optioni("limit")
 				}

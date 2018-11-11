@@ -83,8 +83,10 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"!":  []string{"message"},
 		":":  []string{"command"},
 		"::": []string{"command", "list"},
-		"@":  []string{"config"},
-		"$":  []string{"cache"},
+
+		"pwd": []string{"nfs.pwd"},
+		"dir": []string{"nfs.dir"},
+		"git": []string{"nfs.git"},
 	}
 
 	return s
@@ -137,7 +139,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"init.shy": &ctx.Config{Name: "init.shy", Value: "etc/init.shy", Help: "启动脚本"},
 		"exit.shy": &ctx.Config{Name: "exit.shy", Value: "etc/exit.shy", Help: "启动脚本"},
 
-		"time_format": &ctx.Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 		"time_unit":   &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
 		"time_close":  &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
 

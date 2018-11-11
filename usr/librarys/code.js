@@ -18,10 +18,6 @@ function send_command(form, cb) {
         data[form[i].name] = form[i].value
     }
 
-    if (data["dir"]) {
-        context.Cookie("dir", data["dir"])
-    }
-
     context.GET("", data, function(msg) {
         msg = msg[0]
 
@@ -228,38 +224,76 @@ function init_result(event) {
     })
 }
 function init_download(event) {
+    var append = document.querySelector("table.append.dir")
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "root",
+        "onclick": function(event) {
+            option["dir"].value = ""
+            context.Cookie("download_dir", option["dir"].value)
+            send_command(option)
+            return true
+        }
+    })
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "back",
+        "onclick": function(event) {
+            var path = option["dir"].value.split("/")
+            while (path.pop() == "") {}
+            option["dir"].value = path.join("/")+(path.length? "/": "")
+            context.Cookie("download_dir", option["dir"].value)
+            send_command(option)
+            return true
+        }
+    })
+
     var option = document.querySelector("form.option.dir")
-    if (!option) {
-        return
+    var sort_order = option["sort_order"]
+    var sort_field = option["sort_field"]
+    sort_field.innerHTML = ""
+    sort_field.onchange = function(event) {
+        switch (event.target.selectedOptions[0].value) {
+            case "filename":
+            case "type":
+                sort_order.value = (sort_order.value == "str")? "str_r": "str"
+                break
+            case "line":
+            case "size":
+                sort_order.value = (sort_order.value == "int")? "int_r": "int"
+                break
+            case "time":
+                sort_order.value = (sort_order.value == "time")? "time_r": "time"
+                break
+        }
+        send_command(option)
     }
 
-    document.querySelector("form.option.dir input[name=dir]").value = context.Search("download_dir")
+    var th = append.querySelectorAll("th")
+    for (var i = 0; i < th.length; i++) {
+        var value = th[i].innerText.trim()
+        var opt = append_child(sort_field, "option", {
+            "value": value, "innerText": value,
+        })
+    }
 
-    option["dir"].value && option["dir"].value != context.Cookie("dir") && send_command(option)
+    (option["dir"].value = context.Search("download_dir")) && send_command(option)
 
-    var append = document.querySelector("table.append.dir")
-    append.onchange = 
-    append.onclick = function(event) {
+    append.onchange = append.onclick = function(event) {
         console.log(event)
-        if (event.target.tagName == "A") {
-            if (event.target.dataset.type != "true") {
-                location.href = option["dir"].value+"/"+event.target.innerText
-                return
+        if (event.target.tagName == "TD") {
+            copy_to_clipboard(event.target.innerText.trim())
+            var name = event.target.innerText.trim()
+            option["dir"].value += name
+            if (name.endsWith("/")) {
+                context.Cookie("download_dir", option["dir"].value)
             }
-
-            option["dir"].value = option["dir"].value+"/"+event.target.innerText
-            send_command(option, function(msg) {
-                context.Cookie("download_dir", option["dir"].value = msg.dir.join(""))
-            })
-        } else if (event.target.tagName == "TD") {
-            copy_to_clipboard(event.target.innerText)
         } else if (event.target.tagName == "TH") {
-            option["sort_field"].value = event.target.innerText
+            option["sort_field"].value = event.target.innerText.trim()
 
-            var sort_order = option["sort_order"]
-            switch (event.target.innerText) {
+            switch (event.target.innerText.trim()) {
                 case "filename":
-                case "is_dir":
+                case "type":
                     sort_order.value = (sort_order.value == "str")? "str_r": "str"
                     break
                 case "line":
@@ -270,9 +304,9 @@ function init_download(event) {
                     sort_order.value = (sort_order.value == "time")? "time_r": "time"
                     break
             }
-
-            send_command(option)
         }
+
+        send_command(option)
     }
 }
 

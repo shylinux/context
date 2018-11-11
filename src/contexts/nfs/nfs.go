@@ -3,7 +3,9 @@ package nfs
 import (
 	"bufio"
 	"contexts/ctx"
+	"crypto/sha1"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,8 +18,10 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -68,27 +72,11 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 	f, e := os.OpenFile(name, flag, os.ModePerm)
 	return name, f, e
 }
-
-func dir(m *ctx.Message, name string, level int, deep bool, fields []string) {
+func dir(m *ctx.Message, name string, level int, deep bool, trip int, fields []string) {
 	back, e := os.Getwd()
 	m.Assert(e)
 	os.Chdir(name)
 	defer os.Chdir(back)
-	s, e := os.Stat(".")
-	for _, k := range fields {
-		switch k {
-		case "filename":
-			m.Add("append", "filename", "..")
-		case "is_dir":
-			m.Add("append", "is_dir", "true")
-		case "size":
-			m.Add("append", "size", 0)
-		case "line":
-			m.Add("append", "line", 0)
-		case "time":
-			m.Add("append", "time", s.ModTime().Format("2006-01-02 15:04:05"))
-		}
-	}
 
 	if fs, e := ioutil.ReadDir("."); m.Assert(e) {
 		for _, f := range fs {
@@ -96,70 +84,83 @@ func dir(m *ctx.Message, name string, level int, deep bool, fields []string) {
 				continue
 			}
 
-			if f.IsDir() {
-				if m.Has("dirs") {
-					m.Optioni("dirs", m.Optioni("dirs")+1)
-				}
-			} else {
-				if m.Has("files") {
-					m.Optioni("files", m.Optioni("files")+1)
-				}
-			}
-
-			if m.Has("sizes") {
-				m.Optioni("sizes", m.Optioni("sizes")+int(f.Size()))
-			}
-
-			line := 0
-			if m.Has("lines") {
-				if !f.IsDir() {
-					f, e := os.Open(path.Join(back, name, f.Name()))
-					m.Assert(e)
-					defer f.Close()
-					bio := bufio.NewScanner(f)
-					for bio.Scan() {
-						bio.Text()
-						line++
-					}
-					m.Optioni("lines", m.Optioni("lines")+line)
-				}
-			}
-
-			filename := ""
-			switch m.Confx("dir_name") {
-			case "name":
-				filename = f.Name()
-			case "tree":
-				filename = strings.Repeat("  ", level) + f.Name()
-			default:
-				filename = path.Join(back, name, f.Name())
-			}
-
 			if !(m.Confx("dir_type") == "file" && f.IsDir() ||
 				m.Confx("dir_type") == "dir" && !f.IsDir()) {
-				for _, k := range fields {
-					switch k {
+				for _, field := range fields {
+					switch field {
+					case "time":
+						m.Add("append", "time", f.ModTime().Format(m.Conf("time_format")))
+					case "type":
+						if m.Assert(e) && f.IsDir() {
+							m.Add("append", "type", "dir")
+						} else {
+							m.Add("append", "type", "file")
+						}
+					case "full":
+						m.Add("append", "full", path.Join(back, name, f.Name()))
+					case "path":
+						m.Add("append", "path", path.Join(back, name, f.Name())[trip:])
+					case "tree":
+						if level == 0 {
+							m.Add("append", "tree", f.Name())
+						} else {
+							m.Add("append", "tree", strings.Repeat("| ", level-1)+"|-"+f.Name())
+						}
 					case "filename":
-						m.Add("append", "filename", filename)
-					case "is_dir":
-						f, e := os.Stat(filename)
-						m.Assert(e)
-						m.Add("append", "is_dir", f.IsDir())
+						if f.IsDir() {
+							m.Add("append", "filename", f.Name()+"/")
+						} else {
+							m.Add("append", "filename", f.Name())
+						}
 					case "size":
 						m.Add("append", "size", f.Size())
 					case "line":
-						m.Add("append", "line", line)
-					case "time":
-						m.Add("append", "time", f.ModTime().Format("2006-01-02 15:04:05"))
+						nline := 0
+						if f.IsDir() {
+							d, e := ioutil.ReadDir(f.Name())
+							m.Assert(e)
+							nline = len(d)
+						} else {
+							f, e := os.Open(f.Name())
+							m.Assert(e)
+							defer f.Close()
+
+							bio := bufio.NewScanner(f)
+							for bio.Scan() {
+								bio.Text()
+								nline++
+							}
+						}
+						m.Add("append", "line", nline)
+					case "hash":
+						if f.IsDir() {
+							d, e := ioutil.ReadDir(f.Name())
+							m.Assert(e)
+							meta := []string{}
+							for _, v := range d {
+								meta = append(meta, fmt.Sprintf("%s%d%s", v.Name(), v.Size(), v.ModTime()))
+							}
+							sort.Strings(meta)
+
+							h := sha1.Sum([]byte(strings.Join(meta, "")))
+							m.Add("append", "hash", hex.EncodeToString(h[:]))
+							break
+						}
+
+						f, e := ioutil.ReadFile(f.Name())
+						m.Assert(e)
+						h := sha1.Sum(f)
+						m.Add("append", "hash", hex.EncodeToString(h[:]))
 					}
 				}
 			}
 			if f.IsDir() && deep {
-				dir(m, f.Name(), level+1, deep, fields)
+				dir(m, f.Name(), level+1, deep, trip, fields)
 			}
 		}
 	}
 }
+
 func (nfs *NFS) insert(rest []rune, letters []rune) []rune {
 	n := len(rest)
 	l := len(letters)
@@ -824,17 +825,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"dir_root": "usr",
 		}, Help: "读取文件的缓存区的大小"},
 
-		"dir_deep":   &ctx.Config{Name: "dir_deep(yes/no)", Value: "yes", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
-		"dir_type":   &ctx.Config{Name: "dir_type(file/dir)", Value: "file", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
-		"dir_field":  &ctx.Config{Name: "dir_field", Value: "filename is_dir line size time", Help: "表格排序字段"},
+		"dir_type":   &ctx.Config{Name: "dir_type(file/dir/all)", Value: "all", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
 		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
-		"dir_info":   &ctx.Config{Name: "dir_info(sizes/lines/files/dirs)", Value: "sizes lines files dirs", Help: "dir命令输出目录的统计信息, info: 输出统计信息, 否则输出"},
-		"sort_field": &ctx.Config{Name: "sort_field", Value: "line", Help: "表格排序字段"},
-		"sort_order": &ctx.Config{Name: "sort_order(int/int_r/string/string_r/time/time_r)", Value: "int", Help: "表格排序类型"},
-
-		"git_conf": &ctx.Config{Name: "git_conf", Value: map[string]interface{}{
-			"dir_root": "usr",
-		}, Help: "读取文件的缓存区的大小"},
+		"dir_fields": &ctx.Config{Name: "dir_fields(time/type/name/size/line/hash)", Value: "time size line filename", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 
 		"git_branch":   &ctx.Config{Name: "git_branch", Value: "--list", Help: "版本控制状态参数"},
 		"git_status":   &ctx.Config{Name: "git_status", Value: "-sb", Help: "版本控制状态参数"},
@@ -846,7 +839,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"git_path":     &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
 		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff log", Help: "命令集合"},
 
-		"paths": &ctx.Config{Name: "paths", Value: []interface{}{""}, Help: "文件路径"},
+		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", ""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -898,7 +891,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					return
 				}
 
-				if p, f, e := open(m, arg[0], os.O_RDWR); m.Assert(e) {
+				if p, f, e := open(m, arg[0]); m.Assert(e) {
 					m.Optionv("in", f)
 					m.Start(m.Confx("nfs_name", arg, 1), help, key, p)
 				}
@@ -1038,9 +1031,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 		}},
 		"export": &ctx.Command{Name: "export filename", Help: "导出数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			_, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+			name := time.Now().Format(arg[0])
+			_, f, e := open(m, name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 			m.Assert(e)
 			defer f.Close()
+			m.Log("fuck", "what %v", name)
+			m.Log("fuck", "what %v", m.Meta)
 
 			switch {
 			case strings.HasSuffix(arg[0], ".json"):
@@ -1081,6 +1077,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					f.WriteString(v)
 				}
 			}
+			m.Log("fuck", "what %v", name)
+			m.Log("fuck", "what %v", m.Meta)
+			m.Set("append").Set("result").Echo(name)
 		}},
 
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1169,80 +1168,44 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 		}},
 
-		"dir": &ctx.Command{
-			Name: "dir dir [dir_deep yes|no] [dir_info info] [dir_name name|tree|path|full] [dir_type both|file|dir] [sort_field name] [sort_order type]",
-			Help: "查看目录, dir: 目录名, dir_info: 显示统计信息, dir_name: 文件名类型, dir_type: 文件类型, sort_field: 排序字段, sort_order: 排序类型",
-			Form: map[string]int{
-				"dir_root":   1,
-				"dir_deep":   1,
-				"dir_type":   1,
-				"dir_name":   1,
-				"dir_info":   1,
-				"dir_link":   1,
-				"dir_field":  1,
-				"sort_field": 1,
-				"sort_order": 1,
-			},
+		"dir": &ctx.Command{Name: "dir dir [dir_type both|file|dir] [dir_name name|tree|path|full] [dir_deep] fields...",
+			Help: "查看目录, dir: 目录名, dir_type: 文件类型, dir_name: 文件名类型, dir_deep: 递归查询, fields: 查询字段",
+			Form: map[string]int{"dir_type": 1, "dir_name": 1, "dir_deep": 0, "dir_sort": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				conf := m.Confv("dir_conf")
+				wd, e := os.Getwd()
+				m.Assert(e)
+				trip := len(wd) + 1
 
-				m.Log("info", "option %s", m.Option("dir"))
-				if len(arg) > 0 {
-					m.Log("info", "arg0 %s", arg[0])
+				if len(arg) == 0 {
+					arg = append(arg, "")
 				}
-				m.Log("info", "elect %s", ctx.Elect(m.Option("dir"), arg, 0))
-
-				m.Option("dir", path.Clean(ctx.Elect(m.Option("dir"), arg, 0)))
-				d := path.Join(m.Confx("dir_root", conf), m.Option("dir"))
-				if s, e := os.Stat(d); m.Assert(e) && !s.IsDir() {
-					d = path.Dir(d)
+				dirs := arg[0]
+				if m.Options("dir_root") {
+					dirs = path.Join(m.Option("dir_root"), dirs)
 				}
 
-				fields := strings.Split(m.Confx("dir_field"), " ")
-
-				trip := 0
-				if m.Confx("dir_name") == "path" {
-					wd, e := os.Getwd()
-					m.Assert(e)
-					trip = len(wd) + 1
-				}
-
-				info := strings.Split(m.Confx("dir_info"), " ")
-				for _, v := range info {
-					m.Option(v, 0)
-				}
-
-				m.Option("time_layout", "2006-01-02 15:04:05")
-				dir(m, d, 0, ctx.Right(m.Confx("dir_deep")), fields)
-				m.Sort(m.Confx("sort_field"), m.Confx("sort_order"))
-				m.Table(func(maps map[string]string, list []string, line int) bool {
-					for i, v := range list {
-						key := m.Meta["append"][i]
-						switch key {
-						case "filename":
-							v = maps[key]
-							if line > -1 && trip > 0 && trip <= len(v) {
-								v = v[trip:]
-								if m.Options("dir_link") {
-									m.Meta["filename"][line] = fmt.Sprintf(m.Option("dir_link"), maps["is_dir"], v)
-								} else {
-									m.Meta["filename"][line] = v
-								}
-							}
-							if line > -1 {
-								if m.Options("dir_link") {
-									m.Meta["filename"][line] = fmt.Sprintf(m.Option("dir_link"), maps["is_dir"], v)
-								}
-							}
+				for _, v := range m.Confv("paths").([]interface{}) {
+					d := path.Join(v.(string), dirs)
+					if s, e := os.Stat(d); e == nil {
+						if s.IsDir() {
+							dir(m, d, 0, ctx.Right(m.Has("dir_deep")), trip, strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "))
+						} else {
+							m.Append("directory", d)
+							return
 						}
+						break
 					}
-					return true
-				})
-				if !m.Options("dir_link") {
-					m.Table()
 				}
-				for _, v := range info {
-					m.Echo("%s: %s\n", v, m.Option(v))
+				if m.Has("dir_sort") {
+					m.Sort(m.Meta["dir_sort"][1], m.Meta["dir_sort"][0])
+				}
+
+				if len(m.Meta["append"]) == 1 {
+					for _, v := range m.Meta[m.Meta["append"][0]] {
+						m.Echo(v).Echo(" ")
+					}
+				} else {
+					m.Table()
 				}
 			}},
 		"git": &ctx.Command{

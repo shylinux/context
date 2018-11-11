@@ -136,13 +136,23 @@ function insert_child(parent, element, html, position) {
 }
 function append_child(parent, element, html) {
     var elm = document.createElement(element)
-    html && (elm.innerHTML = html)
+    html && typeof html == "string" && (elm.innerHTML = html)
+    if (typeof html == "object") {
+        for (var k in html) {
+            elm[k] = html[k]
+        }
+    }
     parent.append(elm)
     return elm
 }
 function insert_before(self, element, html) {
     var elm = document.createElement(element)
-    html && (elm.innerHTML = html)
+    html && typeof html == "string" && (elm.innerHTML = html)
+    if (typeof html == "object") {
+        for (var k in html) {
+            elm[k] = html[k]
+        }
+    }
     return self.parentElement.insertBefore(elm, self)
 }
 

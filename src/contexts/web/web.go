@@ -83,6 +83,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Add("option", "method", r.Method).Add("option", "path", r.URL.Path)
 
 			msg.Option("remote_addr", r.RemoteAddr)
+			msg.Option("dir_root", m.Cap("directory"))
 			msg.Option("referer", r.Header.Get("Referer"))
 			msg.Option("accept", r.Header.Get("Accept"))
 
@@ -682,6 +683,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Log("upload", "file(%d): %s", h.Size, p)
 			m.Append("redirect", m.Option("referer"))
 		}},
+		"/download/": &ctx.Command{Name: "/download/", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
+			http.ServeFile(w, r, m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0))
+		}},
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
@@ -802,6 +808,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
 							if val["command"] != nil {
 								msg.Cmd(val["command"], args)
+								if msg.Options("file_name") {
+									m.Append("page_redirect", fmt.Sprintf("/download/%s",
+										msg.Sess("nfs").Copy(msg, "append").Copy(msg, "result").Cmd("export", msg.Option("file_name")).Result(0)))
+									return
+								}
 							}
 						}
 
@@ -809,6 +820,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							list = append(list, msg.Meta)
 						} else if val["template"] != nil {
 							m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))
+						}
+
+						if msg.Appends("directory") {
+							m.Append("page_redirect", fmt.Sprintf("/download?file=%s", msg.Append("directory")))
+							return
 						}
 
 						if msg.Detail(0) == "login" && msg.Appends("sessid") {

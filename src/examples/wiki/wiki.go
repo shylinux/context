@@ -291,7 +291,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				} else {
 					m.Add("append", "pend", "")
 				}
-				m.Option("time_layout", "2006-01-02 15:04:05")
+				m.Option("time_format", "2006-01-02 15:04:05")
 				m.Sort("time", "time_r")
 			}
 		}},
@@ -379,7 +379,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 					msg.Add("append", "title", strings.TrimSuffix(f.Name(), ".md")+"源码解析")
 					msg.Add("append", "time", f.ModTime().Format("01/02 15:03"))
 				}
-				msg.Option("time_layout", "01/02 15:03")
+				msg.Option("time_format", "01/02 15:03")
 				msg.Sort("time", "time_r")
 
 				articles := []*Article{}

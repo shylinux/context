@@ -24,7 +24,7 @@ func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	log.Configs["flag_color"] = &ctx.Config{Name: "flag_color", Value: "true", Help: "模块日志输出颜色"}
 	log.Configs["flag_time"] = &ctx.Config{Name: "flag_time", Value: "2006/01/02 15:04:05 ", Help: "模块日志输出颜色"}
-	log.Configs["bench.log"] = &ctx.Config{Name: "bench.log", Value: "var/bench.log", Help: "模块日志输出的文件"}
+	log.Configs["bench.log"] = &ctx.Config{Name: "bench.log", Value: "bench.log", Help: "模块日志输出的文件"}
 	return log
 }
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
