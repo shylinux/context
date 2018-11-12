@@ -674,7 +674,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Assert(e)
 			defer f.Close()
 
-			p := path.Join(m.Conf("directory"), m.Option("dir"), h.Filename)
+			p := path.Join(m.Conf("directory"), m.Option("download_dir"), h.Filename)
 			o, e := os.Create(p)
 			m.Assert(e)
 			defer o.Close()

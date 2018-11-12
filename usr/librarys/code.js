@@ -387,7 +387,7 @@ function init_context() {
         send_command(option)
     }
 }
-function init_context() {
+function init_command() {
     var append = document.querySelector("table.append.command")
     var option = document.querySelector("form.option.command")
     insert_before(append, "input", {
