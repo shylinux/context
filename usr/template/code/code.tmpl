@@ -124,12 +124,9 @@
     {{if eq $form_type "upload"}}
     {{end}}
     <form class="option {{option .Meta "componet_name"}}"
-          data-last_componet_group="{{option . "last_componet_group"|meta}}"
-          data-last_componet_order="{{option . "last_componet_order"|meta}}"
           data-componet_group="{{option . "componet_group"|meta}}"
           data-componet_order="{{option . "componet_order"|meta}}"
           data-componet_name="{{option . "componet_name"|meta}}"
-          data-componet_help="{{option . "componet_help"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
              onsubmit="onaction(event,'upload')"
