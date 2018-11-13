@@ -1041,7 +1041,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			defer f.Close()
 
 			switch {
-			case strings.HasSuffix(arg[0], ".json"):
+			case strings.HasSuffix(arg[0], ".json") && len(m.Meta["append"]) > 0:
 				data := []interface{}{}
 
 				nrow := len(m.Meta[m.Meta["append"][0]])
@@ -1056,7 +1056,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				en.SetIndent("", "  ")
 				en.Encode(data)
 
-			case strings.HasSuffix(arg[0], ".csv"):
+			case strings.HasSuffix(arg[0], ".csv") && len(m.Meta["append"]) > 0:
 				w := csv.NewWriter(f)
 
 				line := []string{}
@@ -1075,10 +1075,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 				w.Flush()
 			default:
+				m.Log("fuck", "what ---%v", m.Meta)
 				for _, v := range m.Meta["result"] {
 					f.WriteString(v)
 				}
 			}
+			m.Log("fuck", "what ---%v", m.Meta)
 			m.Set("append").Set("result").Echo(name)
 		}},
 

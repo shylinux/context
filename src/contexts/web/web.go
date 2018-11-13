@@ -346,7 +346,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"get": &ctx.Command{Name: "get [method GET|POST] url arg...",
 			Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "trans": 1, "parse": 1},
+			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "parse": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 					if m.Has("path_value") {
@@ -417,10 +417,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					switch {
 					case strings.HasPrefix(ct, "application/json"):
 						json.Unmarshal(buf, &result)
-						if m.Has("trans") {
+						if m.Has("parse") {
 							msg := m.Spawn()
 							msg.Put("option", "response", result)
-							msg.Cmd("trans", "response", m.Option("trans"))
+							msg.Cmd("trans", "response", m.Option("parse"))
 							m.Copy(msg, "append")
 							m.Copy(msg, "result")
 							return
@@ -657,7 +657,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"session": &ctx.Command{Name: "session", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			sessid := m.Option("sessid")
-			if sessid == "" && m.Options("username") && m.Options("password") {
+			if m.Options("username") && m.Options("password") {
 				sessid = m.Sess("aaa").Cmd("login", m.Option("username"), m.Option("password")).Result(0)
 			}
 			if sessid == "" && m.Options("remote_addr") {
@@ -717,7 +717,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 
 				group := m.Option("componet_group")
-				order := m.Option("componet_order")
+				order := m.Option("componet_name")
 				right := group == "login"
 				if !right {
 					right = !m.Confs("login_right")
@@ -728,17 +728,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if !right {
 					login = m.Spawn().Cmd("session").Appendv("login").(*ctx.Message)
 				}
-				if !right && login != nil {
-					if role := login.Confv("right", []interface{}{"right", "role"}); role != nil && role.(string) == "root" {
-						right = true
-					}
-				}
-				if !right && login != nil {
-					if role := login.Confv("right", []interface{}{group, "right", "role"}); role != nil && role.(string) == "owner" {
-						right = true
-					}
+				if login != nil {
+					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: login.Cap("sessid")})
 				}
 
+				if !right && login != nil {
+					right = m.Sess("aaa").Cmd("right", login.Cap("stream"), "check", group).Results(0)
+				}
+				if !right && login != nil {
+					right = m.Sess("aaa").Cmd("right", "void", "check", group).Results(0)
+				}
+
+				m.Log("info", "group: %v, name: %v, right: %v", group, order, right)
 				for count := 0; count == 0; group, order, right = "login", "", true {
 					for _, v := range m.Confv("componet", group).([]interface{}) {
 						val := v.(map[string]interface{})
@@ -748,9 +749,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						order_right := right
 						if !order_right && login != nil {
-							if role := login.Confv("right", []interface{}{group, val["componet_name"], "right", "role"}); role != nil && role.(string) == "share" {
-								order_right = true
-							}
+							order_right = m.Sess("aaa").Cmd("right", login.Cap("stream"), "check", group, val["componet_name"]).Results(0)
+						}
+						if !order_right && login != nil {
+							order_right = m.Sess("aaa").Cmd("right", "void", "check", group, val["componet_name"]).Results(0)
 						}
 						if !order_right {
 							continue
@@ -770,7 +772,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 						count++
 
-						msg.Option("componet_order", val["componet_name"].(string))
+						msg.Option("componet_name", val["componet_name"].(string))
 
 						for k, v := range val {
 							if msg.Option(k) != "" {
@@ -808,9 +810,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
 							if val["componet_cmd"] != nil {
 								msg.Cmd(val["componet_cmd"], args)
-								if msg.Options("file_name") {
+								if msg.Options("download_file") {
 									m.Append("page_redirect", fmt.Sprintf("/download/%s",
-										msg.Sess("nfs").Copy(msg, "append").Copy(msg, "result").Cmd("export", msg.Option("file_name")).Result(0)))
+										msg.Sess("nfs").Copy(msg, "append").Copy(msg, "result").Cmd("export", msg.Option("download_file")).Result(0)))
 									return
 								}
 							}

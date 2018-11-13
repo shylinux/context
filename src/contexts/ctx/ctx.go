@@ -2997,14 +2997,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				if len(arg) == 0 || action != "" {
 					save := map[string]interface{}{}
 					if action == "load" {
-						f, e := os.Open(which)
+						f, e := os.Open(m.Sess("nfs").Cmd("path", which).Result(0))
 						if e != nil {
 							return
 						}
 						defer f.Close()
 
 						de := json.NewDecoder(f)
-						de.Decode(&save)
+						if e = de.Decode(&save); e != nil {
+							m.Log("info", "e: %v", e)
+						}
 					}
 
 					m.BackTrace(func(m *Message) bool {
@@ -3163,7 +3165,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}},
 
 		"trans": &Command{Name: "trans key index", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			value := m.Data[(arg[0])]
+			value := m.Data[arg[0]]
 			if arg[1] != "" {
 				v := Chain(m, value, arg[1])
 				value = v
@@ -3173,7 +3175,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			case map[string]interface{}:
 				for k, v := range val {
 					m.Add("append", "key", k)
-					m.Add("append", "value", v)
+					switch value := v.(type) {
+					case float64:
+						m.Add("append", "value", fmt.Sprintf("%d", int(value)))
+					default:
+						m.Add("append", "value", fmt.Sprintf("%v", value))
+					}
 				}
 				m.Sort("key", "str").Table()
 			case map[string]string:
@@ -3187,11 +3194,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					switch value := v.(type) {
 					case map[string]interface{}:
 						for k, v := range value {
-							m.Add("append", k, v)
+							m.Add("append", k, fmt.Sprintf("%v", v))
 						}
 					default:
 						m.Add("append", "index", i)
-						m.Add("append", "value", v)
+						m.Add("append", "value", fmt.Sprintf("%v", v))
 					}
 				}
 				m.Table()

@@ -16,7 +16,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"strconv"
 	"time"
 )
 
@@ -58,16 +57,8 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	c.Caches = map[string]*ctx.Cache{
 		"method":      &ctx.Cache{Name: "method", Value: arg[0], Help: "登录方式"},
 		"sessid":      &ctx.Cache{Name: "sessid", Value: aaa.Session(arg[1]), Help: "会话令牌"},
+		"login_time":  &ctx.Cache{Name: "login_time", Value: fmt.Sprintf("%d", now), Help: "登录时间"},
 		"expire_time": &ctx.Cache{Name: "expire_time", Value: fmt.Sprintf("%d", int64(m.Confi("expire"))+now), Help: "会话超时"},
-		"login_time": &ctx.Cache{Name: "login_time", Value: fmt.Sprintf("%d", now), Help: "登录时间", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-			if len(arg) > 0 {
-				return arg[0]
-			}
-
-			n, e := strconv.Atoi(x.Value)
-			m.Assert(e)
-			return time.Unix(int64(n), 0).Format("15:03:04")
-		}},
 	}
 	c.Configs = map[string]*ctx.Config{
 		"right": &ctx.Config{Name: "right", Value: map[string]interface{}{}, Help: "用户权限"},
@@ -122,11 +113,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"key":    &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
-		"login": &ctx.Command{
-			Name: "login [sessid]|[username password]",
-			Form: map[string]int{"ip": 1, "openid": 1, "cert": 1, "pub": 1, "key": 1, "load": 1, "save": 1},
+		"login": &ctx.Command{Name: "login [sessid]|[username password]",
+			Form: map[string]int{"ip": 1, "openid": 1, "cert": 1, "pub": 1, "key": 1},
 			Help: []string{"会话管理", "sessid: 令牌", "username: 账号", "password: 密码",
-				"ip: 主机地址", "openid: 微信登录", "cert: 证书", "pub: 公钥", "key: 私钥", "load: 加载会话", "save: 保存会话"},
+				"ip: 主机地址", "openid: 微信登录", "cert: 证书", "pub: 公钥", "key: 私钥"},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if aaa, ok := c.Server.(*AAA); m.Assert(ok) {
 					method := ""
@@ -185,7 +175,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							return
 						}
 
-						m.Start(fmt.Sprintf("user%d", m.Capi("nuser", 1)), "密码登录", "password", arg[0])
+						name := ""
+						switch arg[0] {
+						case "root", "void":
+							name = arg[0]
+						default:
+							name = fmt.Sprintf("user%d", m.Capi("nuser", 1))
+						}
+
+						m.Start(name, "密码登录", "password", arg[0])
 						m.Cap("password", "password", aaa.Password(arg[1]), "密码登录")
 						m.Append("sessid", m.Cap("sessid"))
 						m.Echo(m.Cap("sessid"))
@@ -196,6 +194,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							if n > 0 && m.Cap("sessid") == arg[0] {
 								if int64(m.Capi("expire_time")) > time.Now().Unix() {
 									m.Sess("login", m.Target().Message())
+									m.Append("login_time", time.Unix(int64(m.Capi("login_time")), 0).Format(m.Conf("time_format")))
+									m.Append("expire_time", time.Unix(int64(m.Capi("expire_time")), 0).Format(m.Conf("time_format")))
 									m.Echo(m.Cap("stream"))
 								} else {
 									m.Target().Close(m)
@@ -242,8 +242,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				if m.Cap("stream") == arg[0] {
 					if len(arg) == 1 { //查看所有权
 						for k, v := range m.Confv("right").(map[string]interface{}) {
-							m.Add("append", "group", k)
-							m.Add("append", "right", v)
+							for order, right := range v.(map[string]interface{}) {
+								m.Add("append", "group", k)
+								m.Add("append", "order", order)
+								m.Add("append", "right", right)
+							}
 						}
 						return true
 					}
@@ -280,8 +283,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 					if len(arg) == 3 { //查看使用权
 						for k, v := range m.Confv("right", arg[2]).(map[string]interface{}) {
-							m.Add("append", "order", k)
-							m.Add("append", "right", v)
+							for order, right := range v.(map[string]interface{}) {
+								m.Add("append", "order", k)
+								m.Add("append", "right", order)
+								m.Add("append", "detail", right)
+							}
 						}
 						return true
 					}

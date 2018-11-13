@@ -24,6 +24,31 @@ build:
 run:
 	etc/run.sh 2>var/error.log
 
+tar:
+	[ -e tar ] || mkdir tar
+	[ -e tar/bin ] || mkdir tar/bin
+	[ -e tar/etc ] || mkdir tar/etc
+	cp etc/bootstrap.sh tar/
+	cp etc/init.shy tar/etc/
+	cp etc/exit.shy tar/etc/
+	touch tar/etc/local.shy
+	touch tar/etc/exit_local.shy
+	[ -e tar/usr ] || mkdir tar/usr
+	cp -r usr/template tar/usr
+	cp -r usr/librarys tar/usr
+	[ -e tar/var ] || mkdir tar/var
+
+tar_all: tar darwin linux64
+	cp etc/local.shy tar/etc/
+	cp etc/exit_local.shy tar/etc/
+	mv bench.darwin tar/bin/
+	mv bench.linux64 tar/bin/
+	tar zcvf tar.tgz tar
+
+darwin:
+	GOARCH=amd64 GOOS=darwin go build $(BENCH)
+	mv bench bench.darwin
+
 win64:
 	GOARCH=amd64 GOOS=windows go build $(BENCH)
 	mv bench.exe bench_1.0_win64.exe
@@ -33,7 +58,7 @@ win32:
 
 linux64:
 	GOARCH=amd64 GOOS=linux go build $(BENCH)
-	mv bench bench_1.0_linux64
+	mv bench bench.linux64
 linux32:
 	GOARCH=386 GOOS=linux go build $(BENCH)
 	mv bench bench_1.0_linux32
@@ -67,4 +92,6 @@ load_dotsfile:\
 	cp $< $@
 ~/.vim/syntax/shy.vim: $(DOTS)/shy.vim
 	cp $< $@
+
+.PHONY: tar
 

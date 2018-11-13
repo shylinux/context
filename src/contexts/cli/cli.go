@@ -716,6 +716,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}
 				}
 
+				m.Append("datetime", t.Format(m.Confx("time_format")))
+				m.Append("timestamp", t.Unix()*int64(m.Confi("time_unit")))
+
 				if stamp {
 					m.Echo("%d", t.Unix()*int64(m.Confi("time_unit")))
 				} else {

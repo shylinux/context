@@ -21,8 +21,10 @@ function send_command(form, cb) {
     context.GET("", data, function(msg) {
         msg = msg[0]
 
-        var result = document.querySelector("code.result."+data["componet_name"]+" pre")
-        var append = document.querySelector("table.append."+data["componet_name"])
+        var name = data["componet_name_alias"] || data["componet_name"]
+
+        var result = document.querySelector("code.result."+name+" pre")
+        var append = document.querySelector("table.append."+name)
         if (msg && (msg.append || msg.result)) {
             result && (result.innerHTML = (msg.result || []).join(""))
             append && (append.innerHTML = "")
@@ -74,15 +76,22 @@ function onaction(event, action) {
             }
             break
         case "command":
-            send_command(event.target.form)
+            send_command(event.target.form, function() {
+                if (event.target.value == "login") {
+                    location.reload()
+                }
+            })
             break
         case "input":
             switch (event.key) {
                 case "Enter":
+                    var clistack = document.querySelector("#clistack")
+                    if (!clistack) {
+                        break
+                    }
                     var history = JSON.parse(event.target.dataset["history"] || "[]")
                     if (history.length == 0 || event.target.value != history[history.length-1]) {
                         history.push(event.target.value)
-                        var clistack = document.querySelector("#clistack")
                         insert_child(clistack, "option").value = event.target.value
                     }
                     check_argument(event.target.form, event.target)
@@ -152,6 +161,10 @@ function onaction(event, action) {
                         event.target.dataset["history"] = JSON.stringify(history)
                         event.target.dataset["history_last"] = history.length-1
                         break
+                    }
+                case "b":
+                    if (event.ctrlKey && event.key == "b") {
+                        add_fieldset()
                     }
                 default:
                     console.log(event)
@@ -238,6 +251,9 @@ function init_result(event) {
 }
 function init_download(event) {
     var append = document.querySelector("table.append.dir")
+    if (!append) {
+        return
+    }
     insert_before(append, "input", {
         "type": "button",
         "value": "root",
@@ -339,6 +355,9 @@ function init_download(event) {
 
 function init_context() {
     var append = document.querySelector("table.append.ctx")
+    if (!append) {
+        return
+    }
     var option = document.querySelector("form.option.ctx")
     insert_before(append, "input", {
         "type": "button",
@@ -355,6 +374,26 @@ function init_context() {
         "value": "shy",
         "onclick": function(event) {
             option["ctx"].value = "shy"
+            send_command(option)
+            context.Cookie("current_ctx", option["ctx"].value)
+            return true
+        }
+    })
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "aaa",
+        "onclick": function(event) {
+            option["ctx"].value = "aaa"
+            send_command(option)
+            context.Cookie("current_ctx", option["ctx"].value)
+            return true
+        }
+    })
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "web",
+        "onclick": function(event) {
+            option["ctx"].value = "web"
             send_command(option)
             context.Cookie("current_ctx", option["ctx"].value)
             return true
@@ -389,6 +428,9 @@ function init_context() {
 }
 function init_command() {
     var append = document.querySelector("table.append.command")
+    if (!append) {
+        return
+    }
     var option = document.querySelector("form.option.command")
     insert_before(append, "input", {
         "type": "button",
@@ -418,6 +460,44 @@ function init_command() {
     })
 }
 
+function init_userinfo() {
+    var append = document.querySelector("table.append.userinfo")
+    if (!append) {
+        return
+    }
+    var option = document.querySelector("form.option.userinfo")
+    return
+    insert_before(append, "input", {
+        "type": "button",
+        "value": "logout",
+        "onclick": function(event) {
+            context.Cookie("sessid", "")
+            location.reload()
+            return true
+        }
+    })
+}
+
+var ncommand = 3
+function add_fieldset() {
+    var name = "command"+ncommand++
+
+    var fieldset = append_child(document.querySelector("body"), "fieldset")
+    append_child(fieldset, "legend", {"innerText": name})
+
+    var option = append_child(fieldset, "form", {"className": "option "+name})
+    option.dataset["componet_group"] = "index"
+    option.dataset["componet_name"] = "command"
+    option.dataset["componet_name_alias"] = name
+    append_child(option, "input").style["display"] = "none"
+    append_child(option, "input", {"name": "cmd", "className": "cmd", "onkeyup": function(event){
+        onaction(event, "input")
+    }}).focus()
+
+    var append = append_child(fieldset, "table", {"className": "append "+name})
+    append_child(append_child(fieldset, "code", {"className": "result "+name}), "pre")
+}
+
 window.onload = function() {
     init_option()
     init_append()
@@ -425,4 +505,6 @@ window.onload = function() {
     init_download()
     init_context()
     init_command()
+    init_userinfo()
 }
+

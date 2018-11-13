@@ -1,7 +1,7 @@
 ~stdio
-    config load var/history.json history
+    config load history.json history
 ~code
-    config load var/counter.json counter
+    config load counter.json counter
 
 source etc/local.shy
 ~shy

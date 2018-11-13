@@ -125,7 +125,6 @@
     {{end}}
     <form class="option {{option .Meta "componet_name"}}"
           data-componet_group="{{option . "componet_group"|meta}}"
-          data-componet_order="{{option . "componet_order"|meta}}"
           data-componet_name="{{option . "componet_name"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
@@ -140,7 +139,7 @@
                       <label>{{index $input "label"}} : </label>
                   {{end}}
                   {{if eq $type "button"}}
-                      <input type="button" onclick="return onaction(event, 'command')" value="{{index $input "label"}}">
+                      <input type="button" onclick="return onaction(event, 'command')" value="{{index $input "value"}}">
                   {{else if eq $type "submit"}}
                       <input type="submit" value="{{index $input "value"}}">
                   {{else if eq $type "file"}}
@@ -157,6 +156,14 @@
                               {{end}}
                           {{end}}
                       </select>
+                  {{else if eq $type "password"}}
+                      <input
+                          type="password"
+                          name="{{index $input "name"}}"
+                          value="{{index $input "value"}}"
+                          class="{{index $input "class"}}"
+                          onclick="return onaction(event, 'click')"
+                          onkeyup="return onaction(event, 'input')">
                   {{else}}
                       <input
                           name="{{index $input "name"}}"
