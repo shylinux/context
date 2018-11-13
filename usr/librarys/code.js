@@ -108,11 +108,7 @@ function onaction(event, action) {
             }
             break
         case "command":
-            send_command(event.target.form, function() {
-                if (event.target.value == "login") {
-                    location.reload()
-                }
-            })
+            send_command(event.target.form, function() {})
             break
         case "input":
             switch (event.key) {

@@ -725,7 +725,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					login = m.Spawn().Cmd("session").Appendv("login").(*ctx.Message)
 				}
 				if login != nil {
-					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: login.Cap("sessid")})
+					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: login.Cap("sessid"), Path: "/"})
 				}
 
 				if !right && login != nil {

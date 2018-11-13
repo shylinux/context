@@ -19,8 +19,8 @@ func sysinfo(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 	m.Append("uptime", d)
 	m.Append("procs", sys.Procs)
 
-	m.Append("total", kit.FmtSize(sys.Totalram))
-	m.Append("free", kit.FmtSize(sys.Freeram))
+	m.Append("total", kit.FmtSize(uint64(sys.Totalram)))
+	m.Append("free", kit.FmtSize(uint64(sys.Freeram)))
 	m.Append("mper", fmt.Sprintf("%d%%", sys.Freeram*100/sys.Totalram))
 
 	fs := &syscall.Statfs_t{}
