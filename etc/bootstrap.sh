@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+bench=bin/bench.win64.exe
 [ `uname` = "Darwin" ] && bench=bin/bench.darwin
 [ `uname` = "Linux" ] && bench=bin/bench.linux64
 [ -e "$bench" ] || bench=bench

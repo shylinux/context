@@ -35,26 +35,27 @@ tar:
 	cp -r usr/librarys tar/usr
 	[ -e tar/var ] || mkdir tar/var
 
-tar_all: tar darwin linux64
+tar_all: tar linux64 darwin win64
 	cp etc/local.shy tar/etc/
 	cp etc/exit_local.shy tar/etc/
 	mv bench.darwin tar/bin/
 	mv bench.linux64 tar/bin/
+	mv bench.win64.exe tar/bin/
 	tar zcvf tar.tgz tar
 
 linux64:
-	GOARCH=amd64 GOOS=linux go build $(BENCH) -o bench.linux64
+	GOARCH=amd64 GOOS=linux go build -o bench.linux64 $(BENCH)
 linux32:
-	GOARCH=386 GOOS=linux go build $(BENCH) -o bench.linux32
+	GOARCH=386 GOOS=linux go build -o bench.linux32 $(BENCH)
 linux_arm:
-	GOARCH=arm GOOS=linux go build $(BENCH) -o bench.linux.arm
+	GOARCH=arm GOOS=linux go build -o bench.linux.arm $(BENCH)
 darwin:
-	GOARCH=amd64 GOOS=darwin go build $(BENCH) -o bench.darwin
+	GOARCH=amd64 GOOS=darwin go build -o bench.darwin $(BENCH)
 
 win64:
-	GOARCH=amd64 GOOS=windows go build $(BENCH) -o bench.win64.exe
+	GOARCH=amd64 GOOS=windows go build -o bench.win64.exe $(BENCH)
 win32:
-	GOARCH=386 GOOS=windows go build $(BENCH) -o bench.win32.exe
+	GOARCH=386 GOOS=windows go build -o bench.win32.exe $(BENCH)
 
 
 DOTS=etc/dotsfile

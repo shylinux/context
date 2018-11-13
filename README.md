@@ -3,12 +3,6 @@ context: 为代码提供自由的运行环境，干掉各种库依赖、包依�
 
 // TODO: 代码已重构多次，文档比较落后，近期会整理文档。
 
-// TODO: zsh tmux docker git vim
-
-// TODO: linux nginx python redis mysql
-
-// TODO: code wiki jira lark mall
-
 终端工具链，各种实用的功能模块，通过简洁的接口，自由的组合在一起。
 
 作为一个工具箱，内置各种实用工具，通过灵活的配置，打造个性化的工具链。
@@ -32,19 +26,21 @@ context: 为代码提供自由的运行环境，干掉各种库依赖、包依�
 
 ## 1 context安装
 ### 1.0 context程序下载
-选择自己操作系统与处理器的类型对应的版本下载，直接运行即可。
 
-https://github.com/shylinux/context-bin/raw/master/bench-linux-arm
+下载并解压: https://github.com/shylinux/context-tar/raw/master/tar.tgz
 
-https://github.com/shylinux/context-bin/raw/master/bench-linux-386
+#### 1.0.1 Linux
 
-https://github.com/shylinux/context-bin/raw/master/bench-linux-amd64
+./bootstrap.sh
 
-https://github.com/shylinux/context-bin/raw/master/bench-windows-386.exe
+#### 1.0.2 MacOSX
 
-https://github.com/shylinux/context-bin/raw/master/bench-windows-amd64.exe
+./bootstrap.sh
 
-https://github.com/shylinux/context-bin/raw/master/bench-darwin-amd64
+#### 1.0.3 Windows
+
+cp bin/bench.win64.exe .
+双击运行
 
 ### 1.1 context源码安装
 #### 1.1.0 golang安装
@@ -54,25 +50,19 @@ https://github.com/shylinux/context-bin/raw/master/bench-darwin-amd64
 * Linux安装 集成在了开发环境的安装包中，先安装好git即可
 
 #### 1.1.1 golang开发环境安装
-* 下载：git clone https://github.com/shylinux/context-dev
-* 安装：cd context-dev && ./install.sh
 
 #### 1.1.2 context源码安装
 * 下载：git clone https://github.com/shylinux/context
-* 编译：cd context && go install src/example/bench.go
+* 编译：cd context && make && make run
 
 ## 2 context使用
-### 2.0 应用示例--启动WEB服务器
 ```sh
-$ bench
-> ~web
-> serve ./ ':9090'
+$ ./bootstrap.sh
+0[00:13:47]ctx.cli.shy> 
 ```
-在shell中，运行命令bench，启动应用，进入到一个类似于shell的环境中。
+context启动后就像其它shell一样，解析并执行各种命令行。
 
-执行"~web"，切换到web模块，执行"serve ./ ':9090'"，在当前目录启动一个WEB服务器，监听地址为"0.0.0.0:9090"。
-
-打开浏览器输入"http://localhost:9090" ，即可看一个静态WEB服务器已经启动。
+context默认的启动脚本中，会开启WEB服务，可以用浏览器操作http://localhost:9094/code/。用户名root，密码root。
 
 #### 2.0.1 添加脚本
 bench支持脚本解析，可以添加启动脚本，这样就可以在启动的时候就运行一些命令，启动一些功能。
