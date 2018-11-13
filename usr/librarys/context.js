@@ -109,14 +109,16 @@ context = {
             }
 
             try {
-                var msg = JSON.parse(xhr.responseText||'{"result":[]}');
+                var msg = JSON.parse(xhr.responseText||'{"result":[]}')
             } catch (e) {
                 var msg = {"result": [xhr.responseText]}
             }
 
             console.log(msg)
-            msg.result && console.log(msg.result.join(""));
-            if (msg.page_redirect) {
+            msg.result && console.log(msg.result.join(""))
+            if (msg.download_file) {
+                window.open(msg.download_file.join(""))
+            } else if (msg.page_redirect) {
                 location.href = msg.page_redirect.join("")
             } else if (msg.page_refresh) {
                 location.reload()
@@ -139,6 +141,13 @@ function append_child(parent, element, html) {
     html && typeof html == "string" && (elm.innerHTML = html)
     if (typeof html == "object") {
         for (var k in html) {
+            if (typeof html[k] == "object") {
+                for (var d in html[k]) {
+                    elm[k][d] = html[k][d]
+                }
+                continue
+            }
+
             elm[k] = html[k]
         }
     }

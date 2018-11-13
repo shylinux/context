@@ -316,7 +316,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				for _, v := range exports {
-					m.Log("info", "export %v", v)
 					if v["file"] != "" {
 						m.Sess("nfs").Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
 					}

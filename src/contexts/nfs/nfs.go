@@ -69,7 +69,7 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 	}
 
 	m.Log("info", "open %s", name)
-	f, e := os.OpenFile(name, flag, os.ModePerm)
+	f, e := os.OpenFile(name, flag, 0660)
 	return name, f, e
 }
 func dir(m *ctx.Message, name string, level int, deep bool, trip int, fields []string) {
@@ -1075,13 +1075,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 				w.Flush()
 			default:
-				m.Log("fuck", "what ---%v", m.Meta)
 				for _, v := range m.Meta["result"] {
 					f.WriteString(v)
 				}
 			}
-			m.Log("fuck", "what ---%v", m.Meta)
-			m.Set("append").Set("result").Echo(name)
+			m.Set("append").Set("result").Add("append", "directory", name).Echo(name)
 		}},
 
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1167,6 +1165,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				p := path.Join(m.Confv("paths", 0).(string), arg[0])
 				qrcode.WriteFile(strings.Join(arg[1:], ""), qrcode.Medium, size, p)
 				m.Log("info", "genqr %s", p)
+				m.Append("directory", p)
 			}
 		}},
 

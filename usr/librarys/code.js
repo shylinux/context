@@ -9,6 +9,7 @@ function copy_to_clipboard(text) {
     insert_child(clipstack, "option").value = text
     clipstack.childElementCount > 3 && clipstack.removeChild(clipstack.lastElementChild)
 }
+
 function send_command(form, cb) {
     var data = {}
     for (var key in form.dataset) {
@@ -49,6 +50,7 @@ function send_command(form, cb) {
         typeof(cb) == "function" && cb(msg)
     })
 }
+
 function check_argument(form, target) {
     for (var i = 0; i < form.length-1; i++) {
         if (form[i] == target) {
@@ -62,6 +64,36 @@ function check_argument(form, target) {
     }
     send_command(form)
 }
+
+var ncommand = 3
+function add_fieldset() {
+    var name = "command"+ncommand++
+
+    var fieldset = append_child(document.querySelector("body"), "fieldset")
+    append_child(fieldset, "legend", {"innerText": name})
+
+    var option = append_child(fieldset, "form", {
+        "className": "option "+name,
+        "dataset": {
+            "componet_group": "index",
+            "componet_name": "command",
+            "componet_name_alias": name,
+            "componet_name_order": ncommand-1,
+        }
+    })
+
+    append_child(option, "input", {"style": {"display": "none"}})
+
+    append_child(option, "input", {
+        "name": "cmd",
+        "className": "cmd",
+        "onkeyup": function(event){onaction(event, "input")}
+    }).focus()
+
+    var append = append_child(fieldset, "table", {"className": "append "+name})
+    append_child(append_child(fieldset, "code", {"className": "result "+name}), "pre")
+}
+
 function onaction(event, action) {
     switch (action) {
         case "submit":
@@ -162,9 +194,39 @@ function onaction(event, action) {
                         event.target.dataset["history_last"] = history.length-1
                         break
                     }
-                case "b":
-                    if (event.ctrlKey && event.key == "b") {
+                case "v":
+                    if (event.ctrlKey && event.key == "v") {
                         add_fieldset()
+                    }
+                case "q":
+                    if (event.ctrlKey && event.key == "q") {
+                        var can_remove = false
+                        var order = -1
+                        for (var p = event.target; p.parentElement && p.tagName != "FIELDSET"; p = p.parentElement) {
+                            if (p.tagName == "FORM" && p.dataset["componet_name_alias"]) {
+                                can_remove = true
+                                order = p.dataset["componet_name_order"]
+                            }
+                        }
+                        if (p && can_remove) {
+                            p.parentElement.removeChild(p)
+                        }
+
+                        for (;order < ncommand; order++) {
+                            var input = document.querySelector("form.option.command"+order+" input[name=cmd]")
+                            if (input) {
+                                input.focus()
+                                return
+                            }
+                        }
+                        for (;order > 0; order--) {
+                            var input = document.querySelector("form.option.command"+order+" input[name=cmd]")
+                            if (input) {
+                                input.focus()
+                                ncommand = order+1
+                                return
+                            }
+                        }
                     }
                 default:
                     console.log(event)
@@ -204,6 +266,7 @@ function onaction(event, action) {
             break
     }
 }
+
 var inputs = {}
 var ninput = 0
 var keymap = ['a', 'b', 'c']
@@ -352,7 +415,6 @@ function init_download(event) {
         })
     }
 }
-
 function init_context() {
     var append = document.querySelector("table.append.ctx")
     if (!append) {
@@ -459,7 +521,6 @@ function init_command() {
         }
     })
 }
-
 function init_userinfo() {
     var append = document.querySelector("table.append.userinfo")
     if (!append) {
@@ -476,26 +537,6 @@ function init_userinfo() {
             return true
         }
     })
-}
-
-var ncommand = 3
-function add_fieldset() {
-    var name = "command"+ncommand++
-
-    var fieldset = append_child(document.querySelector("body"), "fieldset")
-    append_child(fieldset, "legend", {"innerText": name})
-
-    var option = append_child(fieldset, "form", {"className": "option "+name})
-    option.dataset["componet_group"] = "index"
-    option.dataset["componet_name"] = "command"
-    option.dataset["componet_name_alias"] = name
-    append_child(option, "input").style["display"] = "none"
-    append_child(option, "input", {"name": "cmd", "className": "cmd", "onkeyup": function(event){
-        onaction(event, "input")
-    }}).focus()
-
-    var append = append_child(fieldset, "table", {"className": "append "+name})
-    append_child(append_child(fieldset, "code", {"className": "result "+name}), "pre")
 }
 
 window.onload = function() {

@@ -18,11 +18,8 @@ install_all: install
 	touch etc/login.txt
 	touch etc/history.txt
 
-build:
-	go build $(BENCH)
-
 run:
-	etc/run.sh 2>var/error.log
+	etc/bootstrap.sh
 
 tar:
 	[ -e tar ] || mkdir tar
@@ -45,26 +42,19 @@ tar_all: tar darwin linux64
 	mv bench.linux64 tar/bin/
 	tar zcvf tar.tgz tar
 
+linux64:
+	GOARCH=amd64 GOOS=linux go build $(BENCH) -o bench.linux64
+linux32:
+	GOARCH=386 GOOS=linux go build $(BENCH) -o bench.linux32
+linux_arm:
+	GOARCH=arm GOOS=linux go build $(BENCH) -o bench.linux.arm
 darwin:
-	GOARCH=amd64 GOOS=darwin go build $(BENCH)
-	mv bench bench.darwin
+	GOARCH=amd64 GOOS=darwin go build $(BENCH) -o bench.darwin
 
 win64:
-	GOARCH=amd64 GOOS=windows go build $(BENCH)
-	mv bench.exe bench_1.0_win64.exe
+	GOARCH=amd64 GOOS=windows go build $(BENCH) -o bench.win64.exe
 win32:
-	GOARCH=386 GOOS=windows go build $(BENCH)
-	mv bench.exe bench_1.0_win32.exe
-
-linux64:
-	GOARCH=amd64 GOOS=linux go build $(BENCH)
-	mv bench bench.linux64
-linux32:
-	GOARCH=386 GOOS=linux go build $(BENCH)
-	mv bench bench_1.0_linux32
-linux_arm:
-	GOARCH=arm GOOS=linux go build $(BENCH)
-	mv bench bench_1.0_linux_arm
+	GOARCH=386 GOOS=windows go build $(BENCH) -o bench.win32.exe
 
 
 DOTS=etc/dotsfile
@@ -93,5 +83,5 @@ load_dotsfile:\
 ~/.vim/syntax/shy.vim: $(DOTS)/shy.vim
 	cp $< $@
 
-.PHONY: tar
+.PHONY: tar run
 

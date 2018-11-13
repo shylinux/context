@@ -230,10 +230,6 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		return true
 	})
 
-	if len(arg) == 0 {
-		return false
-	}
-
 	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: m.Confx("protocol", arg, 2), Help: "服务协议"}
 	web.Caches["address"] = &ctx.Cache{Name: "address", Value: m.Confx("address", arg, 1), Help: "服务地址"}
 	m.Log("info", "%d %s://%s", m.Capi("nserve", 1), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
@@ -825,7 +821,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 						if msg.Appends("directory") {
-							m.Append("page_redirect", fmt.Sprintf("/download/%s", msg.Append("directory")))
+							m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
 							return
 						}
 

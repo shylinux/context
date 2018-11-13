@@ -3,5 +3,15 @@
 ~code
     config load counter.json counter
 
+~aaa
+    login root root
+~find aaa.root
+    config right right.role root
+~aaa
+    login void void
+    right void owner login add from root
+    right void owner login add from root
+
 source etc/local.shy
+
 ~shy

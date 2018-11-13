@@ -4,5 +4,4 @@ source etc/exit_local.shy
     config save counter.json counter
 ~stdio
     config save history.json history
-return hello
 
