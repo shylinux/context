@@ -145,9 +145,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
 
 		"cmd_script": &ctx.Config{Name: "cmd_script", Value: map[string]interface{}{
-			"sh":  "bash",
-			"py":  "python",
-			"shy": "source",
+			"sh": "bash", "shy": "source", "py": "python",
 		}, Help: "系统命令超时"},
 
 		"source_list": &ctx.Config{Name: "source_list", Value: []interface{}{}, Help: "系统命令超时"},
@@ -311,7 +309,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if msg.Cmd(detail); msg.Hand {
 					m.Cap("ps_target", msg.Cap("module"))
 				} else {
-					msg.Copy(m, "target").Detail(-1, "system")
+					msg.Copy(m, "target").Copy(m, "result").Detail(-1, "system")
 					msg.Cmd()
 				}
 
@@ -336,7 +334,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				if len(rest) > 0 {
-					pipe := m.Spawn().Copy(msg, "option").Copy(msg, "append").Cmd("cmd", rest)
+					m.Log("fuck", "%v", msg.Meta)
+					pipe := m.Spawn().Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("cmd", rest)
 
 					msg.Set("result").Set("append")
 					msg.Copy(pipe, "result").Copy(pipe, "append")
@@ -757,6 +756,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
 			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				if len(m.Meta["result"]) > 0 {
+					for _, v := range m.Meta["result"] {
+						if strings.TrimSpace(v) != "" {
+							arg = append(arg, v)
+						}
+					}
+				}
+
 				conf := map[string]interface{}{}
 				if m.Confv("cmd_combine", arg[0]) != nil {
 					conf = m.Confv("cmd_combine", arg[0]).(map[string]interface{})

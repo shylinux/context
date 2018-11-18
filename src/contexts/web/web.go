@@ -282,7 +282,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				map[string]interface{}{"componet_name": "head", "template": "head"},
 				map[string]interface{}{"componet_name": "clipbaord", "componet_help": "clipbaord", "template": "clipboard"},
 				map[string]interface{}{"componet_name": "time", "componet_help": "time", "template": "componet",
-					"context": "cli", "componet_cmd": "time", "arguments": []interface{}{"@string"},
+					"componet_ctx": "cli", "componet_cmd": "time", "arguments": []interface{}{"@string"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "time_format",
 							"label": "format", "value": "2006-01-02 15:04:05",
@@ -615,7 +615,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Add("append", "order", i)
 						m.Add("append", "componet_name", value["componet_name"])
 						m.Add("append", "componet_help", value["componet_help"])
-						m.Add("append", "context", value["context"])
+						m.Add("append", "componet_ctx", value["componet_ctx"])
 						m.Add("append", "componet_cmd", value["componet_cmd"])
 					}
 				}
@@ -626,7 +626,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Add("append", "order", i)
 					m.Add("append", "componet_name", value["componet_name"])
 					m.Add("append", "componet_help", value["componet_help"])
-					m.Add("append", "context", value["context"])
+					m.Add("append", "componet_ctx", value["componet_ctx"])
 					m.Add("append", "componet_cmd", value["componet_cmd"])
 				}
 				m.Table()
@@ -644,7 +644,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				} else {
 					m.Confv("componet", []interface{}{arg[0], arg[1]}, map[string]interface{}{
 						"componet_name": arg[2], "componet_help": arg[3],
-						"context":      m.Confx("componet_context", arg, 4),
+						"componet_ctx": m.Confx("componet_context", arg, 4),
 						"componet_cmd": m.Confx("componet_command", arg, 5),
 					})
 					break
@@ -755,8 +755,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 						context := m.Cap("module")
-						if val["context"] != nil {
-							context = val["context"].(string)
+						if val["componet_ctx"] != nil {
+							context = val["componet_ctx"].(string)
 						}
 
 						msg := m.Find(context)

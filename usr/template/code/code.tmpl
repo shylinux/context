@@ -68,6 +68,7 @@
     }
     table.append {
         font-size:14px;
+        overflow: auto;
     }
     table.append th {
         font-family:monospace;
@@ -119,7 +120,7 @@
 {{end}}
 
 {{define "componet"}}
-<fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "context"}}.{{option .Meta "componet_cmd"}})</legend>
+<fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "componet_ctx"}}.{{option .Meta "componet_cmd"}})</legend>
     {{$form_type := option . "form_type"|meta}}
 
     {{if eq $form_type "upload"}}

@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -72,7 +73,7 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 	f, e := os.OpenFile(name, flag, 0660)
 	return name, f, e
 }
-func dir(m *ctx.Message, name string, level int, deep bool, trip int, fields []string) {
+func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, trip int, dir_reg *regexp.Regexp, fields []string, format string) {
 	back, e := os.Getwd()
 	m.Assert(e)
 	os.Chdir(name)
@@ -80,17 +81,16 @@ func dir(m *ctx.Message, name string, level int, deep bool, trip int, fields []s
 
 	if fs, e := ioutil.ReadDir("."); m.Assert(e) {
 		for _, f := range fs {
-			if f.Name()[0] == '.' {
+			if f.Name() == "." || f.Name() == ".." {
 				continue
 			}
 
 			f, _ := os.Stat(f.Name())
-			if !(m.Confx("dir_type") == "file" && f.IsDir() ||
-				m.Confx("dir_type") == "dir" && !f.IsDir()) {
+			if !(dir_type == "file" && f.IsDir() || dir_type == "dir" && !f.IsDir()) && (dir_reg == nil || dir_reg.MatchString(f.Name())) {
 				for _, field := range fields {
 					switch field {
 					case "time":
-						m.Add("append", "time", f.ModTime().Format(m.Conf("time_format")))
+						m.Add("append", "time", f.ModTime().Format(format))
 					case "type":
 						if m.Assert(e) && f.IsDir() {
 							m.Add("append", "type", "dir")
@@ -156,7 +156,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, trip int, fields []s
 				}
 			}
 			if f.IsDir() && deep {
-				dir(m, f.Name(), level+1, deep, trip, fields)
+				dir(m, f.Name(), level+1, deep, dir_type, trip, dir_reg, fields, format)
 			}
 		}
 	}
@@ -1169,9 +1169,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 		}},
 
-		"dir": &ctx.Command{Name: "dir dir [dir_type both|file|dir] [dir_name name|tree|path|full] [dir_deep] fields...",
-			Help: "查看目录, dir: 目录名, dir_type: 文件类型, dir_name: 文件名类型, dir_deep: 递归查询, fields: 查询字段",
-			Form: map[string]int{"dir_type": 1, "dir_name": 1, "dir_deep": 0, "dir_sort": 2},
+		"dir": &ctx.Command{Name: "dir dir [dir_type both|file|dir] [dir_deep] fields...",
+			Help: "查看目录, dir: 目录名, dir_type: 文件类型, dir_deep: 递归查询, fields: 查询字段",
+			Form: map[string]int{"dir_reg": 1, "dir_type": 1, "dir_deep": 0, "dir_sort": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				wd, e := os.Getwd()
 				m.Assert(e)
@@ -1185,11 +1185,15 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					dirs = path.Join(m.Option("dir_root"), dirs)
 				}
 
+				rg, e := regexp.Compile(m.Option("dir_reg"))
+
 				for _, v := range m.Confv("paths").([]interface{}) {
 					d := path.Join(v.(string), dirs)
 					if s, e := os.Stat(d); e == nil {
 						if s.IsDir() {
-							dir(m, d, 0, ctx.Right(m.Has("dir_deep")), trip, strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "))
+							dir(m, d, 0, ctx.Right(m.Has("dir_deep")), m.Confx("dir_type"), trip, rg,
+								strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "),
+								m.Conf("time_format"))
 						} else {
 							m.Append("directory", d)
 							return

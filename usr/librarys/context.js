@@ -94,7 +94,6 @@ context = {
 
         var arg = args.join("&");
         arg && (url += ((url.indexOf("?")>-1)? "&": "?") + arg)
-        console.log("GET: "+url);
 
         var xhr = new XMLHttpRequest();
         xhr.open("GET", url);
@@ -114,8 +113,6 @@ context = {
                 var msg = {"result": [xhr.responseText]}
             }
 
-            console.log(msg)
-            msg.result && console.log(msg.result.join(""))
             if (msg.download_file) {
                 window.open(msg.download_file.join(""))
             } else if (msg.page_redirect) {
@@ -130,38 +127,48 @@ context = {
 }
 
 context.isMobile = navigator.userAgent.indexOf("Mobile") > -1
+context.scroll_by = window.innerHeight/2
 
-function insert_child(parent, element, html, position) {
-    var elm = document.createElement(element)
-    html && (elm.innerHTML = html)
-    return parent.insertBefore(elm, position || parent.firstElementChild)
-}
-function append_child(parent, element, html) {
-    var elm = document.createElement(element)
-    html && typeof html == "string" && (elm.innerHTML = html)
-    if (typeof html == "object") {
+function modify_node(which, html) {
+    var node = which
+    if (typeof which == "string") {
+        node = document.querySelector(which)
+    }
+
+    html && typeof html == "string" && (node.innerHTML = html)
+    if (html && typeof html == "object") {
         for (var k in html) {
             if (typeof html[k] == "object") {
                 for (var d in html[k]) {
-                    elm[k][d] = html[k][d]
+                    node[k][d] = html[k][d]
                 }
                 continue
             }
-
-            elm[k] = html[k]
+            node[k] = html[k]
         }
     }
+    return node
+}
+function create_node(element, html) {
+    var node = document.createElement(element)
+    return modify_node(node, html)
+}
+
+function insert_child(parent, element, html, position) {
+    var elm = create_node(element, html)
+    return parent.insertBefore(elm, position || parent.firstElementChild)
+}
+function append_child(parent, element, html) {
+    var elm = create_node(element, html)
     parent.append(elm)
     return elm
 }
 function insert_before(self, element, html) {
-    var elm = document.createElement(element)
-    html && typeof html == "string" && (elm.innerHTML = html)
-    if (typeof html == "object") {
-        for (var k in html) {
-            elm[k] = html[k]
-        }
-    }
+    var elm = create_node(element, html)
     return self.parentElement.insertBefore(elm, self)
 }
-
+function insert_button(which, value, callback) {
+    insert_before(which, "input", {
+        "type": "button", "value": value, "onclick": callback,
+    })
+}
