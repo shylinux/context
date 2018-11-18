@@ -3223,6 +3223,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			Form: map[string]int{"parse": 2, "group": 1, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "trans_map": 3, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 				msg := m.Spawn()
+				m.Set("result")
 
 				nrow := len(m.Meta[m.Meta["append"][0]])
 				for i := 0; i < nrow; i++ {

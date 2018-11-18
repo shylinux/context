@@ -334,7 +334,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				if len(rest) > 0 {
-					m.Log("fuck", "%v", msg.Meta)
 					pipe := m.Spawn().Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("cmd", rest)
 
 					msg.Set("result").Set("append")
@@ -342,7 +341,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
-				m.Copy(msg, "result").Copy(msg, "append")
+				m.Set("append").Set("result").Copy(msg, "append").Copy(msg, "result")
 				// m.Capi("last_msg", 0, msg.Code())
 				// m.Capi("ps_count", 1)
 			}
