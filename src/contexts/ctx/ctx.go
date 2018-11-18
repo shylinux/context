@@ -2908,7 +2908,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 								m.Add("append", "res", msg.Result(0))
 							} else {
 								m.Add("append", "index", i)
-								m.Add("append", "command", fmt.Sprintf("%s: %s", c.Help, strings.Replace(c.Name, "\n", "\\n", -1)))
+								m.Add("append", "help", fmt.Sprintf("%s", c.Help))
+								m.Add("append", "command", fmt.Sprintf("%s", strings.Replace(c.Name, "\n", "\\n", -1)))
 							}
 						}
 					}
@@ -2935,17 +2936,19 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.target.Commands[m.Cap("list_count")] = &Command{Name: strings.Join(arg, " "), Help: list_help, Hand: func(cmd *Message, c *Context, key string, args ...string) {
 						list := []string{}
 						for _, v := range arg {
-							if v == "_" {
-								if len(args) > 0 {
-									v, args = args[0], args[1:]
-								} else {
-									v = "''"
-								}
-							} else if v == "__" {
+							if v == "__" {
 								if len(args) > 0 {
 									v, args = args[0], args[1:]
 								} else {
 									continue
+								}
+							} else if strings.HasPrefix(v, "_") {
+								if len(args) > 0 {
+									v, args = args[0], args[1:]
+								} else if len(v) > 1 {
+									v = v[1:]
+								} else {
+									v = "''"
 								}
 							}
 							list = append(list, v)
