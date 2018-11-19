@@ -840,7 +840,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"git_path":     &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
 		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff log", Help: "命令集合"},
 
-		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", ""}, Help: "文件路径"},
+		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", ""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

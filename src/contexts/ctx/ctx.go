@@ -3231,7 +3231,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						for _, k := range m.Meta["append"] {
 							if m.Has("parse") && m.Option("parse") == k {
 								var value interface{}
-								m.Assert(json.Unmarshal([]byte(m.Meta[k][i]), &value))
+								json.Unmarshal([]byte(m.Meta[k][i]), &value)
 								if m.Meta["parse"][1] != "" {
 									value = Chain(m, value, m.Meta["parse"][1])
 								}
@@ -3241,8 +3241,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 									for k, v := range val {
 										msg.Add("append", k, v)
 									}
-								case []interface{}:
+								case nil:
+									msg.Add("append", m.Meta["parse"][1], "")
 								default:
+									msg.Add("append", m.Meta["parse"][1], fmt.Sprintf("%v", val))
 								}
 							} else {
 								msg.Add("append", k, m.Meta[k][i])
