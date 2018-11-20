@@ -17,6 +17,10 @@ import (
 	"time"
 )
 
+type LOGGER interface {
+	LOG(*Message, string, string)
+}
+
 func Right(arg interface{}) bool {
 	switch str := arg.(type) {
 	case nil:
@@ -600,13 +604,11 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message {
 	return m
 }
 func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
-	l := m.Sess("log", !m.Confs("compact_log"))
-	if l == nil || m.Detail(0) == "log" || m.Detail(0) == "write" || m.Options("silent") {
-		return m
+	if l := m.Sess("log", false); l != nil {
+		if log, ok := l.target.Server.(LOGGER); ok {
+			log.LOG(m, action, fmt.Sprintf(str, arg...))
+		}
 	}
-
-	l.Optionv("msg", m)
-	l.Cmd("log", action, fmt.Sprintf(str, arg...))
 	return m
 }
 

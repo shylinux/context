@@ -484,7 +484,7 @@ function init_download(event) {
         if ((dir.endsWith(".sh") || dir.endsWith(".shy") || dir.endsWith(".py")) && !show) {
             var command = document.querySelector("form.option.command")
             var cmd = command["cmd"]
-            cmd.value = "run "+ dir
+            cmd.value = "run "+ dir.split("/").pop()
             cmd.focus()
             if (run) {
                 check_option(command)

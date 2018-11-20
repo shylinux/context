@@ -148,26 +148,28 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if index {
 		m.Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
+		wd, _ := os.Getwd()
+		m.Log("info", "wd: %s", wd)
 	}
-	if index && m.Confs("logheaders") {
-		for k, v := range r.Header {
-			m.Log("info", "%s: %v", k, v)
-		}
-		m.Log("info", "")
-	}
-
-	if r.URL.Path == "/" && m.Confs("root_index") {
-		r.URL.Path = m.Conf("root_index")
-	}
-
+	// if index && m.Confs("logheaders") {
+	// 	for k, v := range r.Header {
+	// 		m.Log("info", "%s: %v", k, v)
+	// 	}
+	// 	m.Log("info", "")
+	// }
+	//
+	// if r.URL.Path == "/" && m.Confs("root_index") {
+	// 	r.URL.Path = m.Conf("root_index")
+	// }
+	//
 	web.ServeMux.ServeHTTP(w, r)
 
-	if index && m.Confs("logheaders") {
-		for k, v := range w.Header() {
-			m.Log("info", "%s: %v", k, v)
-		}
-		m.Log("info", "")
-	}
+	// if index && m.Confs("logheaders") {
+	// 	for k, v := range w.Header() {
+	// 		m.Log("info", "%s: %v", k, v)
+	// 	}
+	// 	m.Log("info", "")
+	// }
 }
 
 func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
@@ -272,6 +274,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"cert":            &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":             &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
 
+		"library_dir":      &ctx.Config{Name: "library_dir", Value: "usr/librarys", Help: "模板路径"},
 		"template_dir":     &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板路径"},
 		"template_debug":   &ctx.Config{Name: "template_debug", Value: "true", Help: "模板调试"},
 		"componet_context": &ctx.Config{Name: "component_context", Value: "nfs", Help: "默认模块"},

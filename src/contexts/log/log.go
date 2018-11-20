@@ -13,6 +13,31 @@ type LOG struct {
 	*ctx.Context
 }
 
+func (log *LOG) LOG(msg *ctx.Message, action string, str string) {
+	m := log.Context.Message()
+
+	if m.Confs("silent", action) {
+		return
+	}
+	if m.Confs("module", fmt.Sprintf("%s.%s", msg.Target().Name, action)) {
+		return
+	}
+
+	color := 0
+	if m.Confs("flag_color") && m.Confs("color", action) {
+		color = m.Confi("color", action)
+	}
+
+	date := time.Now().Format(m.Conf("flag_time"))
+	action = fmt.Sprintf("%d %s(%s->%s)", msg.Code(), action, msg.Source().Name, msg.Target().Name)
+
+	if color > 0 {
+		log.out.WriteString(fmt.Sprintf("%s\033[%dm%s %s\033[0m\n", date, color, action, str))
+	} else {
+		log.out.WriteString(fmt.Sprintf("%s%s %s\n", date, action, str))
+	}
+}
+
 func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{}
 	c.Configs = map[string]*ctx.Config{}
