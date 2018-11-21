@@ -7,6 +7,8 @@ var code = {
     ncommand: 1,
     show_result: true,
     show_height: "30px",
+    scroll_x: 50,
+    scroll_y: 50,
 }
 
 function copy_to_clipboard(text) {
@@ -225,6 +227,53 @@ function onaction(event, action) {
     var dataset = target.dataset
 
     switch (action) {
+        case "scroll":
+            var body = document.getElementsByTagName("body")[0]
+            if (target.tagName == "BODY") {
+                switch (event.key) {
+                    case "h":
+                        if (event.ctrlKey) {
+                            window.scrollBy(-code.scroll_x*10, 0)
+                        } else {
+                            window.scrollBy(-code.scroll_x, 0)
+                        }
+                        break
+                    case "H":
+                        window.scrollBy(-body.scrollWidth, 0)
+                        break
+                    case "l":
+                        if (event.ctrlKey) {
+                            window.scrollBy(code.scroll_x*10, 0)
+                        } else {
+                            window.scrollBy(code.scroll_x, 0)
+                        }
+                        break
+                    case "L":
+                        window.scrollBy(body.scrollWidth, 0)
+                        break
+                    case "j":
+                        if (event.ctrlKey) {
+                            window.scrollBy(0, code.scroll_y*10)
+                        } else {
+                            window.scrollBy(0, code.scroll_y)
+                        }
+                        break
+                    case "J":
+                        window.scrollBy(0, body.scrollHeight)
+                        break
+                    case "k":
+                        if (event.ctrlKey) {
+                            window.scrollBy(0, -code.scroll_y*10)
+                        } else {
+                            window.scrollBy(0, -code.scroll_y)
+                        }
+                        break
+                    case "K":
+                        window.scrollBy(0, -body.scrollHeight)
+                        break
+                }
+            }
+            return
         case "keymap":
             if (target.tagName == "INPUT" && target.type == "text") {
                 return
@@ -236,12 +285,6 @@ function onaction(event, action) {
                         item.className = code.showmap? "keymap show": "keymap hide"
                     })
                     break
-                case "j":
-                    window.scrollBy(0, context.scroll_by)
-                    break
-                case "k":
-                    window.scrollBy(0, -context.scroll_by)
-                    break
                 case "m":
                     add_command()
                     break
@@ -249,10 +292,10 @@ function onaction(event, action) {
                     code.show_result = !code.show_result
                     document.querySelectorAll("form.option input[name=cmd]").forEach(function(input) {
                         for (var command = input; command.tagName != "FIELDSET"; command = command.parentElement) {}
-                        var result = command.querySelector("code.result pre")
                         var append = command.querySelector("table.append")
+                        var result = command.querySelector("code.result pre")
+                        // append.style.display = (code.show_result||!append.querySelector("tr"))? "": "none"
                         result.style.height = (code.show_result||result.innerText=="")? "": code.show_height
-                        append.style.display = (code.show_result||!append.querySelector("tr"))? "": "none"
                     })
                     break
                 case "0":
@@ -367,13 +410,11 @@ function onaction(event, action) {
                         result.innerHTML = ""
                         break
                     case "z":
-                        append.style.display = (result.style.height||!append.querySelector("tr"))? "": "none"
+                        // append.style.display = (result.style.height||!append.querySelector("tr"))? "": "none"
                         result.style.height = result.style.height? "": code.show_height
                         break
                     case "x":
-                        target.value = ""
-                        append.innerHTML = ""
-                        result.innerHTML = ""
+                        result.style.height = result.style.height? "": "1px"
                         break
                     case "s":
                         copy_to_clipboard(result.innerText)
@@ -457,6 +498,8 @@ function init_option() {
             case "g".charCodeAt(0):
             case "j".charCodeAt(0):
             case "k".charCodeAt(0):
+            case "h".charCodeAt(0):
+            case "l".charCodeAt(0):
             case "z".charCodeAt(0):
             case "m".charCodeAt(0):
                 continue

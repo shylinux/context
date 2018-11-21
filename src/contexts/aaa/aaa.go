@@ -107,7 +107,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"nuser": &ctx.Cache{Name: "nuser", Value: "0", Help: "用户数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"expire": &ctx.Config{Name: "expire(s)", Value: "7200", Help: "会话超时"},
+		"expire": &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
 		"cert":   &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
 		"pub":    &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
 		"key":    &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
