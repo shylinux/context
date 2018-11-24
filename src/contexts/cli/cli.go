@@ -640,6 +640,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 		}},
 		"run": &ctx.Command{Name: "run", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) == 0 {
+				name := path.Join(m.Option("dir_root"), m.Option("download_dir"))
+				msg := m.Sess("nfs").Add("option", "dir_reg", ".*\\.(sh|shy|py)$").Add("option", "dir_root", "").Cmd("dir", name)
+				m.Copy(msg, "append").Copy(msg, "result")
+				return
+			}
+
 			name := path.Join(m.Option("dir_root"), m.Option("download_dir"), arg[0])
 			msg := m.Spawn(c).Cmd("cmd", name, arg[1:])
 			m.Copy(msg, "append").Copy(msg, "result")

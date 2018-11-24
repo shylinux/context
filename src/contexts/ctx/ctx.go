@@ -2560,6 +2560,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				for _, k := range msg.Meta["option"] {
 					if len(arg) == 0 {
 						m.Add("append", "key", k)
+						m.Add("append", "len", len(msg.Meta[k]))
 						m.Add("append", "value", fmt.Sprintf("%v", msg.Meta[k]))
 						continue
 					}
