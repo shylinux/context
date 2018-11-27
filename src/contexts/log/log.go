@@ -19,6 +19,9 @@ func (log *LOG) LOG(msg *ctx.Message, action string, str string) {
 	if m.Confs("silent", action) {
 		return
 	}
+	if msg.Target() == nil {
+		return
+	}
 	if m.Confs("module", fmt.Sprintf("%s.%s", msg.Target().Name, action)) {
 		return
 	}

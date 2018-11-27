@@ -89,6 +89,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"path": []string{"nfs.path"},
 		"dir":  []string{"nfs.dir"},
 		"git":  []string{"nfs.git"},
+		"brow": []string{"web.brow"},
 	}
 
 	return s
@@ -623,7 +624,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if m.Options("current_ctx") {
 					args := []string{"context", m.Option("current_ctx")}
 					arg = append(args, arg...)
+					m.Option("current_ctx", "")
+				} else {
+					args := []string{"context", m.Source().Name}
+					arg = append(args, arg...)
 				}
+
 				m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
 					switch msg.Cmd().Detail(0) {
 					case "cmd":

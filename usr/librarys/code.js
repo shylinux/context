@@ -97,7 +97,11 @@ function send_command(form, cb) {
         var append = document.querySelector("table.append."+name)
 
         if (result && msg) {
-            result.innerHTML = (msg.result || []).join("")
+            if (msg["Content-Type"] && msg["Content-Type"].join("") == "text/html") {
+                append_child(result, "iframe").innerHTML = (msg.result || []).join("")
+            } else {
+                result.innerHTML = (msg.result || []).join("")
+            }
         }
         if (append && msg) {
             append.innerHTML = ""

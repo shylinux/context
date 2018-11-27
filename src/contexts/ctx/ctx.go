@@ -775,6 +775,9 @@ func (m *Message) Search(key string, root ...bool) []*Message {
 	m.Assert(e)
 
 	target := m.target
+	if target == nil {
+		return []*Message{nil}
+	}
 	if len(root) > 0 && root[0] {
 		target = m.target.root
 	}
