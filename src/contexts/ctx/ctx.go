@@ -3203,7 +3203,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					switch value := v.(type) {
 					case map[string]interface{}:
 						for k, v := range value {
-							m.Add("append", k, fmt.Sprintf("%v", v))
+							switch value := v.(type) {
+							case float64:
+								m.Add("append", k, fmt.Sprintf("%d", int(value)))
+							default:
+								m.Add("append", k, fmt.Sprintf("%v", value))
+							}
 						}
 					default:
 						m.Add("append", "index", i)
@@ -3231,6 +3236,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				msg := m.Spawn()
 				m.Set("result")
 
+				// 筛选与解析
 				nrow := len(m.Meta[m.Meta["append"][0]])
 				for i := 0; i < nrow; i++ {
 					if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
@@ -3259,10 +3265,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				}
 
+				// 聚合
 				if m.Set("append"); m.Has("group") {
-
 					group := m.Option("group")
-
 					nrow := len(msg.Meta[msg.Meta["append"][0]])
 
 					for i := 0; i < nrow; i++ {
@@ -3313,10 +3318,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Copy(msg, "append")
 				}
 
+				// 排序
 				if m.Has("order") {
 					m.Sort(m.Meta["order"][1], m.Option("order"))
 				}
 
+				// 分页
 				offset := 0
 				limit := m.Confi("page_limit")
 				if m.Has("limit") {
@@ -3336,12 +3343,24 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Meta[k] = m.Meta[k][offset : offset+limit]
 				}
 
+				// 值转换
+				for i := 0; i < len(m.Meta["trans_map"]); i += 3 {
+					trans := m.Meta["trans_map"][i:]
+					for j := 0; j < len(m.Meta[trans[0]]); j++ {
+						if m.Meta[trans[0]][j] == trans[1] {
+							m.Meta[trans[0]][j] = trans[2]
+						}
+					}
+				}
+
+				// 选择列
 				if m.Option("fields") != "" {
 					msg = m.Spawn()
 					msg.Copy(m, "append", strings.Split(m.Option("fields"), " ")...)
 					m.Set("append").Copy(msg, "append")
 				}
 
+				// 格式化
 				for i := 0; i < len(m.Meta["format"])-1; i += 2 {
 					format := m.Meta["format"]
 					for j, v := range m.Meta[format[i]] {
@@ -3349,6 +3368,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				}
 
+				// 变换列
 				if m.Has("vertical") {
 					msg := m.Spawn()
 					nrow := len(m.Meta[m.Meta["append"][0]])
@@ -3366,6 +3386,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Set("append").Copy(msg, "append")
 				}
 
+				// 取单值
 				if len(arg) > 2 {
 					if len(m.Meta[arg[2]]) > 0 {
 						m.Echo(m.Meta[arg[2]][0])

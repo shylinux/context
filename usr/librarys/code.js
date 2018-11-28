@@ -7,6 +7,7 @@ var code = {
     ncommand: 1,
     show_result: true,
     show_height: "30px",
+    hide_height: "14px",
     scroll_x: 50,
     scroll_y: 50,
 }
@@ -45,7 +46,7 @@ function add_sort(append, field, cb) {
                     sort_table(append, i, dataset["sort_asc"] == "1")
                 } else if (target.tagName == "TD") {
                     var tr = target.parentElement.parentElement.querySelector("tr")
-                    if (tr.childNodes[i].innerText == field) {
+                    if (tr.childNodes[i].innerText.startsWith(field)) {
                         typeof cb == "function" && cb(event)
                     }
                     copy_to_clipboard(target.innerText)
@@ -107,8 +108,8 @@ function send_command(form, cb) {
             append.innerHTML = ""
             if (msg.append) {
                 var tr = append_child(append, "tr")
-                for (var i in msg.append) {
-                    append_child(tr, "th", msg.append[i])
+                for (var i = 0; i < msg.append.length; i++) {
+                    append_child(tr, "th", msg.append[i]+"("+(i+1)+")")
                 }
 
                 var ncol = msg.append.length
@@ -351,6 +352,25 @@ function onaction(event, action) {
                 var result = command.querySelector("code.result pre")
 // yt
                 switch (event.key) {
+                    case "1":
+                    case "2":
+                    case "3":
+                    case "4":
+                    case "5":
+                    case "6":
+                    case "7":
+                    case "8":
+                    case "9":
+                        var item = document.querySelectorAll("table.append.command"+(parseInt(option.dataset.componet_name_order)-1)+" td")
+                        if (event.shiftKey) {
+                            var item = document.querySelectorAll("table.append.command1 td")
+                        }
+                        target.value += item[parseInt(event.key)-1].innerText
+                        break
+                    case "0":
+                        var pre_pre = document.querySelector("code.result.command"+(parseInt(option.dataset.componet_name_order)-1)+" pre")
+                        target.value += pre_pre.innerText
+                        break
                     case "a":
                     case "e":
                     case "b":
@@ -418,7 +438,7 @@ function onaction(event, action) {
                         result.style.height = result.style.height? "": code.show_height
                         break
                     case "x":
-                        result.style.height = result.style.height? "": "1px"
+                        result.style.height = result.style.height? "": code.hide_height
                         break
                     case "s":
                         copy_to_clipboard(result.innerText)
