@@ -249,7 +249,7 @@ func (nfs *NFS) prompt(arg ...string) string {
 		rest = arg[1]
 	}
 
-	if !nfs.Caps("windows") && len(nfs.pages) > 0 {
+	if !nfs.Caps("windows") && len(nfs.pages) > 0 && nfs.width > 0 {
 		for i := (len(nfs.pages[len(nfs.pages)-1]) - 1) / (nfs.width); i > 0; i-- {
 			nfs.escape("2K").escape("A")
 		}
@@ -359,7 +359,7 @@ func (nfs *NFS) View(buf []string, top int, height int) {
 	}
 }
 func (nfs *NFS) Read(p []byte) (n int, err error) {
-	if nfs.Caps("windows") || !nfs.Caps("termbox") {
+	if nfs.Caps("windows") || !nfs.Caps("termbox") || nfs.Confs("term_simple") {
 		return nfs.in.Read(p)
 	}
 
@@ -809,7 +809,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"nfile": &ctx.Cache{Name: "nfile", Value: "-1", Help: "已经打开的文件数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"qr_size": &ctx.Config{Name: "qr_size", Value: "256", Help: "二维码的默认大小"},
+		"term_simple": &ctx.Config{Name: "term_simple", Value: "false", Help: "二维码的默认大小"},
+		"qr_size":     &ctx.Config{Name: "qr_size", Value: "256", Help: "二维码的默认大小"},
 
 		"pscolor": &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"},
 		"nfs_name": &ctx.Config{Name: "nfs_name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
