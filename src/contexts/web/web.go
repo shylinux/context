@@ -5,7 +5,7 @@ import (
 	"contexts/ctx"
 	"encoding/json"
 	"fmt"
-	// "github.com/PuerkitoBio/goquery"
+	"github.com/PuerkitoBio/goquery"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -35,7 +35,16 @@ type WEB struct {
 	*ctx.Context
 }
 
-func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string {
+func proxy(m *ctx.Message, url string) string {
+	if strings.HasPrefix(url, "//") {
+		return "proxy/https:" + url
+	}
+
+	return "proxy/" + url
+}
+func Merge(m *ctx.Message, uri string, arg ...string) string {
+	uri = strings.Replace(uri, ":/", "://", -1)
+	uri = strings.Replace(uri, ":///", "://", -1)
 	add, e := url.Parse(uri)
 	m.Assert(e)
 	adds := []string{m.Confx("protocol", add.Scheme, "%s://"), m.Confx("hostname", add.Host)}
@@ -77,6 +86,7 @@ func (web *WEB) Merge(m *ctx.Message, uri string, arg ...string) string {
 
 	return strings.Join(adds, "")
 }
+
 func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		m.TryCatch(m.Spawn(), true, func(msg *ctx.Message) {
@@ -148,8 +158,6 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if index {
 		m.Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
-		wd, _ := os.Getwd()
-		m.Log("info", "wd: %s", wd)
 	}
 	if index && m.Confs("logheaders") {
 		for k, v := range r.Header {
@@ -200,6 +208,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	m.Cap("directory", m.Confx("directory", arg, 0))
 
 	render := m.Target().Commands["/render"]
+	proxy := m.Target().Commands["/proxy/"]
 
 	m.Travel(func(m *ctx.Message, i int) bool {
 		if h, ok := m.Target().Server.(MUX); ok && m.Cap("register") == "no" {
@@ -213,6 +222,9 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 
 			if m.Target().Commands["/render"] == nil {
 				m.Target().Commands["/render"] = render
+			}
+			if m.Target().Commands["/proxy/"] == nil {
+				m.Target().Commands["/proxy/"] = proxy
 			}
 
 			msg := m.Target().Message()
@@ -361,7 +373,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					method := m.Confx("method")
-					uri := web.Merge(m, arg[0], arg[1:]...)
+					uri := Merge(m, arg[0], arg[1:]...)
 					body, _ := m.Optionv("body").(io.Reader)
 
 					if method == "POST" && body == nil {
@@ -402,20 +414,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						return
 					}
 					m.Assert(e)
+					for k, v := range res.Header {
+						m.Log("info", "%s: %v", k, v)
+					}
 
 					for _, v := range res.Cookies() {
 						m.Confv("cookie", v.Name, v)
 						m.Log("info", "set-cookie %s: %v", v.Name, v.Value)
 					}
 
-					buf, e := ioutil.ReadAll(res.Body)
-					m.Assert(e)
-
 					var result interface{}
 					ct := res.Header.Get("Content-Type")
+
 					switch {
 					case strings.HasPrefix(ct, "application/json"):
-						json.Unmarshal(buf, &result)
+						json.NewDecoder(res.Body).Decode(&result)
 						if m.Has("parse") {
 							msg := m.Spawn()
 							msg.Put("option", "response", result)
@@ -424,9 +437,56 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							m.Copy(msg, "result")
 							return
 						}
+					case strings.HasPrefix(ct, "text/html"):
+						html, e := goquery.NewDocumentFromReader(res.Body)
+						m.Assert(e)
+						query := html.Find("html")
+						if m.Has("parse") {
+							query = query.Find(m.Option("parse"))
+						}
+
+						query.Each(func(n int, s *goquery.Selection) {
+							s.Find("a").Each(func(n int, s *goquery.Selection) {
+								if attr, ok := s.Attr("href"); ok {
+									s.SetAttr("href", proxy(m, attr))
+								}
+							})
+							s.Find("img").Each(func(n int, s *goquery.Selection) {
+								if attr, ok := s.Attr("src"); ok {
+									s.SetAttr("src", proxy(m, attr))
+								}
+								if attr, ok := s.Attr("r-lazyload"); ok {
+									s.SetAttr("src", proxy(m, attr))
+								}
+							})
+							s.Find("script").Each(func(n int, s *goquery.Selection) {
+								if attr, ok := s.Attr("src"); ok {
+									s.SetAttr("src", proxy(m, attr))
+								}
+							})
+							if html, e := s.Html(); e == nil {
+								m.Add("append", "html", html)
+							}
+						})
+					default:
+						if w, ok := m.Optionv("response").(http.ResponseWriter); ok {
+							header := w.Header()
+							for k, v := range res.Header {
+								header.Add(k, v[0])
+							}
+							io.Copy(w, res.Body)
+							return
+						} else {
+							buf, e := ioutil.ReadAll(res.Body)
+							m.Assert(e)
+
+							m.Append("Content-Type", ct)
+							result = string(buf)
+						}
+
 					}
 					m.Target().Configs[m.Confx("body_response")] = &ctx.Config{Value: result}
-					m.Echo(string(buf))
+					m.Echo("%v", result)
 				}
 			}},
 		"post": &ctx.Command{Name: "post [file fieldname filename]", Help: "post请求",
@@ -441,6 +501,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					buf := &bytes.Buffer{}
 					writer := multipart.NewWriter(buf)
 					writer.SetBoundary(fmt.Sprintf("\r\n--%s--\r\n", writer.Boundary()))
+					part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+					m.Assert(e)
 
 					for i := 1; i < len(arg)-1; i += 2 {
 						value := arg[i+1]
@@ -454,10 +516,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 						writer.WriteField(arg[i], value)
 					}
-					part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
-					m.Assert(e)
-					io.Copy(part, file)
 
+					io.Copy(part, file)
 					writer.Close()
 					msg.Optionv("body", buf)
 					msg.Option("content_type", writer.FormDataContentType())
@@ -503,6 +563,39 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Copy(msg, "result").Copy(msg, "append")
 			}},
 		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if _, ok := m.Optionv("request").(*http.Request); ok {
+				action := false
+				m.Travel(func(m *ctx.Message, i int) bool {
+					for key, v := range m.Target().Commands {
+						method, url := "", ""
+						if strings.HasPrefix(v.Name, "get ") {
+							method, url = "get", strings.TrimPrefix(v.Name, "get ")
+						} else if strings.HasPrefix(v.Name, "post ") {
+							method, url = "post", strings.TrimPrefix(v.Name, "post ")
+						} else {
+							continue
+						}
+
+						if len(arg) == 0 {
+							m.Add("append", "method", method)
+							m.Add("append", "request", url)
+						} else if strings.HasPrefix(url, arg[0]) {
+							msg := m.Spawn().Cmd(key, arg[1:])
+							m.Copy(msg, "append").Copy(msg, "result")
+							action = true
+							return false
+						}
+					}
+					return true
+				})
+
+				if !action {
+					msg := m.Spawn().Cmd("get", arg)
+					m.Copy(msg, "append").Copy(msg, "result")
+				}
+				return
+			}
+
 			url := m.Confx("brow_home", arg, 0)
 			switch runtime.GOOS {
 			case "windows":
@@ -839,6 +932,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					en.Encode(list)
 				}
 			}
+		}},
+		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Log("fuck", "what %v", key)
+			msg := m.Spawn().Cmd("get", strings.TrimPrefix(key, "/proxy/"), arg)
+			m.Copy(msg, "append").Copy(msg, "result")
 		}},
 	},
 }
