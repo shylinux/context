@@ -6,6 +6,7 @@ install:
 	@go get github.com/nsf/termbox-go
 	@go get github.com/skip2/go-qrcode
 	@go get github.com/gomarkdown/markdown
+	@go get github.com/PuerkitoBio/goquery
 	go install $(BENCH)
 	@date
 	# bench web.code.counter nmake 1
@@ -20,6 +21,10 @@ install_all: install
 
 run:
 	etc/bootstrap.sh
+shy:
+	cp -r src/ ~/shycontext/
+	cp -r usr/template/ ~/shycontext/usr/
+	cp -r usr/librarys/ ~/shycontext/usr/
 
 tar:
 	[ -e tar ] || mkdir tar
