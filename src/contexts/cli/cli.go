@@ -227,7 +227,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				msg := m
 				for k, v := range m.Confv("cmd_script").(map[string]interface{}) {
 					if strings.HasSuffix(detail[0], "."+k) {
-						detail[0] = m.Sess("nfs").Cmd("path", detail[0]).Result(0)
 						detail = append([]string{v.(string)}, detail...)
 						msg = m.Spawn(cli.target)
 						break
