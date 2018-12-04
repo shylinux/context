@@ -2279,9 +2279,10 @@ var CGI = template.FuncMap{
 var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
 var Index = &Context{Name: "ctx", Help: "模块中心",
 	Caches: map[string]*Cache{
-		"nserver":  &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
-		"ncontext": &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
-		"nmessage": &Cache{Name: "nmessage", Value: "0", Help: "消息数量"},
+		"begin_time": &Cache{Name: "begin_time", Value: "", Help: "启动时间"},
+		"nserver":    &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
+		"ncontext":   &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
+		"nmessage":   &Cache{Name: "nmessage", Value: "0", Help: "消息数量"},
 	},
 	Configs: map[string]*Config{
 		"chain":       &Config{Name: "chain", Value: map[string]interface{}{}, Help: "调试模式，on:打印，off:不打印)"},
@@ -2323,16 +2324,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 				m.Echo("^_^  Welcome to context world  ^_^\n")
 				m.Echo("Version: 1.0 A New Language, A New Framework\n")
-				m.Echo("More: github.com/shylinux/context/README.md\n")
-				m.Color(31, "       c\n")
-				m.Color(31, "     sh").Color(33, " go\n")
-				m.Color(31, "   vi").Color(32, " php").Color(32, " js\n")
-				m.Echo(" ARM Linux HTTP\n")
-				m.Color(31, "Context ").Color(32, "Message\n")
-				m.Color(32, "ctx ").Color(33, "cli ").Color(31, "aaa ").Color(33, "web\n")
-				m.Color(32, "lex ").Color(33, "yac ").Color(31, "log ").Color(33, "gdb\n")
-				m.Color(32, "tcp ").Color(33, "nfs ").Color(31, "ssh ").Color(33, "mdb\n")
-				m.Color(31, "script ").Color(32, "template\n")
+				m.Echo("More: https://github.com/shylinux/context\n")
 				return
 			}
 
@@ -3089,16 +3081,19 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 				switch val := value.(type) {
 				case map[string]interface{}:
-					for k, v := range val {
-						m.Add("append", k, v)
+					if true {
+						for k, v := range val {
+							m.Add("append", k, v)
+						}
+						sort.Strings(m.Meta["append"])
+						m.Table()
+					} else {
+						for k, v := range val {
+							m.Add("append", "key", k)
+							m.Add("append", "value", v)
+						}
+						m.Sort("key", "str").Table()
 					}
-					sort.Strings(m.Meta["append"])
-					m.Table()
-					// for k, v := range val {
-					// 	m.Add("append", "key", k)
-					// 	m.Add("append", "value", v)
-					// }
-					// m.Sort("key", "str").Table()
 				case map[string]string:
 					for k, v := range val {
 						m.Add("append", k, v)
@@ -3115,7 +3110,15 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						switch value := v.(type) {
 						case map[string]interface{}:
 							for k, v := range value {
-								m.Add("append", k, v)
+								switch val := v.(type) {
+								case string:
+									m.Add("append", k, val)
+								case float64:
+									m.Add("append", k, int(val))
+								default:
+									b, _ := json.Marshal(val)
+									m.Add("append", k, string(b))
+								}
 							}
 							sort.Strings(m.Meta["append"])
 						case map[string]string:
@@ -3185,10 +3188,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				for k, v := range val {
 					m.Add("append", "key", k)
 					switch value := v.(type) {
+					case string:
+						m.Add("append", "value", value)
 					case float64:
 						m.Add("append", "value", fmt.Sprintf("%d", int(value)))
 					default:
-						m.Add("append", "value", fmt.Sprintf("%v", value))
+						b, _ := json.Marshal(value)
+						m.Add("append", "value", fmt.Sprintf("%v", string(b)))
 					}
 				}
 				m.Sort("key", "str").Table()
@@ -3204,15 +3210,25 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					case map[string]interface{}:
 						for k, v := range value {
 							switch value := v.(type) {
+							case string:
+								m.Add("append", k, value)
 							case float64:
 								m.Add("append", k, fmt.Sprintf("%d", int(value)))
 							default:
-								m.Add("append", k, fmt.Sprintf("%v", value))
+								b, _ := json.Marshal(value)
+								m.Add("append", k, fmt.Sprintf("%v", string(b)))
 							}
 						}
+					case string:
+						m.Add("append", "index", i)
+						m.Add("append", "value", value)
+					case float64:
+						m.Add("append", "index", i)
+						m.Add("append", "value", fmt.Sprintf("%v", int(value)))
 					default:
 						m.Add("append", "index", i)
-						m.Add("append", "value", fmt.Sprintf("%v", v))
+						b, _ := json.Marshal(value)
+						m.Add("append", "value", fmt.Sprintf("%v", string(b)))
 					}
 				}
 				m.Table()
@@ -3222,45 +3238,61 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					m.Add("append", "value", v)
 				}
 				m.Table()
+			case string:
+				m.Echo("%s", val)
 			case float64:
 				m.Echo("%d", int(val))
 			case nil:
 				m.Echo("")
 			default:
-				m.Echo("%v", val)
+				b, _ := json.Marshal(val)
+				m.Echo("%s", string(b))
 			}
 		}},
 		"select": &Command{Name: "select key value field",
-			Form: map[string]int{"parse": 2, "group": 1, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "trans_map": 3, "vertical": 0},
+			Form: map[string]int{"parse": 2, "group": 1, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "trans_map": 3, "vertical": 0, "hide": 1},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
 				msg := m.Spawn()
 				m.Set("result")
 
-				// 筛选与解析
+				// 解析
 				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					for j := 0; j < len(m.Meta["parse"]); j += 2 {
+						var value interface{}
+						e := json.Unmarshal([]byte(m.Meta[m.Meta["parse"][j]][i]), &value)
+						if m.Meta["parse"][j+1] != "" {
+							value = Chain(m, value, m.Meta["parse"][j+1])
+						}
+						m.Log("fuck", "info %v %v %v %v %T", e, m.Meta["parse"][j], m.Meta["parse"][j+1], value, value)
+
+						switch val := value.(type) {
+						case map[string]interface{}:
+							for k, v := range val {
+								m.Add("append", k, v)
+							}
+						case float64:
+							m.Add("append", m.Meta["parse"][j+1], fmt.Sprintf("%d", int(val)))
+						case nil:
+							m.Add("append", m.Meta["parse"][j+1], "")
+						default:
+							m.Add("append", m.Meta["parse"][j+1], fmt.Sprintf("%v", val))
+						}
+					}
+				}
+
+				// 筛选
+				hides := map[string]bool{}
+				for _, k := range m.Meta["hide"] {
+					hides[k] = true
+				}
 				for i := 0; i < nrow; i++ {
 					if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
 						for _, k := range m.Meta["append"] {
-							if m.Has("parse") && m.Option("parse") == k {
-								var value interface{}
-								json.Unmarshal([]byte(m.Meta[k][i]), &value)
-								if m.Meta["parse"][1] != "" {
-									value = Chain(m, value, m.Meta["parse"][1])
-								}
-
-								switch val := value.(type) {
-								case map[string]interface{}:
-									for k, v := range val {
-										msg.Add("append", k, v)
-									}
-								case nil:
-									msg.Add("append", m.Meta["parse"][1], "")
-								default:
-									msg.Add("append", m.Meta["parse"][1], fmt.Sprintf("%v", val))
-								}
-							} else {
-								msg.Add("append", k, m.Meta[k][i])
+							if hides[k] {
+								continue
 							}
+							msg.Add("append", k, m.Meta[k][i])
 						}
 					}
 				}
@@ -3452,6 +3484,7 @@ func Start() {
 	for k, c := range Index.contexts {
 		Pulse.Sess(k, c)
 	}
+	Pulse.Cap("begin_time", time.Now().Format(Pulse.Conf("time_format")))
 
 	args := os.Args[1:]
 	if len(args) > 0 {

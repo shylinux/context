@@ -195,7 +195,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		}},
 		"show": &ctx.Command{Name: "show table fields...",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"eq": 2, "where": 1, "group": 1, "desc": 0, "order": 1, "limit": 1, "offset": 1, "other": -1,
+			Form: map[string]int{"like": 2, "eq": 2, "where": 1, "group": 1, "desc": 0, "order": 1, "limit": 1, "offset": 1, "other": -1,
 				"extra_field": 2, "extra_fields": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
@@ -231,6 +231,19 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 							m.Option("where", m.Option("where")+" and "+strings.Join(eq, "and"))
 						} else {
 							m.Option("where", strings.Join(eq, "and"))
+						}
+					}
+
+					begin := []string{}
+					for i := 0; i < len(m.Meta["begin"]); i += 2 {
+						begin = append(begin, fmt.Sprintf(" %s like '%s%%' ", m.Meta["begin"][i], m.Meta["begin"][i+1]))
+					}
+
+					if len(begin) > 0 {
+						if m.Options("where") {
+							m.Option("where", m.Option("where")+" and "+strings.Join(begin, "and"))
+						} else {
+							m.Option("where", strings.Join(begin, "and"))
 						}
 					}
 

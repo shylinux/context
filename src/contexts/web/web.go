@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/go-cas/cas"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -109,6 +110,28 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			}
 			for k, v := range r.Form {
 				msg.Add("option", k, v)
+				if k == "ticket" {
+					m.Log("info", "hide ticket %v %v %v %v", k, v, r.URL, r.Header.Get("index_path"))
+					uri, _ := r.URL.Parse(r.Header.Get("index_path"))
+					http.Redirect(w, r, uri.Path, http.StatusTemporaryRedirect)
+					return
+				}
+			}
+
+			if msg.Confs("cas_url") {
+				if !cas.IsAuthenticated(r) && !msg.Confs("skip_cas") {
+					r.URL.Path = r.Header.Get("index_path")
+					cas.RedirectToLogin(w, r)
+					return
+				}
+
+				msg.Option("username", cas.Username(r))
+				msg.Option("password", cas.Username(r))
+				for k, v := range cas.Attributes(r) {
+					for _, val := range v {
+						msg.Add("option", k, val)
+					}
+				}
 			}
 
 			msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
@@ -157,8 +180,10 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.Header.Set("index_module", m.Cap("module"))
 
 	if index {
+		r.Header.Set("index_path", r.URL.String())
 		m.Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 	}
+
 	if index && m.Confs("logheaders") {
 		for k, v := range r.Header {
 			m.Log("info", "%s: %v", k, v)
@@ -189,6 +214,7 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	web.Configs["skip_cas"] = &ctx.Config{Name: "skip_cas", Value: "false", Help: "默认路由"}
 	web.Configs["root_index"] = &ctx.Config{Name: "root_index", Value: "/render", Help: "默认路由"}
 	web.Configs["logheaders"] = &ctx.Config{Name: "logheaders(yes/no)", Value: "no", Help: "日志输出报文头"}
 	web.Configs["template_sub"] = &ctx.Config{Name: "template_sub", Value: web.Context.Name, Help: "模板文件"}
@@ -247,7 +273,17 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: m.Confx("protocol", arg, 2), Help: "服务协议"}
 	web.Caches["address"] = &ctx.Cache{Name: "address", Value: m.Confx("address", arg, 1), Help: "服务地址"}
 	m.Log("info", "%d %s://%s", m.Capi("nserve", 1), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
-	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
+
+	var handler http.Handler
+	if cas_url, e := url.Parse(m.Conf("cas_url")); e == nil && m.Confs("cas_url") {
+		m.Log("info", "cas url: %s", m.Conf("cas_url"))
+		client := cas.NewClient(&cas.Options{URL: cas_url})
+		handler = client.Handle(web)
+	} else {
+		handler = web
+	}
+
+	web.Server = &http.Server{Addr: m.Cap("address"), Handler: handler}
 
 	if m.Caps("master", true); m.Cap("protocol") == "https" {
 		web.Caches["cert"] = &ctx.Cache{Name: "cert", Value: m.Confx("cert", arg, 3), Help: "服务证书"}
@@ -274,6 +310,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"login_lark":      &ctx.Config{Name: "login_lark", Value: "false", Help: "缓存大小"},
 		"login_right":     &ctx.Config{Name: "login_right", Value: "1", Help: "缓存大小"},
 		"log_uri":         &ctx.Config{Name: "log_uri", Value: "false", Help: "缓存大小"},
 		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
@@ -286,6 +323,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"cert":            &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":             &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
 
+		"cas_url":          &ctx.Config{Name: "cas_url", Value: "", Help: "模板路径"},
 		"library_dir":      &ctx.Config{Name: "library_dir", Value: "usr/librarys", Help: "模板路径"},
 		"template_dir":     &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板路径"},
 		"template_debug":   &ctx.Config{Name: "template_debug", Value: "true", Help: "模板调试"},
@@ -402,8 +440,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if m.Confs("log_uri") {
 						m.Echo("%s: %s\n", req.Method, req.URL)
 					}
-					for k, v := range req.Header {
-						m.Log("info", "%s: %s", k, v)
+					if m.Confs("logheaders") {
+						for k, v := range req.Header {
+							m.Log("info", "%s: %s", k, v)
+						}
 					}
 
 					if web.Client == nil {
@@ -414,8 +454,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						return
 					}
 					m.Assert(e)
-					for k, v := range res.Header {
-						m.Log("info", "%s: %v", k, v)
+					if m.Confs("logheaders") {
+						for k, v := range res.Header {
+							m.Log("info", "%s: %v", k, v)
+						}
 					}
 
 					for _, v := range res.Cookies() {
@@ -424,8 +466,22 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					var result interface{}
-					ct := res.Header.Get("Content-Type")
+					defer func() {
+						m.Target().Configs[m.Confx("body_response")] = &ctx.Config{Value: result}
+						m.Log("info", "cache %s", m.Confx("body_response"))
+					}()
 
+					if m.Has("save") {
+						p := path.Join(m.Sess("nfs").Cmd("pwd").Result(0), m.Option("save"))
+						f, e := os.Create(p)
+						m.Assert(e)
+						io.Copy(f, res.Body)
+						defer f.Close()
+						m.Log("info", "save file %s", p)
+						return
+					}
+
+					ct := res.Header.Get("Content-Type")
 					switch {
 					case strings.HasPrefix(ct, "application/json"):
 						json.NewDecoder(res.Body).Decode(&result)
@@ -433,10 +489,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							msg := m.Spawn()
 							msg.Put("option", "response", result)
 							msg.Cmd("trans", "response", m.Option("parse"))
-							m.Copy(msg, "append")
-							m.Copy(msg, "result")
+							m.Copy(msg, "append").Copy(msg, "result")
 							return
 						}
+						b, _ := json.Marshal(result)
+						result = string(b)
 					case strings.HasPrefix(ct, "text/html"):
 						html, e := goquery.NewDocumentFromReader(res.Body)
 						m.Assert(e)
@@ -485,7 +542,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 					}
-					m.Target().Configs[m.Confx("body_response")] = &ctx.Config{Value: result}
 					m.Echo("%v", result)
 				}
 			}},
@@ -493,6 +549,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			Form: map[string]int{"file": 2, "content_type": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				msg := m.Spawn()
+				parse := "_"
 				if m.Has("file") {
 					file, e := os.Open(m.Meta["file"][1])
 					m.Assert(e)
@@ -505,6 +562,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Assert(e)
 
 					for i := 1; i < len(arg)-1; i += 2 {
+						if arg[i] == "parse" {
+							parse = arg[i+1]
+							continue
+						}
 						value := arg[i+1]
 						if len(arg[i+1]) > 1 {
 							switch arg[i+1][0] {
@@ -525,6 +586,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				} else if m.Option("content_type") == "json" {
 					data := map[string]interface{}{}
 					for i := 1; i < len(arg)-1; i += 2 {
+						if arg[i] == "parse" {
+							parse = arg[i+1]
+							continue
+						}
 						switch arg[i+1] {
 						case "false":
 							data[arg[i]] = false
@@ -538,8 +603,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 					}
+
 					b, e := json.Marshal(data)
 					m.Assert(e)
+					m.Log("info", "json %v", string(b))
+
 					msg.Optionv("body", bytes.NewReader(b))
 					msg.Option("content_type", "application/json")
 					arg = arg[:1]
@@ -558,6 +626,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					arg = arg[:1]
 				} else {
 					msg.Option("content_type", "application/x-www-form-urlencoded")
+				}
+
+				if parse != "_" {
+					arg = append(arg, "parse")
+					arg = append(arg, parse)
 				}
 				msg.Cmd("get", "method", "POST", arg)
 				m.Copy(msg, "result").Copy(msg, "append")
@@ -769,7 +842,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			defer o.Close()
 
 			io.Copy(o, f)
-			m.Log("upload", "file(%d): %s", h.Size, p)
+			m.Log("upload", "file: %s", p)
 			m.Append("redirect", m.Option("referer"))
 		}},
 		"/download/": &ctx.Command{Name: "/download/", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -781,11 +854,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
 				list := []interface{}{}
-
-				// tmpl, e := web.Template.Clone()
-				// m.Assert(e)
-				// tmpl.Funcs(ctx.CGI)
-				//
 
 				tmpl := web.Template
 				if m.Confs("template_debug") {
@@ -826,6 +894,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 				if !right && login != nil {
 					right = m.Sess("aaa").Cmd("right", "void", "check", group).Results(0)
+				}
+
+				if !right {
+					if lark := m.Find("web.lark"); lark != nil && m.Confs("login_lark") {
+						right = ctx.Right(lark.Cmd("auth", m.Option("username"), "check", m.Option("cmd")).Result(0))
+					}
 				}
 
 				m.Log("info", "group: %v, name: %v, right: %v", group, order, right)
@@ -934,7 +1008,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 		}},
 		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Log("fuck", "what %v", key)
 			msg := m.Spawn().Cmd("get", strings.TrimPrefix(key, "/proxy/"), arg)
 			m.Copy(msg, "append").Copy(msg, "result")
 		}},

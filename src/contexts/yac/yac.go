@@ -359,7 +359,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			m.Cmd("train", "stm", "label", "label", "exp")
 			m.Cmd("train", "stm", "goto", "goto", "exp", "opt{", "exp", "}", "exp")
 
-			m.Cmd("train", "stm", "echo", "echo", "rep{", "exp", "}")
+			m.Cmd("train", "stm", "expr", "expr", "rep{", "exp", "}")
 			m.Cmd("train", "stm", "return", "return", "rep{", "exp", "}")
 
 			m.Cmd("train", "word", "word", "mul{", "~", "!", "=", "\\?\\?", "\\?", "<", ">$", ">@", ">", "\\|", "%", "exe", "str", "[a-zA-Z0-9_/\\-.:]+", "}")

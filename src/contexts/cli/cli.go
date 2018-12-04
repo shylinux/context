@@ -227,6 +227,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				msg := m
 				for k, v := range m.Confv("cmd_script").(map[string]interface{}) {
 					if strings.HasSuffix(detail[0], "."+k) {
+						detail[0] = m.Sess("nfs").Cmd("path", detail[0]).Result(0)
 						detail = append([]string{v.(string)}, detail...)
 						msg = m.Spawn(cli.target)
 						break
@@ -573,7 +574,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			m.Echo(m.Cap(arg[1]))
 		}},
-		"echo": &ctx.Command{Name: "echo arg...", Help: "输出表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"expr": &ctx.Command{Name: "expr arg...", Help: "输出表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			m.Echo("%s", strings.Join(arg[1:], ""))
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, result: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
