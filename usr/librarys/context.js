@@ -93,10 +93,12 @@ context = {
         }
 
         var arg = args.join("&");
-        arg && (url += ((url.indexOf("?")>-1)? "&": "?") + arg)
+        // arg && (url += ((url.indexOf("?")>-1)? "&": "?") + arg)
 
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", url);
+        // xhr.open("POST", url);
+        xhr.open("POST", url);
+        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded")
         xhr.setRequestHeader("Accept", "application/json")
 
         xhr.onreadystatechange = function() {
@@ -122,7 +124,7 @@ context = {
             }
             typeof cb == "function" && cb(msg)
         }
-        xhr.send();
+        xhr.send(arg);
     },
 }
 

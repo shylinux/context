@@ -187,6 +187,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 							m.Log("info", "import %s", arg[1])
 							module := msg.Cap("module")
 							for k, _ := range msg.Target().Commands {
+								if len(k) > 0 && k[0] == '/' {
+									continue
+								}
 								if len(arg) == 2 {
 									cli.alias[k] = []string{module + "." + k}
 									continue
@@ -649,13 +652,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"run": &ctx.Command{Name: "run", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) == 0 {
 				name := path.Join(m.Option("dir_root"), m.Option("download_dir"))
-				msg := m.Sess("nfs").Add("option", "dir_reg", ".*\\.(sh|shy|py)$").Add("option", "dir_root", "").Cmd("dir", name)
+				msg := m.Sess("nfs").Add("option", "dir_reg", ".*\\.(sh|shy|py)$").Add("option", "dir_root", "").Cmd("dir", name, "dir_deep")
 				m.Copy(msg, "append").Copy(msg, "result")
 				return
 			}
 
-			name := path.Join(m.Option("dir_root"), m.Option("download_dir"), arg[0])
-			msg := m.Spawn(c).Cmd("cmd", name, arg[1:])
+			// name := path.Join(m.Option("dir_root"), m.Option("download_dir"), arg[0])
+			msg := m.Spawn(c).Cmd("cmd", arg[0], arg[1:])
 			m.Copy(msg, "append").Copy(msg, "result")
 		}},
 

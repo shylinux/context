@@ -121,6 +121,8 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			if msg.Confs("cas_url") {
 				if !cas.IsAuthenticated(r) && !msg.Confs("skip_cas") {
 					r.URL.Path = r.Header.Get("index_path")
+					w.Header().Add("Access-Control-Allow-Origin", "*")
+					w.Header().Add("Vary", "*")
 					cas.RedirectToLogin(w, r)
 					return
 				}
@@ -395,7 +397,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"get": &ctx.Command{Name: "get [method GET|POST] url arg...",
 			Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "parse": 1},
+			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "parse": 1, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 					if m.Has("path_value") {
@@ -472,12 +474,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}()
 
 					if m.Has("save") {
-						p := path.Join(m.Sess("nfs").Cmd("pwd").Result(0), m.Option("save"))
+
+						p := m.Option("save")
+						if !strings.Contains(m.Option("save"), "/") {
+							p = path.Join(m.Sess("nfs").Cmd("pwd").Result(0), m.Option("save"))
+						}
+
 						f, e := os.Create(p)
 						m.Assert(e)
 						io.Copy(f, res.Body)
 						defer f.Close()
-						m.Log("info", "save file %s", p)
+						m.Log("info", "save file %s %s", p, m.Sess("aaa").Cmd("md5", p).Result(0))
+						m.Echo(p)
 						return
 					}
 
@@ -492,7 +500,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							m.Copy(msg, "append").Copy(msg, "result")
 							return
 						}
-						b, _ := json.Marshal(result)
+						b, _ := json.MarshalIndent(result, "", "  ")
 						result = string(b)
 					case strings.HasPrefix(ct, "text/html"):
 						html, e := goquery.NewDocumentFromReader(res.Body)
@@ -848,7 +856,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/download/": &ctx.Command{Name: "/download/", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
-			http.ServeFile(w, r, m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0))
+			p := m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0)
+			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("md5", p).Result(0))
+			http.ServeFile(w, r, p)
 		}},
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
@@ -897,7 +907,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 
 				if !right {
-					if lark := m.Find("web.lark"); lark != nil && m.Confs("login_lark") {
+					lark := m.Find("web.lark")
+					if lark != nil && m.Confs("login_lark") {
 						right = ctx.Right(lark.Cmd("auth", m.Option("username"), "check", m.Option("cmd")).Result(0))
 					}
 				}

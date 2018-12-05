@@ -2968,9 +2968,27 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					})
 				}
 			}},
-		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [create map|list|string key name help] [delete key]",
+		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [list|map arg...] [create map|list|string key name help] [delete key]",
 			Help: "配置管理, export: 导出配置, save: 保存配置到文件, load: 从文件加载配置, create: 创建配置, delete: 删除配置",
 			Hand: func(m *Message, c *Context, key string, arg ...string) {
+				if len(arg) > 2 && arg[2] == "list" {
+					chain := strings.Split(arg[1], ".")
+					chain = append(chain, "-2")
+
+					for _, val := range arg[3:] {
+						m.Confv(arg[0], chain, val)
+					}
+					return
+				}
+				if len(arg) > 2 && arg[2] == "map" {
+					chain := strings.Split(arg[1], ".")
+
+					for i := 3; i < len(arg)-1; i += 2 {
+						m.Confv(arg[0], append(chain, arg[i]), arg[i+1])
+					}
+					return
+				}
+
 				all := false
 				if len(arg) > 0 && arg[0] == "all" {
 					arg, all = arg[1:], true
@@ -3053,15 +3071,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 					switch action {
 					case "save":
-						// f, e := os.Create(which)
-						// m.Assert(e)
-						// defer f.Close()
-						//
 						buf, e := json.MarshalIndent(save, "", "  ")
 						m.Assert(e)
 						m.Sess("nfs").Add("option", "data", string(buf)).Cmd("save", which)
-
-						// f.Write(buf)
 					case "export":
 						buf, e := json.MarshalIndent(save, "", "  ")
 						m.Assert(e)
@@ -3079,68 +3091,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					value = m.Confv(arg[0])
 				}
 
-				switch val := value.(type) {
-				case map[string]interface{}:
-					if true {
-						for k, v := range val {
-							m.Add("append", k, v)
-						}
-						sort.Strings(m.Meta["append"])
-						m.Table()
-					} else {
-						for k, v := range val {
-							m.Add("append", "key", k)
-							m.Add("append", "value", v)
-						}
-						m.Sort("key", "str").Table()
-					}
-				case map[string]string:
-					for k, v := range val {
-						m.Add("append", k, v)
-					}
-					sort.Strings(m.Meta["append"])
-					m.Table()
-					// for k, v := range val {
-					// 	m.Add("append", "key", k)
-					// 	m.Add("append", "value", v)
-					// }
-					// m.Sort("key", "str").Table()
-				case []interface{}:
-					for i, v := range val {
-						switch value := v.(type) {
-						case map[string]interface{}:
-							for k, v := range value {
-								switch val := v.(type) {
-								case string:
-									m.Add("append", k, val)
-								case float64:
-									m.Add("append", k, int(val))
-								default:
-									b, _ := json.Marshal(val)
-									m.Add("append", k, string(b))
-								}
-							}
-							sort.Strings(m.Meta["append"])
-						case map[string]string:
-							for k, v := range value {
-								m.Add("append", k, v)
-							}
-							sort.Strings(m.Meta["append"])
-						default:
-							m.Add("append", "index", i)
-							m.Add("append", "value", v)
-						}
-					}
-					m.Table()
-				case []string:
-					for i, v := range val {
-						m.Add("append", "index", i)
-						m.Add("append", "value", v)
-					}
-					m.Table()
-				default:
-					m.Echo("%v", value)
-				}
+				msg := m.Spawn()
+				msg.Put("option", "_cache", value)
+				msg.Cmd("trans", "_cache", "")
+				m.Copy(msg, "append").Copy(msg, "result")
 			}},
 		"cache": &Command{Name: "cache [all] |key [value]|key = value|key name value help|delete key]",
 			Help: "查看、读写、赋值、新建、删除缓存变量",
@@ -3257,26 +3211,58 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 				// 解析
 				nrow := len(m.Meta[m.Meta["append"][0]])
+				keys := []string{}
 				for i := 0; i < nrow; i++ {
 					for j := 0; j < len(m.Meta["parse"]); j += 2 {
 						var value interface{}
-						e := json.Unmarshal([]byte(m.Meta[m.Meta["parse"][j]][i]), &value)
+						json.Unmarshal([]byte(m.Meta[m.Meta["parse"][j]][i]), &value)
 						if m.Meta["parse"][j+1] != "" {
 							value = Chain(m, value, m.Meta["parse"][j+1])
 						}
-						m.Log("fuck", "info %v %v %v %v %T", e, m.Meta["parse"][j], m.Meta["parse"][j+1], value, value)
+
+						switch val := value.(type) {
+						case map[string]interface{}:
+							for k, _ := range val {
+								keys = append(keys, k)
+							}
+						default:
+							keys = append(keys, m.Meta["parse"][j+1])
+						}
+					}
+				}
+				for i := 0; i < nrow; i++ {
+					for _, k := range keys {
+						m.Add("append", k, "")
+					}
+				}
+				for i := 0; i < nrow; i++ {
+					for j := 0; j < len(m.Meta["parse"]); j += 2 {
+						var value interface{}
+						json.Unmarshal([]byte(m.Meta[m.Meta["parse"][j]][i]), &value)
+						if m.Meta["parse"][j+1] != "" {
+							value = Chain(m, value, m.Meta["parse"][j+1])
+						}
 
 						switch val := value.(type) {
 						case map[string]interface{}:
 							for k, v := range val {
-								m.Add("append", k, v)
+								switch val := v.(type) {
+								case string:
+									m.Meta[k][i] = val
+								case float64:
+									m.Meta[k][i] = fmt.Sprintf("%d", int(val))
+								default:
+									b, _ := json.Marshal(val)
+									m.Meta[k][i] = string(b)
+								}
 							}
+						case string:
+							m.Meta[m.Meta["parse"][j+1]][i] = val
 						case float64:
-							m.Add("append", m.Meta["parse"][j+1], fmt.Sprintf("%d", int(val)))
-						case nil:
-							m.Add("append", m.Meta["parse"][j+1], "")
+							m.Meta[m.Meta["parse"][j+1]][i] = fmt.Sprintf("%d", int(val))
 						default:
-							m.Add("append", m.Meta["parse"][j+1], fmt.Sprintf("%v", val))
+							b, _ := json.Marshal(val)
+							m.Meta[m.Meta["parse"][j+1]][i] = string(b)
 						}
 					}
 				}

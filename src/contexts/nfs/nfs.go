@@ -1016,6 +1016,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
 				defer f.Close()
+				m.Append("directory", p)
+				m.Echo(p)
 
 				for _, v := range arg[1:] {
 					n, e := fmt.Fprint(f, v)
