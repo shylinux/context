@@ -619,12 +619,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					return
 				}
 
-				m.Confv("source_list", -1, map[string]interface{}{
-					"source_time": m.Time(),
-					"source_ctx":  m.Option("current_ctx"),
-					"source_cmd":  strings.Join(arg, " "),
-				})
-
+				// m.Confv("source_list", -1, map[string]interface{}{
+				// 	"source_time": m.Time(),
+				// 	"source_ctx":  m.Option("current_ctx"),
+				// 	"source_cmd":  strings.Join(arg, " "),
+				// })
+                //
 				if m.Options("current_ctx") {
 					args := []string{"context", m.Option("current_ctx")}
 					arg = append(args, arg...)

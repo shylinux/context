@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -450,7 +451,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		}},
 		"md5": &ctx.Command{Name: "md5 content", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
-				h := md5.Sum(aaa.Input(arg[0]))
+				h := md5.Sum(aaa.Input(strings.Join(arg, "")))
 				m.Echo(hex.EncodeToString(h[:]))
 			}
 		}},

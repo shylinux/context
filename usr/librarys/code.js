@@ -49,9 +49,41 @@ function add_sort(append, field, cb) {
                     if (tr.childNodes[i].innerText.startsWith(field)) {
                         typeof cb == "function" && cb(event)
                     }
+                    var has = document.querySelector("td.clip")
+                    has && (has.className = "")
+                    target.className = "clip"
                     copy_to_clipboard(target.innerText)
                 }
             }
+        }
+    }
+}
+function del_command(target) {
+    var can_remove = false
+    var order = -1
+    for (var p = target; p.parentElement && p.tagName != "FIELDSET"; p = p.parentElement) {
+        if (p.tagName == "FORM" && p.dataset["componet_name_alias"]) {
+            can_remove = true
+            order = p.dataset["componet_name_order"]
+        }
+    }
+    if (p && can_remove) {
+        p.parentElement.removeChild(p)
+    }
+
+    for (;order < code.ncommand; order++) {
+        var input = document.querySelector("form.option.command"+order+" input[name=cmd]")
+        if (input) {
+            input.focus()
+            return
+        }
+    }
+    for (;order >= 0; order--) {
+        var input = document.querySelector("form.option.command"+(order? order: "")+" input[name=cmd]")
+        code.ncommand = order+1
+        if (input) {
+            input.focus()
+            return
         }
     }
 }
@@ -66,6 +98,7 @@ function add_command() {
         "dataset": {
             "componet_group": "index",
             "componet_name": "command",
+            "componet_workflow": context.Search("workflow"),
             "componet_name_alias": name,
             "componet_name_order": code.ncommand-1,
         }
@@ -79,6 +112,7 @@ function add_command() {
 
     add_sort(append_child(fieldset, "table", {"className": "append "+name}))
     append_child(append_child(fieldset, "code", {"className": "result "+name}), "pre")
+    return fieldset
 }
 
 function send_command(form, cb) {
@@ -473,33 +507,7 @@ function onaction(event, action) {
                         add_command()
                         break
                     case "q":
-                        var can_remove = false
-                        var order = -1
-                        for (var p = target; p.parentElement && p.tagName != "FIELDSET"; p = p.parentElement) {
-                            if (p.tagName == "FORM" && p.dataset["componet_name_alias"]) {
-                                can_remove = true
-                                order = p.dataset["componet_name_order"]
-                            }
-                        }
-                        if (p && can_remove) {
-                            p.parentElement.removeChild(p)
-                        }
-
-                        for (;order < code.ncommand; order++) {
-                            var input = document.querySelector("form.option.command"+order+" input[name=cmd]")
-                            if (input) {
-                                input.focus()
-                                return
-                            }
-                        }
-                        for (;order >= 0; order--) {
-                            var input = document.querySelector("form.option.command"+(order? order: "")+" input[name=cmd]")
-                            code.ncommand = order+1
-                            if (input) {
-                                input.focus()
-                                return
-                            }
-                        }
+                        del_command(event.target)
                         break
                 }
             }
@@ -657,6 +665,9 @@ function init_command() {
     insert_button(append, "exec", function(event) {
         send_command(option)
     })
+    insert_button(append, "add", function(event) {
+        add_command()
+    })
 }
 
 function init_userinfo() {
@@ -670,6 +681,38 @@ function init_userinfo() {
     })
 }
 
+function init_workflow() {
+    var max = 0
+    for (var k in workflow.commands) {
+        if (parseInt(k) > max) {
+            max = parseInt(k)
+        }
+    }
+
+    if (workflow.commands[""]) {
+        var option = document.querySelector("form.option.command")
+        var cmd = option.querySelector("input[name=cmd]")
+        cmd.value = workflow.commands[""].join(" ")
+        check_option(option)
+    }
+
+    for (var i = 1; i <= max; i++) {
+        var fieldset = add_command()
+        if (workflow.commands[i]) {
+            var cmd = fieldset.querySelector("input[name=cmd]")
+            cmd.value = workflow.commands[i].join(" ")
+            var option = fieldset.querySelector("form.option")
+            check_option(option)
+            var option = fieldset.querySelector("form.option")
+        }
+    }
+}
+
+function init_control() {
+    var option = document.querySelector("form.option.command")
+    var append = document.querySelector("table.append.command")
+}
+
 window.onload = function() {
     init_option()
     init_append()
@@ -678,5 +721,7 @@ window.onload = function() {
     init_context()
     init_command()
     init_userinfo()
+    init_workflow()
+    init_control()
 }
 

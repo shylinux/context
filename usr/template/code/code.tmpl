@@ -84,6 +84,9 @@
         padding-left: 10px;
         padding-right: 20px;
     }
+    table.append td.clip {
+        background-color:red;
+    }
     code.result pre {
         color:white;
         font-size:14px;
@@ -100,6 +103,10 @@
 </style>
 </head>
 <body onkeyup="return onaction(event, 'keymap')" onkeydown="return onaction(event, 'scroll')">
+<script>
+    {{$id := option . "workflow"|option}}
+    var workflow ={{conf . "workflow" $id}}
+</script>
 {{end}}
 
 {{define "void"}}{{end}}
@@ -126,6 +133,7 @@
     <form class="option {{option .Meta "componet_name"}}"
           data-componet_group="{{option . "componet_group"|meta}}"
           data-componet_name="{{option . "componet_name"|meta}}"
+          data-componet_workflow="{{option . "workflow"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
              onsubmit="onaction(event,'upload')"

@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 type MUX interface {
@@ -113,16 +114,14 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				if k == "ticket" {
 					m.Log("info", "hide ticket %v %v %v %v", k, v, r.URL, r.Header.Get("index_path"))
 					uri, _ := r.URL.Parse(r.Header.Get("index_path"))
-					http.Redirect(w, r, uri.Path, http.StatusTemporaryRedirect)
+					http.Redirect(w, r, uri.Path+"?workflow="+uri.Query().Get("workflow"), http.StatusTemporaryRedirect)
 					return
 				}
 			}
 
 			if msg.Confs("cas_url") {
 				if !cas.IsAuthenticated(r) && !msg.Confs("skip_cas") {
-					r.URL.Path = r.Header.Get("index_path")
-					w.Header().Add("Access-Control-Allow-Origin", "*")
-					w.Header().Add("Vary", "*")
+					r.URL, _ = r.URL.Parse(r.Header.Get("index_path"))
 					cas.RedirectToLogin(w, r)
 					return
 				}
@@ -324,6 +323,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"protocol":        &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
 		"cert":            &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
 		"key":             &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
+		"site":            &ctx.Config{Name: "site", Value: "", Help: "网站地址"},
 
 		"cas_url":          &ctx.Config{Name: "cas_url", Value: "", Help: "模板路径"},
 		"library_dir":      &ctx.Config{Name: "library_dir", Value: "usr/librarys", Help: "模板路径"},
@@ -349,6 +349,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				map[string]interface{}{"componet_name": "tail", "template": "tail"},
 			},
 		}, Help: "组件列表"},
+
+		"workflow": &ctx.Config{Name: "workflow", Value: map[string]interface{}{}, Help: "默认组件"},
+		"workflow_view": &ctx.Config{Name: "workflow_view", Value: map[string]interface{}{
+			"base": []interface{}{"key", "share", "comment", "creator", "create_time", "modify_time", "commands"},
+			"link": []interface{}{"share", "comment", "creator", "link"},
+		}, Help: "默认组件"},
 	},
 	Commands: map[string]*ctx.Command{
 		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -838,6 +844,44 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Appendv("login", login)
 			m.Echo(sessid)
 		}},
+		"workflow": &ctx.Command{Name: "workflow", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			flow := m.Confv("workflow").(map[string]interface{})
+			if len(arg) > 0 && arg[0] == "delete" {
+				delete(flow, arg[1])
+				arg = arg[2:]
+			}
+
+			if len(arg) == 0 {
+				view := "base"
+				if m.Has("view") {
+					view = m.Option("view")
+				}
+				for _, v := range flow {
+					val := v.(map[string]interface{})
+					for _, k := range m.Confv("workflow_view", view).([]interface{}) {
+						switch v := val[k.(string)].(type) {
+						case map[string]interface{}:
+							b, _ := json.Marshal(v)
+							m.Add("append", "commands", string(b))
+						case nil:
+							m.Add("append", k.(string), "")
+						default:
+							m.Add("append", k.(string), v)
+						}
+					}
+				}
+				m.Table()
+				return
+			}
+
+			if len(arg) > 1 {
+				m.Confv("workflow", strings.Split(arg[0], "."), arg[1])
+			}
+
+			msg := m.Spawn().Put("option", "_cache", flow).Cmd("trans", "_cache", arg[0])
+			m.Copy(msg, "append").Copy(msg, "result")
+		}},
+
 		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			r := m.Optionv("request").(*http.Request)
 			f, h, e := r.FormFile("upload")
@@ -913,7 +957,43 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 
-				m.Log("info", "group: %v, name: %v, right: %v", group, order, right)
+				protected := false
+				workflow, ok := m.Confv("workflow", m.Option("workflow")).(map[string]interface{})
+				if right {
+					if !ok { // 创建工作流
+						create_time := time.Now().Format(m.Conf("time_format"))
+						id := m.Option("workflow")
+						if id == "" {
+							id = m.Sess("aaa").Cmd("md5", m.Option("remote_addr"), create_time).Result(0)
+						}
+						m.Confv("workflow", id, map[string]interface{}{
+							"remote_addr": m.Option("remote_addr"),
+							"modify_time": create_time,
+							"create_time": create_time,
+							"creator":     m.Option("username"),
+							"share":       "protected",
+							"link":        fmt.Sprintf("%s?workflow=%s", m.Conf("site"), id),
+							"comment":     "default flow",
+							"key":         id,
+							"commands":    map[string]interface{}{},
+						})
+
+						m.Append("redirect", fmt.Sprintf("?workflow=%s", id))
+						return
+					}
+
+					if workflow["creator"].(string) != m.Option("username") {
+						switch workflow["share"].(string) {
+						case "private":
+							return
+						case "protected":
+							protected = true
+						case "public":
+						}
+					}
+				}
+				m.Log("info", "group: %v, order: %v, right: %v, share: %v", group, order, right, workflow["share"])
+
 				for count := 0; count == 0; group, order, right = "login", "", true {
 					for _, v := range m.Confv("componet", group).([]interface{}) {
 						val := v.(map[string]interface{})
@@ -972,6 +1052,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 						args := []string{}
+						if val["componet_cmd"] != nil {
+							args = append(args, val["componet_cmd"].(string))
+						}
+
 						if val["arguments"] != nil {
 							for _, v := range val["arguments"].([]interface{}) {
 								switch value := v.(type) {
@@ -983,7 +1067,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
 							if val["componet_cmd"] != nil {
-								msg.Cmd(val["componet_cmd"], args)
+								if !protected {
+									m.Confv("workflow", []interface{}{m.Option("workflow"), "commands", m.Option("componet_name_order")}, args[1:])
+									m.Confv("workflow", []interface{}{m.Option("workflow"), "modify_time"}, time.Now().Format(m.Conf("time_format")))
+								}
+
+								msg.Cmd(args)
 								if msg.Options("download_file") {
 									m.Append("page_redirect", fmt.Sprintf("/download/%s",
 										msg.Sess("nfs").Copy(msg, "append").Copy(msg, "result").Cmd("export", msg.Option("download_file")).Result(0)))
