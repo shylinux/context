@@ -114,7 +114,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				if k == "ticket" {
 					m.Log("info", "hide ticket %v %v %v %v", k, v, r.URL, r.Header.Get("index_path"))
 					uri, _ := r.URL.Parse(r.Header.Get("index_path"))
-					http.Redirect(w, r, uri.Path+"?workflow="+uri.Query().Get("workflow"), http.StatusTemporaryRedirect)
+					http.Redirect(w, r, uri.Path+"?bench="+uri.Query().Get("bench"), http.StatusTemporaryRedirect)
 					return
 				}
 			}
@@ -350,8 +350,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "组件列表"},
 
-		"workflow": &ctx.Config{Name: "workflow", Value: map[string]interface{}{}, Help: "默认组件"},
-		"workflow_view": &ctx.Config{Name: "workflow_view", Value: map[string]interface{}{
+		"bench": &ctx.Config{Name: "bench", Value: map[string]interface{}{}, Help: "默认组件"},
+		"bench_view": &ctx.Config{Name: "bench_view", Value: map[string]interface{}{
 			"base": []interface{}{"key", "share", "comment", "creator", "create_time", "modify_time", "commands"},
 			"link": []interface{}{"share", "comment", "creator", "link"},
 		}, Help: "默认组件"},
@@ -844,21 +844,74 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Appendv("login", login)
 			m.Echo(sessid)
 		}},
-		"workflow": &ctx.Command{Name: "workflow", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			flow := m.Confv("workflow").(map[string]interface{})
-			if len(arg) > 0 && arg[0] == "delete" {
-				delete(flow, arg[1])
+		"bench": &ctx.Command{Name: "bench", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			default_com := "default bench"
+			default_cmd := map[string]interface{}{}
+			if len(arg) > 0 && arg[0] == "copy" { // 复制工作流
+				bench := m.Confv("bench", arg[1]).(map[string]interface{})
+				for k, v := range bench["commands"].(map[string]interface{}) {
+					default_cmd[k] = v
+				}
+				arg[0] = "create"
+				default_com = bench["comment"].(string)
+				m.Option("bench", "")
+			}
+
+			if len(arg) > 0 && arg[0] == "create" { // 创建工作流
+				create_time := time.Now().Format(m.Conf("time_format"))
+				key := m.Option("bench")
+				if key == "" {
+					key = m.Sess("aaa").Cmd("md5", m.Option("remote_addr"), create_time).Result(0)
+				}
+				link := fmt.Sprintf("%s?bench=%s", m.Conf("site"), key)
+				if _, ok := m.Confv("bench").(map[string]interface{}); !ok {
+					m.Log("info", "%s create bench  %s", m.Option("username"), key)
+					m.Confv("bench", key, map[string]interface{}{
+						"remote_addr": m.Option("remote_addr"),
+						"modify_time": create_time,
+						"create_time": create_time,
+						"creator":     m.Option("username"),
+						"share":       "protected",
+						"link":        link,
+						"comment":     default_com,
+						"key":         key,
+						"commands":    default_cmd,
+					})
+				}
+
+				m.Append("key", key)
+				m.Echo(link)
+				return
+			}
+
+			bench := m.Confv("bench").(map[string]interface{})
+			if len(arg) > 0 && arg[0] == "check" { // 检查工作流
+				if bench["creator"].(string) != arg[1] {
+					switch bench["share"].(string) {
+					case "private":
+						m.Echo("private")
+						return
+					case "protected":
+						m.Echo("protected")
+					case "public":
+					}
+				}
+				return
+			}
+
+			if len(arg) > 0 && arg[0] == "delete" { // 删除工作流
+				delete(bench, arg[1])
 				arg = arg[2:]
 			}
 
-			if len(arg) == 0 {
+			if len(arg) == 0 { // 查看工作流
 				view := "base"
 				if m.Has("view") {
 					view = m.Option("view")
 				}
-				for _, v := range flow {
+				for _, v := range bench {
 					val := v.(map[string]interface{})
-					for _, k := range m.Confv("workflow_view", view).([]interface{}) {
+					for _, k := range m.Confv("bench_view", view).([]interface{}) {
 						switch v := val[k.(string)].(type) {
 						case map[string]interface{}:
 							b, _ := json.Marshal(v)
@@ -874,11 +927,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			if len(arg) > 1 {
-				m.Confv("workflow", strings.Split(arg[0], "."), arg[1])
+			if len(arg) > 1 { // 编辑工作流
+				m.Confv("bench", strings.Split(arg[0], "."), arg[1])
 			}
 
-			msg := m.Spawn().Put("option", "_cache", flow).Cmd("trans", "_cache", arg[0])
+			// 查看工作流
+			msg := m.Spawn().Put("option", "_cache", bench).Cmd("trans", "_cache", arg[0])
 			m.Copy(msg, "append").Copy(msg, "result")
 		}},
 
@@ -957,42 +1011,17 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 
-				protected := false
-				workflow, ok := m.Confv("workflow", m.Option("workflow")).(map[string]interface{})
+				bench_share := ""
 				if right {
-					if !ok { // 创建工作流
-						create_time := time.Now().Format(m.Conf("time_format"))
-						id := m.Option("workflow")
-						if id == "" {
-							id = m.Sess("aaa").Cmd("md5", m.Option("remote_addr"), create_time).Result(0)
-						}
-						m.Confv("workflow", id, map[string]interface{}{
-							"remote_addr": m.Option("remote_addr"),
-							"modify_time": create_time,
-							"create_time": create_time,
-							"creator":     m.Option("username"),
-							"share":       "protected",
-							"link":        fmt.Sprintf("%s?workflow=%s", m.Conf("site"), id),
-							"comment":     "default flow",
-							"key":         id,
-							"commands":    map[string]interface{}{},
-						})
-
-						m.Append("redirect", fmt.Sprintf("?workflow=%s", id))
+					if _, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{}); !ok { // 创建工作流
+						m.Append("redirect", fmt.Sprintf("?bench=%s", m.Spawn().Cmd("bench", "create").Append("key")))
 						return
 					}
-
-					if workflow["creator"].(string) != m.Option("username") {
-						switch workflow["share"].(string) {
-						case "private":
-							return
-						case "protected":
-							protected = true
-						case "public":
-						}
+					if bench_share = m.Spawn().Cmd("bench", "check", m.Option("username")).Result(0); bench_share == "private" {
+						return
 					}
 				}
-				m.Log("info", "group: %v, order: %v, right: %v, share: %v", group, order, right, workflow["share"])
+				m.Log("info", "group: %v, order: %v, right: %v, share: %v", group, order, right, bench_share)
 
 				for count := 0; count == 0; group, order, right = "login", "", true {
 					for _, v := range m.Confv("componet", group).([]interface{}) {
@@ -1067,9 +1096,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
 							if val["componet_cmd"] != nil {
-								if !protected {
-									m.Confv("workflow", []interface{}{m.Option("workflow"), "commands", m.Option("componet_name_order")}, args[1:])
-									m.Confv("workflow", []interface{}{m.Option("workflow"), "modify_time"}, time.Now().Format(m.Conf("time_format")))
+								if bench_share != "protected" {
+									m.Confv("bench", []interface{}{m.Option("bench"), "commands", m.Option("componet_name_order")}, args[1:])
+									m.Confv("bench", []interface{}{m.Option("bench"), "modify_time"}, time.Now().Format(m.Conf("time_format")))
 								}
 
 								msg.Cmd(args)

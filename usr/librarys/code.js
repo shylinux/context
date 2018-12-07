@@ -98,7 +98,7 @@ function add_command() {
         "dataset": {
             "componet_group": "index",
             "componet_name": "command",
-            "componet_workflow": context.Search("workflow"),
+            "componet_bench": context.Search("bench"),
             "componet_name_alias": name,
             "componet_name_order": code.ncommand-1,
         }
@@ -219,7 +219,7 @@ function sort_table(table, index, sort_asc) {
         if (sort_asc) {
             method = function(a, b) {return Date.parse(a) > Date.parse(b)}
             sort_order = "time"
-        } else { 
+        } else {
             method = function(a, b) {return Date.parse(a) < Date.parse(b)}
             sort_order = "time_r"
         }
@@ -227,7 +227,7 @@ function sort_table(table, index, sort_asc) {
         if (sort_asc) {
             method = function(a, b) {return parseInt(a) > parseInt(b)}
             sort_order = "int"
-        } else { 
+        } else {
             method = function(a, b) {return parseInt(a) < parseInt(b)}
             sort_order = "int_r"
         }
@@ -681,26 +681,26 @@ function init_userinfo() {
     })
 }
 
-function init_workflow() {
+function init_bench() {
     var max = 0
-    for (var k in workflow.commands) {
+    for (var k in bench.commands) {
         if (parseInt(k) > max) {
             max = parseInt(k)
         }
     }
 
-    if (workflow.commands[""]) {
+    if (bench.commands[""]) {
         var option = document.querySelector("form.option.command")
         var cmd = option.querySelector("input[name=cmd]")
-        cmd.value = workflow.commands[""].join(" ")
+        cmd.value = bench.commands[""].join(" ")
         check_option(option)
     }
 
     for (var i = 1; i <= max; i++) {
         var fieldset = add_command()
-        if (workflow.commands[i]) {
+        if (bench.commands[i]) {
             var cmd = fieldset.querySelector("input[name=cmd]")
-            cmd.value = workflow.commands[i].join(" ")
+            cmd.value = bench.commands[i].join(" ")
             var option = fieldset.querySelector("form.option")
             check_option(option)
             var option = fieldset.querySelector("form.option")
@@ -721,7 +721,7 @@ window.onload = function() {
     init_context()
     init_command()
     init_userinfo()
-    init_workflow()
+    init_bench()
     init_control()
 }
 
