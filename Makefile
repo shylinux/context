@@ -7,7 +7,7 @@ install:
 	@go get github.com/skip2/go-qrcode
 	@go get github.com/gomarkdown/markdown
 	@go get github.com/PuerkitoBio/goquery
-	go install $(BENCH)
+	GOPATH=$(PWD):$(GOPATH) go install $(BENCH)
 	@date
 	# bench web.code.counter nmake 1
 

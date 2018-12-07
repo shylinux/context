@@ -863,8 +863,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if key == "" {
 					key = m.Sess("aaa").Cmd("md5", m.Option("remote_addr"), create_time).Result(0)
 				}
+
 				link := fmt.Sprintf("%s?bench=%s", m.Conf("site"), key)
-				if _, ok := m.Confv("bench").(map[string]interface{}); !ok {
+				if _, ok := m.Confv("bench", key).(map[string]interface{}); !ok {
 					m.Log("info", "%s create bench  %s", m.Option("username"), key)
 					m.Confv("bench", key, map[string]interface{}{
 						"remote_addr": m.Option("remote_addr"),
@@ -884,8 +885,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			bench := m.Confv("bench").(map[string]interface{})
 			if len(arg) > 0 && arg[0] == "check" { // 检查工作流
+				bench := m.Confv("bench", m.Option("bench")).(map[string]interface{})
 				if bench["creator"].(string) != arg[1] {
 					switch bench["share"].(string) {
 					case "private":
@@ -899,6 +900,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
+			bench := m.Confv("bench").(map[string]interface{})
 			if len(arg) > 0 && arg[0] == "delete" { // 删除工作流
 				delete(bench, arg[1])
 				arg = arg[2:]
