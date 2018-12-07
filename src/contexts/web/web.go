@@ -98,6 +98,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("dir_root", m.Cap("directory"))
 			msg.Option("referer", r.Header.Get("Referer"))
 			msg.Option("accept", r.Header.Get("Accept"))
+			msg.Option("index_path", r.Header.Get("index_path"))
 
 			r.ParseMultipartForm(int64(m.Confi("multipart_bsize")))
 			if r.ParseForm(); len(r.PostForm) > 0 {
@@ -994,6 +995,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				if !right {
 					login = m.Spawn().Cmd("session").Appendv("login").(*ctx.Message)
+					if login != nil && m.Option("username") == "" {
+						m.Option("username", login.Cap("stream"))
+					}
 				}
 				if login != nil {
 					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: login.Cap("sessid"), Path: "/"})
@@ -1016,7 +1020,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				bench_share := ""
 				if right {
 					if _, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{}); !ok { // 创建工作流
-						m.Append("redirect", fmt.Sprintf("?bench=%s", m.Spawn().Cmd("bench", "create").Append("key")))
+						m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Spawn().Cmd("bench", "create").Append("key")))
 						return
 					}
 					if bench_share = m.Spawn().Cmd("bench", "check", m.Option("username")).Result(0); bench_share == "private" {
