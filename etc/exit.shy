@@ -1,7 +1,7 @@
 source etc/exit_local.shy
 
-~code
-    config save counter.json counter
+~web
+    config save web.json bench
 ~stdio
     config save history.json history
 
