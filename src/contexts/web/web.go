@@ -98,7 +98,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("dir_root", m.Cap("directory"))
 			msg.Option("referer", r.Header.Get("Referer"))
 			msg.Option("accept", r.Header.Get("Accept"))
-			msg.Option("index_path", r.Header.Get("index_path"))
 
 			r.ParseMultipartForm(int64(m.Confi("multipart_bsize")))
 			if r.ParseForm(); len(r.PostForm) > 0 {
@@ -312,23 +311,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"login_lark":      &ctx.Config{Name: "login_lark", Value: "false", Help: "缓存大小"},
-		"login_right":     &ctx.Config{Name: "login_right", Value: "1", Help: "缓存大小"},
-		"log_uri":         &ctx.Config{Name: "log_uri", Value: "false", Help: "缓存大小"},
-		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
-		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
+		"log_uri":         &ctx.Config{Name: "log_uri", Value: "false", Help: "输出请求"},
 		"method":          &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
-		"brow_home":       &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "服务"},
-		"directory":       &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
-		"address":         &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
-		"protocol":        &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
-		"cert":            &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "路由数量"},
-		"key":             &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "路由数量"},
-		"site":            &ctx.Config{Name: "site", Value: "", Help: "网站地址"},
+		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
+		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
+		"brow_home":       &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "浏览服务"},
 
-		"cas_url":          &ctx.Config{Name: "cas_url", Value: "", Help: "模板路径"},
-		"library_dir":      &ctx.Config{Name: "library_dir", Value: "usr/librarys", Help: "模板路径"},
-		"template_dir":     &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板路径"},
+		"directory": &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
+		"protocol":  &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
+		"address":   &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
+		"site":      &ctx.Config{Name: "site", Value: "", Help: "网站地址"},
+		"cert":      &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "证书"},
+		"key":       &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "密钥"},
+
+		"login_right": &ctx.Config{Name: "login_right", Value: "1", Help: "登录认证"},
+		"login_lark":  &ctx.Config{Name: "login_lark", Value: "false", Help: "会话认证"},
+		"cas_url":     &ctx.Config{Name: "cas_url", Value: "", Help: "单点登录"},
+
+		"library_dir":      &ctx.Config{Name: "library_dir", Value: "usr/librarys", Help: "脚本目录"},
+		"template_dir":     &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板目录"},
 		"template_debug":   &ctx.Config{Name: "template_debug", Value: "true", Help: "模板调试"},
 		"componet_context": &ctx.Config{Name: "component_context", Value: "nfs", Help: "默认模块"},
 		"componet_command": &ctx.Config{Name: "component_command", Value: "pwd", Help: "默认命令"},
@@ -351,11 +352,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "组件列表"},
 
-		"bench": &ctx.Config{Name: "bench", Value: map[string]interface{}{}, Help: "默认组件"},
+		"bench": &ctx.Config{Name: "bench", Value: map[string]interface{}{}, Help: "工作流"},
 		"bench_view": &ctx.Config{Name: "bench_view", Value: map[string]interface{}{
 			"base": []interface{}{"key", "share", "comment", "creator", "create_time", "modify_time", "commands"},
 			"link": []interface{}{"share", "comment", "creator", "link"},
-		}, Help: "默认组件"},
+		}, Help: "工作流"},
 	},
 	Commands: map[string]*ctx.Command{
 		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -939,28 +940,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Copy(msg, "append").Copy(msg, "result")
 		}},
 
-		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request)
-			f, h, e := r.FormFile("upload")
-			m.Assert(e)
-			defer f.Close()
-
-			p := path.Join(m.Conf("directory"), m.Option("download_dir"), h.Filename)
-			o, e := os.Create(p)
-			m.Assert(e)
-			defer o.Close()
-
-			io.Copy(o, f)
-			m.Log("upload", "file: %s", p)
-			m.Append("redirect", m.Option("referer"))
-		}},
-		"/download/": &ctx.Command{Name: "/download/", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			r := m.Optionv("request").(*http.Request)
-			w := m.Optionv("response").(http.ResponseWriter)
-			p := m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0)
-			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("md5", p).Result(0))
-			http.ServeFile(w, r, p)
-		}},
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
@@ -995,9 +974,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				if !right {
 					login = m.Spawn().Cmd("session").Appendv("login").(*ctx.Message)
-					if login != nil && m.Option("username") == "" {
-						m.Option("username", login.Cap("stream"))
-					}
 				}
 				if login != nil {
 					http.SetCookie(w, &http.Cookie{Name: "sessid", Value: login.Cap("sessid"), Path: "/"})
@@ -1020,7 +996,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				bench_share := ""
 				if right {
 					if _, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{}); !ok { // 创建工作流
-						m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Spawn().Cmd("bench", "create").Append("key")))
+						m.Append("redirect", fmt.Sprintf("?bench=%s", m.Spawn().Cmd("bench", "create").Append("key")))
 						return
 					}
 					if bench_share = m.Spawn().Cmd("bench", "check", m.Option("username")).Result(0); bench_share == "private" {
@@ -1141,6 +1117,28 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					en.Encode(list)
 				}
 			}
+		}},
+		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
+			f, h, e := r.FormFile("upload")
+			m.Assert(e)
+			defer f.Close()
+
+			p := path.Join(m.Conf("directory"), m.Option("download_dir"), h.Filename)
+			o, e := os.Create(p)
+			m.Assert(e)
+			defer o.Close()
+
+			io.Copy(o, f)
+			m.Log("upload", "file: %s", p)
+			m.Append("redirect", m.Option("referer"))
+		}},
+		"/download/": &ctx.Command{Name: "/download/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
+			p := m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0)
+			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("md5", p).Result(0))
+			http.ServeFile(w, r, p)
 		}},
 		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn().Cmd("get", strings.TrimPrefix(key, "/proxy/"), arg)

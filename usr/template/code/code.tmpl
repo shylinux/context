@@ -124,6 +124,8 @@
 </fieldset>
 {{end}}
 
+{{define "docker"}}{{conf . bench}}{{end}}
+
 {{define "componet"}}
 <fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "componet_ctx"}}.{{option .Meta "componet_cmd"}})</legend>
     {{$form_type := option . "form_type"|meta}}
