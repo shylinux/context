@@ -2257,6 +2257,15 @@ var CGI = template.FuncMap{
 		return template.HTML(str)
 	},
 
+	"json": func(arg ...interface{}) interface{} {
+		if len(arg) == 0 {
+			return ""
+		}
+
+		b, _ := json.Marshal(arg[0])
+		return string(b)
+	},
+
 	"list": func(arg interface{}) interface{} {
 		n := 0
 		switch v := arg.(type) {

@@ -227,8 +227,7 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 
 	web.ServeMux = http.NewServeMux()
 	web.Template = template.New("render").Funcs(ctx.CGI)
-	web.Template.ParseGlob(path.Join(m.Conf("template_dir"), "/*.tmpl"))
-	web.Template.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl"))
+	template.Must(web.Template.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl")))
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
@@ -1079,8 +1078,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
 							if val["componet_cmd"] != nil {
 								if bench_share != "protected" {
-									m.Confv("bench", []interface{}{m.Option("bench"), "commands", m.Option("componet_name_order")}, args[1:])
-									m.Confv("bench", []interface{}{m.Option("bench"), "modify_time"}, time.Now().Format(m.Conf("time_format")))
+									now := time.Now().Format(m.Conf("time_format"))
+									m.Confv("bench", []interface{}{m.Option("bench"), "commands", m.Option("componet_name_order")}, map[string]interface{}{
+										"cmd": args[1:],
+										"now": now,
+									})
+									m.Confv("bench", []interface{}{m.Option("bench"), "modify_time"}, now)
 								}
 
 								msg.Cmd(args)

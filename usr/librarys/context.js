@@ -174,3 +174,16 @@ function insert_button(which, value, callback) {
         "type": "button", "value": value, "onclick": callback,
     })
 }
+
+function right(arg) {
+    if (arg == "true") {
+        return true
+    }
+    if (arg == "false") {
+        return false
+    }
+    if (arg) {
+        return true
+    }
+    return false
+}

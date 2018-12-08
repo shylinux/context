@@ -36,6 +36,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			},
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "head", "template": "head"},
+				map[string]interface{}{"componet_name": "docker", "componet_help": "docker", "template": "docker"},
 				map[string]interface{}{"componet_name": "login", "componet_help": "login", "template": "componet",
 					"componet_ctx": "aaa", "componet_cmd": "login", "arguments": []interface{}{"@username", "@password"},
 					"inputs": []interface{}{

@@ -21,6 +21,35 @@
     }
 </style>
 <style>
+    div.workflow {
+        position:fixed;
+        background-color:red;
+        top:200px;
+        left:20px;
+        width:40px;
+        height:20px;
+        overflow:hidden;
+    }
+    div.workflow:hover {
+        width:480px;
+        height:200px;
+        overflow:scroll;
+    }
+    div.workflow.min {
+        width:40px;
+        height:20px;
+    }
+    div.workflow ul.docker ul li {
+    }
+    div.workflow ul.docker ul li:hover {
+        background-color:green;
+    }
+    div.workflow ul.docker li span:hover {
+        background-color:green;
+    }
+    form.option div {
+        float:left;
+    }
     textarea.clipboard {
         color:white;
         background-color:#272822;
@@ -124,7 +153,32 @@
 </fieldset>
 {{end}}
 
-{{define "docker"}}{{conf . bench}}{{end}}
+{{define "docker"}}
+{{$key := option . "bench"}}
+{{$bench := conf . "bench" $key}}
+<script>var workflow = {{conf . "bench"}}</script>
+<div class="workflow">
+    <span>flow</span>
+    <ul class="docker">
+        <li><span>工作流</span>
+            <ul class="fly">
+                <li data-action="create_fly">+ 创建工作流</li>
+                {{range $key, $item := conf . "bench"}}
+                    <li data-key="{{$key}}">{{index $item "modify_time"}} {{index $item "comment"}}({{index $item "creator"}})</li>
+                {{end}}
+            </ul>
+        </li>
+        <li><span>命令行</span>
+            <ul class="cmd">
+                <li data-action="create_cmd">+ 创建命令行</li>
+                {{range $index, $cmd := index $bench "commands"}}
+                    <li class="command{{$index}}" data-cmd="{{$index}}">{{index $cmd "now"|option}} {{$index}}: {{index $cmd "cmd"|option}}</li>
+                {{end}}
+            </ul>
+        </li>
+    </ul>
+</div>
+{{end}}
 
 {{define "componet"}}
 <fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "componet_ctx"}}.{{option .Meta "componet_cmd"}})</legend>
