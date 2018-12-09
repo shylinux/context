@@ -342,8 +342,6 @@ function onaction(event, action, arg) {
     var dataset = target.dataset
 
     switch (action) {
-        case "workflow":
-            break
         case "scroll":
             var body = document.getElementsByTagName("body")[0]
             if (target.tagName == "BODY") {
@@ -395,60 +393,65 @@ function onaction(event, action, arg) {
             if (target.tagName == "INPUT" && target.type == "text") {
                 return
             }
+            if (event.ctrlKey) {
+                switch (event.key) {
+                    case "b":
+                        var item = document.querySelector("div.workflow>div")
+                        item.onclick()
+                        break
+                    case "p":
+                        var target = document.querySelector("div.workflow>ul>li>ul>li[data-action=quick_txt]")
+                        code.quick_txt = !code.quick_txt
+                        target.className= code.quick_txt? "quick": ""
+                        break
+                    case "y":
+                        copy_to_clipboard(prompt("text"))
+                        break
+                    case "s":
+                        save_clipboard(document.querySelector("div.workflow>ul>li>ul.txt>li[data-action=save_txt"))
+                        break
+                    case "m":
+                        add_command()
+                        break
+                    case "z":
+                        shrink_command_result()
+                        break
+                    case "r":
+                        location.reload()
+                        break
+                    case "t":
+                        location.search = ""
+                        break
+                    case "g":
+                        document.querySelectorAll("form.option label.keymap").forEach(function(item) {
+                            code.showmap = !(item.className == "keymap show")
+                            item.className = code.showmap? "keymap show": "keymap hide"
+                        })
+                        break
+                    case "0":
+                        document.querySelector("form.option.command input[name=cmd]").focus()
+                        break
+                    case "1":
+                    case "2":
+                    case "3":
+                    case "4":
+                    case "5":
+                    case "6":
+                    case "7":
+                    case "8":
+                    case "9":
+                        document.querySelector("form.option.command"+event.key+" input[name=cmd]").focus()
+                        break
+                }
+                return
+            }
+
             switch (event.key) {
-                case "g":
-                    document.querySelectorAll("form.option label.keymap").forEach(function(item) {
-                        code.showmap = !(item.className == "keymap show")
-                        item.className = code.showmap? "keymap show": "keymap hide"
-                    })
-                    break
-                case "m":
-                    add_command()
-                    break
-                case "z":
-                    shrink_command_result()
-                    break
-                case "s":
-                    save_clipboard(document.querySelector("div.workflow>ul>li>ul.txt>li[data-action=save_txt"))
-                    break
-                case "y":
-                    copy_to_clipboard(prompt("text"))
-                    break
-                case "r":
-                    location.reload()
-                    break
-                case "t":
-                    location.search = ""
-                    break
-                case "0":
-                    document.querySelector("form.option.command input[name=cmd]").focus()
-                    break
-                case "1":
-                case "2":
-                case "3":
-                case "4":
-                case "5":
-                case "6":
-                case "7":
-                case "8":
-                case "9":
-                    document.querySelector("form.option.command"+event.key+" input[name=cmd]").focus()
-                    break
                 default:
                     if (code.inputs[event.key]) {
                         code.inputs[event.key].focus()
                     }
                     break
-            }
-            break
-        case "command":
-            check_option(target.form, target)
-            break
-        case "click":
-            if (target.nodeName == "INPUT" && event.altKey) {
-                var board = document.querySelector(".clipboard")
-                target.value = board.value
-                check_option(target.form, target)
             }
             break
         case "input":
@@ -468,7 +471,6 @@ function onaction(event, action, arg) {
             var result = command.querySelector("code.result pre")
 
             if (event.ctrlKey) {
-// yt
                 switch (event.key) {
                     case "1":
                     case "2":
@@ -600,13 +602,24 @@ function onaction(event, action, arg) {
                         break
                 }
             }
+
             if (dataset["last_char"] == "j" && event.key == "k") {
                 target.value = target.value.substr(0, target.value.length-2)
                 target.blur()
             }
 
             dataset["last_char"] = event.key
-            return false
+            break
+        case "click":
+            if (target.nodeName == "INPUT" && event.altKey) {
+                var board = document.querySelector(".clipboard")
+                target.value = board.value
+                check_option(target.form, target)
+            }
+            break
+        case "command":
+            check_option(target.form, target)
+            break
     }
 }
 

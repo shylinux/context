@@ -136,7 +136,7 @@
     }
 </style>
 </head>
-<body onkeyup="return onaction(event, 'keymap')" onkeydown="return onaction(event, 'scroll')">
+<body onkeydown="return onaction(event, 'scroll')" onkeyup="return onaction(event, 'keymap')">
 <script>
     {{$id := option . "bench"|option}}
     var bench ={{conf . "bench" $id}}
@@ -164,13 +164,13 @@
 {{$bench := conf . "bench" $key}}
 <script>var workflow = {{conf . "bench"}}</script>
 <div class="workflow">
-    <div>&nbsp;bench</div>
+    <div>&nbsp;bench (Ctrl+B)</div>
     <ul class="docker">
         <li><span>粘贴板</span>
             <ul class="txt">
                 <li data-action="save_txt">+ 保存粘贴板(Ctrl+S)</li>
                 <li data-action="create_txt">+ 添加粘贴板(Ctrl+Y)</li>
-                <li data-action="quick_txt">+ 快捷粘贴板</li>
+                <li data-action="quick_txt">+ 快捷粘贴板(Ctrl+P)</li>
             </ul>
         </li>
         <li><span>命令行</span>
