@@ -609,7 +609,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					return
 				}
 
-				if m.Sess("nfs").Cmd("path", arg[0]).Results(0) {
+				if m.Sess("nfs").Cmd("path", arg[0]).Results(0) && arg[0] != "bench" {
 					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
 					if len(arg) < 2 || arg[1] != "async" {
 						m.Wait()
@@ -624,7 +624,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 	"source_ctx":  m.Option("current_ctx"),
 				// 	"source_cmd":  strings.Join(arg, " "),
 				// })
-                //
+				//
 				if m.Options("current_ctx") {
 					args := []string{"context", m.Option("current_ctx")}
 					arg = append(args, arg...)

@@ -174,7 +174,6 @@ function insert_button(which, value, callback) {
         "type": "button", "value": value, "onclick": callback,
     })
 }
-
 function right(arg) {
     if (arg == "true") {
         return true
@@ -187,3 +186,28 @@ function right(arg) {
     }
     return false
 }
+
+function format_date(arg) {
+    var date = arg.getDate()
+    if (date < 10) {
+        date = "0"+date
+    }
+    var month = arg.getMonth()+1
+    if (month < 10) {
+        month = "0"+month
+    }
+    var hour = arg.getHours()
+    if (hour < 10) {
+        hour = "0"+hour
+    }
+    var minute = arg.getMinutes()
+    if (minute < 10) {
+        minute = "0"+minute
+    }
+    var second = arg.getSeconds()
+    if (second < 10) {
+        second = "0"+second
+    }
+    return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
+}
+

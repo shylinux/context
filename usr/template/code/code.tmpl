@@ -22,30 +22,35 @@
 </style>
 <style>
     div.workflow {
+        font-size:14px;
+        font-family:monospace;
         position:fixed;
-        background-color:red;
-        top:200px;
-        left:20px;
-        width:40px;
+        background-color:#498bb1a8;
+        border:solid 3px red;
+        color:#e6dd37;
+        top:{{conf . "docker_view" "top"}}px;
+        left:{{conf . "docker_view" "left"}}px;
+        width:60px;
         height:20px;
         overflow:hidden;
     }
-    div.workflow:hover {
-        width:480px;
-        height:200px;
+    div.workflow:hover, div.workflow.min:hover {
+        width:{{conf . "docker_view" "width"}}px;
+        height:{{conf . "docker_view" "height"}}px;
         overflow:scroll;
     }
-    div.workflow.min {
-        width:40px;
-        height:20px;
+    div.workflow.max {
+        width:{{conf . "docker_view" "width"}}px;
+        height:{{conf . "docker_view" "height"}}px;
     }
-    div.workflow ul.docker ul li {
+    div.workflow ul.docker ul li.quick {
+        background-color:red;
     }
     div.workflow ul.docker ul li:hover {
-        background-color:green;
+        background-color:red;
     }
     div.workflow ul.docker li span:hover {
-        background-color:green;
+        background-color:red;
     }
     form.option div {
         float:left;
@@ -155,25 +160,39 @@
 
 {{define "docker"}}
 {{$key := option . "bench"}}
+{{$username := option . "username"|option}}
 {{$bench := conf . "bench" $key}}
 <script>var workflow = {{conf . "bench"}}</script>
 <div class="workflow">
-    <span>flow</span>
+    <div>&nbsp;bench</div>
     <ul class="docker">
-        <li><span>工作流</span>
-            <ul class="fly">
-                <li data-action="create_fly">+ 创建工作流</li>
-                {{range $key, $item := conf . "bench"}}
-                    <li data-key="{{$key}}">{{index $item "modify_time"}} {{index $item "comment"}}({{index $item "creator"}})</li>
-                {{end}}
+        <li><span>粘贴板</span>
+            <ul class="txt">
+                <li data-action="save_txt">+ 保存粘贴板(Ctrl+S)</li>
+                <li data-action="create_txt">+ 添加粘贴板(Ctrl+Y)</li>
+                <li data-action="quick_txt">+ 快捷粘贴板</li>
             </ul>
         </li>
         <li><span>命令行</span>
             <ul class="cmd">
-                <li data-action="create_cmd">+ 创建命令行</li>
+                <li data-action="shrink_cmd">+ 折叠命令行(Ctrl+Z)</li>
+                <li data-action="create_cmd">+ 添加命令行(Ctrl+M)</li>
                 {{range $index, $cmd := index $bench "commands"}}
                     <li class="command{{$index}}" data-cmd="{{$index}}">{{index $cmd "now"|option}} {{$index}}: {{index $cmd "cmd"|option}}</li>
                 {{end}}
+            </ul>
+        </li>
+        <li><span>工作流</span>
+            <ul class="fly">
+                <li data-action="refresh_fly">+ 刷新工作流(Ctrl+R)</li>
+                <li data-action="create_fly">+ 添加工作流(Ctrl+T)</li>
+                {{range $key, $item := conf . "bench"}}
+                    {{$creator := index $item "creator"}}
+                    {{if eq $creator $username}}
+                        <li data-key="{{$key}}">{{index $item "modify_time"}} {{index $item "comment"}}({{index $item "creator"}})</li>
+                    {{end}}
+                {{end}}
+                <li data-action="rename_fly">+ 命名工作流</li>
             </ul>
         </li>
     </ul>
@@ -273,3 +292,4 @@
 <script src="/librarys/code.js"></script>
 </body>
 {{end}}
+

@@ -227,7 +227,7 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 
 	web.ServeMux = http.NewServeMux()
 	web.Template = template.New("render").Funcs(ctx.CGI)
-	template.Must(web.Template.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl")))
+	web.Template.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl"))
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
@@ -355,6 +355,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"bench_view": &ctx.Config{Name: "bench_view", Value: map[string]interface{}{
 			"base": []interface{}{"key", "share", "comment", "creator", "create_time", "modify_time", "commands"},
 			"link": []interface{}{"share", "comment", "creator", "link"},
+		}, Help: "工作流"},
+		"docker_view": &ctx.Config{Name: "docker_view", Value: map[string]interface{}{
+			"top": 200, "left": 10, "width": 480, "height": 320,
 		}, Help: "工作流"},
 	},
 	Commands: map[string]*ctx.Command{

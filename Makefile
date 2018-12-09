@@ -23,9 +23,9 @@ install_all: install
 run:
 	etc/bootstrap.sh
 shy:
-	cp -r src/ ~/shycontext/
-	cp -r usr/template/ ~/shycontext/usr/
-	cp -r usr/librarys/ ~/shycontext/usr/
+	cp -r src/contexts ~/context/src/
+	cp -r usr/template ~/context/usr/
+	cp -r usr/librarys/ ~/context/usr/
 
 tar:
 	[ -e tar ] || mkdir tar

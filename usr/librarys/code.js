@@ -4,15 +4,37 @@ var code = {
     inputs: [],
     ninput: 0,
 
+    quick_txt: false,
+    ntext: 1,
+
     ncommand: 1,
     show_result: true,
     show_height: "30px",
     hide_height: "14px",
     scroll_x: 50,
     scroll_y: 50,
+    current_cmd: "",
 }
 
-function copy_to_clipboard(text) {
+function save_clipboard(item) {
+    var txt = []
+    var li = item.parentElement.children
+    for (var i = 0; i < li.length; i++) {
+        if (li[i].dataset["text"]) {
+            txt.push(li[i].dataset["text"])
+        }
+    }
+
+    context.GET("", {
+        "componet_bench": context.Search("bench"),
+        "componet_group": "index",
+        "componet_name": "command",
+        "cmd": "bench "+context.Search("bench")+".clipstack"+" '"+JSON.stringify(txt)+"'"
+    }, function(msg) {
+        alert("保存成功")
+    })
+}
+function copy_to_clipboard(text, skip_docker) {
     var clipboard = modify_node(".clipboard", {"value": text})
     clipboard.select()
     document.execCommand("copy")
@@ -21,6 +43,31 @@ function copy_to_clipboard(text) {
     var clipstack = document.querySelector("#clipstack")
     insert_child(clipstack, "option").value = text
     clipstack.childElementCount > 3 && clipstack.removeChild(clipstack.lastElementChild)
+
+    if (skip_docker) {
+        return
+    }
+
+    var txt = document.querySelector("div.workflow>ul>li>ul.txt")
+    var target = append_child(txt, "li", {
+        "innerText": format_date(new Date())+" "+(code.ntext++)+": "+text,
+        "dataset": {
+            "text": text,
+            "action": "copy_txt",
+        },
+        "onclick": function(event) {
+            if (event.altKey) {
+                target.parentElement.removeChild(target)
+                return
+            }
+            if (event.shiftKey) {
+                var cmd = document.querySelector("form.option.command"+code.current_cmd+" input[name=cmd]")
+                cmd && (cmd.value += " "+text)
+                return
+            }
+            copy_to_clipboard(text, true)
+        },
+    })
 }
 function add_keymap(input) {
     if (code.ninput < code.keymap.length && input.style.display != "none") {
@@ -52,7 +99,7 @@ function add_sort(append, field, cb) {
                     var has = document.querySelector("td.clip")
                     has && (has.className = "")
                     target.className = "clip"
-                    copy_to_clipboard(target.innerText)
+                    copy_to_clipboard(target.innerText, !event.shiftKey)
                 }
             }
         }
@@ -87,7 +134,18 @@ function del_command(target) {
         }
     }
 }
+function shrink_command_result() {
+    code.show_result = !code.show_result
+    document.querySelectorAll("form.option input[name=cmd]").forEach(function(input) {
+        for (var command = input; command.tagName != "FIELDSET"; command = command.parentElement) {}
+        var append = command.querySelector("table.append")
+        var result = command.querySelector("code.result pre")
+        // append.style.display = (code.show_result||!append.querySelector("tr"))? "": "none"
+        result.style.height = (code.show_result||result.innerText=="")? "": code.show_height
+    })
+}
 function add_command(init) {
+    var order = code.ncommand
     var name = "command"+code.ncommand++
 
     var fieldset = append_child(document.querySelector("body"), "fieldset")
@@ -100,14 +158,15 @@ function add_command(init) {
             "componet_name": "command",
             "componet_bench": context.Search("bench"),
             "componet_name_alias": name,
-            "componet_name_order": code.ncommand-1,
+            "componet_name_order": order,
         }
     })
 
     append_child(option, "input", {"style": {"display": "none"}})
     add_keymap(append_child(option, "input", {
         "name": "cmd", "className": "cmd",
-        "onkeyup": function(event){onaction(event, "input")}
+        "onkeyup": function(event) {onaction(event, "input")},
+        "onfocus": function(event) {code.current_cmd=order}
     })).focus()
 
     add_sort(append_child(fieldset, "table", {"className": "append "+name}))
@@ -119,14 +178,12 @@ function add_command(init) {
 
     var cmds = document.querySelector("div.workflow ul.cmd")
     var cmd = append_child(cmds, "li", {
-        "innertText": code.ncommand+": ",
+        "innertText": order+": ",
         "className": name,
         "dataset": {
-            "cmd": code.ncommand-1,
+            "cmd": order,
         }
     })
-
-    init_docker()
     return fieldset
 }
 
@@ -141,8 +198,7 @@ function send_command(form, cb) {
 
     var order = (data["componet_name_order"]||"")
     var cmd = document.querySelector("div.workflow>ul>li>ul>li.command"+order)
-    var now = new Date()
-    cmd && (cmd.innerText = now.getFullYear()+"-"+(now.getMonth()+1)+"-"+now.getDay()+" "+now.getHours()+":"+now.getMinutes()+":"+now.getSeconds()+" : "+order+" "+data["cmd"])
+    cmd && (cmd.innerText = format_date(new Date())+" "+order+": "+data["cmd"])
 
     context.GET("", data, function(msg) {
         msg = msg[0]
@@ -350,14 +406,19 @@ function onaction(event, action, arg) {
                     add_command()
                     break
                 case "z":
-                    code.show_result = !code.show_result
-                    document.querySelectorAll("form.option input[name=cmd]").forEach(function(input) {
-                        for (var command = input; command.tagName != "FIELDSET"; command = command.parentElement) {}
-                        var append = command.querySelector("table.append")
-                        var result = command.querySelector("code.result pre")
-                        // append.style.display = (code.show_result||!append.querySelector("tr"))? "": "none"
-                        result.style.height = (code.show_result||result.innerText=="")? "": code.show_height
-                    })
+                    shrink_command_result()
+                    break
+                case "s":
+                    save_clipboard(document.querySelector("div.workflow>ul>li>ul.txt>li[data-action=save_txt"))
+                    break
+                case "y":
+                    copy_to_clipboard(prompt("text"))
+                    break
+                case "r":
+                    location.reload()
+                    break
+                case "t":
+                    location.search = ""
                     break
                 case "0":
                     document.querySelector("form.option.command input[name=cmd]").focus()
@@ -401,11 +462,12 @@ function onaction(event, action, arg) {
                 break
             }
 
+            for (var command = target; command.tagName != "FIELDSET"; command = command.parentElement) {}
+            var option = command.querySelector("form.option")
+            var append = command.querySelector("table.append")
+            var result = command.querySelector("code.result pre")
+
             if (event.ctrlKey) {
-                for (var command = target; command.tagName != "FIELDSET"; command = command.parentElement) {}
-                var option = command.querySelector("form.option")
-                var append = command.querySelector("table.append")
-                var result = command.querySelector("code.result pre")
 // yt
                 switch (event.key) {
                     case "1":
@@ -417,11 +479,16 @@ function onaction(event, action, arg) {
                     case "7":
                     case "8":
                     case "9":
-                        var item = document.querySelectorAll("table.append.command"+(parseInt(option.dataset.componet_name_order)-1)+" td")
-                        if (event.shiftKey) {
-                            var item = document.querySelectorAll("table.append.command1 td")
+                        if (code.quick_txt) {
+                            var item = document.querySelectorAll("div.workflow>ul>li>ul.txt>li[data-text]")
+                            target.value += item[parseInt(event.key)-1].dataset["text"]
+                        } else {
+                            var item = document.querySelectorAll("table.append.command"+(parseInt(option.dataset.componet_name_order)-1)+" td")
+                            if (event.shiftKey) {
+                                var item = document.querySelectorAll("table.append.command1 td")
+                            }
+                            target.value += item[parseInt(event.key)-1].innerText
                         }
-                        target.value += item[parseInt(event.key)-1].innerText
                         break
                     case "0":
                         var pre_pre = document.querySelector("code.result.command"+(parseInt(option.dataset.componet_name_order)-1)+" pre")
@@ -731,8 +798,8 @@ function init_bench() {
 }
 
 function init_docker() {
+    // 移动
     document.querySelectorAll("div.workflow").forEach(function(item) {
-        what = item
         var moving = false
         item.onclick = function(event) {
             if (event.target != item) {
@@ -747,31 +814,87 @@ function init_docker() {
             if (moving) {
                 item.style.left = (item.offsetLeft+event.movementX)+"px"
                 item.style.top = (item.offsetTop+event.movementY)+"px"
+                context.Cookie("docker_left", item.style.left)
+                context.Cookie("docker_top", item.style.top)
             }
         }
+        item.style.left = context.Cookie("docker_left")
+        item.style.top = context.Cookie("docker_top")
     })
-
-    document.querySelectorAll("div.workflow>span").forEach(function(item) {
+    // 固定
+    document.querySelectorAll("div.workflow>div").forEach(function(item) {
         item.onclick = function(event) {
-            item.dataset["hide"] = !right(item.dataset["hide"])
-            item.parentElement.className = right(item.dataset["hide"])? "workflow min": "workflow"
+            item.dataset["show"] = !right(item.dataset["show"])
+            item.parentElement.className = right(item.dataset["show"])? "workflow max": "workflow"
+            context.Cookie("docker_class", item.parentElement.className)
+        }
+        if (context.Cookie("docker_class")) {
+            item.parentElement.className = context.Cookie("docker_class")
         }
     })
+    // 折叠
     document.querySelectorAll("ul.docker>li>span").forEach(function(item) {
         item.onclick = function(event) {
             item.dataset["hide"] = !right(item.dataset["hide"])
             item.nextElementSibling.style.display = right(item.dataset["hide"])? "none": ""
         }
     })
+
+    var txt = bench.clipstack
+    if (txt) {
+        text = JSON.parse(txt)
+        for (var i = 0; i < text.length; i++) {
+            copy_to_clipboard(text[i])
+        }
+    }
+    // 事件
     document.querySelectorAll("ul.docker>li>ul>li").forEach(function(item) {
         item.onclick = function(event) {
+            var target = event.target
             var data = item.dataset
             switch (data["action"]) {
-                case "create_fly":
-                    location.search = ""
+                case "quick_txt":
+                    code.quick_txt = !code.quick_txt
+                    target.className= code.quick_txt? "quick": ""
+                    break
+                case "copy_txt":
+                    if (event.altKey) {
+                        target.parentElement.removeChild(target)
+                        return
+                    }
+                    if (event.shiftKey) {
+                        var cmd = document.querySelector("form.option.command"+code.current_cmd+" input[name=cmd]")
+                        cmd && (cmd.value += " "+text)
+                        return
+                    }
+                    copy_to_clipboard(data["text"], true)
+                    break
+                case "save_txt":
+                    save_clipboard(item)
+                    return
+                case "create_txt":
+                    copy_to_clipboard(prompt("text"))
+                    return
+                case "shrink_cmd":
+                    shrink_command_result()
                     return
                 case "create_cmd":
                     add_command()
+                    return
+                case "refresh_fly":
+                    location.reload()
+                    return
+                case "create_fly":
+                    location.search = ""
+                    return
+                case "rename_fly":
+                    context.GET("", {
+                        "componet_bench": context.Search("bench"),
+                        "componet_group": "index",
+                        "componet_name": "command",
+                        "cmd": "bench "+context.Search("bench")+".comment"+" "+prompt("name"),
+                    })
+                    location.reload()
                     return
             }
             if (data["key"] && context.Search("bench") != data["key"]) {
@@ -779,7 +902,7 @@ function init_docker() {
                 return
             }
             var cmd = document.querySelector("form.option.command"+data["cmd"]+" input[name=cmd]")
-            cmd.focus()
+            cmd && cmd.focus()
         }
     })
 }
