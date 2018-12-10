@@ -4,18 +4,20 @@ var code = {
     inputs: [],
     ninput: 0,
 
-    quick_txt: false,
     ntext: 1,
+    quick_txt: false,
 
     ncommand: 1,
+    current_cmd: "",
+
     show_result: true,
     show_height: "30px",
     hide_height: "14px",
     scroll_x: 50,
     scroll_y: 50,
-    current_cmd: "",
 }
 
+// 粘贴板
 function save_clipboard(item) {
     var txt = []
     var li = item.parentElement.children
@@ -69,6 +71,7 @@ function copy_to_clipboard(text, skip_docker) {
         },
     })
 }
+
 function add_keymap(input) {
     if (code.ninput < code.keymap.length && input.style.display != "none") {
         input.title = "keymap: "+code.keymap[code.ninput]
@@ -105,6 +108,8 @@ function add_sort(append, field, cb) {
         }
     }
 }
+
+// 命令行
 function del_command(target) {
     var can_remove = false
     var order = -1
@@ -186,7 +191,6 @@ function add_command(init) {
     })
     return fieldset
 }
-
 function send_command(form, cb) {
     var data = {}
     for (var key in form.dataset) {
@@ -236,7 +240,6 @@ function send_command(form, cb) {
         typeof(cb) == "function" && cb(msg)
     })
 }
-
 function check_option(form, target) {
     for (var i = 0; i < form.length-1; i++) {
         if (form[i] == target) {
@@ -250,6 +253,7 @@ function check_option(form, target) {
     }
     send_command(form)
 }
+
 function add_history(input, cmd) {
     var dataset = event.target.dataset
     var history = JSON.parse(input.dataset["history"] || "[]")
@@ -402,7 +406,7 @@ function onaction(event, action, arg) {
                     case "p":
                         var target = document.querySelector("div.workflow>ul>li>ul>li[data-action=quick_txt]")
                         code.quick_txt = !code.quick_txt
-                        target.className= code.quick_txt? "quick": ""
+                        target.className= code.quick_txt? "stick": ""
                         break
                     case "y":
                         copy_to_clipboard(prompt("text"))
@@ -629,13 +633,10 @@ function init_option() {
     code.keymap =[]
     for (var i = 97; i < 123; i++) {
         switch (i) {
-            case "g".charCodeAt(0):
             case "j".charCodeAt(0):
             case "k".charCodeAt(0):
             case "h".charCodeAt(0):
             case "l".charCodeAt(0):
-            case "z".charCodeAt(0):
-            case "m".charCodeAt(0):
                 continue
         }
         code.keymap.push(String.fromCharCode(i))
@@ -650,6 +651,17 @@ function init_result(event) {
         item.onclick = function(event) {
             // copy_to_clipboard(event.target.innerText)
         }
+    })
+}
+
+function init_userinfo() {
+    var option = document.querySelector("form.option.userinfo")
+    var append = document.querySelector("table.append.userinfo")
+    if (!append) {return}
+
+    insert_button(append, "logout", function(event) {
+        context.Cookie("sessid", "")
+        location.reload()
     })
 }
 function init_download(event) {
@@ -725,6 +737,7 @@ function init_download(event) {
         }
     })
 }
+
 function init_context() {
     var option = document.querySelector("form.option.ctx")
     var append = document.querySelector("table.append.ctx")
@@ -747,50 +760,7 @@ function init_context() {
         change(event.target.innerText.trim())
     })
 }
-
 function init_command() {
-    var option = document.querySelector("form.option.command")
-    var append = document.querySelector("table.append.command")
-    var result = document.querySelector("code.result.command pre")
-    if (!append) {return}
-
-    insert_button(append, "online", function(event) {
-        option["cmd"].value += " cmd_env IS_PROD_RUNTIME 1"
-        option["cmd"].focus()
-        send_command(option)
-    })
-    insert_button(append, "clear", function(event) {
-        option["cmd"].value = ""
-        result.innerHTML = ""
-        append.innerHTML = ""
-    })
-    insert_button(append, "exec", function(event) {
-        send_command(option)
-    })
-    insert_button(append, "add", function(event) {
-        add_command()
-    })
-}
-
-function init_userinfo() {
-    var option = document.querySelector("form.option.userinfo")
-    var append = document.querySelector("table.append.userinfo")
-    if (!append) {return}
-
-    insert_button(append, "logout", function(event) {
-        context.Cookie("sessid", "")
-        location.reload()
-    })
-}
-
-function init_bench() {
-    var max = 0
-    for (var k in bench.commands) {
-        if (parseInt(k) > max) {
-            max = parseInt(k)
-        }
-    }
-
     if (bench.commands[""]) {
         var option = document.querySelector("form.option.command")
         var cmd = option.querySelector("input[name=cmd]")
@@ -798,125 +768,141 @@ function init_bench() {
         check_option(option)
     }
 
+    var max = 0
+    for (var k in bench.commands) {
+        if (parseInt(k) > max) {
+            max = parseInt(k)
+        }
+    }
+
     for (var i = 1; i <= max; i++) {
         var fieldset = add_command(true)
         if (bench.commands[i]) {
-            var cmd = fieldset.querySelector("input[name=cmd]")
+            var option = fieldset.querySelector("form.option")
+            var cmd = option.querySelector("input[name=cmd]")
             cmd.value = bench.commands[i].cmd.join(" ")
-            var option = fieldset.querySelector("form.option")
             check_option(option)
-            var option = fieldset.querySelector("form.option")
         }
     }
 }
-
 function init_docker() {
-    // 移动
-    document.querySelectorAll("div.workflow").forEach(function(item) {
-        var moving = false
-        item.onclick = function(event) {
-            if (event.target != item) {
+    text = JSON.parse(bench.clipstack || "[]")
+    for (var i = 0; i < text.length; i++) {
+        copy_to_clipboard(text[i])
+    }
+
+    document.querySelectorAll("div.workflow").forEach(function(workflow) {
+        // 移动面板
+        workflow.style.left = context.Cookie("docker_left")
+        workflow.style.top = context.Cookie("docker_top")
+        var moving = false, left0 = 0, top0 = 0, x0 = 0, y0 = 0
+        workflow.onclick = function(event) {
+            if (event.target != workflow) {
                 return
             }
             moving = !moving
-        }
-        item.onmousemove = function(event) {
-            if (event.target != item) {
-                return
-            }
             if (moving) {
-                item.style.left = (item.offsetLeft+event.movementX)+"px"
-                item.style.top = (item.offsetTop+event.movementY)+"px"
-                context.Cookie("docker_left", item.style.left)
-                context.Cookie("docker_top", item.style.top)
+                left0 = workflow.offsetLeft
+                top0 = workflow.offsetTop
+                x0 = event.clientX
+                y0 = event.clientY
             }
         }
-        item.style.left = context.Cookie("docker_left")
-        item.style.top = context.Cookie("docker_top")
-    })
-    // 固定
-    document.querySelectorAll("div.workflow>div").forEach(function(item) {
-        item.onclick = function(event) {
-            item.dataset["show"] = !right(item.dataset["show"])
-            item.parentElement.className = right(item.dataset["show"])? "workflow max": "workflow"
-            context.Cookie("docker_class", item.parentElement.className)
+        workflow.onmousemove = function(event) {
+            if (moving) {
+                workflow.style.left = (left0+(event.clientX-x0))+"px"
+                workflow.style.top = (top0+(event.clientY-y0))+"px"
+                context.Cookie("docker_left", workflow.style.left)
+                context.Cookie("docker_top", workflow.style.top)
+            }
         }
-        if (context.Cookie("docker_class")) {
-            item.parentElement.className = context.Cookie("docker_class")
-        }
-    })
-    // 折叠
-    document.querySelectorAll("ul.docker>li>span").forEach(function(item) {
-        item.onclick = function(event) {
-            item.dataset["hide"] = !right(item.dataset["hide"])
-            item.nextElementSibling.style.display = right(item.dataset["hide"])? "none": ""
-        }
-    })
 
-    var txt = bench.clipstack
-    if (txt) {
-        text = JSON.parse(txt)
-        for (var i = 0; i < text.length; i++) {
-            copy_to_clipboard(text[i])
+        // 固定面板
+        if (context.Cookie("docker_class")) {
+            workflow.className = context.Cookie("docker_class")
         }
-    }
-    // 事件
-    document.querySelectorAll("ul.docker>li>ul>li").forEach(function(item) {
-        item.onclick = function(event) {
-            var target = event.target
-            var data = item.dataset
-            switch (data["action"]) {
-                case "quick_txt":
-                    code.quick_txt = !code.quick_txt
-                    target.className= code.quick_txt? "quick": ""
-                    break
-                case "copy_txt":
-                    if (event.altKey) {
-                        target.parentElement.removeChild(target)
-                        return
-                    }
-                    if (event.shiftKey) {
-                        var cmd = document.querySelector("form.option.command"+code.current_cmd+" input[name=cmd]")
-                        cmd && (cmd.value += " "+text)
-                        return
-                    }
-                    copy_to_clipboard(data["text"], true)
-                    break
-                case "save_txt":
-                    save_clipboard(item)
-                    return
-                case "create_txt":
-                    copy_to_clipboard(prompt("text"))
-                    return
-                case "shrink_cmd":
-                    shrink_command_result()
-                    return
-                case "create_cmd":
-                    add_command()
-                    return
-                case "refresh_fly":
-                    location.reload()
-                    return
-                case "create_fly":
-                    location.search = ""
-                    return
-                case "rename_fly":
-                    context.GET("", {
-                        "componet_bench": context.Search("bench"),
-                        "componet_group": "index",
-                        "componet_name": "command",
-                        "cmd": "bench "+context.Search("bench")+".comment"+" "+prompt("name"),
-                    })
-                    location.reload()
-                    return
-            }
-            if (data["key"] && context.Search("bench") != data["key"]) {
-                context.Search("bench", data["key"])
-                return
-            }
-            var cmd = document.querySelector("form.option.command"+data["cmd"]+" input[name=cmd]")
-            cmd && cmd.focus()
+        var head = workflow.querySelector("div")
+        head.onclick = function(event) {
+            head.dataset["show"] = !right(head.dataset["show"])
+            workflow.className = right(head.dataset["show"])? "workflow max": "workflow"
+            context.Cookie("docker_class", workflow.className)
         }
+
+        // 折叠目录
+        var docker = workflow.querySelector("ul.docker")
+        docker.querySelectorAll("li>div").forEach(function(menu) {
+            menu.onclick = function(event) {
+                menu.dataset["hide"] = !right(menu.dataset["hide"])
+                menu.nextElementSibling.style.display = right(menu.dataset["hide"])? "none": ""
+            }
+        })
+
+        // 事件
+        docker.querySelectorAll("li>ul>li").forEach(function(item) {
+            if (bench["key"] == item.dataset["key"]) {
+                item.className = "stick"
+            }
+
+            item.onclick = function(event) {
+                var target = event.target
+                var data = item.dataset
+                switch (data["action"]) {
+                    case "quick_txt":
+                        code.quick_txt = !code.quick_txt
+                        target.className= code.quick_txt? "stick": ""
+                        break
+                    case "copy_txt":
+                        if (event.altKey) {
+                            target.parentElement.removeChild(target)
+                            return
+                        }
+                        if (event.shiftKey) {
+                            var cmd = document.querySelector("form.option.command"+code.current_cmd+" input[name=cmd]")
+                            cmd && (cmd.value += " "+text)
+                            return
+                        }
+                        copy_to_clipboard(data["text"], true)
+                        break
+                    case "save_txt":
+                        save_clipboard(item)
+                        return
+                    case "create_txt":
+                        copy_to_clipboard(prompt("text"))
+                        return
+                    case "shrink_cmd":
+                        shrink_command_result()
+                        return
+                    case "create_cmd":
+                        add_command()
+                        return
+                    case "refresh_fly":
+                        location.reload()
+                        return
+                    case "create_fly":
+                        location.search = ""
+                        return
+                    case "rename_fly":
+                        context.GET("", {
+                            "componet_bench": context.Search("bench"),
+                            "componet_group": "index",
+                            "componet_name": "command",
+                            "cmd": "bench "+context.Search("bench")+".comment"+" "+prompt("name"),
+                        })
+                        location.reload()
+                        return
+                }
+
+                // 切换工作流
+                if (data["key"] && data["key"] != bench["key"]) {
+                    context.Search("bench", data["key"])
+                    return
+                }
+
+                // 切换命令行
+                var cmd = document.querySelector("form.option.command"+data["cmd"]+" input[name=cmd]")
+                cmd && cmd.focus()
+            }
+        })
     })
 }
 
@@ -924,11 +910,12 @@ window.onload = function() {
     init_option()
     init_append()
     init_result()
+
+    init_userinfo()
     init_download()
+
     init_context()
     init_command()
-    init_userinfo()
-    init_bench()
     init_docker()
 }
 

@@ -22,36 +22,29 @@
 </style>
 <style>
     div.workflow {
+        color:#e6dd37;
         font-size:14px;
         font-family:monospace;
-        position:fixed;
         background-color:#498bb1a8;
         border:solid 3px red;
-        color:#e6dd37;
-        top:{{conf . "docker_view" "top"}}px;
-        left:{{conf . "docker_view" "left"}}px;
         width:60px;
         height:20px;
-        overflow:hidden;
-    }
-    div.workflow:hover, div.workflow.min:hover {
-        width:{{conf . "docker_view" "width"}}px;
-        height:{{conf . "docker_view" "height"}}px;
         overflow:scroll;
+        position:fixed;
+        top:{{conf . "docker_view" "top"}}px;
+        left:{{conf . "docker_view" "left"}}px;
     }
-    div.workflow.max {
+    div.workflow:hover, div.workflow.max {
         width:{{conf . "docker_view" "width"}}px;
         height:{{conf . "docker_view" "height"}}px;
     }
-    div.workflow ul.docker ul li.quick {
+    div.workflow div:hover, div.workflow li li:hover {
         background-color:red;
     }
-    div.workflow ul.docker ul li:hover {
+    div.workflow div.stick, div.workflow li li.stick {
         background-color:red;
     }
-    div.workflow ul.docker li span:hover {
-        background-color:red;
-    }
+
     form.option div {
         float:left;
     }
@@ -162,18 +155,17 @@
 {{$key := option . "bench"}}
 {{$username := option . "username"|option}}
 {{$bench := conf . "bench" $key}}
-<script>var workflow = {{conf . "bench"}}</script>
 <div class="workflow">
     <div>&nbsp;bench (Ctrl+B)</div>
     <ul class="docker">
-        <li><span>粘贴板</span>
+        <li><div>粘贴板</div>
             <ul class="txt">
                 <li data-action="save_txt">+ 保存粘贴板(Ctrl+S)</li>
                 <li data-action="create_txt">+ 添加粘贴板(Ctrl+Y)</li>
                 <li data-action="quick_txt">+ 快捷粘贴板(Ctrl+P)</li>
             </ul>
         </li>
-        <li><span>命令行</span>
+        <li><div>命令行</div>
             <ul class="cmd">
                 <li data-action="shrink_cmd">+ 折叠命令行(Ctrl+Z)</li>
                 <li data-action="create_cmd">+ 添加命令行(Ctrl+M)</li>
@@ -182,7 +174,7 @@
                 {{end}}
             </ul>
         </li>
-        <li><span>工作流</span>
+        <li><div>工作流</div>
             <ul class="fly">
                 <li data-action="refresh_fly">+ 刷新工作流(Ctrl+R)</li>
                 <li data-action="create_fly">+ 添加工作流(Ctrl+T)</li>
