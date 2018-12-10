@@ -2253,10 +2253,26 @@ var CGI = template.FuncMap{
 		}
 		return []interface{}{}
 	},
+
+	"slice": func(list interface{}, arg ...interface{}) interface{} {
+		switch l := list.(type) {
+		case string:
+			if len(arg) == 0 {
+				return l
+			}
+			if len(arg) == 1 {
+				return l[arg[0].(int):]
+			}
+			if len(arg) == 2 {
+				return l[arg[0].(int):arg[1].(int)]
+			}
+		}
+
+		return ""
+	},
 	"unescape": func(str string) interface{} {
 		return template.HTML(str)
 	},
-
 	"json": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""
@@ -2265,7 +2281,6 @@ var CGI = template.FuncMap{
 		b, _ := json.Marshal(arg[0])
 		return string(b)
 	},
-
 	"list": func(arg interface{}) interface{} {
 		n := 0
 		switch v := arg.(type) {

@@ -181,10 +181,11 @@
                 {{range $key, $item := conf . "bench"}}
                     {{$creator := index $item "creator"}}
                     {{if eq $creator $username}}
-                        <li data-key="{{$key}}">{{index $item "modify_time"}} {{index $item "comment"}}({{index $item "creator"}})</li>
+                        <li data-key="{{$key}}">{{index $item "modify_time"}} {{index $item "comment"}}({{slice $key 0 6}})</li>
                     {{end}}
                 {{end}}
                 <li data-action="rename_fly">+ 命名工作流</li>
+                <li data-action="remove_fly">+ 删除工作流</li>
             </ul>
         </li>
     </ul>

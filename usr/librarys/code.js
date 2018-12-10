@@ -890,6 +890,21 @@ function init_docker() {
                         })
                         location.reload()
                         return
+                    case "remove_fly":
+                        context.GET("", {
+                            "componet_bench": context.Search("bench"),
+                            "componet_group": "index",
+                            "componet_name": "command",
+                            "cmd": "~code bench delete "+context.Search("bench"),
+                        })
+                        var b = ""
+                        document.querySelectorAll("div.workflow>ul.docker>li>ul.fly>li[data-key]").forEach(function(item){
+                            if (!b && item.dataset["key"] != context.Search("bench")) {
+                                b = item.dataset["key"]
+                            }
+                        })
+                        context.Search("bench", b)
+                        return
                 }
 
                 // 切换工作流

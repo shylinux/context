@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"contexts/ctx"
+	"encoding/csv"
 	"path"
 	"toolkit"
 
@@ -774,7 +776,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
 			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
-			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0},
+			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if len(m.Meta["result"]) > 0 {
 					for _, v := range m.Meta["result"] {
@@ -855,7 +857,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 								m.Echo("error: ").Echo("%s\n", e)
 								m.Echo("%s\n", string(out))
 							} else {
-								m.Echo(string(out))
+								switch m.Option("cmd_parse") {
+								case "csv":
+									data, e := csv.NewReader(bytes.NewReader(out)).ReadAll()
+									m.Assert(e)
+									for i := 1; i < len(data); i++ {
+										for j := 0; j < len(data[i]); j++ {
+											m.Add("append", data[0][j], data[i][j])
+										}
+									}
+									m.Table()
+								default:
+									m.Echo(string(out))
+								}
+
 							}
 						}
 						wait <- true
