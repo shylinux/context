@@ -19,6 +19,7 @@ header {
     background-color:#0747a6;
     width:100%;
     height:40px;
+    position:fixed;
 }
 header .title {
     padding:6px;
@@ -49,55 +50,117 @@ header .search input:focus {
 }
 
 nav {
+    min-width:240px;
+    margin-top:40px;
     float:left;
-    min-width:250px;
+}
+nav.fixed {
     overflow:auto;
+    max-height:calc(100% - 40px);
+    position:fixed;
 }
-article {
-    float:left;
-    width:calc(100% - 400px);
-    min-width:400px;
-    overflow:auto;
+nav>ul {
+    padding:0;
+    margin:0;
 }
-
-.list li {
-    padding-top:10px;
-}
-.list li:hover {
-    background-color:green;
-}
-.list a {
-    text-decoration-line:none;
-}
-.toggle_menu {
-    width:100%;
+nav>ul>li>div {
     cursor:pointer;
+    font-size:18px;
     background-color:green;
-}
-.menu li {
-    padding-top:10px;
-}
-.menu a {
-    text-decoration-line:none;
-}
-.menu li:hover {
-    background-color:green;
-}
-.toggle_list {
+    padding-left:10px;
+    padding:5px;
     width:100%;
-    cursor:pointer;
+}
+nav>ul>li>ul>li {
+    padding:5px;
+}
+nav>ul>li>ul>li:hover {
     background-color:green;
 }
-.link a {
+nav>ul>li>ul>li>a {
     text-decoration-line:none;
-}
-.text {
-    margin:20px;
 }
 .mono {
     font-family:monospace;
 }
+
+article {
+    padding:20px;
+    max-width:calc(100% - 40px);
+    float:right;
+}
+article h2 {
+    cursor:alias;
+}
+article h3 {
+    cursor:alias;
+}
+article h4 {
+    cursor:alias;
+}
+
+article table {
+    border-collapse:collapse;
+}
+article table caption {
+    font-weight:bold;
+    border:2px solid green;
+}
+article table tr:hover {
+    background:lightgreen;
+}
+article table th {
+    background:lightgreen;
+    border:2px solid green;
+    text-align:center;
+    padding:0;
+}
+article table th:hover {
+    background-color:red;
+    cursor:pointer;
+}
+article table td {
+    border:2px solid green;
+    text-align:center;
+    padding:3px;
+}
+article table td:hover {
+    background-color:red;
+}
+
+article pre {
+    color:white;
+    background-color:#272822;
+    overflow:scroll;
+    padding:5px;
+    border:solid 2px green;
+    border-left:solid 4px green;
+    margin:0;
+    font-size:14px;
+    line-height:16px;
+}
+article div.number1 {
+    color:#ff9800;
+    font-family:monospace;
+    background-color:#272822;
+    text-align:right;
+    padding:5px 0;
+    border:solid green 2px;
+    float:left;
+}
+article div.number1 div {
+    padding: 0 5px;
+}
+article div.number1 div:hover {
+    cursor:alias;
+    background-color:red;
+}
+
 footer {
+    height:40px;
+    background-color:red;
+    text-align:center;
+    vertical-align:middle;
     clear:both;
 }
 </style>
@@ -111,34 +174,37 @@ footer {
     <div class="search"><input type="text" placeholder="搜索"></div>
     <div class="title">shylinux</div>
 </header>
-<nav>
 {{end}}
 
 {{define "list"}}
-<div class="toggle_menu" onclick="action(event, 'toggle_list')">文章</div>
-<ul class="list" hidden>
-{{range $i, $l := table .}}
-    <li>
-        <a href="?wiki_favor={{index $l "file"}}">{{index $l "file"}}</a><br/>
-        <span class="mono"> {{index $l "time"}} </span>
-    </li>
-{{end}}
-</ul>
+<nav>
+    <ul>
+        <li><div class="toggle_menu" onclick="action(event, 'toggle_list')">文章</div>
+            <ul class="list" hidden>
+                {{range $i, $l := table .}}
+                    <li>
+                        <a href="?wiki_favor={{index $l "file"}}">{{index $l "file"}}</a><br/>
+                        <span class="mono"> {{index $l "time"}} </span>
+                    </li>
+                {{end}}
+            </ul>
+        </li>
+        <li><div class="toggle_menu" onclick="action(event, 'toggle_menu')">目录</div>
+            <ul class="menu"></ul>
+        </li>
+        <li><div class="toggle_link" onclick="action(event, 'toggle_link')">参考链接</div>
+            <ul class="link" hidden></ul>
+        </li>
+    </ul>
+</nav>
 {{end}}
 
 {{define "text"}}
-<div class="toggle_menu" onclick="action(event, 'toggle_menu')">目录</div>
-<ul class="menu"></ul>
-</nav>
-<article>
-<div class="toggle_link" onclick="action(event, 'toggle_link')">参考链接</div>
-<ul class="link" hidden></ul>
-<div class="text">{{result .|meta|unescape}}</div>
-</article>
+<article>{{result .|meta|unescape}}</article>
 {{end}}
 
 {{define "footer"}}
-<footer>shylinux</footer>
+<footer><div>shylinux</div></footer>
 {{end}}
 
 {{define "tail"}}

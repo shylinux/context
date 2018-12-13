@@ -211,3 +211,70 @@ function format_date(arg) {
     return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
 }
 
+function sort_table(table, index, sort_asc) {
+    var list = table.querySelectorAll("tr")
+    var new_list = []
+
+    var is_time = true
+    var is_number = true
+    for (var i = 1; i < list.length; i++) {
+        var value = Date.parse(list[i].childNodes[index].innerText)
+        if (!(value > 0)) {
+            is_time = false
+        }
+
+        var value = parseInt(list[i].childNodes[index].innerText)
+        if (!(value >= 0 || value <= 0)) {
+            is_number = false
+        }
+
+        new_list.push(list[i])
+    }
+
+    var sort_order = ""
+    if (is_time) {
+        if (sort_asc) {
+            method = function(a, b) {return Date.parse(a) > Date.parse(b)}
+            sort_order = "time"
+        } else {
+            method = function(a, b) {return Date.parse(a) < Date.parse(b)}
+            sort_order = "time_r"
+        }
+    } else if (is_number) {
+        if (sort_asc) {
+            method = function(a, b) {return parseInt(a) > parseInt(b)}
+            sort_order = "int"
+        } else {
+            method = function(a, b) {return parseInt(a) < parseInt(b)}
+            sort_order = "int_r"
+        }
+    } else {
+        if (sort_asc) {
+            method = function(a, b) {return a > b}
+            sort_order = "str"
+        } else {
+            method = function(a, b) {return a < b}
+            sort_order = "str_r"
+        }
+    }
+
+    list = new_list
+    new_list = []
+    for (var i = 0; i < list.length; i++) {
+        list[i].parentElement && list[i].parentElement.removeChild(list[i])
+        for (var j = i+1; j < list.length; j++) {
+            if (typeof method == "function" && method(list[i].childNodes[index].innerText, list[j].childNodes[index].innerText)) {
+                var temp = list[i]
+                list[i] = list[j]
+                list[j] = temp
+            }
+        }
+        new_list.push(list[i])
+    }
+
+    for (var i = 0; i < new_list.length; i++) {
+        table.appendChild(new_list[i])
+    }
+    return sort_order
+}
+

@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/gomarkdown/markdown"
+	"html/template"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -26,21 +27,22 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			"md": true,
 		}, Help: "路由数量"},
 
+		"bench_disable":  &ctx.Config{Name: "bench_disable", Value: "true", Help: "工作流"},
 		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
-				map[string]interface{}{"name": "head", "template": "head"},
-				map[string]interface{}{"name": "header", "template": "header"},
-				map[string]interface{}{"name": "list", "template": "list",
-					"context": "web.wiki", "command": "wiki_list", "arguments": []interface{}{"h2", "int_r"},
+				map[string]interface{}{"componet_name": "head", "template": "head"},
+				map[string]interface{}{"componet_name": "header", "template": "header"},
+				map[string]interface{}{"componet_name": "list", "template": "list",
+					"componet_ctx": "web.wiki", "componet_cmd": "wiki_list", "arguments": []interface{}{"h2", "int_r"},
 					"pre_run": true,
 				},
-				map[string]interface{}{"name": "text", "template": "text",
-					"context": "web.wiki", "command": "wiki_body", "arguments": []interface{}{"@wiki_favor"},
+				map[string]interface{}{"componet_name": "text", "template": "text",
+					"componet_ctx": "web.wiki", "componet_cmd": "wiki_body", "arguments": []interface{}{"@wiki_favor"},
 					"pre_run": true,
 				},
-				map[string]interface{}{"name": "footer", "template": "footer"},
-				map[string]interface{}{"name": "tail", "template": "tail"},
+				map[string]interface{}{"componet_name": "footer", "template": "footer"},
+				map[string]interface{}{"componet_name": "tail", "template": "tail"},
 			},
 		}, Help: "组件列表"},
 	},
@@ -109,6 +111,15 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		"wiki_body": &ctx.Command{Name: "wiki_body", Help: "wiki_body", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			which := path.Join(m.Conf("wiki_dir"), m.Confx("wiki_favor", arg, 0))
 			if ls, e := ioutil.ReadFile(which); e == nil {
+
+				buffer := bytes.NewBuffer([]byte{})
+				temp, e := template.New("temp").Funcs(ctx.CGI).Parse(string(ls))
+				if e != nil {
+					m.Log("info", "parse %s %s", which, e)
+				}
+				temp.Execute(buffer, m)
+				ls = buffer.Bytes()
+
 				ls = markdown.ToHTML(ls, nil, nil)
 				m.Echo(string(ls))
 			}
@@ -216,11 +227,11 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 						}
 
 						ls = markdown.ToHTML(ls, nil, nil)
+
 					default:
 						pre = true
 					}
 				}
-
 				if pre {
 					m.Option("nline", bytes.Count(ls, []byte("\n")))
 					m.Option("nbyte", len(ls))

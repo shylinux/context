@@ -94,6 +94,8 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 		m.TryCatch(m.Spawn(), true, func(msg *ctx.Message) {
 			msg.Add("option", "method", r.Method).Add("option", "path", r.URL.Path)
 
+			msg.Option("index_path", r.Header.Get("index_path"))
+			msg.Option("index_url", r.Header.Get("index_url"))
 			msg.Option("remote_addr", r.RemoteAddr)
 			msg.Option("dir_root", m.Cap("directory"))
 			msg.Option("referer", r.Header.Get("Referer"))
@@ -112,16 +114,20 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			for k, v := range r.Form {
 				msg.Add("option", k, v)
 				if k == "ticket" {
-					m.Log("info", "hide ticket %v %v %v %v", k, v, r.URL, r.Header.Get("index_path"))
-					uri, _ := r.URL.Parse(r.Header.Get("index_path"))
-					http.Redirect(w, r, uri.Path+"?bench="+uri.Query().Get("bench"), http.StatusTemporaryRedirect)
+					m.Log("info", "hide ticket %v %v %v", k, v, msg.Option("index_url"))
+					uri, _ := r.URL.Parse(r.Header.Get("index_url"))
+					redirect := uri.Path
+					if b := uri.Query().Get("bench"); b != "" {
+						redirect += "?bench=" + b
+					}
+					http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 					return
 				}
 			}
 
 			if msg.Confs("cas_url") {
 				if !cas.IsAuthenticated(r) && !msg.Confs("skip_cas") {
-					r.URL, _ = r.URL.Parse(r.Header.Get("index_path"))
+					r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
 					cas.RedirectToLogin(w, r)
 					return
 				}
@@ -181,7 +187,8 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.Header.Set("index_module", m.Cap("module"))
 
 	if index {
-		r.Header.Set("index_path", r.URL.String())
+		r.Header.Set("index_url", r.URL.String())
+		r.Header.Set("index_path", r.URL.Path)
 		m.Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 	}
 
@@ -351,7 +358,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "组件列表"},
 
-		"bench": &ctx.Config{Name: "bench", Value: map[string]interface{}{}, Help: "工作流"},
+		"bench_disable": &ctx.Config{Name: "bench_disable", Value: "false", Help: "工作流"},
+		"bench":         &ctx.Config{Name: "bench", Value: map[string]interface{}{}, Help: "工作流"},
 		"bench_view": &ctx.Config{Name: "bench_view", Value: map[string]interface{}{
 			"base": []interface{}{"key", "share", "comment", "creator", "create_time", "modify_time", "commands"},
 			"link": []interface{}{"share", "comment", "creator", "link"},
@@ -422,7 +430,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						arg[0] = fmt.Sprintf(arg[0], values...)
 					}
 
-					method := m.Confx("method")
+					method := m.Conf("method")
+					if m.Has("method") {
+						method = m.Option("method")
+					}
+					m.Log("fuck", "what %s", method)
+					m.Log("fuck", "what %s", m.Option("method"))
+					m.Log("fuck", "what %s", m.Conf("method"))
 					uri := Merge(m, arg[0], arg[1:]...)
 					body, _ := m.Optionv("body").(io.Reader)
 
@@ -432,6 +446,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 					}
 
+					m.Log("fuck", "what %s", method)
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
 
@@ -999,9 +1014,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 
 				bench_share := ""
-				if right {
+				if right && !m.Confs("bench_disable") {
 					if _, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{}); !ok { // 创建工作流
-						m.Append("redirect", fmt.Sprintf("?bench=%s", m.Spawn().Cmd("bench", "create").Append("key")))
+						m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Spawn().Cmd("bench", "create").Append("key")))
 						return
 					}
 					if bench_share = m.Spawn().Cmd("bench", "check", m.Option("username")).Result(0); bench_share == "private" {

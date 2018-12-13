@@ -23,7 +23,9 @@ install_all: install
 run:
 	etc/bootstrap.sh
 shy:
+	cp -r src/toolkit ~/context/src/
 	cp -r src/contexts ~/context/src/
+	cp -r src/examples ~/context/src/
 	cp -r usr/template ~/context/usr/
 	cp -r usr/librarys/ ~/context/usr/
 

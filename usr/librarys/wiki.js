@@ -3,10 +3,7 @@ function action(event, cmd) {
         case "toggle_nav":
             var nav = document.querySelector("nav")
             nav.hidden = !nav.hidden
-            var article = document.querySelector("article")
-            if (!context.isMobile) {
-                article.style.width = nav.hidden? "80%": "calc(100% - 400px)"
-            }
+            set_layout(event)
             break
         case "toggle_list":
             var list = document.querySelector(".list")
@@ -31,8 +28,10 @@ function init_menu() {
     for (var i = 0; i < hs.length; i++) {
         var head = document.getElementsByTagName(hs[i]);
         for (var j = 0; j < head.length; j++) {
-            head[j].id = "head"+head[j].offsetTop;
-            head[j].onclick = function(event) {}
+            head[j].id = hs[i]+"_"+j
+            head[j].onclick = function(event) {
+                location.hash=event.target.id
+            }
             list.push({"level": hs[i], "position": head[j].offsetTop, "title": head[j].innerText, "hash": head[j].id})
             if (head[j].offsetTop > max) {
                 max = head[j].offsetTop;
@@ -120,35 +119,72 @@ function init_link() {
 }
 
 function init_code() {
+    var fuck = context.isMobile? 22: 16
     var m = document.getElementsByTagName("pre");
     for (var i = 0; i < m.length; i++) {
-        var line = (m[i].clientHeight-10)/15
-        // if (line < 3) {
-        // 	continue
-        // }
-        console.log(m[i].clientHeight)
-        var nu = m[i].parentElement.insertBefore(document.createElement("div"), m[i]);
-        nu.className = "number1"
+        var nu = insert_before(m[i], "div", {"className": "number1"})
 
+        var line = (m[i].clientHeight-10)/fuck
         for (var j = 1; j <= line; j++) {
-            console.log(j)
-            var li = nu.appendChild(document.createElement("div"));
-            li.appendChild(document.createTextNode(""+j));
+            append_child(nu, "div", {
+                "style": {
+                    "fontSize": context.isMobile?"20px":"14px",
+                    "lineHeight": context.isMobile?"22px":"16px",
+                },
+                "id": "code"+i+"_"+"line"+j,
+                "onclick": function(event) {
+                    location.href = "#"+event.target.id
+                },
+            }).appendChild(document.createTextNode(""+j));
         }
     }
+}
+
+function add_sort(append, field, cb) {
+    append.onclick = function(event) {
+        var target = event.target
+        var dataset = target.dataset
+        var nodes = target.parentElement.childNodes
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i] == target) {
+                if (target.tagName == "TH") {
+                    dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
+                    sort_table(append, i, dataset["sort_asc"] == "1")
+                } else if (target.tagName == "TD") {
+                    var tr = target.parentElement.parentElement.querySelector("tr")
+                    if (tr.childNodes[i].innerText.startsWith(field)) {
+                        typeof cb == "function" && cb(event)
+                    }
+                }
+            }
+        }
+    }
+}
+
+function init_table(event) {
+    var append = document.querySelectorAll("article table").forEach(add_sort)
+}
+
+function set_layout() {
+    article = document.querySelector("article")
+    nav = document.querySelector("nav")
+    if (window.innerWidth > 600) {
+        article.style.maxWidth = (window.innerWidth - nav.offsetWidth-40)+"px"
+        nav.className = "fixed"
+    } else {
+        article.style.maxWidth = ""
+        nav.className = ""
+    }
+}
+
+window.onresize = function (event) {
+    set_layout()
 }
 
 window.onload = function() {
     init_menu()
     init_link()
     init_code()
-    var article = document.querySelector("article")
-    var nav = document.querySelector("nav")
-    if (context.isMobile) {
-        article.style.width = "100%"
-    } else {
-        article.style.maxHeight = "calc(100% - 80px)"
-        nav.style.maxHeight = "calc(100% - 80px)"
-    }
-    article.style.width = nav.hidden? "80%": "calc(100% - 400px)"
+    init_table()
+    set_layout()
 }

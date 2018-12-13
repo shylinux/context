@@ -2042,15 +2042,7 @@ var CGI = template.FuncMap{
 			return ""
 		}
 
-		if m, ok := arg[0].(*Message); ok {
-			if len(arg) == 1 {
-				return fmt.Sprintf("%v", m)
-			}
-
-			msg := m.Spawn(m.Target()).Cmd(arg[1:]...)
-			return strings.Join(msg.Meta["result"], "")
-		}
-		return ""
+		return strings.Join(Pulse.Sess("cli").Cmd(arg).Meta["result"], "")
 	},
 
 	"detail": func(arg ...interface{}) interface{} {
@@ -2254,33 +2246,6 @@ var CGI = template.FuncMap{
 		return []interface{}{}
 	},
 
-	"slice": func(list interface{}, arg ...interface{}) interface{} {
-		switch l := list.(type) {
-		case string:
-			if len(arg) == 0 {
-				return l
-			}
-			if len(arg) == 1 {
-				return l[arg[0].(int):]
-			}
-			if len(arg) == 2 {
-				return l[arg[0].(int):arg[1].(int)]
-			}
-		}
-
-		return ""
-	},
-	"unescape": func(str string) interface{} {
-		return template.HTML(str)
-	},
-	"json": func(arg ...interface{}) interface{} {
-		if len(arg) == 0 {
-			return ""
-		}
-
-		b, _ := json.Marshal(arg[0])
-		return string(b)
-	},
 	"list": func(arg interface{}) interface{} {
 		n := 0
 		switch v := arg.(type) {
@@ -2298,6 +2263,80 @@ var CGI = template.FuncMap{
 			list[i-1] = i
 		}
 		return list
+	},
+	"slice": func(list interface{}, arg ...interface{}) interface{} {
+		switch l := list.(type) {
+		case string:
+			if len(arg) == 0 {
+				return l
+			}
+			if len(arg) == 1 {
+				return l[arg[0].(int):]
+			}
+			if len(arg) == 2 {
+				return l[arg[0].(int):arg[1].(int)]
+			}
+		}
+
+		return ""
+	},
+
+	"unescape": func(str string) interface{} {
+		return template.HTML(str)
+	},
+	"json": func(arg ...interface{}) interface{} {
+		if len(arg) == 0 {
+			return ""
+		}
+
+		b, _ := json.Marshal(arg[0])
+		return string(b)
+	},
+	"so": func(arg ...interface{}) interface{} {
+		if len(arg) == 0 {
+			return ""
+		}
+
+		cli := Pulse.Sess("cli")
+		cli.Cmd("source", strings.Join(Trans(arg), " "))
+		result := []string{}
+		if len(cli.Meta["append"]) > 0 {
+			result = append(result, "<table>")
+			result = append(result, "<caption>")
+			result = append(result, Trans(arg)...)
+			result = append(result, "</caption>")
+			cli.Table(func(maps map[string]string, list []string, line int) bool {
+				if line == -1 {
+					result = append(result, "<tr>")
+					for _, v := range list {
+						result = append(result, "<th>")
+						result = append(result, v)
+						result = append(result, "</th>")
+					}
+					result = append(result, "</tr>")
+					return true
+				}
+				result = append(result, "<tr>")
+				for _, v := range list {
+					result = append(result, "<td>")
+					result = append(result, v)
+					result = append(result, "</td>")
+				}
+				result = append(result, "</tr>")
+				return true
+			})
+			result = append(result, "</table>")
+		} else {
+			result = append(result, "<pre><code>")
+			result = append(result, fmt.Sprintf("%s", cli.Find("shy", false).Conf("prompt")))
+			result = append(result, Trans(arg)...)
+			result = append(result, "\n")
+			result = append(result, cli.Meta["result"]...)
+			result = append(result, "</code></pre>")
+
+		}
+
+		return template.HTML(strings.Join(result, ""))
 	},
 }
 var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
