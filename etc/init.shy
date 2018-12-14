@@ -1,7 +1,7 @@
 ~stdio
     config load history.json history
 ~web
-    # config load web.json
+    config load web.json
 
 ~aaa
     login root root
