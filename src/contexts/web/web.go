@@ -434,9 +434,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if m.Has("method") {
 						method = m.Option("method")
 					}
-					m.Log("fuck", "what %s", method)
-					m.Log("fuck", "what %s", m.Option("method"))
-					m.Log("fuck", "what %s", m.Conf("method"))
 					uri := Merge(m, arg[0], arg[1:]...)
 					body, _ := m.Optionv("body").(io.Reader)
 
@@ -446,7 +443,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 					}
 
-					m.Log("fuck", "what %s", method)
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
 
@@ -515,6 +511,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					ct := res.Header.Get("Content-Type")
+					m.Log("info", "content: %s", ct)
 					switch {
 					case strings.HasPrefix(ct, "application/json"):
 						json.NewDecoder(res.Body).Decode(&result)
@@ -558,6 +555,19 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								m.Add("append", "html", html)
 							}
 						})
+					case strings.HasPrefix(ct, "text"):
+						buf, e := ioutil.ReadAll(res.Body)
+						m.Assert(e)
+						if m.Has("parse") {
+							json.Unmarshal(buf, &result)
+							m.Log("fuck", "%v ", result)
+							msg := m.Spawn()
+							msg.Put("option", "response", result)
+							msg.Cmd("trans", "response", m.Option("parse"))
+							m.Copy(msg, "append").Copy(msg, "result")
+							return
+						}
+						result = string(buf)
 					default:
 						if w, ok := m.Optionv("response").(http.ResponseWriter); ok {
 							header := w.Header()

@@ -3057,7 +3057,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					arg, all = arg[1:], true
 				}
 
-				action, which := "", "-1"
+				action, which, chain := "", "-1", ""
 				have := map[string]bool{}
 				if len(arg) > 0 {
 					switch arg[0] {
@@ -3073,6 +3073,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 					case "create", "delete":
 						action, arg = arg[0], arg[1:]
+					case "parse":
+						chain, arg = arg[1], arg[2:]
 					}
 				}
 
@@ -3156,7 +3158,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 				msg := m.Spawn()
 				msg.Put("option", "_cache", value)
-				msg.Cmd("trans", "_cache", "")
+				msg.Cmd("trans", "_cache", chain)
 				m.Copy(msg, "append").Copy(msg, "result")
 			}},
 		"cache": &Command{Name: "cache [all] |key [value]|key = value|key name value help|delete key]",
