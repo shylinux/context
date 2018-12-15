@@ -906,6 +906,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			if len(arg) > 0 && arg[0] == "check" { // 检查工作流
 				bench := m.Confv("bench", m.Option("bench")).(map[string]interface{})
+				m.Log("fuck", "waht %v", bench)
 				if bench["creator"].(string) != arg[1] {
 					switch bench["share"].(string) {
 					case "private":
@@ -1007,15 +1008,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 
 				if !right {
-					lark := m.Find("web.lark")
+					lark := m.Find("web.chat.lark")
 					if lark != nil && m.Confs("login_lark") {
 						right = ctx.Right(lark.Cmd("auth", m.Option("username"), "check", m.Option("cmd")).Result(0))
 					}
 				}
 
 				bench_share := ""
+				bench, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{})
 				if right && !m.Confs("bench_disable") {
-					if _, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{}); !ok { // 创建工作流
+					if !ok { // 创建工作流
 						m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Spawn().Cmd("bench", "create").Append("key")))
 						return
 					}
@@ -1098,7 +1100,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
 							if val["componet_cmd"] != nil {
-								if bench_share != "protected" {
+								if len(bench) > 0 && bench_share != "protected" {
 									now := time.Now().Format(m.Conf("time_format"))
 									m.Confv("bench", []interface{}{m.Option("bench"), "commands", m.Option("componet_name_order")}, map[string]interface{}{
 										"cmd": args[1:],

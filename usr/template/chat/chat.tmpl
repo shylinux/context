@@ -21,33 +21,6 @@
     }
 </style>
 <style>
-    div.workflow {
-        color:#e6dd37;
-        font-size:14px;
-        font-family:monospace;
-        background-color:#498bb1a8;
-        border:solid 3px red;
-        width:60px;
-        height:20px;
-        overflow:scroll;
-        position:fixed;
-        top:{{conf . "docker_view" "top"}}px;
-        left:{{conf . "docker_view" "left"}}px;
-    }
-    div.workflow:hover, div.workflow.max {
-        width:{{conf . "docker_view" "width"}}px;
-        height:{{conf . "docker_view" "height"}}px;
-    }
-    div.workflow div:hover, div.workflow li li:hover {
-        background-color:red;
-    }
-    div.workflow div.stick, div.workflow li li.stick {
-        background-color:red;
-    }
-
-    form.option div {
-        float:left;
-    }
     textarea.clipboard {
         color:white;
         background-color:#272822;
@@ -111,9 +84,6 @@
         padding-left: 10px;
         padding-right: 20px;
     }
-    table.append td.clip {
-        background-color:red;
-    }
     code.result pre {
         color:white;
         font-size:14px;
@@ -129,11 +99,7 @@
     }
 </style>
 </head>
-<body onkeydown="return onaction(event, 'scroll')" onkeyup="return onaction(event, 'keymap')">
-<script>
-    {{$id := option . "bench"|option}}
-    var bench ={{conf . "bench" $id}}
-</script>
+<body onkeyup="return onaction(event, 'keymap')" onkeydown="return onaction(event, 'scroll')">
 {{end}}
 
 {{define "void"}}{{end}}
@@ -151,59 +117,16 @@
 </fieldset>
 {{end}}
 
-{{define "docker"}}
-{{$key := option . "bench"}}
-{{$username := option . "username"|option}}
-{{$bench := conf . "bench" $key}}
-<div class="workflow">
-    <div>&nbsp;bench (Ctrl+B)</div>
-    <ul class="docker">
-        <li><div>粘贴板</div>
-            <ul class="txt">
-                <li data-action="save_txt">+ 保存粘贴板(Ctrl+S)</li>
-                <li data-action="create_txt">+ 添加粘贴板(Ctrl+Y)</li>
-                <li data-action="quick_txt">+ 快捷粘贴板(Ctrl+P)</li>
-            </ul>
-        </li>
-        <li><div>命令行</div>
-            <ul class="cmd">
-                <li data-action="shrink_cmd">+ 折叠命令行(Ctrl+Z)</li>
-                <li data-action="create_cmd">+ 添加命令行(Ctrl+M)</li>
-                {{if $bench}}
-                    {{range $index, $cmd := index $bench "commands"}}
-                        <li class="command{{$index}}" data-cmd="{{$index}}">{{index $cmd "now"|option}} {{$index}}: {{index $cmd "cmd"|option}}</li>
-                    {{end}}
-                {{end}}
-            </ul>
-        </li>
-        <li><div>工作流</div>
-            <ul class="fly">
-                <li data-action="refresh_fly">+ 刷新工作流(Ctrl+R)</li>
-                <li data-action="create_fly">+ 添加工作流(Ctrl+T)</li>
-                {{range $key, $item := conf . "bench"}}
-                    {{$creator := index $item "creator"|option}}
-                    {{if eq $creator $username}}
-                        <li data-key="{{$key}}">{{index $item "modify_time"}} {{index $item "comment"}}({{slice $key 0 6}})</li>
-                    {{end}}
-                {{end}}
-                <li data-action="rename_fly">+ 命名工作流</li>
-                <li data-action="remove_fly">+ 删除工作流</li>
-            </ul>
-        </li>
-    </ul>
-</div>
-{{end}}
-
 {{define "componet"}}
 <fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "componet_ctx"}}.{{option .Meta "componet_cmd"}})</legend>
     {{$form_type := option . "form_type"|meta}}
+    {{$msg := .}}
 
     {{if eq $form_type "upload"}}
     {{end}}
     <form class="option {{option .Meta "componet_name"}}"
           data-componet_group="{{option . "componet_group"|meta}}"
           data-componet_name="{{option . "componet_name"|meta}}"
-          data-componet_bench="{{option . "bench"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
              onsubmit="onaction(event,'upload')"
@@ -243,9 +166,15 @@
                           onclick="return onaction(event, 'click')"
                           onkeyup="return onaction(event, 'input')">
                   {{else}}
+                      {{$name := index $input "name"}}
+                      {{$value := option $msg $name|option}}
                       <input
                           name="{{index $input "name"}}"
-                          value="{{index $input "value"}}"
+                          {{if $value}}
+                              value="{{$value}}"
+                          {{else}}
+                              value="{{index $input "value"}}"
+                          {{end}}
                           class="{{index $input "class"}}"
                           {{if index $input "clipstack"}}
                               list="{{index $input "clipstack"}}"
@@ -287,4 +216,3 @@
 <script src="/librarys/code.js"></script>
 </body>
 {{end}}
-
