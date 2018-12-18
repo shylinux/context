@@ -36,11 +36,15 @@ function save_clipboard(item) {
         alert("保存成功")
     })
 }
-function copy_to_clipboard(text, skip_docker) {
+function copy_to_clipboard(text, skip_blur, skip_docker) {
     var clipboard = modify_node(".clipboard", {"value": text})
-    clipboard.select()
-    document.execCommand("copy")
-    clipboard.blur()
+    if (skip_blur) {
+        document.execCommand("copy")
+    } else {
+        clipboard.select()
+        document.execCommand("copy")
+        clipboard.blur()
+    }
 
     var clipstack = document.querySelector("#clipstack")
     insert_child(clipstack, "option").value = text
@@ -62,12 +66,13 @@ function copy_to_clipboard(text, skip_docker) {
                 target.parentElement.removeChild(target)
                 return
             }
+
             if (event.shiftKey) {
                 var cmd = document.querySelector("form.option.command"+code.current_cmd+" input[name=cmd]")
                 cmd && (cmd.value += " "+text)
                 return
             }
-            copy_to_clipboard(text, true)
+            copy_to_clipboard(text, false, true)
         },
     })
 }
@@ -99,10 +104,16 @@ function add_sort(append, field, cb) {
                     if (tr.childNodes[i].innerText.startsWith(field)) {
                         typeof cb == "function" && cb(event)
                     }
-                    var has = document.querySelector("td.clip")
-                    has && (has.className = "")
-                    target.className = "clip"
-                    copy_to_clipboard(target.innerText, !event.shiftKey)
+
+                    var text = window.getSelection().toString()
+                    if (!text) {
+                        var has = document.querySelector("td.clip")
+                        has && (has.className = "")
+                        target.className = "clip"
+                        text = target.innerText
+                    }
+
+                    copy_to_clipboard(text, true, !event.shiftKey)
                 }
             }
         }
@@ -582,7 +593,10 @@ function init_append(event) {
 function init_result(event) {
     var result = document.querySelectorAll("code.result pre").forEach(function(item) {
         item.onclick = function(event) {
-            // copy_to_clipboard(event.target.innerText)
+            var text = window.getSelection().toString()
+            if (text) {
+                copy_to_clipboard(text, true, !event.shiftKey)
+            }
         }
     })
 }

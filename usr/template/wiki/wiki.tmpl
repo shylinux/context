@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=0.7">
+<link rel="shortcut icon" type="image/ico" href="/favicon.ico">
 <title>{{option .Meta "page_title"}}</title>
 <style>
 html, body {
-    height:100%;
-    width:100%;
-    margin:0px;
     background-color:#d8d8d8;
+    width:100%;
+    height:100%;
+    margin:0px;
 }
 header {
     color:white;
@@ -18,7 +19,6 @@ header {
     text-align:center;
     background-color:#0747a6;
     width:100%;
-    height:40px;
     position:fixed;
 }
 header .title {
@@ -50,13 +50,10 @@ header .search input:focus {
 }
 
 nav {
-    min-width:240px;
-    margin-top:40px;
+    overflow:auto;
     float:left;
 }
 nav.fixed {
-    overflow:auto;
-    max-height:calc(100% - 40px);
     position:fixed;
 }
 nav>ul {
@@ -80,13 +77,11 @@ nav>ul>li>ul>li:hover {
 nav>ul>li>ul>li>a {
     text-decoration-line:none;
 }
-.mono {
+nav>ul>li>ul>li .mono {
     font-family:monospace;
 }
 
 article {
-    padding:20px;
-    max-width:calc(100% - 40px);
     float:right;
 }
 article h2 {
@@ -135,6 +130,7 @@ article pre {
     padding:5px;
     border:solid 2px green;
     border-left:solid 4px green;
+    max-width:800px;
     margin:0;
     font-size:14px;
     line-height:16px;
@@ -157,11 +153,17 @@ article div.number1 div:hover {
 }
 
 footer {
-    height:40px;
+    color:white;
+    font-size:20px;
+    font-family:monospace;
+    text-align:center;
     background-color:red;
     text-align:center;
     vertical-align:middle;
     clear:both;
+}
+footer .title {
+    padding:6px;
 }
 </style>
 </head>
@@ -172,14 +174,14 @@ footer {
 <header>
     <div class="toggle" onclick="action(event, 'toggle_nav')">三</div>
     <div class="search"><input type="text" placeholder="搜索"></div>
-    <div class="title">shylinux</div>
+    <div class="title">shylinux 天行健，君子以自强不息</div>
 </header>
 {{end}}
 
 {{define "list"}}
 <nav>
     <ul>
-        <li><div class="toggle_menu" onclick="action(event, 'toggle_list')">文章</div>
+        <li><div onclick="action(event, 'toggle_list')">文档</div>
             <ul class="list" hidden>
                 {{range $i, $l := table .}}
                     <li>
@@ -189,10 +191,10 @@ footer {
                 {{end}}
             </ul>
         </li>
-        <li><div class="toggle_menu" onclick="action(event, 'toggle_menu')">目录</div>
+        <li><div onclick="action(event, 'toggle_list')">目录</div>
             <ul class="menu"></ul>
         </li>
-        <li><div class="toggle_link" onclick="action(event, 'toggle_link')">参考链接</div>
+        <li><div onclick="action(event, 'toggle_list')">链接</div>
             <ul class="link" hidden></ul>
         </li>
     </ul>
@@ -204,7 +206,7 @@ footer {
 {{end}}
 
 {{define "footer"}}
-<footer><div>shylinux</div></footer>
+<footer><div class="title">shycontext 地势坤，君子以厚德载物</div></footer>
 {{end}}
 
 {{define "tail"}}

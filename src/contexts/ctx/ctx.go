@@ -2298,29 +2298,25 @@ var CGI = template.FuncMap{
 		}
 
 		cli := Pulse.Sess("cli")
-		cli.Cmd("source", strings.Join(Trans(arg), " "))
+		cmd := strings.Join(Trans(arg), " ")
+		cli.Cmd("source", cmd)
+
 		result := []string{}
 		if len(cli.Meta["append"]) > 0 {
 			result = append(result, "<table>")
-			result = append(result, "<caption>")
-			result = append(result, Trans(arg)...)
-			result = append(result, "</caption>")
+			result = append(result, "<caption>", cmd, "</caption>")
 			cli.Table(func(maps map[string]string, list []string, line int) bool {
 				if line == -1 {
 					result = append(result, "<tr>")
 					for _, v := range list {
-						result = append(result, "<th>")
-						result = append(result, v)
-						result = append(result, "</th>")
+						result = append(result, "<th>", v, "</th>")
 					}
 					result = append(result, "</tr>")
 					return true
 				}
 				result = append(result, "<tr>")
 				for _, v := range list {
-					result = append(result, "<td>")
-					result = append(result, v)
-					result = append(result, "</td>")
+					result = append(result, "<td>", v, "</td>")
 				}
 				result = append(result, "</tr>")
 				return true
@@ -2328,12 +2324,9 @@ var CGI = template.FuncMap{
 			result = append(result, "</table>")
 		} else {
 			result = append(result, "<pre><code>")
-			result = append(result, fmt.Sprintf("%s", cli.Find("shy", false).Conf("prompt")))
-			result = append(result, Trans(arg)...)
-			result = append(result, "\n")
+			result = append(result, fmt.Sprintf("%s", cli.Find("shy", false).Conf("prompt")), cmd, "\n")
 			result = append(result, cli.Meta["result"]...)
 			result = append(result, "</code></pre>")
-
 		}
 
 		return template.HTML(strings.Join(result, ""))

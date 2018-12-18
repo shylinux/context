@@ -1,3 +1,34 @@
+var wiki = {
+    layout: {
+        header: {
+            height: 40,
+        },
+        nav: {
+            min_width: 240,
+        },
+        article: {
+            padding: 20,
+        },
+        footer: {
+            height: 40,
+        },
+    },
+}
+
+function set_layout() {
+    var nav = document.querySelector("nav")
+    var article = document.querySelector("article")
+
+    if (window.innerWidth > 600) {
+        nav.className = "fixed"
+        wiki.layout.article.width = window.innerWidth - nav.offsetWidth- 2*wiki.layout.article.padding
+        article.style.width = wiki.layout.article.width+"px"
+    } else {
+        nav.className = ""
+        article.style.width = ""
+    }
+}
+
 function action(event, cmd) {
     switch (cmd) {
         case "toggle_nav":
@@ -6,20 +37,31 @@ function action(event, cmd) {
             set_layout(event)
             break
         case "toggle_list":
-            var list = document.querySelector(".list")
+            var list = event.target.nextElementSibling
             list.hidden = !list.hidden
-            break
-        case "toggle_menu":
-            var menu = document.querySelector(".menu")
-            menu.hidden = !menu.hidden
-            break
-        case "toggle_link":
-            var link = document.querySelector(".link")
-            link.hidden = !link.hidden
             break
     }
 }
+function init_layout() {
+    var header = document.querySelector("header")
+    var nav = document.querySelector("nav")
+    var article = document.querySelector("article")
+    var footer = document.querySelector("footer")
 
+    wiki.layout.nav.height = window.innerHeight - wiki.layout.header.height - wiki.layout.footer.height
+    wiki.layout.article.min_height = window.innerHeight - wiki.layout.header.height - wiki.layout.footer.height - 2*wiki.layout.article.padding
+
+    header.style.height = wiki.layout.header.height+"px"
+    footer.style.height = wiki.layout.footer.height+"px"
+    nav.style.height = wiki.layout.nav.height+"px"
+    nav.style.minWidth = wiki.layout.nav.min_width+"px"
+    nav.style.marginTop = wiki.layout.header.height+"px"
+    article.style.minHeight = wiki.layout.article.min_height+"px"
+    article.style.marginTop = wiki.layout.header.height+"px"
+    article.style.padding = wiki.layout.article.padding+"px"
+
+    set_layout()
+}
 function init_menu() {
     var max = 0;
     var min = 1000;
@@ -96,35 +138,22 @@ function init_menu() {
         }
     }
 }
-
 function init_link() {
-    var link = [];
-    var a = document.querySelectorAll(".text a");
-    for (var i = 0; i < a.length; i++) {
-        link.push({href: a[i].href, title: a[i].innerText});
-    }
-    var m = document.getElementsByClassName("link");
-    for (var i = 0; i < m.length; i++) {
-        var one = append_child(m[i], "li")
-        var a = one.appendChild(document.createTextNode("相关链接: "));
-
-        for (var j = 0; j < link.length; j++) {
-            var one = append_child(m[i], "li")
-            var a = one.appendChild(document.createTextNode(link[j].title+": "));
-            var a = append_child(one, "a");
-            a.href = link[j].href
-            a.innerText = a.href
-        }
-    }
+    var link = document.querySelector("nav .link");
+    document.querySelectorAll("article a").forEach(function(item) {
+        append_child(append_child(link, "li", {"innertText": item.innerText}), "a", {
+            "href": item.href,
+            "innerText": item.href,
+        })
+    })
 }
-
 function init_code() {
     var fuck = context.isMobile? 22: 16
-    var m = document.getElementsByTagName("pre");
-    for (var i = 0; i < m.length; i++) {
-        var nu = insert_before(m[i], "div", {"className": "number1"})
 
-        var line = (m[i].clientHeight-10)/fuck
+    document.querySelectorAll("article pre").forEach(function(item, i) {
+        var nu = insert_before(item, "div", {"className": "number1"})
+
+        var line = (item.clientHeight-10)/fuck
         for (var j = 1; j <= line; j++) {
             append_child(nu, "div", {
                 "style": {
@@ -137,54 +166,23 @@ function init_code() {
                 },
             }).appendChild(document.createTextNode(""+j));
         }
-    }
-}
 
-function add_sort(append, field, cb) {
-    append.onclick = function(event) {
-        var target = event.target
-        var dataset = target.dataset
-        var nodes = target.parentElement.childNodes
-        for (var i = 0; i < nodes.length; i++) {
-            if (nodes[i] == target) {
-                if (target.tagName == "TH") {
-                    dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
-                    sort_table(append, i, dataset["sort_asc"] == "1")
-                } else if (target.tagName == "TD") {
-                    var tr = target.parentElement.parentElement.querySelector("tr")
-                    if (tr.childNodes[i].innerText.startsWith(field)) {
-                        typeof cb == "function" && cb(event)
-                    }
-                }
-            }
+        item.onclick = function(event) {
+            window.getSelection().toString() && document.execCommand("copy")
         }
-    }
+    })
 }
-
 function init_table(event) {
     var append = document.querySelectorAll("article table").forEach(add_sort)
 }
 
-function set_layout() {
-    article = document.querySelector("article")
-    nav = document.querySelector("nav")
-    if (window.innerWidth > 600) {
-        article.style.maxWidth = (window.innerWidth - nav.offsetWidth-40)+"px"
-        nav.className = "fixed"
-    } else {
-        article.style.maxWidth = ""
-        nav.className = ""
-    }
-}
-
 window.onresize = function (event) {
-    set_layout()
+    init_layout()
 }
-
-window.onload = function() {
+window.onload = function(event) {
+    init_layout()
     init_menu()
     init_link()
     init_code()
     init_table()
-    set_layout()
 }

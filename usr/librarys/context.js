@@ -131,6 +131,42 @@ context = {
 context.isMobile = navigator.userAgent.indexOf("Mobile") > -1
 context.scroll_by = window.innerHeight/2
 
+function right(arg) {
+    if (arg == "true") {
+        return true
+    }
+    if (arg == "false") {
+        return false
+    }
+    if (arg) {
+        return true
+    }
+    return false
+}
+function format_date(arg) {
+    var date = arg.getDate()
+    if (date < 10) {
+        date = "0"+date
+    }
+    var month = arg.getMonth()+1
+    if (month < 10) {
+        month = "0"+month
+    }
+    var hour = arg.getHours()
+    if (hour < 10) {
+        hour = "0"+hour
+    }
+    var minute = arg.getMinutes()
+    if (minute < 10) {
+        minute = "0"+minute
+    }
+    var second = arg.getSeconds()
+    if (second < 10) {
+        second = "0"+second
+    }
+    return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
+}
+
 function modify_node(which, html) {
     var node = which
     if (typeof which == "string") {
@@ -173,42 +209,6 @@ function insert_button(which, value, callback) {
     insert_before(which, "input", {
         "type": "button", "value": value, "onclick": callback,
     })
-}
-function right(arg) {
-    if (arg == "true") {
-        return true
-    }
-    if (arg == "false") {
-        return false
-    }
-    if (arg) {
-        return true
-    }
-    return false
-}
-
-function format_date(arg) {
-    var date = arg.getDate()
-    if (date < 10) {
-        date = "0"+date
-    }
-    var month = arg.getMonth()+1
-    if (month < 10) {
-        month = "0"+month
-    }
-    var hour = arg.getHours()
-    if (hour < 10) {
-        hour = "0"+hour
-    }
-    var minute = arg.getMinutes()
-    if (minute < 10) {
-        minute = "0"+minute
-    }
-    var second = arg.getSeconds()
-    if (second < 10) {
-        second = "0"+second
-    }
-    return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
 }
 
 function sort_table(table, index, sort_asc) {
@@ -276,5 +276,25 @@ function sort_table(table, index, sort_asc) {
         table.appendChild(new_list[i])
     }
     return sort_order
+}
+function add_sort(append, field, cb) {
+    append.onclick = function(event) {
+        var target = event.target
+        var dataset = target.dataset
+        var nodes = target.parentElement.childNodes
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i] == target) {
+                if (target.tagName == "TH") {
+                    dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
+                    sort_table(append, i, dataset["sort_asc"] == "1")
+                } else if (target.tagName == "TD") {
+                    var tr = target.parentElement.parentElement.querySelector("tr")
+                    if (tr.childNodes[i].innerText.startsWith(field)) {
+                        typeof cb == "function" && cb(event)
+                    }
+                }
+            }
+        }
+    }
 }
 
