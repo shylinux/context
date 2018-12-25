@@ -83,6 +83,7 @@ nav>ul>li>ul>li .mono {
 
 article {
     float:right;
+    max-width:calc(100% - 40px);
 }
 article h2 {
     cursor:alias;
@@ -96,6 +97,7 @@ article h4 {
 
 article table {
     border-collapse:collapse;
+    margin-bottom:10px;
 }
 article table caption {
     font-weight:bold;
@@ -129,9 +131,9 @@ article pre {
     overflow:scroll;
     padding:5px;
     border:solid 2px green;
-    border-left:solid 4px green;
     max-width:800px;
     margin:0;
+    margin-bottom:10px;
     font-size:14px;
     line-height:16px;
 }
@@ -142,6 +144,7 @@ article div.number1 {
     text-align:right;
     padding:5px 0;
     border:solid green 2px;
+    margin-bottom:10px;
     float:left;
 }
 article div.number1 div {
@@ -167,7 +170,7 @@ footer .title {
 }
 </style>
 </head>
-<body>
+<body onkeydown="action(event, 'scroll')">
 {{end}}
 
 {{define "header"}}

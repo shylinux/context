@@ -45,6 +45,16 @@
     div.workflow div.stick, div.workflow li li.stick {
         background-color:red;
     }
+    div.workflow li>label.result{
+        background-color:rgba(0,0,0,0.2);
+        padding:0 5px;
+        border:2px solid green;
+        margin-left: 10px;
+    }
+    div.workflow li>input {
+        background-color:rgba(0,0,0,0.2);
+    }
+
 
     form.option div {
         float:left;
@@ -168,7 +178,11 @@
         </li>
         <li><div>命令行</div>
             <ul class="cmd">
-                <li data-action="shrink_cmd">+ 折叠命令行(Ctrl+Z)</li>
+                {{range $name, $cmd := conf . "toolkit"}}
+                    <li>{{$name}} <input type="text" data-cmd="{{$name}}" onkeyup="onaction(event, 'toolkit')"><label class="result"></label></li>
+                {{end}}
+
+                <li class="stick" data-action="shrink_cmd">+ 折叠命令行(Ctrl+Z)</li>
                 <li data-action="create_cmd">+ 添加命令行(Ctrl+M)</li>
                 {{if $bench}}
                     {{range $index, $cmd := index $bench "commands"}}

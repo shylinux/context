@@ -1084,6 +1084,34 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			m.Set("append").Set("result").Add("append", "directory", name).Echo(name)
 		}},
+		"import": &ctx.Command{Name: "import filename [index]", Help: "导入数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			_, f, e := open(m, arg[0])
+			m.Assert(e)
+			defer f.Close()
+
+			switch {
+			case strings.HasSuffix(arg[0], ".json"):
+				var data interface{}
+				de := json.NewDecoder(f)
+				de.Decode(&data)
+
+				msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", arg[1:])
+				m.Copy(msg, "append").Copy(msg, "result")
+			case strings.HasSuffix(arg[0], ".csv"):
+				r := csv.NewReader(f)
+
+				l, e := r.Read()
+				m.Assert(e)
+				m.Meta["append"] = l
+
+				for l, e = r.Read(); e != nil; l, e = r.Read() {
+					for i, v := range l {
+						m.Add("append", m.Meta["append"][i], v)
+					}
+				}
+				m.Table()
+			}
+		}},
 
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) > 0 && arg[0] == "all" {

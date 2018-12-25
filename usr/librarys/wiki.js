@@ -13,6 +13,12 @@ var wiki = {
             height: 40,
         },
     },
+
+    show_result: false,
+    show_height: "30px",
+    hide_height: "14px",
+    scroll_x: 50,
+    scroll_y: 50,
 }
 
 function set_layout() {
@@ -30,6 +36,9 @@ function set_layout() {
 }
 
 function action(event, cmd) {
+    var target = event.target
+    var dataset = target.dataset
+
     switch (cmd) {
         case "toggle_nav":
             var nav = document.querySelector("nav")
@@ -39,6 +48,11 @@ function action(event, cmd) {
         case "toggle_list":
             var list = event.target.nextElementSibling
             list.hidden = !list.hidden
+            break
+        case "scroll":
+            if (target.tagName == "BODY") {
+                scroll_page(event, wiki)
+            }
             break
     }
 }

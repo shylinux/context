@@ -5,6 +5,7 @@ import (
 	"contexts/ctx"
 	"encoding/csv"
 	"path"
+	"syscall"
 	"toolkit"
 
 	"fmt"
@@ -30,7 +31,21 @@ type CLI struct {
 	target *ctx.Context
 	stack  []*Frame
 
+	*time.Timer
 	*ctx.Context
+}
+
+func (cli *CLI) schedule(m *ctx.Message) string {
+	first, timer := "", int64(1<<50)
+	for k, v := range m.Confv("timer").(map[string]interface{}) {
+		val := v.(map[string]interface{})
+		if val["action_time"].(int64) < timer && !val["done"].(bool) {
+			first, timer = k, val["action_time"].(int64)
+		}
+	}
+	cli.Timer.Reset(time.Until(time.Unix(0, timer/int64(m.Confi("time_unit"))*1000000000)))
+	m.Log("fuck", "what %v %d", first, timer)
+	return m.Conf("timer_next", first)
 }
 
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
@@ -97,6 +112,7 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	cli.target = m.Target()
 	return cli
 }
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
@@ -159,6 +175,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"top": map[string]interface{}{"active": true},
 			"ls":  map[string]interface{}{"arg": []interface{}{"-l"}},
 		}, Help: "系统命令配置, active: 交互方式, cmd: 命令映射, arg: 命令参数, args: 子命令参数, path: 命令目录, env: 环境变量, dir: 工作目录"},
+
+		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
+		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
 	},
 	Commands: map[string]*ctx.Command{
 		"alias": &ctx.Command{Name: "alias [short [long...]]|[delete short]|[import module [command [alias]]]",
@@ -275,7 +294,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						execexec = execexec || ctx.Right(detail[i+1])
 						i++
 					case "<":
-						pipe := m.Spawn().Cmd("import", detail[i+1])
+						pipe := m.Sess("nfs").Cmd("import", detail[i+1])
 						msg.Copy(pipe, "append")
 						i++
 					case ">":
@@ -312,8 +331,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				detail = args
+				msg.Set("detail", detail...)
 
-				if msg.Cmd(detail); msg.Hand {
+				if msg.Cmd(); msg.Hand {
 					m.Cap("ps_target", msg.Cap("module"))
 				} else {
 					msg.Copy(m, "target").Copy(m, "result").Detail(-1, "system")
@@ -632,8 +652,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					arg = append(args, arg...)
 					m.Option("current_ctx", "")
 				} else {
-					args := []string{"context", m.Source().Name}
-					arg = append(args, arg...)
+					if !strings.HasPrefix(arg[0], "context") {
+						args := []string{"context", m.Source().Name}
+						arg = append(args, arg...)
+					}
 				}
 
 				m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
@@ -664,87 +686,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Copy(msg, "append").Copy(msg, "result")
 		}},
 
-		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if d, e := time.ParseDuration(arg[0]); m.Assert(e) {
-				m.Log("info", "sleep %v", d)
-				time.Sleep(d)
-				m.Log("info", "sleep %v done", d)
-			}
-		}},
-		"time": &ctx.Command{Name: "time when [begin|end|yestoday|tommorow|monday|sunday|first|last|origin|last]",
-			Help: "查看时间, when: 输入的时间戳, 剩余参数是时间偏移",
-			Form: map[string]int{"time_format": 1, "time_close": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-				t, stamp := time.Now(), true
-				if len(arg) > 0 {
-					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
-						t = time.Unix(int64(i/int64(m.Confi("time_unit"))), 0)
-						arg = arg[1:]
-						stamp = false
-					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
-						arg = arg[1:]
-						t = n
-					}
-				}
-
-				if len(arg) > 0 {
-					switch arg[0] {
-					case "begin":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", t.Hour(), t.Minute(), t.Second()))
-						m.Assert(e)
-						t = t.Add(-d)
-					case "end":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds%dns", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()))
-						m.Assert(e)
-						t = t.Add(time.Duration(24*time.Hour) - d)
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					case "yestoday":
-						t = t.Add(-time.Duration(24 * time.Hour))
-					case "tomorrow":
-						t = t.Add(time.Duration(24 * time.Hour))
-					case "monday":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
-						m.Assert(e)
-						t = t.Add(-d)
-					case "sunday":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
-						m.Assert(e)
-						t = t.Add(time.Duration(7*24*time.Hour) - d)
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					case "first":
-						t = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.Local)
-					case "last":
-						month, year := t.Month()+1, t.Year()
-						if month >= 13 {
-							month, year = 1, year+1
-						}
-						t = time.Date(year, month, 1, 0, 0, 0, 0, time.Local)
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					case "origin":
-						t = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.Local)
-					case "final":
-						t = time.Date(t.Year()+1, 1, 1, 0, 0, 0, 0, time.Local)
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					}
-				}
-
-				m.Append("datetime", t.Format(m.Confx("time_format")))
-				m.Append("timestamp", t.Unix()*int64(m.Confi("time_unit")))
-
-				if stamp {
-					m.Echo("%d", t.Unix()*int64(m.Confi("time_unit")))
-				} else {
-					m.Echo(t.Format(m.Confx("time_format")))
-				}
-			}},
 		"tmux": &ctx.Command{Name: "tmux buffer", Help: "终端管理, buffer: 查看复制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			switch arg[0] {
 			case "buffer":
@@ -854,8 +795,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 							}
 						} else {
 							if out, e := cmd.Output(); e != nil {
-								m.Echo("error: ").Echo("%s\n", e)
-								m.Echo("%s\n", string(out))
+								if e == exec.ErrNotFound {
+									m.Echo("error: ").Echo("not found\n")
+								} else {
+									m.Echo("error: ").Echo("%s\n", e)
+									m.Echo("%s\n", string(out))
+								}
 							} else {
 								switch m.Option("cmd_parse") {
 								case "csv":
@@ -911,6 +856,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			m.Append("lookups", mem.Lookups)
 			m.Append("objects", mem.HeapObjects)
+
+			sys := &syscall.Sysinfo_t{}
+			syscall.Sysinfo(sys)
+
+			m.Append("total", kit.FmtSize(uint64(sys.Totalram)))
+			m.Append("free", kit.FmtSize(uint64(sys.Freeram)))
+			m.Append("mper", fmt.Sprintf("%d%%", sys.Freeram*100/sys.Totalram))
+
 			m.Table()
 		}},
 		"windows": &ctx.Command{Name: "windows", Help: "windows", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1037,6 +990,184 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}
 				}
 			}},
+
+		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if d, e := time.ParseDuration(arg[0]); m.Assert(e) {
+				m.Log("info", "sleep %v", d)
+				time.Sleep(d)
+				m.Log("info", "sleep %v done", d)
+			}
+		}},
+		"time": &ctx.Command{Name: "time when [begin|end|yestoday|tommorow|monday|sunday|first|last|new|eve] [offset]",
+			Help: "查看时间, when: 输入的时间戳, 剩余参数是时间偏移",
+			Form: map[string]int{"time_format": 1, "time_close": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+				t, stamp := time.Now(), true
+				if len(arg) > 0 {
+					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
+						t, stamp, arg = time.Unix(int64(i/int64(m.Confi("time_unit"))), 0), false, arg[1:]
+					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
+						t, arg = n, arg[1:]
+					} else {
+						for _, v := range []string{"01-02", "2006-01-02", "15:04:05", "15:04"} {
+							if n, e := time.ParseInLocation(v, arg[0], time.Local); e == nil {
+								t, arg = n, arg[1:]
+								break
+							}
+						}
+					}
+				}
+
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "begin":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t, arg = t.Add(-d), arg[1:]
+					case "end":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds%dns", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()))
+						m.Assert(e)
+						t, arg = t.Add(time.Duration(24*time.Hour)-d), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "yestoday":
+						t, arg = t.Add(-time.Duration(24*time.Hour)), arg[1:]
+					case "tomorrow":
+						t, arg = t.Add(time.Duration(24*time.Hour)), arg[1:]
+					case "monday":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t, arg = t.Add(-d), arg[1:]
+					case "sunday":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t, arg = t.Add(time.Duration(7*24*time.Hour)-d), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "first":
+						t, arg = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.Local), arg[1:]
+					case "last":
+						month, year := t.Month()+1, t.Year()
+						if month >= 13 {
+							month, year = 1, year+1
+						}
+						t, arg = time.Date(year, month, 1, 0, 0, 0, 0, time.Local), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "new":
+						t, arg = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
+					case "eve":
+						t, arg = time.Date(t.Year()+1, 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "":
+						arg = arg[1:]
+					}
+				}
+
+				if len(arg) > 0 {
+					if d, e := time.ParseDuration(arg[0]); e == nil {
+						t, arg = t.Add(d), arg[1:]
+					}
+				}
+
+				m.Append("datetime", t.Format(m.Confx("time_format")))
+				m.Append("timestamp", t.Unix()*int64(m.Confi("time_unit")))
+
+				if stamp {
+					m.Echo("%d", t.Unix()*int64(m.Confi("time_unit")))
+				} else {
+					m.Echo(t.Format(m.Confx("time_format")))
+				}
+			}},
+		"timer": &ctx.Command{Name: "timer [begin time] [repeat] [order time] time cmd", Help: "定时任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if cli, ok := c.Server.(*CLI); m.Assert(ok) {
+				if len(arg) == 0 { // 查看任务列表
+					for k, v := range m.Confv("timer").(map[string]interface{}) {
+						val := v.(map[string]interface{})
+						m.Add("append", "key", k)
+						m.Add("append", "action_time", time.Unix(0, val["action_time"].(int64)/int64(m.Confi("time_unit"))*1000000000).Format(m.Conf("time_format")))
+						m.Add("append", "order", val["order"])
+						m.Add("append", "time", val["time"])
+						m.Add("append", "cmd", val["cmd"])
+						m.Add("append", "msg", val["msg"])
+						m.Add("append", "results", fmt.Sprintf("%v", val["result"]))
+					}
+					m.Table()
+					return
+				}
+
+				now := int64(m.Spawn().Cmd("time").Appendi("timestamp"))
+				begin := now
+				if len(arg) > 0 && arg[0] == "begin" {
+					begin, arg = int64(m.Spawn().Cmd("time", arg[1]).Appendi("timestamp")), arg[2:]
+				}
+
+				repeat := false
+				if len(arg) > 0 && arg[0] == "repeat" {
+					repeat, arg = true, arg[1:]
+				}
+
+				order := ""
+				if len(arg) > 0 && arg[0] == "order" {
+					order, arg = arg[1], arg[2:]
+				}
+
+				action := int64(m.Spawn().Cmd("time", begin, order, arg[0]).Appendi("timestamp"))
+
+				// 创建任务
+				hash := m.Sess("aaa").Cmd("md5", arg, now).Result(0)
+				m.Confv("timer", hash, map[string]interface{}{
+					"create_time": now,
+					"begin_time":  begin,
+					"action_time": action,
+					"repeat":      repeat,
+					"order":       order,
+					"done":        false,
+					"time":        arg[0],
+					"cmd":         arg[1:],
+					"msg":         0,
+					"result":      "",
+				})
+
+				if cli.Timer == nil { // 创建时间队列
+					cli.Timer = time.NewTimer((time.Duration)((action - now) / int64(m.Confi("time_unit")) * 1000000000))
+					go func() {
+						for {
+							select {
+							case <-cli.Timer.C:
+								m.Log("info", "timer %s", m.Conf("timer_next"))
+								if m.Conf("timer_next") == "" {
+									break
+								}
+								timer := m.Confv("timer", m.Conf("timer_next")).(map[string]interface{})
+								m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
+
+								msg := m.Sess("cli").Cmd("source", timer["cmd"])
+								timer["result"] = msg.Meta["result"]
+								timer["msg"] = msg.Code()
+
+								if timer["repeat"].(bool) {
+									timer["action_time"] = int64(m.Spawn().Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
+								} else {
+									timer["done"] = true
+								}
+								cli.schedule(m)
+							}
+						}
+						cli.Timer = nil
+					}()
+				}
+
+				// 调度任务
+				cli.schedule(m)
+				m.Echo(hash)
+			}
+		}},
 	},
 }
 

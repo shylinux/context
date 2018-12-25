@@ -1,7 +1,6 @@
 package ctx
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1454,6 +1453,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	if m == nil {
 		return m
 	}
+
 	if len(args) > 0 {
 		m.Set("detail", Trans(args...)...)
 	}
@@ -3050,7 +3050,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					arg, all = arg[1:], true
 				}
 
-				action, which, chain := "", "-1", ""
+				action, which := "", "-1"
 				have := map[string]bool{}
 				if len(arg) > 0 {
 					switch arg[0] {
@@ -3066,8 +3066,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 					case "create", "delete":
 						action, arg = arg[0], arg[1:]
-					case "parse":
-						chain, arg = arg[1], arg[2:]
 					}
 				}
 
@@ -3149,9 +3147,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					value = m.Confv(arg[0])
 				}
 
-				msg := m.Spawn()
-				msg.Put("option", "_cache", value)
-				msg.Cmd("trans", "_cache", chain)
+				msg := m.Spawn().Put("option", "_cache", value).Cmd("trans", "_cache")
 				m.Copy(msg, "append").Copy(msg, "result")
 			}},
 		"cache": &Command{Name: "cache [all] |key [value]|key = value|key name value help|delete key]",
@@ -3188,25 +3184,26 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 			}},
 
-		"trans": &Command{Name: "trans key index", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) {
+		"trans": &Command{Name: "trans key [index]", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			value := m.Data[arg[0]]
-			if arg[1] != "" {
-				v := Chain(m, value, arg[1])
-				value = v
+			if len(arg) > 1 && arg[1] != "" {
+				value = Chain(m, value, arg[1])
 			}
 
 			switch val := value.(type) {
 			case map[string]interface{}:
 				for k, v := range val {
 					m.Add("append", "key", k)
-					switch value := v.(type) {
+					switch val := v.(type) {
+					case nil:
+						m.Add("append", "value", "")
 					case string:
-						m.Add("append", "value", value)
+						m.Add("append", "value", val)
 					case float64:
-						m.Add("append", "value", fmt.Sprintf("%d", int(value)))
+						m.Add("append", "value", fmt.Sprintf("%d", int(val)))
 					default:
-						b, _ := json.Marshal(value)
-						m.Add("append", "value", fmt.Sprintf("%v", string(b)))
+						b, _ := json.Marshal(val)
+						m.Add("append", "value", fmt.Sprintf("%s", string(b)))
 					}
 				}
 				m.Sort("key", "str").Table()
@@ -3218,9 +3215,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Sort("key", "str").Table()
 			case []interface{}:
 				for i, v := range val {
-					switch value := v.(type) {
+					switch val := v.(type) {
 					case map[string]interface{}:
-						for k, v := range value {
+						for k, v := range val {
 							switch value := v.(type) {
 							case string:
 								m.Add("append", k, value)
@@ -3233,13 +3230,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 						}
 					case string:
 						m.Add("append", "index", i)
-						m.Add("append", "value", value)
+						m.Add("append", "value", val)
 					case float64:
 						m.Add("append", "index", i)
-						m.Add("append", "value", fmt.Sprintf("%v", int(value)))
+						m.Add("append", "value", fmt.Sprintf("%v", int(val)))
+					case nil:
+						m.Add("append", "index", i)
+						m.Add("append", "value", "")
 					default:
 						m.Add("append", "index", i)
-						b, _ := json.Marshal(value)
+						b, _ := json.Marshal(val)
 						m.Add("append", "value", fmt.Sprintf("%v", string(b)))
 					}
 				}
@@ -3472,47 +3472,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 				m.Set("result").Table()
 			}},
-		"import": &Command{Name: "import filename", Help: "导入数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			f, e := os.Open(arg[0])
-			m.Assert(e)
-			defer f.Close()
-
-			switch {
-			case strings.HasSuffix(arg[0], ".json"):
-				var data interface{}
-				de := json.NewDecoder(f)
-				de.Decode(&data)
-				m.Optionv("data", data)
-
-				switch d := data.(type) {
-				case []interface{}:
-					for _, value := range d {
-						switch val := value.(type) {
-						case map[string]interface{}:
-							for k, v := range val {
-								m.Add("append", k, v)
-							}
-						}
-					}
-				}
-			case strings.HasSuffix(arg[0], ".csv"):
-				r := csv.NewReader(f)
-				l, e := r.Read()
-				m.Assert(e)
-				m.Meta["append"] = l
-
-				for {
-					l, e := r.Read()
-					if e != nil {
-						break
-					}
-					for i, v := range l {
-						m.Add("append", m.Meta["append"][i], v)
-					}
-				}
-			}
-			m.Table()
-		}},
 	},
 }
 

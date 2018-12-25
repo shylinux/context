@@ -297,4 +297,51 @@ function add_sort(append, field, cb) {
         }
     }
 }
+function scroll_page(event, page) {
+    var body = document.querySelector("body")
+
+    switch (event.key) {
+        case "h":
+            if (event.ctrlKey) {
+                window.scrollBy(-page.scroll_x*10, 0)
+            } else {
+                window.scrollBy(-page.scroll_x, 0)
+            }
+            break
+        case "H":
+            window.scrollBy(-body.scrollWidth, 0)
+            break
+        case "l":
+            if (event.ctrlKey) {
+                window.scrollBy(page.scroll_x*10, 0)
+            } else {
+                window.scrollBy(page.scroll_x, 0)
+            }
+            break
+        case "L":
+            window.scrollBy(body.scrollWidth, 0)
+            break
+        case "j":
+            if (event.ctrlKey) {
+                window.scrollBy(0, page.scroll_y*10)
+            } else {
+                window.scrollBy(0, page.scroll_y)
+            }
+            break
+        case "J":
+            window.scrollBy(0, body.scrollHeight)
+            break
+        case "k":
+            if (event.ctrlKey) {
+                window.scrollBy(0, -page.scroll_y*10)
+            } else {
+                window.scrollBy(0, -page.scroll_y)
+            }
+            break
+        case "K":
+            window.scrollBy(0, -body.scrollHeight)
+            break
+    }
+    return
+}
 

@@ -322,6 +322,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
 		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
 		"brow_home":       &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "浏览服务"},
+		"spide":           &ctx.Config{Name: "spide", Value: map[string]interface{}{}, Help: "浏览服务"},
+		"client_timeout":  &ctx.Config{Name: "client_timeout", Value: "100s", Help: "浏览服务"},
 
 		"directory": &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
 		"protocol":  &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
@@ -333,6 +335,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"login_right": &ctx.Config{Name: "login_right", Value: "1", Help: "登录认证"},
 		"login_lark":  &ctx.Config{Name: "login_lark", Value: "false", Help: "会话认证"},
 		"cas_url":     &ctx.Config{Name: "cas_url", Value: "", Help: "单点登录"},
+
+		"toolkit": &ctx.Config{Name: "toolkit", Value: map[string]interface{}{
+			"time": map[string]interface{}{
+				"cmd": "time",
+			},
+		}, Help: "小工具"},
 
 		"library_dir":      &ctx.Config{Name: "library_dir", Value: "usr/librarys", Help: "脚本目录"},
 		"template_dir":     &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板目录"},
@@ -415,7 +423,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"get": &ctx.Command{Name: "get [method GET|POST] url arg...",
 			Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "parse": 1, "save": 1},
+			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "parse": 1, "sub_parse": 3, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 					if m.Has("path_value") {
@@ -470,10 +478,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					if web.Client == nil {
-						web.Client = &http.Client{}
+						d, e := time.ParseDuration(m.Conf("client_timeout"))
+						m.Assert(e)
+						web.Client = &http.Client{Timeout: d}
 					}
 					res, e := web.Client.Do(req)
 					if e != nil {
+						m.Log("info", "get error %v", e)
 						return
 					}
 					m.Assert(e)
@@ -495,7 +506,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}()
 
 					if m.Has("save") {
-
 						p := m.Option("save")
 						if !strings.Contains(m.Option("save"), "/") {
 							p = path.Join(m.Sess("nfs").Cmd("pwd").Result(0), m.Option("save"))
@@ -512,27 +522,44 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					ct := res.Header.Get("Content-Type")
 					m.Log("info", "content: %s", ct)
+
 					switch {
 					case strings.HasPrefix(ct, "application/json"):
 						json.NewDecoder(res.Body).Decode(&result)
 						if m.Has("parse") {
-							msg := m.Spawn()
-							msg.Put("option", "response", result)
-							msg.Cmd("trans", "response", m.Option("parse"))
+							msg := m.Spawn().Put("option", "data", result).Cmd("trans", "data", m.Option("parse"))
 							m.Copy(msg, "append").Copy(msg, "result")
 							return
 						}
 						b, _ := json.MarshalIndent(result, "", "  ")
 						result = string(b)
 					case strings.HasPrefix(ct, "text/html"):
-						html, e := goquery.NewDocumentFromReader(res.Body)
+						page, e := goquery.NewDocumentFromReader(res.Body)
 						m.Assert(e)
-						query := html.Find("html")
+
+						query := page.Find("html")
 						if m.Has("parse") {
 							query = query.Find(m.Option("parse"))
 						}
 
 						query.Each(func(n int, s *goquery.Selection) {
+							if m.Options("sub_parse") {
+								for i := 0; i < len(m.Meta["sub_parse"])-2; i += 3 {
+									item := s.Find(m.Meta["sub_parse"][i+1])
+									if m.Meta["sub_parse"][i+1] == "" {
+										item = s
+									}
+									if v, ok := item.Attr(m.Meta["sub_parse"][i+2]); ok {
+										m.Add("append", m.Meta["sub_parse"][i], v)
+										m.Log("info", "item attr %v", v)
+									} else {
+										m.Add("append", m.Meta["sub_parse"][i], strings.Replace(item.Text(), "\n", "", -1))
+										m.Log("info", "item text %v", item.Text())
+									}
+								}
+								return
+							}
+
 							s.Find("a").Each(func(n int, s *goquery.Selection) {
 								if attr, ok := s.Attr("href"); ok {
 									s.SetAttr("href", proxy(m, attr))
@@ -551,10 +578,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 									s.SetAttr("src", proxy(m, attr))
 								}
 							})
+
 							if html, e := s.Html(); e == nil {
 								m.Add("append", "html", html)
 							}
 						})
+						m.Table()
+						result = ""
 					case strings.HasPrefix(ct, "text"):
 						buf, e := ioutil.ReadAll(res.Body)
 						m.Assert(e)
@@ -1024,6 +1054,17 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 
+				if m.Options("toolkit") {
+					m.Log("what", "waht %v", m.Optionv("toolkit"))
+					m.Log("what", "waht %v", m.Confv("toolkit"))
+					if kit, ok := m.Confv("toolkit", m.Option("toolkit")).(map[string]interface{}); ok {
+						m.Log("what", "waht %v", kit)
+						msg := m.Sess("cli").Cmd(kit["cmd"], m.Option("argument"))
+						m.Copy(msg, "append").Copy(msg, "result")
+					}
+					return
+				}
+
 				bench_share := ""
 				bench, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{})
 				if right && !m.Confs("bench_disable") {
@@ -1179,6 +1220,101 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			msg := m.Spawn().Cmd("get", strings.TrimPrefix(key, "/proxy/"), arg)
 			m.Copy(msg, "append").Copy(msg, "result")
+		}},
+
+		"spide": &ctx.Command{Name: "spide", Help: "spide", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) == 0 {
+				for k, v := range m.Confv("spide").(map[string]interface{}) {
+					val := v.(map[string]interface{})
+					m.Add("append", "key", k)
+					m.Add("append", "limit", val["limit"])
+					m.Add("append", "site", val["site"])
+				}
+				m.Sort("key", "str").Table()
+				return
+			}
+
+			if len(arg) > 0 && arg[0] == "add" {
+				m.Confv("spide", arg[1], map[string]interface{}{
+					"site":      arg[2],
+					"narg":      strings.Count(arg[2], "%s"),
+					"parse":     arg[3],
+					"sub_parse": arg[4:],
+					"fields":    m.Option("fields"),
+					"offset":    m.Option("offset"),
+					"limit":     m.Option("limit"),
+				})
+				return
+			}
+
+			spide := m.Confv("spide", arg[0]).(map[string]interface{})
+			arg = arg[1:]
+
+			sub_parse := spide["sub_parse"].([]string)
+
+			args := []interface{}{}
+			for i := 0; i < spide["narg"].(int); i++ {
+				args = append(args, url.QueryEscape(arg[i]))
+			}
+
+			msg := m.Spawn().Cmd("get", fmt.Sprintf(spide["site"].(string), args...),
+				"parse", spide["parse"], sub_parse)
+			arg = arg[spide["narg"].(int):]
+
+			offset := spide["offset"].(string)
+			if m.Has("offset") {
+				offset = m.Option("offset")
+			}
+			if len(arg) > 0 {
+				offset, arg = arg[0], arg[1:]
+			}
+
+			limit := spide["limit"].(string)
+			if m.Has("limit") {
+				limit = m.Option("limit")
+			}
+			if len(arg) > 0 {
+				limit, arg = arg[0], arg[1:]
+			}
+
+			fields := spide["fields"].(string)
+			if m.Has("fields") {
+				fields = m.Option("fields")
+			}
+			if len(arg) > 0 {
+				fields, arg = arg[0], arg[1:]
+			}
+
+			m.Copy(msg, "append").Copy(msg, "result")
+			m.Cmd("select", "limit", limit, "offset", offset, "fields", fields)
+
+		}},
+		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			date := "2018-12-24"
+			if len(arg) > 0 {
+				date, arg = arg[0], arg[1:]
+			}
+			to := "QFK"
+			if len(arg) > 0 {
+				to, arg = arg[0], arg[1:]
+			}
+			from := "BJP"
+			if len(arg) > 0 {
+				from, arg = arg[0], arg[1:]
+			}
+			m.Echo("%s->%s %s\n", from, to, date)
+
+			msg := m.Spawn().Cmd("get", fmt.Sprintf("https://kyfw.12306.cn/otn/leftTicket/queryX?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT", date, from, to), "parse", "data.result")
+			for _, v := range msg.Meta["value"] {
+				fields := strings.Split(v, "|")
+				m.Add("append", "车次--", fields[3])
+				m.Add("append", "出发----", fields[8])
+				m.Add("append", "到站----", fields[9])
+				m.Add("append", "时长----", fields[10])
+				m.Add("append", "二等座", fields[30])
+				m.Add("append", "一等座", fields[31])
+			}
+			m.Table()
 		}},
 	},
 }

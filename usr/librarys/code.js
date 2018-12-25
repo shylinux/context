@@ -10,7 +10,7 @@ var code = {
     ncommand: 1,
     current_cmd: "",
 
-    show_result: true,
+    show_result: false,
     show_height: "30px",
     hide_height: "14px",
     scroll_x: 50,
@@ -105,15 +105,19 @@ function add_sort(append, field, cb) {
                         typeof cb == "function" && cb(event)
                     }
 
-                    var text = window.getSelection().toString()
-                    if (!text) {
-                        var has = document.querySelector("td.clip")
-                        has && (has.className = "")
-                        target.className = "clip"
-                        text = target.innerText
+                    var has = document.querySelector("td.clip")
+                    has && (has.className = "")
+                    target.className = "clip"
+
+                    if (event.shiftKey) {
+                        copy_to_clipboard(target.innerText, false, false)
+                        return
                     }
 
-                    copy_to_clipboard(text, true, !event.shiftKey)
+                    var text = window.getSelection().toString()
+                    if (text) {
+                        copy_to_clipboard(text, true, !event.shiftKey)
+                    }
                 }
             }
         }
@@ -222,13 +226,6 @@ function send_command(form, cb) {
         var result = document.querySelector("code.result."+name+" pre")
         var append = document.querySelector("table.append."+name)
 
-        if (result && msg) {
-            if (msg["Content-Type"] && msg["Content-Type"].join("") == "text/html") {
-                append_child(result, "iframe").innerHTML = (msg.result || []).join("")
-            } else {
-                result.innerHTML = (msg.result || []).join("")
-            }
-        }
         if (append && msg) {
             append.innerHTML = ""
             if (msg.append) {
@@ -245,7 +242,18 @@ function send_command(form, cb) {
                         append_child(tr, "td", msg[msg.append[k]][i])
                     }
                 }
+
+                result && ( result.style.height = code.show_result? "": code.show_height)
             }
+        }
+
+        if (result && msg) {
+            if (msg["Content-Type"] && msg["Content-Type"].join("") == "text/html") {
+                append_child(result, "iframe").innerHTML = (msg.result || []).join("")
+            } else {
+                result.innerHTML = (msg.result || []).join("")
+            }
+            init_result()
         }
 
         typeof(cb) == "function" && cb(msg)
@@ -363,6 +371,8 @@ function onaction(event, action, arg) {
                         break
                     case "z":
                         shrink_command_result()
+                        var target = document.querySelector("div.workflow>ul>li>ul>li[data-action=shrink_cmd]")
+                        target.className = code.show_result? "": "stick"
                         break
                     case "r":
                         location.reload()
@@ -567,6 +577,14 @@ function onaction(event, action, arg) {
             break
         case "command":
             check_option(target.form, target)
+            break
+        case "toolkit":
+            if (event.key == "Enter") {
+                context.GET("", {"toolkit": dataset["cmd"], "argument": target.value}, function(msg) {
+                    target.nextElementSibling.innerText = msg.result
+                    event
+                })
+            }
             break
     }
 }
@@ -814,10 +832,13 @@ function init_docker() {
                         save_clipboard(item)
                         return
                     case "create_txt":
-                        copy_to_clipboard(prompt("text"))
+                        var text = prompt("text")
+                        text && copy_to_clipboard(text)
                         return
                     case "shrink_cmd":
                         shrink_command_result()
+                        var target = document.querySelector("div.workflow>ul>li>ul>li[data-action=shrink_cmd]")
+                        target.className = code.show_result? "": "stick"
                         return
                     case "create_cmd":
                         add_command()
