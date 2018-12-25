@@ -1,0 +1,50 @@
+~web
+    spide add weather "http://weather.sina.com.cn/%s" "div.blk_fc_c0_i"\
+        sub_parse date "p.wt_fc_c0_i_date" text\
+        sub_parse day "p.wt_fc_c0_i_day" text\
+        sub_parse weather "p.wt_fc_c0_i_icons.clearfix img" title\
+        sub_parse temp "p.wt_fc_c0_i_temp" text\
+        sub_parse wind "p.wt_fc_c0_i_tip" text\
+        sub_parse pm "ul.wt_fc_c0_i_level li.l" text\
+        sub_parse env "ul.wt_fc_c0_i_level li.r" text\
+        offset 0 limit 5 fields "date day weather temp"
+
+    spide add topic "https://s.weibo.com/top/summary?cate=realtimehot" "table tr"\
+        sub_parse mark "td.td-03" text\
+        sub_parse count "td.td-02 span" text\
+        sub_parse rank "td.td-01" text\
+        sub_parse topic "td.td-02 a" text\
+        offset 0 limit 22
+
+    spide add pedia "https://zh.wikipedia.org/wiki/%s" "div.mw-parser-output>p,div.mw-parser-output>ul"\
+        sub_parse content "" text\
+        offset 0 limit 3
+
+    spide add baike "http://www.baike.com/wiki/%s&prd=button_doc_entry" "div.summary p, #content h2, #content h3, #content p"\
+        sub_parse content "" text\
+        offset 0 limit 3
+
+    spide add baidu "http://www.baidu.com/s?wd=%s&rsv_spt=1&rsv_iqid=0xa47ffeff0000e033&issp=1&f=8&rsv_bp=0&rsv_idx=2&ie=utf-8&tn=baiduhome_pg&rsv_enter=1&rsv_sug3=19&rsv_sug1=34&rsv_sug7=101&rsv_t=a131Qznttosl8wF0vyMrsGkYevt2bH0XIskFZst3BRmlrWXhmH5zmhgyonPQO%%2BM7kn7j&rsv_sug2=0&inputT=9889&rsv_sug4=12120"\
+        "#content_left div.result.c-container "\
+        sub_parse link "a.c-showurl" text\
+        sub_parse title "h3" text\
+        sub_parse content "div.c-abstract" text\
+        offset 0 limit 10 fields "link title"
+
+    spide add zhihu "https://www.zhihu.com/search?type=content&q=%s&utm_content=search_preset" "div.SearchMain div.Card"\
+        sub_parse up "div.ContentItem-actions button.VoteButton--up" text\
+        sub_parse title "h2.ContentItem-title" text\
+        sub_parse com "div.ContentItem-actions button.ContentItem-action" text\
+        sub_parse content "div.RichContent span.RichText" text\
+        offset 1 limit 10 fields "title up com"
+
+    spide add toutiao "https://www.toutiao.com/search/?keyword=%s"\
+        "div.articleCard"\
+        sub_parse content "" text\
+        offset 0 limit 10
+
+    spide add 12306 "https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc&fs=%s,%s&ts=%s,%s&date=2018-12-23&flag=N,N,Y"\
+        "div.t-list table tr"\
+        sub_parse content "" text\
+        offset 0 limit 10
+
