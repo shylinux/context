@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"contexts/ctx"
 	"encoding/csv"
+	"encoding/json"
 	"path"
 	"syscall"
 	"toolkit"
@@ -803,6 +804,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 								}
 							} else {
 								switch m.Option("cmd_parse") {
+								case "json":
+									var data interface{}
+									if json.Unmarshal(out, &data) == nil {
+										msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
+										m.Copy(msg, "append").Copy(msg, "result")
+									} else {
+										m.Echo(string(out))
+									}
+
 								case "csv":
 									data, e := csv.NewReader(bytes.NewReader(out)).ReadAll()
 									m.Assert(e)
