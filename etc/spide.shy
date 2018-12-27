@@ -43,9 +43,8 @@
         sub_parse content "" text\
         offset 0 limit 10
 
-    spide add 12306 "https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc&fs=%s,%s&ts=%s,%s&flag=N,N,Y"\
+    spide add 12306 "https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc&fs=%s,%s&ts=%s,%s&date=2018-12-23&flag=N,N,Y"\
         "div.t-list table tr"\
-        date $(time $(time) time_format "2006-01-02") \
         sub_parse content "" text\
         offset 0 limit 10
 

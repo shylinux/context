@@ -3259,7 +3259,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			case float64:
 				m.Echo("%d", int(val))
 			case nil:
-				m.Echo("")
 			default:
 				b, _ := json.Marshal(val)
 				m.Echo("%s", string(b))

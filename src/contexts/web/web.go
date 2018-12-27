@@ -97,6 +97,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("index_path", r.Header.Get("index_path"))
 			msg.Option("index_url", r.Header.Get("index_url"))
 			msg.Option("remote_addr", r.RemoteAddr)
+			msg.Option("remote_ip", strings.Split(r.RemoteAddr, ":"))
 			msg.Option("dir_root", m.Cap("directory"))
 			msg.Option("referer", r.Header.Get("Referer"))
 			msg.Option("accept", r.Header.Get("Accept"))
@@ -138,6 +139,12 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 					for _, val := range v {
 						msg.Add("option", k, val)
 					}
+				}
+			}
+
+			if false {
+				if !msg.Sess("aaa").Cmd("session", msg.Option("session"), "ship", "ip").Results(0) {
+					msg.Sess("aaa").Cmd("session", "create", "web", "ship", "ip", m.Option("remote_ip"))
 				}
 			}
 

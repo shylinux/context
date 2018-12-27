@@ -121,37 +121,109 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	Commands: map[string]*ctx.Command{
 		"session": &ctx.Command{Name: "session create", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) == 0 {
-				m.Spawn().Cmd("config", "session").Cmd("select", "parse", "value", "", "fields", "key type meta ship").CopyTo(m)
+				m.Spawn().Cmd("config", "session").Cmd("select", "parse", "value", "", "fields", "key type meta ship data").CopyTo(m)
 				return
 			}
 
+			// 会话
+			s, t := "", ""
 			if len(arg) > 0 && arg[0] == "create" {
-				s := Session(arg[1])
+				s, t = Session(arg[1]), "session"
 				m.Confv("session", s, map[string]interface{}{
 					"create_time": time.Now().Unix(),
 					"type":        "session",
 					"meta":        arg[1],
 				})
-				m.Echo(s)
-				return
+
+				if arg = arg[2:]; len(arg) == 0 {
+					m.Echo(s)
+					return
+				}
+			}
+			if v, ok := m.Confv("session", []interface{}{arg[0], "type"}).(string); ok {
+				s, t, arg = arg[0], v, arg[1:]
 			}
 
-			s, arg := arg[0], arg[1:]
+			// 属性
+			which := "data"
+			if len(arg) > 0 {
+				switch arg[0] {
+				case "data", "ship", "":
+					which, arg = arg[0], arg[1:]
+				}
+			}
 			if len(arg) == 0 {
-				m.Spawn().Cmd("config", "session", s).CopyTo(m)
+				args := []string{s}
+				if which != "" {
+					args = append(args, which)
+				}
+				m.Spawn().Cmd("config", "session", strings.Join(args, ".")).CopyTo(m)
 				return
 			}
 
-			if len(arg) > 0 && arg[0] == "ip" {
-				h := Hash("ip: %s", arg[0])
-				m.Confv("session", h, map[string]interface{}{
-					"create_time": time.Now().Unix(),
-					"type":        "ip",
-					"meta":        arg[1],
-					"ship":        map[string]interface{}{s: true},
-				})
-				m.Confv("session", []interface{}{s, "ship", h}, true)
-				return
+			switch which {
+			case "data": // 数据
+				if len(arg) == 1 {
+					m.Spawn().Cmd("config", "session", strings.Join([]string{s, "data", arg[0]}, ".")).CopyTo(m)
+					for k, _ := range m.Confv("session", []interface{}{s, "ship"}).(map[string]interface{}) {
+						if len(m.Meta["result"]) > 0 || len(m.Meta["append"]) > 0 {
+							break
+						}
+						m.Spawn().Cmd("config", "session", strings.Join([]string{k, "data", arg[0]}, ".")).CopyTo(m)
+					}
+					break
+				}
+
+				m.Spawn().Cmd("config", "session", strings.Join([]string{s, "data", arg[0]}, "."), arg[1]).CopyTo(m)
+				break
+			case "ship": // 节点
+				if len(arg) == 1 {
+					for k, _ := range m.Confv("session", []interface{}{s, "ship"}).(map[string]interface{}) {
+						if auth, ok := m.Confv("session", k).(map[string]interface{}); ok {
+							if auth["type"].(string) == arg[0] {
+								m.Add("append", "key", k)
+								m.Add("append", "type", auth["type"])
+								m.Add("append", "meta", auth["meta"])
+							}
+						}
+					}
+					m.Table()
+					return
+				}
+
+				p, condition := s, ""
+				for i := 0; i < len(arg)-1; i += 2 {
+					switch arg[i] {
+					case "password":
+						if t == "session" {
+							break
+						}
+						fallthrough
+					default:
+						h := Hash("%s%s: %s", condition, arg[i], arg[i+1])
+						if sess := m.Confv("session", h); sess == nil {
+							m.Confv("session", h, map[string]interface{}{
+								"create_time": time.Now().Unix(),
+								"type":        arg[i],
+								"meta":        arg[i+1],
+								"ship": map[string]interface{}{p: map[string]interface{}{
+									"level": 0,
+									"type":  t,
+								}},
+							})
+						}
+						m.Confv("session", []interface{}{s, "ship", h}, map[string]interface{}{
+							"level": 2,
+							"type":  arg[i],
+						})
+						m.Confv("session", []interface{}{p, "ship", h}, map[string]interface{}{
+							"level": 1,
+							"type":  arg[i],
+						})
+						p, t = h, arg[i]
+					}
+				}
+				m.Echo(p)
 			}
 		}},
 
