@@ -13,5 +13,7 @@
     right void owner login add from root
 
 source etc/local.shy
+source etc/spide.shy
 
 ~lark
+

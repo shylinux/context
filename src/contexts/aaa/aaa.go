@@ -30,7 +30,11 @@ type AAA struct {
 	*ctx.Context
 }
 
-func (aaa *AAA) Session(meta string) string {
+func Hash(meta string, arg ...interface{}) string {
+	bs := md5.Sum([]byte(fmt.Sprintln("%s", meta, arg)))
+	return hex.EncodeToString(bs[:])
+}
+func Session(meta string) string {
 	bs := md5.Sum([]byte(fmt.Sprintln("%d%d%s", time.Now().Unix(), rand.Int(), meta)))
 	return hex.EncodeToString(bs[:])
 }
@@ -57,7 +61,7 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	now := time.Now().Unix()
 	c.Caches = map[string]*ctx.Cache{
 		"method":      &ctx.Cache{Name: "method", Value: arg[0], Help: "登录方式"},
-		"sessid":      &ctx.Cache{Name: "sessid", Value: aaa.Session(arg[1]), Help: "会话令牌"},
+		"sessid":      &ctx.Cache{Name: "sessid", Value: Session(arg[1]), Help: "会话令牌"},
 		"login_time":  &ctx.Cache{Name: "login_time", Value: fmt.Sprintf("%d", now), Help: "登录时间"},
 		"expire_time": &ctx.Cache{Name: "expire_time", Value: fmt.Sprintf("%d", int64(m.Confi("expire"))+now), Help: "会话超时"},
 	}
@@ -108,12 +112,49 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"nuser": &ctx.Cache{Name: "nuser", Value: "0", Help: "用户数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"expire": &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
-		"cert":   &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
-		"pub":    &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
-		"key":    &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
+		"session": &ctx.Config{Name: "session", Value: map[string]interface{}{}, Help: "私钥文件"},
+		"expire":  &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
+		"cert":    &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
+		"pub":     &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
+		"key":     &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
+		"session": &ctx.Command{Name: "session create", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) == 0 {
+				m.Spawn().Cmd("config", "session").Cmd("select", "parse", "value", "", "fields", "key type meta ship").CopyTo(m)
+				return
+			}
+
+			if len(arg) > 0 && arg[0] == "create" {
+				s := Session(arg[1])
+				m.Confv("session", s, map[string]interface{}{
+					"create_time": time.Now().Unix(),
+					"type":        "session",
+					"meta":        arg[1],
+				})
+				m.Echo(s)
+				return
+			}
+
+			s, arg := arg[0], arg[1:]
+			if len(arg) == 0 {
+				m.Spawn().Cmd("config", "session", s).CopyTo(m)
+				return
+			}
+
+			if len(arg) > 0 && arg[0] == "ip" {
+				h := Hash("ip: %s", arg[0])
+				m.Confv("session", h, map[string]interface{}{
+					"create_time": time.Now().Unix(),
+					"type":        "ip",
+					"meta":        arg[1],
+					"ship":        map[string]interface{}{s: true},
+				})
+				m.Confv("session", []interface{}{s, "ship", h}, true)
+				return
+			}
+		}},
+
 		"login": &ctx.Command{Name: "login [sessid]|[username password]",
 			Form: map[string]int{"ip": 1, "openid": 1, "cert": 1, "pub": 1, "key": 1},
 			Help: []string{"会话管理", "sessid: 令牌", "username: 账号", "password: 密码",
@@ -322,139 +363,14 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}, c)
 			m.Table()
 		}},
-		"cert": &ctx.Command{Name: "cert [filename]", Help: "导出证书", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.certificate != nil {
-				certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: aaa.certificate.Raw}))
-				if m.Echo(certificate); len(arg) > 0 {
-					m.Assert(ioutil.WriteFile(arg[0], []byte(certificate), 0666))
-				}
-			}
-		}},
-		"pub": &ctx.Command{Name: "pub [filename]", Help: "导出公钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
-				pub, e := x509.MarshalPKIXPublicKey(aaa.public)
-				m.Assert(e)
-				public := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: pub}))
-				if m.Echo(public); len(arg) > 0 {
-					m.Assert(ioutil.WriteFile(arg[0], []byte(public), 0666))
-				}
-			}
-		}},
-		"key": &ctx.Command{Name: "key [filename]", Help: "导出私钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
-				private := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(aaa.private)}))
-				if m.Echo(private); len(arg) > 0 {
-					m.Assert(ioutil.WriteFile(arg[0], []byte(private), 0666))
-				}
-			}
-		}},
-		"sign": &ctx.Command{Name: "sign content [signfile]", Help: "数字签名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
-				h := md5.Sum(aaa.Input(arg[0]))
-				b, e := rsa.SignPKCS1v15(crand.Reader, aaa.private, crypto.MD5, h[:])
-				m.Assert(e)
 
-				res := base64.StdEncoding.EncodeToString(b)
-				if m.Echo(res); len(arg) > 1 {
-					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
-				}
-			}
-		}},
-		"verify": &ctx.Command{Name: "verify content signature", Help: "数字验签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
-				buf := make([]byte, 1024)
-				n, e := base64.StdEncoding.Decode(buf, aaa.Input(arg[1]))
-				m.Assert(e)
-				buf = buf[:n]
-
-				h := md5.Sum(aaa.Input(arg[0]))
-				m.Echo("%t", rsa.VerifyPKCS1v15(aaa.public, crypto.MD5, h[:], buf) == nil)
-			}
-		}},
-		"seal": &ctx.Command{Name: "seal content [sealfile]", Help: "数字加密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
-				b, e := rsa.EncryptPKCS1v15(crand.Reader, aaa.public, aaa.Input(arg[0]))
-				m.Assert(e)
-
-				res := base64.StdEncoding.EncodeToString(b)
-				if m.Echo(res); len(arg) > 1 {
-					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
-				}
-			}
-		}},
-		"deal": &ctx.Command{Name: "deal content", Help: "数字解密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
-				buf := make([]byte, 1024)
-				n, e := base64.StdEncoding.Decode(buf, aaa.Input(arg[0]))
-				m.Assert(e)
-				buf = buf[:n]
-
-				b, e := rsa.DecryptPKCS1v15(crand.Reader, aaa.private, buf)
-				m.Assert(e)
-				m.Echo(string(b))
-			}
-		}},
-		"newcipher": &ctx.Command{Name: "newcipher salt", Help: "加密算法", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
-				salt := md5.Sum(aaa.Input(arg[0]))
-				block, e := aes.NewCipher(salt[:])
-				m.Assert(e)
-				aaa.encrypt = cipher.NewCBCEncrypter(block, salt[:])
-				aaa.decrypt = cipher.NewCBCDecrypter(block, salt[:])
-			}
-		}},
-		"encrypt": &ctx.Command{Name: "encrypt content [enfile]", Help: "加密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.encrypt != nil {
-				content := aaa.Input(arg[0])
-
-				bsize := aaa.encrypt.BlockSize()
-				size := (len(content) / bsize) * bsize
-				if len(content)%bsize != 0 {
-					size += bsize
-				}
-
-				buf := make([]byte, size)
-				for pos := 0; pos < len(content); pos += bsize {
-					end := pos + bsize
-					if end > len(content) {
-						end = len(content)
-					}
-
-					b := make([]byte, bsize)
-					copy(b, content[pos:end])
-
-					aaa.encrypt.CryptBlocks(buf[pos:pos+bsize], b)
-				}
-
-				res := base64.StdEncoding.EncodeToString(buf)
-				if m.Echo(res); len(arg) > 1 {
-					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
-				}
-			}
-		}},
-		"decrypt": &ctx.Command{Name: "decrypt content [defile]", Help: "解密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.decrypt != nil {
-				content := aaa.Input(arg[0])
-
-				buf := make([]byte, 1024)
-				n, e := base64.StdEncoding.Decode(buf, content)
-				m.Assert(e)
-				buf = buf[:n]
-
-				res := make([]byte, n)
-				aaa.decrypt.CryptBlocks(res, buf)
-
-				if m.Echo(string(res)); len(arg) > 1 {
-					m.Assert(ioutil.WriteFile(arg[1], res, 0666))
-				}
-			}
-		}},
 		"md5": &ctx.Command{Name: "md5 content", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
 				h := md5.Sum(aaa.Input(strings.Join(arg, "")))
 				m.Echo(hex.EncodeToString(h[:]))
 			}
 		}},
+
 		"rsa": &ctx.Command{Name: "rsa gen|sign|verify|encrypt|decrypt|cert",
 			Help: []string{"gen: 生成密钥, sgin: 私钥签名, verify: 公钥验签, encrypt: 公钥加密, decrypt: 私钥解密",
 				"密钥: rsa gen [keyfile [pubfile [certfile]]]",
@@ -595,6 +511,134 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 				}
 			}},
+		"cert": &ctx.Command{Name: "cert [filename]", Help: "导出证书", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.certificate != nil {
+				certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: aaa.certificate.Raw}))
+				if m.Echo(certificate); len(arg) > 0 {
+					m.Assert(ioutil.WriteFile(arg[0], []byte(certificate), 0666))
+				}
+			}
+		}},
+		"pub": &ctx.Command{Name: "pub [filename]", Help: "导出公钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
+				pub, e := x509.MarshalPKIXPublicKey(aaa.public)
+				m.Assert(e)
+				public := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: pub}))
+				if m.Echo(public); len(arg) > 0 {
+					m.Assert(ioutil.WriteFile(arg[0], []byte(public), 0666))
+				}
+			}
+		}},
+		"key": &ctx.Command{Name: "key [filename]", Help: "导出私钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
+				private := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(aaa.private)}))
+				if m.Echo(private); len(arg) > 0 {
+					m.Assert(ioutil.WriteFile(arg[0], []byte(private), 0666))
+				}
+			}
+		}},
+		"sign": &ctx.Command{Name: "sign content [signfile]", Help: "数字签名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
+				h := md5.Sum(aaa.Input(arg[0]))
+				b, e := rsa.SignPKCS1v15(crand.Reader, aaa.private, crypto.MD5, h[:])
+				m.Assert(e)
+
+				res := base64.StdEncoding.EncodeToString(b)
+				if m.Echo(res); len(arg) > 1 {
+					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
+				}
+			}
+		}},
+		"verify": &ctx.Command{Name: "verify content signature", Help: "数字验签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
+				buf := make([]byte, 1024)
+				n, e := base64.StdEncoding.Decode(buf, aaa.Input(arg[1]))
+				m.Assert(e)
+				buf = buf[:n]
+
+				h := md5.Sum(aaa.Input(arg[0]))
+				m.Echo("%t", rsa.VerifyPKCS1v15(aaa.public, crypto.MD5, h[:], buf) == nil)
+			}
+		}},
+		"seal": &ctx.Command{Name: "seal content [sealfile]", Help: "数字加密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
+				b, e := rsa.EncryptPKCS1v15(crand.Reader, aaa.public, aaa.Input(arg[0]))
+				m.Assert(e)
+
+				res := base64.StdEncoding.EncodeToString(b)
+				if m.Echo(res); len(arg) > 1 {
+					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
+				}
+			}
+		}},
+		"deal": &ctx.Command{Name: "deal content", Help: "数字解密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
+				buf := make([]byte, 1024)
+				n, e := base64.StdEncoding.Decode(buf, aaa.Input(arg[0]))
+				m.Assert(e)
+				buf = buf[:n]
+
+				b, e := rsa.DecryptPKCS1v15(crand.Reader, aaa.private, buf)
+				m.Assert(e)
+				m.Echo(string(b))
+			}
+		}},
+
+		"newcipher": &ctx.Command{Name: "newcipher salt", Help: "加密算法", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
+				salt := md5.Sum(aaa.Input(arg[0]))
+				block, e := aes.NewCipher(salt[:])
+				m.Assert(e)
+				aaa.encrypt = cipher.NewCBCEncrypter(block, salt[:])
+				aaa.decrypt = cipher.NewCBCDecrypter(block, salt[:])
+			}
+		}},
+		"encrypt": &ctx.Command{Name: "encrypt content [enfile]", Help: "加密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.encrypt != nil {
+				content := aaa.Input(arg[0])
+
+				bsize := aaa.encrypt.BlockSize()
+				size := (len(content) / bsize) * bsize
+				if len(content)%bsize != 0 {
+					size += bsize
+				}
+
+				buf := make([]byte, size)
+				for pos := 0; pos < len(content); pos += bsize {
+					end := pos + bsize
+					if end > len(content) {
+						end = len(content)
+					}
+
+					b := make([]byte, bsize)
+					copy(b, content[pos:end])
+
+					aaa.encrypt.CryptBlocks(buf[pos:pos+bsize], b)
+				}
+
+				res := base64.StdEncoding.EncodeToString(buf)
+				if m.Echo(res); len(arg) > 1 {
+					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
+				}
+			}
+		}},
+		"decrypt": &ctx.Command{Name: "decrypt content [defile]", Help: "解密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.decrypt != nil {
+				content := aaa.Input(arg[0])
+
+				buf := make([]byte, 1024)
+				n, e := base64.StdEncoding.Decode(buf, content)
+				m.Assert(e)
+				buf = buf[:n]
+
+				res := make([]byte, n)
+				aaa.decrypt.CryptBlocks(res, buf)
+
+				if m.Echo(string(res)); len(arg) > 1 {
+					m.Assert(ioutil.WriteFile(arg[1], res, 0666))
+				}
+			}
+		}},
 	},
 }
 

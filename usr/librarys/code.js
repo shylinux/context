@@ -259,7 +259,7 @@ function send_command(form, cb) {
         typeof(cb) == "function" && cb(msg)
     })
 }
-function check_option(form, target) {
+function check_option(form, target, cb) {
     for (var i = 0; i < form.length-1; i++) {
         if (form[i] == target) {
             if (form[i+1].type == "button") {
@@ -270,7 +270,7 @@ function check_option(form, target) {
             return false
         }
     }
-    send_command(form)
+    send_command(form, cb)
 }
 
 function add_history(input, cmd) {
@@ -576,7 +576,11 @@ function onaction(event, action, arg) {
             }
             break
         case "command":
-            check_option(target.form, target)
+            check_option(target.form, target, function(msg) {
+                if (target["value"] == "login") {
+                    location.reload()
+                }
+            })
             break
         case "toolkit":
             if (event.key == "Enter") {

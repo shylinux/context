@@ -602,6 +602,10 @@ func (m *Message) Copy(msg *Message, meta string, arg ...string) *Message {
 
 	return m
 }
+func (m *Message) CopyTo(msg *Message) *Message {
+	msg.Copy(m, "append").Copy(m, "result")
+	return m
+}
 func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 	if l := m.Sess("log", false); l != nil {
 		if log, ok := l.target.Server.(LOGGER); ok {

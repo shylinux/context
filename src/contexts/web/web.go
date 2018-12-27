@@ -1290,7 +1290,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 		}},
 		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			date := "2018-12-24"
+			date := time.Now().Add(time.Hour * 24).Format("2006-01-02")
 			if len(arg) > 0 {
 				date, arg = arg[0], arg[1:]
 			}
