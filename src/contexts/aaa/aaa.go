@@ -112,11 +112,12 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"nuser": &ctx.Cache{Name: "nuser", Value: "0", Help: "用户数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"session": &ctx.Config{Name: "session", Value: map[string]interface{}{}, Help: "私钥文件"},
-		"expire":  &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
-		"cert":    &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
-		"pub":     &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
-		"key":     &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
+		"secrete_key": &ctx.Config{Name: "secrete_key", Value: map[string]interface{}{"password": 1, "uuid": 1}, Help: "私钥文件"},
+		"session":     &ctx.Config{Name: "session", Value: map[string]interface{}{}, Help: "私钥文件"},
+		"expire":      &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
+		"cert":        &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
+		"pub":         &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
+		"key":         &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
 		"session": &ctx.Command{Name: "session create", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -201,7 +202,12 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						return
 					}
 
-					h := Hash("%s%s: %s", condition, arg[i], arg[i+1])
+					value := arg[i+1]
+					if m.Confv("secrete_key", arg[i]) != nil {
+						value = Hash("%s", value)
+					}
+
+					h := Hash("%s%s: %s", condition, arg[i], value)
 					if sess := m.Confv("session", h); sess == nil {
 						// 节点认证
 						if arg[i] == "password" {
@@ -215,7 +221,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						}
 
 						// 创建节点
-						m.Confv("session", h, map[string]interface{}{"create_time": time.Now().Unix(), "type": arg[i], "meta": arg[i+1]})
+						m.Confv("session", h, map[string]interface{}{"create_time": time.Now().Unix(), "type": arg[i], "meta": value})
 						chain = append(chain, map[string]string{"node": h, "hash": p, "level": "0", "type": t})
 					}
 

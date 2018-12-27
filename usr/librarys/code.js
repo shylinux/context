@@ -212,7 +212,7 @@ function send_command(form, cb) {
         data[key] = form.dataset[key]
     }
     for (var i = 0; i < form.length; i++) {
-        if form[i].name {
+        if (form[i].name) {
             data[form[i].name] = form[i].value
         }
     }

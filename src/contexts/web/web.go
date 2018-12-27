@@ -98,7 +98,9 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("index_url", r.Header.Get("index_url"))
 
 			msg.Option("remote_addr", r.RemoteAddr)
-			if ip := r.Header.Get("X-Real-Ip"); ip != "" {
+			if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+				msg.Option("remote_ip", ip)
+			} else if ip := r.Header.Get("X-Real-Ip"); ip != "" {
 				msg.Option("remote_ip", ip)
 			} else {
 				msg.Option("remote_ip", strings.Split(r.RemoteAddr, ":"))
@@ -140,12 +142,12 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				}
 
 				msg.Option("username", cas.Username(r))
-				msg.Option("password", cas.Username(r))
 				for k, v := range cas.Attributes(r) {
 					for _, val := range v {
 						msg.Add("option", k, val)
 					}
 				}
+				msg.Option("uuid", msg.Option(m.Conf("cas_uuid")))
 			}
 
 			msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
@@ -342,6 +344,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"login_right": &ctx.Config{Name: "login_right", Value: "1", Help: "登录认证"},
 		"login_lark":  &ctx.Config{Name: "login_lark", Value: "false", Help: "会话认证"},
 		"cas_url":     &ctx.Config{Name: "cas_url", Value: "", Help: "单点登录"},
+		"cas_uuid":    &ctx.Config{Name: "cas_uuid", Value: "__tea_sdk__user_unique_id", Help: "单点登录"},
 
 		"toolkit": &ctx.Config{Name: "toolkit", Value: map[string]interface{}{
 			"time": map[string]interface{}{
@@ -905,14 +908,20 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid, Path: "/"})
 			}
 
-			if m.Options("username") && m.Options("password") {
+			if m.Options("username") && m.Options("uuid") {
+				if !m.Sess("aaa").Cmd("session", sessid, "ship", "username", m.Option("username"), "uuid", m.Option("uuid")).Results(0) {
+					return
+				}
+			} else if m.Options("username") && m.Options("password") {
 				if !m.Sess("aaa").Cmd("session", sessid, "ship", "username", m.Option("username"), "password", m.Option("password")).Results(0) {
 					return
 				}
 			}
 
 			for _, user := range m.Sess("aaa").Cmd("session", sessid, "ship", "username").Meta["meta"] {
-				if m.Sess("aaa").Cmd("session", sessid, "ship", "username", user, "password").Results(0) {
+				if m.Sess("aaa").Cmd("session", sessid, "ship", "username", user, "uuid").Results(0) {
+					m.Add("append", "username", user)
+				} else if m.Sess("aaa").Cmd("session", sessid, "ship", "username", user, "password").Results(0) {
 					m.Add("append", "username", user)
 				}
 			}
@@ -1061,7 +1070,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 				if !right {
 					if lark := m.Find("web.chat.lark"); lark != nil && m.Confs("login_lark") {
-						right = ctx.Right(lark.Cmd("auth", m.Option("username"), "check", m.Option("cmd")).Result(0))
+						right = ctx.Right(lark.Cmd("auth", username, "check", m.Option("cmd")).Result(0))
 					}
 				}
 
@@ -1069,7 +1078,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				bench_share := ""
 				bench, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{})
 				if order == "" {
-					if username == "" {
+					if !right && username == "" {
 						group, order, right = "login", "", true
 					} else {
 						if right && !m.Confs("bench_disable") {
