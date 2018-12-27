@@ -1,7 +1,8 @@
-source etc/exit_local.shy
 
 ~web
     config save web.json bench
+~aaa
+    config save session.json session
 ~stdio
     config save history.json history
 

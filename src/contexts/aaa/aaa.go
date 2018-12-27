@@ -125,7 +125,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}
 
-			// 会话
+			// 创建会话
 			s, t := "", ""
 			if len(arg) > 0 && arg[0] == "create" {
 				s, t = Session(arg[1]), "session"
@@ -135,16 +135,21 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					"meta":        arg[1],
 				})
 
+				defer func() {
+					m.Set("result").Echo(s)
+				}()
 				if arg = arg[2:]; len(arg) == 0 {
-					m.Echo(s)
 					return
 				}
 			}
 			if v, ok := m.Confv("session", []interface{}{arg[0], "type"}).(string); ok {
 				s, t, arg = arg[0], v, arg[1:]
 			}
+			if s == "" {
+				return
+			}
 
-			// 属性
+			// 查询会话
 			which := "data"
 			if len(arg) > 0 {
 				switch arg[0] {
@@ -161,9 +166,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}
 
+			// 编辑会话
 			switch which {
-			case "data": // 数据
-				if len(arg) == 1 {
+			case "data": // 数据操作
+				if len(arg) == 1 { // 读取数据
 					m.Spawn().Cmd("config", "session", strings.Join([]string{s, "data", arg[0]}, ".")).CopyTo(m)
 					for k, _ := range m.Confv("session", []interface{}{s, "ship"}).(map[string]interface{}) {
 						if len(m.Meta["result"]) > 0 || len(m.Meta["append"]) > 0 {
@@ -174,55 +180,56 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					break
 				}
 
+				// 添加数据
 				m.Spawn().Cmd("config", "session", strings.Join([]string{s, "data", arg[0]}, "."), arg[1]).CopyTo(m)
 				break
-			case "ship": // 节点
-				if len(arg) == 1 {
-					for k, _ := range m.Confv("session", []interface{}{s, "ship"}).(map[string]interface{}) {
-						if auth, ok := m.Confv("session", k).(map[string]interface{}); ok {
-							if auth["type"].(string) == arg[0] {
-								m.Add("append", "key", k)
-								m.Add("append", "type", auth["type"])
-								m.Add("append", "meta", auth["meta"])
+			case "ship": // 节点操作
+				p, condition, chain := s, "", []map[string]string{}
+				for i := 0; i < len(arg); i += 2 {
+					// 查询节点
+					if i == len(arg)-1 {
+						for k, _ := range m.Confv("session", []interface{}{p, "ship"}).(map[string]interface{}) {
+							if auth, ok := m.Confv("session", k).(map[string]interface{}); ok {
+								if auth["type"].(string) == arg[i] {
+									m.Add("append", "key", k)
+									m.Add("append", "type", auth["type"])
+									m.Add("append", "meta", auth["meta"])
+								}
 							}
 						}
+						m.Table()
+						return
 					}
-					m.Table()
-					return
+
+					h := Hash("%s%s: %s", condition, arg[i], arg[i+1])
+					if sess := m.Confv("session", h); sess == nil {
+						// 节点认证
+						if arg[i] == "password" {
+							if v, ok := m.Confv("session", []interface{}{p, "ship"}).(map[string]interface{}); ok {
+								for k, _ := range v {
+									if node, ok := m.Confv("session", []interface{}{k, "type"}).(string); ok && node == "password" {
+										return
+									}
+								}
+							}
+						}
+
+						// 创建节点
+						m.Confv("session", h, map[string]interface{}{"create_time": time.Now().Unix(), "type": arg[i], "meta": arg[i+1]})
+						chain = append(chain, map[string]string{"node": h, "hash": p, "level": "0", "type": t})
+					}
+
+					// 添加节点
+					chain = append(chain, map[string]string{"node": s, "hash": h, "level": "2", "type": arg[i]})
+					chain = append(chain, map[string]string{"node": p, "hash": h, "level": "1", "type": arg[i]})
+					p, t = h, arg[i]
 				}
 
-				p, condition := s, ""
-				for i := 0; i < len(arg)-1; i += 2 {
-					switch arg[i] {
-					case "password":
-						if t == "session" {
-							break
-						}
-						fallthrough
-					default:
-						h := Hash("%s%s: %s", condition, arg[i], arg[i+1])
-						if sess := m.Confv("session", h); sess == nil {
-							m.Confv("session", h, map[string]interface{}{
-								"create_time": time.Now().Unix(),
-								"type":        arg[i],
-								"meta":        arg[i+1],
-								"ship": map[string]interface{}{p: map[string]interface{}{
-									"level": 0,
-									"type":  t,
-								}},
-							})
-						}
-						m.Confv("session", []interface{}{s, "ship", h}, map[string]interface{}{
-							"level": 2,
-							"type":  arg[i],
-						})
-						m.Confv("session", []interface{}{p, "ship", h}, map[string]interface{}{
-							"level": 1,
-							"type":  arg[i],
-						})
-						p, t = h, arg[i]
-					}
+				for _, v := range chain {
+					m.Log("info", "chain: %v", v)
+					m.Confv("session", []interface{}{v["node"], "ship", v["hash"]}, map[string]interface{}{"level": v["level"], "type": v["type"]})
 				}
+
 				m.Echo(p)
 			}
 		}},

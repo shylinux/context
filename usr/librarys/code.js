@@ -212,7 +212,9 @@ function send_command(form, cb) {
         data[key] = form.dataset[key]
     }
     for (var i = 0; i < form.length; i++) {
-        data[form[i].name] = form[i].value
+        if form[i].name {
+            data[form[i].name] = form[i].value
+        }
     }
 
     var order = (data["componet_name_order"]||"")

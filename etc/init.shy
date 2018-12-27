@@ -1,5 +1,7 @@
 ~stdio
-    config load history.json history
+    config load history.json
+~aaa
+    config load session.json
 ~web
     config load web.json
 
