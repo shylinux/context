@@ -525,7 +525,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Assert(e)
 						io.Copy(f, res.Body)
 						defer f.Close()
-						m.Log("info", "save file %s %s", p, m.Sess("aaa").Cmd("md5", p).Result(0))
+						m.Log("info", "save file %s %s", p, m.Sess("aaa").Cmd("md5", "file", p).Result(0))
 						m.Echo(p)
 						return
 					}
@@ -600,7 +600,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Assert(e)
 						if m.Has("parse") {
 							json.Unmarshal(buf, &result)
-							m.Log("fuck", "%v ", result)
 							msg := m.Spawn()
 							msg.Put("option", "response", result)
 							msg.Cmd("trans", "response", m.Option("parse"))
@@ -902,26 +901,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"session": &ctx.Command{Name: "session", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			sessid := m.Option("sessid")
-			if !m.Sess("aaa").Cmd("session", sessid, "ship", "ip").Results(0) {
+			if !m.Sess("aaa").Cmd("auth", sessid, "ship", "ip").Results(0) {
 				w := m.Optionv("response").(http.ResponseWriter)
-				sessid = m.Sess("aaa").Cmd("session", "create", "web", "ship", "ip", m.Option("remote_ip")).Result(0)
+				sessid = m.Sess("aaa").Cmd("auth", "create", "web", "ship", "ip", m.Option("remote_ip")).Result(0)
 				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid, Path: "/"})
 			}
 
 			if m.Options("username") && m.Options("uuid") {
-				if !m.Sess("aaa").Cmd("session", sessid, "ship", "username", m.Option("username"), "uuid", m.Option("uuid")).Results(0) {
+				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "uuid", m.Option("uuid")).Results(0) {
 					return
 				}
 			} else if m.Options("username") && m.Options("password") {
-				if !m.Sess("aaa").Cmd("session", sessid, "ship", "username", m.Option("username"), "password", m.Option("password")).Results(0) {
+				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "password", m.Option("password")).Results(0) {
 					return
 				}
 			}
 
-			for _, user := range m.Sess("aaa").Cmd("session", sessid, "ship", "username").Meta["meta"] {
-				if m.Sess("aaa").Cmd("session", sessid, "ship", "username", user, "uuid").Results(0) {
+			for _, user := range m.Sess("aaa").Cmd("auth", sessid, "ship", "username").Meta["meta"] {
+				if m.Sess("aaa").Cmd("auth", sessid, "ship", "username", user, "uuid").Results(0) {
 					m.Add("append", "username", user)
-				} else if m.Sess("aaa").Cmd("session", sessid, "ship", "username", user, "password").Results(0) {
+				} else if m.Sess("aaa").Cmd("auth", sessid, "ship", "username", user, "password").Results(0) {
 					m.Add("append", "username", user)
 				}
 			}
@@ -944,7 +943,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				create_time := time.Now().Format(m.Conf("time_format"))
 				key := m.Option("bench")
 				if key == "" {
-					key = m.Sess("aaa").Cmd("md5", m.Option("remote_addr"), create_time).Result(0)
+					key = m.Sess("aaa").Cmd("md5", "bench", m.Option("remote_addr"), "time", "rand").Result(0)
 				}
 
 				link := fmt.Sprintf("%s?bench=%s", m.Conf("site"), key)
@@ -970,7 +969,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			if len(arg) > 0 && arg[0] == "check" { // 检查工作流
 				bench := m.Confv("bench", m.Option("bench")).(map[string]interface{})
-				m.Log("fuck", "waht %v", bench)
 				if bench["creator"].(string) != arg[1] {
 					switch bench["share"].(string) {
 					case "private":
@@ -1233,7 +1231,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 			p := m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0)
-			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("md5", p).Result(0))
+			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("md5", "file", p).Result(0))
 			http.ServeFile(w, r, p)
 		}},
 		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

@@ -45,7 +45,6 @@ func (cli *CLI) schedule(m *ctx.Message) string {
 		}
 	}
 	cli.Timer.Reset(time.Until(time.Unix(0, timer/int64(m.Confi("time_unit"))*1000000000)))
-	m.Log("fuck", "what %v %d", first, timer)
 	return m.Conf("timer_next", first)
 }
 
@@ -1111,10 +1110,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					return
 				}
 
-				now := int64(m.Spawn().Cmd("time").Appendi("timestamp"))
+				m.Log("what", "wath %v", m.Spawn().Cmd("time"))
+
+				now := int64(m.Sess("cli").Cmd("time").Appendi("timestamp"))
 				begin := now
 				if len(arg) > 0 && arg[0] == "begin" {
-					begin, arg = int64(m.Spawn().Cmd("time", arg[1]).Appendi("timestamp")), arg[2:]
+					begin, arg = int64(m.Sess("cli").Cmd("time", arg[1]).Appendi("timestamp")), arg[2:]
 				}
 
 				repeat := false
@@ -1127,10 +1128,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					order, arg = arg[1], arg[2:]
 				}
 
-				action := int64(m.Spawn().Cmd("time", begin, order, arg[0]).Appendi("timestamp"))
+				action := int64(m.Sess("cli").Cmd("time", begin, order, arg[0]).Appendi("timestamp"))
 
 				// 创建任务
-				hash := m.Sess("aaa").Cmd("md5", arg, now).Result(0)
+				hash := m.Sess("aaa").Cmd("md5", "timer", arg, "time", "rand").Result(0)
 				m.Confv("timer", hash, map[string]interface{}{
 					"create_time": now,
 					"begin_time":  begin,
@@ -1162,7 +1163,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 								timer["msg"] = msg.Code()
 
 								if timer["repeat"].(bool) {
-									timer["action_time"] = int64(m.Spawn().Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
+									timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
 								} else {
 									timer["done"] = true
 								}
