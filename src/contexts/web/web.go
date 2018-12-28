@@ -525,7 +525,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Assert(e)
 						io.Copy(f, res.Body)
 						defer f.Close()
-						m.Log("info", "save file %s %s", p, m.Sess("aaa").Cmd("md5", "file", p).Result(0))
+						m.Log("info", "save file %s %s", p, m.Sess("aaa").Cmd("hash", "file", p).Result(0))
 						m.Echo(p)
 						return
 					}
@@ -943,7 +943,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				create_time := time.Now().Format(m.Conf("time_format"))
 				key := m.Option("bench")
 				if key == "" {
-					key = m.Sess("aaa").Cmd("md5", "bench", m.Option("remote_addr"), "time", "rand").Result(0)
+					key = m.Sess("aaa").Cmd("hash", "bench", m.Option("remote_addr"), "time", "rand").Result(0)
 				}
 
 				link := fmt.Sprintf("%s?bench=%s", m.Conf("site"), key)
@@ -1231,7 +1231,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 			p := m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0)
-			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("md5", "file", p).Result(0))
+			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("hash", "file", p).Result(0))
 			http.ServeFile(w, r, p)
 		}},
 		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {

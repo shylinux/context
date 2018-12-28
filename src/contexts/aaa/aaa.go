@@ -13,9 +13,11 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 )
@@ -104,15 +106,53 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"nuser": &ctx.Cache{Name: "nuser", Value: "0", Help: "用户数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"hash": &ctx.Config{Name: "hash", Value: map[string]interface{}{}, Help: "散列"},
+
 		"secrete_key": &ctx.Config{Name: "secrete_key", Value: map[string]interface{}{"password": 1, "uuid": 1}, Help: "私钥文件"},
 		"auth":        &ctx.Config{Name: "auth", Value: map[string]interface{}{}, Help: "私钥文件"},
 		"expire":      &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
 		"cert":        &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
 		"pub":         &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
 		"key":         &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
-		"md5":         &ctx.Config{Name: "md5", Value: map[string]interface{}{}, Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
+		"hash": &ctx.Command{Name: "hash type data time rand", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
+				if len(arg) == 0 {
+					m.Spawn().Cmd("config", "hash").CopyTo(m)
+					return
+				}
+
+				if arg[0] == "file" {
+					if f, e := os.Open(arg[1]); e == nil {
+						hash := md5.New()
+						io.Copy(hash, f)
+						h := hash.Sum(nil)
+						arg[1] = hex.EncodeToString(h[:])
+					}
+				}
+
+				meta := []string{}
+				for _, v := range arg {
+					switch v {
+					case "time":
+						v = time.Now().Format(m.Conf("time_format"))
+					case "rand":
+						v = fmt.Sprintf("%d", rand.Int())
+					case "":
+						continue
+					}
+					meta = append(meta, v)
+				}
+
+				h := md5.Sum(aaa.Input(strings.Join(meta, "")))
+				hs := hex.EncodeToString(h[:])
+
+				m.Log("info", "%s: %v", hs, meta)
+				m.Confv("hash", hs, meta)
+				m.Echo(hs)
+			}
+		}},
 		"auth": &ctx.Command{Name: "auth create", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) == 0 {
 				m.Spawn().Cmd("config", "auth").Cmd("select", "parse", "value", "", "fields", "key type meta ship data").CopyTo(m)
@@ -122,7 +162,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			// 创建会话
 			s, t := "", ""
 			if len(arg) > 0 && arg[0] == "create" {
-				s, t = m.Spawn().Cmd("md5", "session", arg[1], "time", "rand").Result(0), "session"
+				s, t = m.Spawn().Cmd("hash", "session", arg[1], "time", "rand").Result(0), "session"
 				m.Confv("auth", s, map[string]interface{}{
 					"create_time": time.Now().Unix(),
 					"type":        "session",
@@ -200,7 +240,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						value = Password(value)
 					}
 
-					h := m.Spawn().Cmd("md5", arg[i], value, condition).Result(0)
+					h := m.Spawn().Cmd("hash", arg[i], value, condition).Result(0)
 					if sess := m.Confv("auth", h); sess == nil {
 						// 节点认证
 						if arg[i] == "password" {
@@ -440,35 +480,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return true
 			}, c)
 			m.Table()
-		}},
-
-		"md5": &ctx.Command{Name: "md5 type data time rand", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
-				if len(arg) == 0 {
-					m.Spawn().Cmd("config", "md5").CopyTo(m)
-					return
-				}
-
-				meta := []string{}
-				for _, v := range arg {
-					switch v {
-					case "time":
-						v = time.Now().Format(m.Conf("time_format"))
-					case "rand":
-						v = fmt.Sprintf("%d", rand.Int())
-					case "":
-						continue
-					}
-					meta = append(meta, v)
-				}
-
-				h := md5.Sum(aaa.Input(strings.Join(meta, "")))
-				hs := hex.EncodeToString(h[:])
-
-				m.Log("info", "%s: %v", hs, meta)
-				m.Confv("md5", hs, meta)
-				m.Echo(hs)
-			}
 		}},
 
 		"rsa": &ctx.Command{Name: "rsa gen|sign|verify|encrypt|decrypt|cert",

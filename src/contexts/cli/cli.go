@@ -1131,7 +1131,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				action := int64(m.Sess("cli").Cmd("time", begin, order, arg[0]).Appendi("timestamp"))
 
 				// 创建任务
-				hash := m.Sess("aaa").Cmd("md5", "timer", arg, "time", "rand").Result(0)
+				hash := m.Sess("aaa").Cmd("hash", "timer", arg, "time", "rand").Result(0)
 				m.Confv("timer", hash, map[string]interface{}{
 					"create_time": now,
 					"begin_time":  begin,
