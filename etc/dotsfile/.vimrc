@@ -145,10 +145,29 @@ set splitbelow
 set splitright
 
 autocmd BufReadPost * normal `"
-autocmd BufNewFile,BufReadPost *.shy set filetype=shy
-autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s
 autocmd BufNewFile,BufReadPost *.conf set filetype=nginx
-autocmd BufNewFile,BufReadPost *.go set foldmethod=syntax
+
+autocmd BufNewFile,BufReadPost *.go call Config("go")
+autocmd BufNewFile,BufReadPost *.sh call Config("sh")
+autocmd BufNewFile,BufReadPost *.shy call Config("shy")
+autocmd BufNewFile,BufReadPost *.py call Config("py")
+autocmd BufNewFile,BufReadPost *.js call Config("js")
+
+fun! Config(language)
+    if a:language == "go"
+        set foldmethod=syntax
+        set foldnestmax=3
+    elseif a:language == "sh"
+    elseif a:language == "shy"
+        set filetype=shy
+        set commentstring=#%s
+    elseif a:language == "py"
+    elseif a:language == "js"
+        let g:javaScript_fold=1
+        set syntax=javaScript
+        set foldmethod=syntax
+    endif
+endfun
 
 command! RR wa | source ~/.vimrc |e
 source ~/.vim_local

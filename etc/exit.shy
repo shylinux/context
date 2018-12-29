@@ -2,7 +2,7 @@
 ~web
     config save web.json bench
 ~aaa
-    config save session.json session
+    config save auth.json hash auth
 ~stdio
     config save history.json history
 

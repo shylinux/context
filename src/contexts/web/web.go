@@ -342,6 +342,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"key":       &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "密钥"},
 
 		"login_right": &ctx.Config{Name: "login_right", Value: "1", Help: "登录认证"},
+		"login_cmd":   &ctx.Config{Name: "login_cmd", Value: "1", Help: "登录认证"},
 		"login_lark":  &ctx.Config{Name: "login_lark", Value: "false", Help: "会话认证"},
 		"cas_url":     &ctx.Config{Name: "cas_url", Value: "", Help: "单点登录"},
 		"cas_uuid":    &ctx.Config{Name: "cas_uuid", Value: "__tea_sdk__user_unique_id", Help: "单点登录"},
@@ -903,7 +904,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			sessid := m.Option("sessid")
 			if !m.Sess("aaa").Cmd("auth", sessid, "ship", "ip").Results(0) {
 				w := m.Optionv("response").(http.ResponseWriter)
-				sessid = m.Sess("aaa").Cmd("auth", "create", "web", "ship", "ip", m.Option("remote_ip")).Result(0)
+				sessid = m.Sess("aaa").Cmd("auth", "create", "session", "web", "ship", "ip", m.Option("remote_ip")).Result(0)
 				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid, Path: "/"})
 			}
 
@@ -1055,22 +1056,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				order := m.Option("componet_name")
 
 				// 权限检查
+				right := !m.Confs("login_right")
 				username := m.Spawn().Cmd("session").Append("username")
-				right := group == "login"
-				if !right {
-					right = !m.Confs("login_right")
-				}
-				if !right {
-					right = m.Sess("aaa").Cmd("right", username, "check", group).Results(0)
-				}
-				if !right {
-					right = m.Sess("aaa").Cmd("right", "void", "check", group).Results(0)
-				}
-				if !right {
-					if lark := m.Find("web.chat.lark"); lark != nil && m.Confs("login_lark") {
+				if !right && m.Confs("login_lark") {
+					if lark := m.Find("web.chat.lark"); lark != nil {
 						right = ctx.Right(lark.Cmd("auth", username, "check", m.Option("cmd")).Result(0))
 					}
 				}
+				right = right || group == "login"
+				right = right || m.Sess("aaa").Cmd("auth", "follow", "username", username, "role", "root").Results(0)
+				right = right || m.Sess("aaa").Cmd("auth", "follow", "username", "void", "group", m.Option("componet_group")).Results(0)
+				right = right || m.Sess("aaa").Cmd("auth", "follow", "username", username, "group", m.Option("componet_group")).Results(0)
+				login_sso := right && m.Sess("aaa").Cmd("auth", "ship", "group", m.Option("componet_group"), "data", "sso").Results(0)
 
 				// 工作空间
 				bench_share := ""
@@ -1102,12 +1099,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						// 权限检查
 						order_right := right
-						if !order_right {
-							order_right = m.Sess("aaa").Cmd("right", username, "check", group, val["componet_name"]).Results(0)
-						}
-						if !order_right {
-							order_right = m.Sess("aaa").Cmd("right", "void", "check", group, val["componet_name"]).Results(0)
-						}
+						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "username", "void", "cmd", val["componet_name"]).Results(0)
+						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "username", username, "cmd", val["componet_name"]).Results(0)
 						if !order_right {
 							continue
 						}
@@ -1166,7 +1159,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 
-						if order != "" || (val["pre_run"] != nil && val["pre_run"].(bool)) {
+						pre_run, ok := val["pre_run"].(bool)
+						if (ok && pre_run) || order != "" {
 							if val["componet_cmd"] != nil {
 								// 记录命令列表
 								if len(bench) > 0 && bench_share != "protected" {
@@ -1179,6 +1173,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								}
 
 								// 执行命令
+								if !pre_run && login_sso &&
+									!m.Sess("aaa").Cmd("auth", "follow", "username", "void", "cmd", args[0]).Results(0) &&
+									!m.Sess("aaa").Cmd("auth", "follow", "username", username, "cmd", args[0]).Results(0) {
+									continue
+								}
 								msg.Cmd(args)
 
 								// 生成下载链接

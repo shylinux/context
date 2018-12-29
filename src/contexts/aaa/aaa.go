@@ -107,9 +107,12 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"hash": &ctx.Config{Name: "hash", Value: map[string]interface{}{}, Help: "散列"},
+		"auth": &ctx.Config{Name: "auth", Value: map[string]interface{}{}, Help: "散列"},
+		"auth_type": &ctx.Config{Name: "auth_type", Value: map[string]interface{}{
+			"password": map[string]interface{}{"private": true, "secrete": true, "single": true},
+		}, Help: "散列"},
 
 		"secrete_key": &ctx.Config{Name: "secrete_key", Value: map[string]interface{}{"password": 1, "uuid": 1}, Help: "私钥文件"},
-		"auth":        &ctx.Config{Name: "auth", Value: map[string]interface{}{}, Help: "私钥文件"},
 		"expire":      &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
 		"cert":        &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
 		"pub":         &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
@@ -159,69 +162,73 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}
 
-			// 创建会话
+			// 会话操作
 			s, t := "", ""
-			if len(arg) > 0 && arg[0] == "create" {
-				s, t = m.Spawn().Cmd("hash", "session", arg[1], "time", "rand").Result(0), "session"
+			switch arg[0] {
+			case "create": // 创建会话
+				s, t = m.Spawn().Cmd("hash", arg[1], arg[2], "time", "rand").Result(0), arg[1]
 				m.Confv("auth", s, map[string]interface{}{
 					"create_time": time.Now().Unix(),
-					"type":        "session",
-					"meta":        arg[1],
+					"type":        arg[1],
+					"meta":        arg[2],
 				})
 
 				defer func() {
 					m.Set("result").Echo(s)
 				}()
-				if arg = arg[2:]; len(arg) == 0 {
+				if arg = arg[3:]; len(arg) == 0 {
 					return
 				}
-			}
-			if v, ok := m.Confv("auth", []interface{}{arg[0], "type"}).(string); ok {
-				s, t, arg = arg[0], v, arg[1:]
-			}
-			if s == "" {
-				return
-			}
-
-			// 查询会话
-			which := "data"
-			if len(arg) > 0 {
-				switch arg[0] {
-				case "data", "ship", "":
-					which, arg = arg[0], arg[1:]
-				}
-			}
-			if len(arg) == 0 {
-				args := []string{s}
-				if which != "" {
-					args = append(args, which)
-				}
-				m.Spawn().Cmd("config", "auth", strings.Join(args, ".")).CopyTo(m)
-				return
-			}
-
-			// 编辑会话
-			switch which {
-			case "data": // 数据操作
-				if len(arg) == 1 { // 读取数据
-					m.Spawn().Cmd("config", "auth", strings.Join([]string{s, "data", arg[0]}, ".")).CopyTo(m)
-					for k, _ := range m.Confv("auth", []interface{}{s, "ship"}).(map[string]interface{}) {
-						if len(m.Meta["result"]) > 0 || len(m.Meta["append"]) > 0 {
-							break
-						}
-						m.Spawn().Cmd("config", "auth", strings.Join([]string{k, "data", arg[0]}, ".")).CopyTo(m)
+			case "follow": // 检查会话
+				ps := []string{m.Spawn().Cmd("hash", arg[1], arg[2]).Result(0)}
+				for i := 0; i < len(ps); i++ {
+					ship, ok := m.Confv("auth", []interface{}{ps[i], "ship"}).(map[string]interface{})
+					if !ok {
+						return
 					}
-					break
+					for k, v := range ship {
+						val := v.(map[string]interface{})
+						if val["level"].(string) == "0" {
+							continue
+						}
+
+						if val["type"].(string) == arg[3] && val["meta"].(string) == arg[4] {
+							m.Echo(k)
+							return
+						}
+						ps = append(ps, k)
+					}
+				}
+				return
+			default:
+				if v, ok := m.Confv("auth", []interface{}{arg[0], "type"}).(string); ok {
+					s, t, arg = arg[0], v, arg[1:]
+					if len(arg) == 0 {
+						arg = append(arg, "data")
+					}
+				}
+			}
+
+			which, p, chain := "data", s, []map[string]string{}
+			for i := 0; i < len(arg); i += 2 {
+				switch arg[i] { // 切换类型
+				case "data", "ship", "":
+					which, i = arg[i], i+1
+				}
+				m.Log("fuck", "which: %s arg: %v", which, arg[i:])
+
+				if i > len(arg)-1 { // 查询会话
+					args := []string{p}
+					if which != "" {
+						args = append(args, which)
+					}
+					m.Spawn().Cmd("config", "auth", strings.Join(args, ".")).CopyTo(m)
+					return
 				}
 
-				// 添加数据
-				m.Spawn().Cmd("config", "auth", strings.Join([]string{s, "data", arg[0]}, "."), arg[1]).CopyTo(m)
-				break
-			case "ship": // 节点操作
-				p, condition, chain := s, "", []map[string]string{}
-				for i := 0; i < len(arg); i += 2 {
-					// 查询节点
-					if i == len(arg)-1 {
+				switch which {
+				case "ship": // 节点操作
+					if i == len(arg)-1 { // 读取节点
 						for k, _ := range m.Confv("auth", []interface{}{p, "ship"}).(map[string]interface{}) {
 							if auth, ok := m.Confv("auth", k).(map[string]interface{}); ok {
 								if auth["type"].(string) == arg[i] {
@@ -235,19 +242,22 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						return
 					}
 
-					value := arg[i+1]
-					if m.Confv("secrete_key", arg[i]) != nil {
-						value = Password(value)
+					condition := ""
+					if ctx.Right(m.Confv("auth_type", []interface{}{arg[i], "private"})) {
+						condition = p // 私有节点
 					}
-
+					value := arg[i+1]
+					if ctx.Right(m.Confv("auth_type", []interface{}{arg[i], "secrete"})) {
+						value = Password(value) // 加密节点
+					}
 					h := m.Spawn().Cmd("hash", arg[i], value, condition).Result(0)
+
 					if sess := m.Confv("auth", h); sess == nil {
-						// 节点认证
-						if arg[i] == "password" {
+						if ctx.Right(m.Confv("auth_type", []interface{}{arg[i], "single"})) { // 单点认证
 							if v, ok := m.Confv("auth", []interface{}{p, "ship"}).(map[string]interface{}); ok {
 								for k, _ := range v {
-									if node, ok := m.Confv("auth", []interface{}{k, "type"}).(string); ok && node == "password" {
-										return
+									if node, ok := m.Confv("auth", []interface{}{k, "type"}).(string); ok && node == arg[i] {
+										return // 认证失败
 									}
 								}
 							}
@@ -255,22 +265,46 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 创建节点
 						m.Confv("auth", h, map[string]interface{}{"create_time": time.Now().Unix(), "type": arg[i], "meta": value})
-						chain = append(chain, map[string]string{"node": h, "hash": p, "level": "0", "type": t})
 					}
 
-					// 添加节点
-					chain = append(chain, map[string]string{"node": s, "hash": h, "level": "2", "type": arg[i]})
-					chain = append(chain, map[string]string{"node": p, "hash": h, "level": "1", "type": arg[i]})
+					if s != "" { // 添加根链接
+						chain = append(chain, map[string]string{"node": s, "hash": h, "level": "2", "type": arg[i], "meta": value})
+					}
+					if p != "" { // 添加子链接
+						chain = append(chain, map[string]string{"node": p, "hash": h, "level": "1", "type": arg[i], "meta": value})
+					}
+					if p != "" { // 添加父链接
+						chain = append(chain, map[string]string{"node": h, "hash": p, "level": "0", "type": t, "meta": ""})
+					}
+
 					p, t = h, arg[i]
-				}
+				case "data": // 数据操作
+					if i == len(arg)-1 { // 读取数据
+						value := m.Confv("auth", []interface{}{p, "data", arg[i]})
+						if ship, ok := m.Confv("auth", []interface{}{p, "ship"}).(map[string]interface{}); ok {
+							for k, _ := range ship {
+								if value != nil {
+									break
+								}
+								value = m.Confv("auth", []interface{}{k, "data", arg[i]})
+							}
+						}
+						if value != nil {
+							m.Echo("%v", value)
+						}
+						return
+					}
 
-				for _, v := range chain {
-					m.Log("info", "chain: %v", v)
-					m.Confv("auth", []interface{}{v["node"], "ship", v["hash"]}, map[string]interface{}{"level": v["level"], "type": v["type"]})
+					// 添加数据
+					m.Confv("auth", []interface{}{p, "data", arg[i]}, arg[i+1])
 				}
-
-				m.Echo(p)
 			}
+
+			for _, v := range chain { // 保存链接
+				m.Log("info", "chain: %v", v)
+				m.Confv("auth", []interface{}{v["node"], "ship", v["hash"]}, map[string]interface{}{"level": v["level"], "type": v["type"], "meta": v["meta"]})
+			}
+			m.Echo(p)
 		}},
 
 		"login": &ctx.Command{Name: "login [sessid]|[username password]",

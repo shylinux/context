@@ -1,7 +1,14 @@
 ~stdio
     config load history.json
 ~aaa
-    config load session.json
+    # config load auth.json
+~aaa
+    auth ship group index cmd source
+    auth ship role void group index data sso true
+    auth ship username root role root
+    auth ship username  shy role root
+    auth ship username void role void
+
 ~web
     config load web.json
 
@@ -9,6 +16,7 @@
     login root root
 ~find aaa.root
     config right right.role root
+
 ~aaa
     login void void
     right void owner login add from root
@@ -16,6 +24,5 @@
 
 source etc/local.shy
 source etc/spide.shy
-
-~lark
+~aaa
 

@@ -6,7 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"path"
-	"syscall"
+	// "syscall"
 	"toolkit"
 
 	"fmt"
@@ -866,13 +866,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Append("lookups", mem.Lookups)
 			m.Append("objects", mem.HeapObjects)
 
-			sys := &syscall.Sysinfo_t{}
-			syscall.Sysinfo(sys)
-
-			m.Append("total", kit.FmtSize(uint64(sys.Totalram)))
-			m.Append("free", kit.FmtSize(uint64(sys.Freeram)))
-			m.Append("mper", fmt.Sprintf("%d%%", sys.Freeram*100/sys.Totalram))
-
+			// sys := &syscall.Sysinfo_t{}
+			// syscall.Sysinfo(sys)
+			//
+			// m.Append("total", kit.FmtSize(uint64(sys.Totalram)))
+			// m.Append("free", kit.FmtSize(uint64(sys.Freeram)))
+			// m.Append("mper", fmt.Sprintf("%d%%", sys.Freeram*100/sys.Totalram))
+			//
 			m.Table()
 		}},
 		"windows": &ctx.Command{Name: "windows", Help: "windows", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
