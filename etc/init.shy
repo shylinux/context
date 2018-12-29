@@ -3,8 +3,9 @@
 ~aaa
     # config load auth.json
 ~aaa
-    auth ship group index cmd source
-    auth ship role void group index data sso true
+    auth ship role root group index
+
+    auth ship username shy password shy
     auth ship username root role root
     auth ship username  shy role root
     auth ship username void role void
