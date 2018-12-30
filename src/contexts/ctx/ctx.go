@@ -2647,7 +2647,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					break
 				}
 			}
-			m.Table()
+			m.Sort("key").Table()
 		}},
 		"result": &Command{Name: "result [index] [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) {
 			msg := m.message
@@ -2852,11 +2852,18 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 					switch action {
 					case "cmd":
-						msg.Cmd(arg)
-						if !msg.Hand {
+						if m.Options("command_sso") && !m.Sess("aaa").Cmd("auth", "ship",
+							"userrole", m.Option("sso_userrole"), "componet", m.Option("sso_componet"), "command", m.Option("sso_command"),
+							"data", arg[0]).Results(0) {
+							m.Log("info", "sso check %v: %v failure", m.Option("sso_componet"), m.Option("sso_command"))
+							m.Echo("error: ").Echo("no right [%s: %s %s]", m.Option("sso_componet"), m.Option("sso_command"), arg[0])
+							break
+						}
+
+						if msg.Cmd(arg); !msg.Hand {
 							msg = msg.Sess("cli").Cmd("cmd", arg)
 						}
-						m.Copy(msg, "append").Copy(msg, "result")
+						msg.CopyTo(m)
 					case "switch":
 						m.target = msg.target
 					case "list":

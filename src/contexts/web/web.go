@@ -147,7 +147,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 						msg.Add("option", k, val)
 					}
 				}
-				msg.Option("uuid", msg.Option(m.Conf("cas_uuid")))
 			}
 
 			msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
@@ -345,7 +344,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"login_cmd":   &ctx.Config{Name: "login_cmd", Value: "1", Help: "登录认证"},
 		"login_lark":  &ctx.Config{Name: "login_lark", Value: "false", Help: "会话认证"},
 		"cas_url":     &ctx.Config{Name: "cas_url", Value: "", Help: "单点登录"},
-		"cas_uuid":    &ctx.Config{Name: "cas_uuid", Value: "__tea_sdk__user_unique_id", Help: "单点登录"},
+		"cas_uuid":    &ctx.Config{Name: "cas_uuid", Value: "email", Help: "单点登录"},
 
 		"toolkit": &ctx.Config{Name: "toolkit", Value: map[string]interface{}{
 			"time": map[string]interface{}{
@@ -902,29 +901,31 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"session": &ctx.Command{Name: "session", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			sessid := m.Option("sessid")
-			if !m.Sess("aaa").Cmd("auth", sessid, "ship", "ip").Results(0) {
+			if sessid == "" || !m.Sess("aaa").Cmd("auth", sessid, "ship", "ip", m.Option("remote_ip")).Results(0) {
 				w := m.Optionv("response").(http.ResponseWriter)
 				sessid = m.Sess("aaa").Cmd("auth", "create", "session", "web", "ship", "ip", m.Option("remote_ip")).Result(0)
 				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid, Path: "/"})
 			}
 
-			if m.Options("username") && m.Options("uuid") {
-				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "uuid", m.Option("uuid")).Results(0) {
+			if m.Options("username") && m.Options("password") {
+				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "password", m.Option("password")).Results(0) {
 					return
 				}
-			} else if m.Options("username") && m.Options("password") {
-				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "password", m.Option("password")).Results(0) {
+			} else if r := m.Optionv("request").(*http.Request); cas.IsAuthenticated(r) && m.Confs("cas_url") {
+				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "uuid", m.Option(m.Conf("cas_uuid"))).Results(0) {
 					return
 				}
 			}
 
-			for _, user := range m.Sess("aaa").Cmd("auth", sessid, "ship", "username").Meta["meta"] {
-				if m.Sess("aaa").Cmd("auth", sessid, "ship", "username", user, "uuid").Results(0) {
-					m.Add("append", "username", user)
-				} else if m.Sess("aaa").Cmd("auth", sessid, "ship", "username", user, "password").Results(0) {
-					m.Add("append", "username", user)
+			for _, secrete := range []string{"uuid", "password"} {
+				for _, key := range m.Sess("aaa").Cmd("auth", sessid, "ship", secrete).Meta["key"] {
+					username := m.Sess("aaa").Cmd("auth", key, "ship", "username").Append("meta")
+					m.Add("append", "username", username)
+					userrole := m.Sess("aaa").Cmd("auth", "ship", "username", username, "userrole").Append("meta")
+					m.Add("append", "userrole", userrole)
 				}
 			}
+			m.Log("info", "username: %v userrole: %v", m.Meta["username"], m.Meta["userrole"])
 			m.Echo(sessid)
 		}},
 		"bench": &ctx.Command{Name: "bench", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
@@ -1055,28 +1056,38 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				group := m.Option("componet_group")
 				order := m.Option("componet_name")
 
+				// 会话检查
+				session := m.Spawn().Cmd("session")
+				username := session.Append("username")
+				userrole := session.Append("userrole")
+
 				// 权限检查
 				right := !m.Confs("login_right")
-				username := m.Spawn().Cmd("session").Append("username")
-				if !right && m.Confs("login_lark") {
+				right = right || group == "login"
+				right = right || (userrole == "root")
+
+				// 权限检查
+				owner_right := right || m.Sess("aaa").Cmd("auth", "follow", "userrole", "void", "componet", m.Option("componet_group")).Results(0)
+				owner_right = owner_right || (username != "" && m.Sess("aaa").Cmd("auth", "follow", "userrole", userrole, "componet", m.Option("componet_group")).Results(0))
+				share_right := owner_right || m.Sess("aaa").Cmd("auth", m.Option("sessid"), "ship", "componet", m.Option("componet_group")).Results(0)
+
+				if !owner_right && m.Confs("login_lark") && username != "" {
 					if lark := m.Find("web.chat.lark"); lark != nil {
-						right = ctx.Right(lark.Cmd("auth", username, "check", m.Option("cmd")).Result(0))
+						owner_right = ctx.Right(lark.Cmd("auth", username, "check", m.Option("cmd")).Result(0))
+						share_right = owner_right
 					}
 				}
-				right = right || group == "login"
-				right = right || m.Sess("aaa").Cmd("auth", "follow", "username", username, "role", "root").Results(0)
-				right = right || m.Sess("aaa").Cmd("auth", "follow", "username", "void", "group", m.Option("componet_group")).Results(0)
-				right = right || m.Sess("aaa").Cmd("auth", "follow", "username", username, "group", m.Option("componet_group")).Results(0)
-				login_sso := right && m.Sess("aaa").Cmd("auth", "ship", "group", m.Option("componet_group"), "data", "sso").Results(0)
+
+				bid := m.Sess("aaa").Cmd("auth", m.Option("sessid"), "ship", "bench", "web").Result(0)
 
 				// 工作空间
 				bench_share := ""
 				bench, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{})
 				if order == "" {
-					if !right && username == "" {
-						group, order, right = "login", "", true
+					if !share_right && username == "" {
+						group, order, share_right = "login", "", true
 					} else {
-						if right && !m.Confs("bench_disable") {
+						if share_right && !m.Confs("bench_disable") {
 							if !ok {
 								m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Spawn().Cmd("bench", "create").Append("key")))
 								return
@@ -1088,9 +1099,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 
-				m.Log("info", "json: %v group: %v order: %v user: %v right: %v share: %v", accept_json, group, order, username, right, bench_share)
+				m.Log("info", "json: %v group: %v order: %v user: %v right: %v owner_right: %v share_right: %v share: %v",
+					accept_json, group, order, username, right, owner_right, share_right, bench_share)
 
-				for count := 0; count == 0; group, order, right = "login", "", true {
+				for count := 0; count == 0; group, order, share_right = "login", "", true {
 					for _, v := range m.Confv("componet", group).([]interface{}) {
 						val := v.(map[string]interface{})
 						if order != "" && val["componet_name"].(string) != order {
@@ -1098,9 +1110,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 						// 权限检查
-						order_right := right
-						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "username", "void", "cmd", val["componet_name"]).Results(0)
-						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "username", username, "cmd", val["componet_name"]).Results(0)
+						order_right := share_right
+						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "userrole", "void", "cmd", val["componet_name"]).Results(0)
+						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "userrole", userrole, "cmd", val["componet_name"]).Results(0)
 						if !order_right {
 							continue
 						}
@@ -1173,12 +1185,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								}
 
 								// 执行命令
-								if !pre_run && login_sso &&
-									!m.Sess("aaa").Cmd("auth", "follow", "username", "void", "cmd", args[0]).Results(0) &&
-									!m.Sess("aaa").Cmd("auth", "follow", "username", username, "cmd", args[0]).Results(0) {
-									continue
+								if pre_run || !msg.Options("command_sso", m.Sess("aaa").Cmd("auth", "ship", "userrole", msg.Option("sso_userrole", userrole),
+									"componet", msg.Option("sso_componet", m.Option("componet_group")), "command", msg.Option("sso_command", args[0]), "data", "sso").Results(0)) ||
+									m.Sess("aaa").Cmd("auth", "follow", "userrole", "void", "command", args[0]).Results(0) ||
+									m.Sess("aaa").Cmd("auth", "follow", "userrole", userrole, "command", args[0]).Results(0) {
+									msg.Cmd(args)
+
+									m.Sess("aaa").Put("option", "bench_command", args).Cmd("auth", bid, "option", "bench_command")
 								}
-								msg.Cmd(args)
 
 								// 生成下载链接
 								if msg.Options("download_file") {

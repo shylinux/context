@@ -2,26 +2,15 @@
     config load history.json
 ~aaa
     # config load auth.json
-~aaa
-    auth ship role root group index
-
-    auth ship username shy password shy
-    auth ship username root role root
-    auth ship username  shy role root
-    auth ship username void role void
-
 ~web
     config load web.json
 
 ~aaa
-    login root root
-~find aaa.root
-    config right right.role root
+    auth ship username void role void
+    auth ship username root role root
+    auth ship username  shy role root
 
-~aaa
-    login void void
-    right void owner login add from root
-    right void owner login add from root
+    auth ship username shy password shy
 
 source etc/local.shy
 source etc/spide.shy
