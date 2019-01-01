@@ -145,8 +145,7 @@
 </head>
 <body onkeydown="return onaction(event, 'scroll')" onkeyup="return onaction(event, 'keymap')">
 <script>
-    {{$id := option . "bench"|option}}
-    var bench ={{conf . "bench" $id}}
+    var bench_data ={{option . "bench_data"}}
 </script>
 {{end}}
 
@@ -218,7 +217,6 @@
     <form class="option {{option .Meta "componet_name"}}"
           data-componet_group="{{option . "componet_group"|meta}}"
           data-componet_name="{{option . "componet_name"|meta}}"
-          data-componet_bench="{{option . "bench"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
              onsubmit="onaction(event,'upload')"

@@ -92,48 +92,32 @@ func Merge(m *ctx.Message, uri string, arg ...string) string {
 func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		m.TryCatch(m.Spawn(), true, func(msg *ctx.Message) {
-			msg.Add("option", "method", r.Method).Add("option", "path", r.URL.Path)
-
-			msg.Option("index_path", r.Header.Get("index_path"))
-			msg.Option("index_url", r.Header.Get("index_url"))
-
 			msg.Option("remote_addr", r.RemoteAddr)
-			if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-				msg.Option("remote_ip", ip)
-			} else if ip := r.Header.Get("X-Real-Ip"); ip != "" {
-				msg.Option("remote_ip", ip)
-			} else {
-				msg.Option("remote_ip", strings.Split(r.RemoteAddr, ":"))
-			}
-
-			msg.Option("dir_root", m.Cap("directory"))
+			msg.Option("remote_ip", r.Header.Get("remote_ip"))
+			msg.Option("index_url", r.Header.Get("index_url"))
+			msg.Option("index_path", r.Header.Get("index_path"))
 			msg.Option("referer", r.Header.Get("Referer"))
 			msg.Option("accept", r.Header.Get("Accept"))
+			msg.Option("method", r.Method)
+			msg.Option("path", r.URL.Path)
 
-			r.ParseMultipartForm(int64(m.Confi("multipart_bsize")))
-			if r.ParseForm(); len(r.PostForm) > 0 {
-				for k, v := range r.PostForm {
-					m.Log("info", "%s: %v", k, v)
-				}
-				m.Log("info", "")
-			}
+			msg.Option("dir_root", msg.Cap("directory"))
 			for _, v := range r.Cookies() {
 				msg.Option(v.Name, v.Value)
 			}
+
+			r.ParseMultipartForm(int64(msg.Confi("multipart_bsize")))
+			if r.ParseForm(); len(r.PostForm) > 0 {
+				for k, v := range r.PostForm {
+					msg.Log("info", "%s: %v", k, v)
+				}
+				msg.Log("info", "")
+			}
 			for k, v := range r.Form {
 				msg.Add("option", k, v)
-				if k == "ticket" {
-					m.Log("info", "hide ticket %v %v %v", k, v, msg.Option("index_url"))
-					uri, _ := r.URL.Parse(r.Header.Get("index_url"))
-					redirect := uri.Path
-					if b := uri.Query().Get("bench"); b != "" {
-						redirect += "?bench=" + b
-					}
-					http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
-					return
-				}
 			}
 
+			msg.Put("option", "request", r).Put("option", "response", w).Sess("web", msg)
 			if msg.Confs("cas_url") {
 				if !cas.IsAuthenticated(r) && !msg.Confs("skip_cas") {
 					r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
@@ -147,10 +131,31 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 						msg.Add("option", k, val)
 					}
 				}
+
+				if msg.Options("ticket") {
+					msg.Option("uuid", msg.Option(msg.Conf("cas_uuid")))
+					msg.Option("sessid", msg.Spawn().Cmd("session", "uuid").Result(0))
+
+					uri, _ := r.URL.Parse(r.Header.Get("index_url"))
+					redirect := uri.Path
+					if b := uri.Query().Get("bench"); b != "" {
+						redirect += "?bench=" + b
+					}
+					http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
+					return
+				}
+			} else if msg.Options("username") && msg.Options("password") {
+				if sessid := msg.Spawn().Cmd("session", "password").Result(0); sessid != "" {
+					msg.Option("sessid", sessid)
+					msg.Option("password", "")
+				} else {
+					w.WriteHeader(http.StatusUnauthorized)
+					msg.Option("username", "")
+				}
+				return
 			}
 
 			msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
-			msg.Put("option", "request", r).Put("option", "response", w)
 			cmd.Hand(msg, msg.Target(), msg.Option("path"))
 
 			switch {
@@ -192,12 +197,19 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m := web.Message()
 
 	index := r.Header.Get("index_module") == ""
-	r.Header.Set("index_module", m.Cap("module"))
-
 	if index {
+		if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+			r.Header.Set("remote_ip", ip)
+		} else if ip := r.Header.Get("X-Real-Ip"); ip != "" {
+			r.Header.Set("remote_ip", ip)
+		} else {
+			r.Header.Set("remote_ip", strings.Split(r.RemoteAddr, ":")[0])
+		}
+
+		m.Log("info", "").Log("info", "%v %s %s", r.Header.Get("remote_ip"), r.Method, r.URL)
+		r.Header.Set("index_module", m.Cap("module"))
 		r.Header.Set("index_url", r.URL.String())
 		r.Header.Set("index_path", r.URL.Path)
-		m.Log("info", "").Log("info", "%v %s %s", r.RemoteAddr, r.Method, r.URL)
 	}
 
 	if index && m.Confs("logheaders") {
@@ -210,7 +222,6 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" && m.Confs("root_index") {
 		r.URL.Path = m.Conf("root_index")
 	}
-
 	web.ServeMux.ServeHTTP(w, r)
 
 	if index && m.Confs("logheaders") {
@@ -341,8 +352,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"key":       &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "密钥"},
 
 		"login_right": &ctx.Config{Name: "login_right", Value: "1", Help: "登录认证"},
-		"login_cmd":   &ctx.Config{Name: "login_cmd", Value: "1", Help: "登录认证"},
-		"login_lark":  &ctx.Config{Name: "login_lark", Value: "false", Help: "会话认证"},
+		"sess_void":   &ctx.Config{Name: "sess_void", Value: "0", Help: "匿名会话"},
 		"cas_url":     &ctx.Config{Name: "cas_url", Value: "", Help: "单点登录"},
 		"cas_uuid":    &ctx.Config{Name: "cas_uuid", Value: "email", Help: "单点登录"},
 
@@ -899,34 +909,28 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 			}
 		}},
-		"session": &ctx.Command{Name: "session", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"session": &ctx.Command{Name: "session [secrete]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			sessid := m.Option("sessid")
-			if sessid == "" || !m.Sess("aaa").Cmd("auth", sessid, "ship", "ip", m.Option("remote_ip")).Results(0) {
-				w := m.Optionv("response").(http.ResponseWriter)
-				sessid = m.Sess("aaa").Cmd("auth", "create", "session", "web", "ship", "ip", m.Option("remote_ip")).Result(0)
-				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: sessid, Path: "/"})
-			}
-
-			if m.Options("username") && m.Options("password") {
-				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "password", m.Option("password")).Results(0) {
+			if sessid == "" || !m.Cmds("aaa.sess", sessid) {
+				if !m.Confs("sess_void") && !m.Options("username") {
 					return
 				}
-			} else if r := m.Optionv("request").(*http.Request); cas.IsAuthenticated(r) && m.Confs("cas_url") {
-				if !m.Sess("aaa").Cmd("auth", sessid, "ship", "username", m.Option("username"), "uuid", m.Option(m.Conf("cas_uuid"))).Results(0) {
-					return
-				}
+
+				// 创建会话
+				sessid = m.Cmdx("aaa.sess", "create", "web", "ip", m.Option("remote_ip"))
+				http.SetCookie(m.Optionv("response").(http.ResponseWriter), &http.Cookie{Name: "sessid", Value: sessid, Path: "/"})
 			}
 
-			for _, secrete := range []string{"uuid", "password"} {
-				for _, key := range m.Sess("aaa").Cmd("auth", sessid, "ship", secrete).Meta["key"] {
-					username := m.Sess("aaa").Cmd("auth", key, "ship", "username").Append("meta")
-					m.Add("append", "username", username)
-					userrole := m.Sess("aaa").Cmd("auth", "ship", "username", username, "userrole").Append("meta")
-					m.Add("append", "userrole", userrole)
+			if len(arg) > 0 { // 用户认证
+				if m.Options("username") && m.Options(arg[0]) && m.Cmds("aaa.sess", sessid, m.Option("username"), arg[0], m.Option(arg[0])) {
+					m.Echo(sessid)
 				}
+				return
 			}
+
+			// 用户角色
+			m.Cmdy("aaa.sess", m.Option("sessid"), "userrole")
 			m.Log("info", "username: %v userrole: %v", m.Meta["username"], m.Meta["userrole"])
-			m.Echo(sessid)
 		}},
 		"bench": &ctx.Command{Name: "bench", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			default_com := "default bench"
@@ -1050,88 +1054,42 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 
 				// 响应模板
-				if m.Option("componet_group") == "" {
-					m.Option("componet_group", m.Conf("componet_group"))
-				}
-				group := m.Option("componet_group")
-				order := m.Option("componet_name")
+				group, order := m.Option("componet_group", m.Confx("componet_group")), m.Option("componet_name")
+				userrole := m.Option("userrole", m.Cmd("web.session").Append("userrole"))
 
 				// 会话检查
-				session := m.Spawn().Cmd("session")
-				username := session.Append("username")
-				userrole := session.Append("userrole")
-
-				// 权限检查
-				right := !m.Confs("login_right")
-				right = right || group == "login"
-				right = right || (userrole == "root")
-
-				// 权限检查
-				owner_right := right || m.Sess("aaa").Cmd("auth", "follow", "userrole", "void", "componet", m.Option("componet_group")).Results(0)
-				owner_right = owner_right || (username != "" && m.Sess("aaa").Cmd("auth", "follow", "userrole", userrole, "componet", m.Option("componet_group")).Results(0))
-				share_right := owner_right || m.Sess("aaa").Cmd("auth", m.Option("sessid"), "ship", "componet", m.Option("componet_group")).Results(0)
-
-				if !owner_right && m.Confs("login_lark") && username != "" {
-					if lark := m.Find("web.chat.lark"); lark != nil {
-						owner_right = ctx.Right(lark.Cmd("auth", username, "check", m.Option("cmd")).Result(0))
-						share_right = owner_right
-					}
+				if userrole == "" { // 用户登录
+					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
+				} else if group == "login" { // 登录成功
+					return
+				} else if !m.Options("bench") || !m.Cmds("aaa.work", m.Option("bench")) { // 创建空间
+					m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Cmdx("aaa.work", m.Option("sessid"))))
+					return
+				} else if !m.Options("right", !m.Confs("login_right") || group == "login" ||
+					m.Cmds("aaa.work", m.Option("bench"), "right", userrole, "componet", m.Option("componet_group"))) { // 没有权限
+					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
+				} else { //n访问成功
+					m.Cmd("aaa.auth", m.Option("bench"), "data", "access_time", m.Time())
+					m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
 				}
 
-				bid := m.Sess("aaa").Cmd("auth", m.Option("sessid"), "ship", "bench", "web").Result(0)
+				m.Log("info", "json: %v group: %v order: %v userrole: %v right: %v", accept_json, group, order, userrole, m.Option("right"))
 
-				// 工作空间
-				bench_share := ""
-				bench, ok := m.Confv("bench", m.Option("bench")).(map[string]interface{})
-				if order == "" {
-					if !share_right && username == "" {
-						group, order, share_right = "login", "", true
-					} else {
-						if share_right && !m.Confs("bench_disable") {
-							if !ok {
-								m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Spawn().Cmd("bench", "create").Append("key")))
-								return
-							}
-							if bench_share = m.Spawn().Cmd("bench", "check", m.Option("username")).Result(0); bench_share == "private" {
-								return
-							}
-						}
+				for _, v := range m.Confv("componet", group).([]interface{}) {
+					val := v.(map[string]interface{})
+					if order != "" && val["componet_name"].(string) != order {
+						continue
 					}
-				}
 
-				m.Log("info", "json: %v group: %v order: %v user: %v right: %v owner_right: %v share_right: %v share: %v",
-					accept_json, group, order, username, right, owner_right, share_right, bench_share)
+					// 查找模块
+					context := m.Cap("module")
+					if val["componet_ctx"] != nil {
+						context = val["componet_ctx"].(string)
+					}
+					msg := m.Find(context)
 
-				for count := 0; count == 0; group, order, share_right = "login", "", true {
-					for _, v := range m.Confv("componet", group).([]interface{}) {
-						val := v.(map[string]interface{})
-						if order != "" && val["componet_name"].(string) != order {
-							continue
-						}
-
-						// 权限检查
-						order_right := share_right
-						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "userrole", "void", "cmd", val["componet_name"]).Results(0)
-						order_right = order_right || m.Sess("aaa").Cmd("auth", "follow", "userrole", userrole, "cmd", val["componet_name"]).Results(0)
-						if !order_right {
-							continue
-						}
-
-						// 查找模块
-						context := m.Cap("module")
-						if val["componet_ctx"] != nil {
-							context = val["componet_ctx"].(string)
-						}
-						msg := m.Find(context)
-						if msg == nil {
-							if !accept_json && val["template"] != nil {
-								m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), m))
-							}
-							continue
-						}
-						count++
-
-						// 添加固定值
+					// 添加固定值
+					if msg != nil {
 						msg.Option("componet_name", val["componet_name"].(string))
 						for k, v := range val {
 							if msg.Option(k) != "" {
@@ -1146,74 +1104,68 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								msg.Put("option", k, value)
 							}
 						}
-
-						// 添加输入值
-						if val["inputs"] != nil {
-							for _, v := range val["inputs"].([]interface{}) {
-								value := v.(map[string]interface{})
-								if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
-									msg.Add("option", value["name"].(string), value["value"])
-								}
-							}
+					}
+					pre_run, _ := val["pre_run"].(bool)
+					if (!pre_run && order == "") || msg == nil {
+						if msg == nil {
+							msg = m
 						}
-
-						// 添加参数值
-						args := []string{}
-						if val["componet_cmd"] != nil {
-							args = append(args, val["componet_cmd"].(string))
-						}
-						if val["arguments"] != nil {
-							for _, v := range val["arguments"].([]interface{}) {
-								switch value := v.(type) {
-								case string:
-									args = append(args, msg.Parse(value))
-								}
-							}
-						}
-
-						pre_run, ok := val["pre_run"].(bool)
-						if (ok && pre_run) || order != "" {
-							if val["componet_cmd"] != nil {
-								// 记录命令列表
-								if len(bench) > 0 && bench_share != "protected" {
-									now := time.Now().Format(m.Conf("time_format"))
-									m.Confv("bench", []interface{}{m.Option("bench"), "commands", m.Option("componet_name_order")}, map[string]interface{}{
-										"cmd": args[1:],
-										"now": now,
-									})
-									m.Confv("bench", []interface{}{m.Option("bench"), "modify_time"}, now)
-								}
-
-								// 执行命令
-								if pre_run || !msg.Options("command_sso", m.Sess("aaa").Cmd("auth", "ship", "userrole", msg.Option("sso_userrole", userrole),
-									"componet", msg.Option("sso_componet", m.Option("componet_group")), "command", msg.Option("sso_command", args[0]), "data", "sso").Results(0)) ||
-									m.Sess("aaa").Cmd("auth", "follow", "userrole", "void", "command", args[0]).Results(0) ||
-									m.Sess("aaa").Cmd("auth", "follow", "userrole", userrole, "command", args[0]).Results(0) {
-									msg.Cmd(args)
-
-									m.Sess("aaa").Put("option", "bench_command", args).Cmd("auth", bid, "option", "bench_command")
-								}
-
-								// 生成下载链接
-								if msg.Options("download_file") {
-									m.Append("page_redirect", fmt.Sprintf("/download/%s",
-										msg.Sess("nfs").Copy(msg, "append").Copy(msg, "result").Cmd("export", msg.Option("download_file")).Result(0)))
-									return
-								}
-							}
-						}
-
-						// 添加响应
 						if accept_json {
 							list = append(list, msg.Meta)
 						} else if val["template"] != nil {
 							m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))
 						}
+						continue
+					}
 
-						if msg.Appends("directory") {
-							m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
-							return
+					// 添加输入值
+					if val["inputs"] != nil {
+						for _, v := range val["inputs"].([]interface{}) {
+							value := v.(map[string]interface{})
+							if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
+								msg.Add("option", value["name"].(string), value["value"])
+							}
 						}
+					}
+
+					// 添加参数值
+					args := []string{}
+					if val["componet_cmd"] != nil {
+						args = append(args, val["componet_cmd"].(string))
+					}
+					if val["arguments"] != nil {
+						for _, v := range val["arguments"].([]interface{}) {
+							switch value := v.(type) {
+							case string:
+								args = append(args, msg.Parse(value))
+							}
+						}
+					}
+
+					// 执行命令
+					if pre_run || m.Cmds("aaa.work", m.Option("bench"), "right", userrole, "componet", m.Option("componet_group"), "command", args[0]) {
+						msg.Cmd(args)
+
+						name_alias := "action." + msg.Option("componet_name")
+						if msg.Options("componet_name_alias") {
+							name_alias = "action." + msg.Option("componet_name_alias")
+						}
+
+						msg.Put("option", name_alias, map[string]interface{}{
+							"action_time": msg.Time(), "order": m.Option("componet_name_order"), "cmd": args,
+						}).Cmd("aaa.auth", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
+					}
+
+					// 添加响应
+					if msg.Appends("directory") {
+						m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
+						return
+					}
+
+					if accept_json {
+						list = append(list, msg.Meta)
+					} else if val["template"] != nil {
+						m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))
 					}
 				}
 

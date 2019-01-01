@@ -24,7 +24,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"login": []interface{}{
 				map[string]interface{}{"componet_name": "head", "template": "head"},
 				map[string]interface{}{"componet_name": "login", "componet_help": "login", "template": "componet",
-					"componet_ctx": "aaa", "componet_cmd": "login", "arguments": []interface{}{"@username", "@password"},
+					"componet_ctx": "aaa", "componet_cmd": "auth", "arguments": []interface{}{"@sessid", "ship", "username", "@username", "password", "@password"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "username", "label": "username"},
 						map[string]interface{}{"type": "password", "name": "password", "label": "password"},

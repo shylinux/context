@@ -1,16 +1,13 @@
 ~stdio
-    config load history.json
+config load history.json
 ~aaa
     # config load auth.json
 ~web
-    config load web.json
+config load web.json
 
 ~aaa
-    auth ship username void role void
-    auth ship username root role root
-    auth ship username  shy role root
-
-    auth ship username shy password shy
+    role root componet index command source
+    user root shy shy
 
 source etc/local.shy
 source etc/spide.shy

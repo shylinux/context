@@ -28,7 +28,6 @@ function save_clipboard(item) {
     }
 
     context.GET("", {
-        "componet_bench": context.Search("bench"),
         "componet_group": "index",
         "componet_name": "command",
         "cmd": "bench "+context.Search("bench")+".clipstack"+" '"+JSON.stringify(txt)+"'"
@@ -176,7 +175,6 @@ function add_command(init) {
         "dataset": {
             "componet_group": "index",
             "componet_name": "command",
-            "componet_bench": context.Search("bench"),
             "componet_name_alias": name,
             "componet_name_order": order,
         }
@@ -732,35 +730,45 @@ function init_context() {
     })
 }
 function init_command() {
-    if (bench.commands[""]) {
+    var option = document.querySelector("form.option.command")
+    if (!option) {
+        return
+    }
+    option.dataset["componet_name_alias"] = "command"
+    option.dataset["componet_name_order"] = 0
+
+    var action = bench_data.action
+    if (action && action["command"]) {
         var option = document.querySelector("form.option.command")
         var cmd = option.querySelector("input[name=cmd]")
-        cmd.value = bench.commands[""].cmd.join(" ")
+        cmd.value = action["command"].cmd[1]
         check_option(option)
     }
 
     var max = 0
-    for (var k in bench.commands) {
-        if (parseInt(k) > max) {
-            max = parseInt(k)
+    for (var k in action) {
+        var order = parseInt(action[k].order)
+        if (order > max) {
+            max = order
         }
     }
 
     for (var i = 1; i <= max; i++) {
         var fieldset = add_command(true)
-        if (bench.commands[i]) {
+        if (action["command"+i]) {
             var option = fieldset.querySelector("form.option")
             var cmd = option.querySelector("input[name=cmd]")
-            cmd.value = bench.commands[i].cmd.join(" ")
+            cmd.value = action["command"+i].cmd[1]
             check_option(option)
         }
     }
 }
 function init_docker() {
-    text = JSON.parse(bench.clipstack || "[]")
+    text = JSON.parse(bench_data.clipstack || "[]")
     for (var i = 0; i < text.length; i++) {
         copy_to_clipboard(text[i])
     }
+    bench_data.board = bench_data.board || {}
 
     document.querySelectorAll("div.workflow").forEach(function(workflow) {
         // 移动面板
@@ -810,7 +818,7 @@ function init_docker() {
 
         // 事件
         docker.querySelectorAll("li>ul>li").forEach(function(item) {
-            if (bench["key"] == item.dataset["key"]) {
+            if (bench_data.board["key"] == item.dataset["key"]) {
                 item.className = "stick"
             }
 
@@ -857,7 +865,6 @@ function init_docker() {
                         return
                     case "rename_fly":
                         context.GET("", {
-                            "componet_bench": context.Search("bench"),
                             "componet_group": "index",
                             "componet_name": "command",
                             "cmd": "bench "+context.Search("bench")+".comment"+" "+prompt("name"),
@@ -866,7 +873,6 @@ function init_docker() {
                         return
                     case "remove_fly":
                         context.GET("", {
-                            "componet_bench": context.Search("bench"),
                             "componet_group": "index",
                             "componet_name": "command",
                             "cmd": "~code bench delete "+context.Search("bench"),
