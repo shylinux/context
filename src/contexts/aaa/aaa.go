@@ -526,7 +526,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				switch arg[1] {
 				case "create":
 					bid, arg = m.Cmdx("aaa.auth", arg[0], "ship", "bench", arg[2]), arg[3:]
-					m.Cmdx("aaa.auth", bid, "data", "name", "web")
+					m.Cmd("aaa.auth", bid, "data", "name", "web")
+					defer func() { m.Set("result").Echo(bid) }()
 				case "select":
 					m.Cmd("aaa.auth", arg[0], "ship", "bench").Table(func(maps map[string]string, list []string, line int) bool {
 						if strings.Contains(maps["meta"], arg[2]) || strings.HasPrefix(maps["key"], arg[2]) || strings.HasSuffix(maps["key"], arg[2]) {
@@ -540,6 +541,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 			case "bench":
 				bid, arg = arg[0], arg[1:]
+			default:
+				return
 			}
 
 			if len(arg) == 0 {

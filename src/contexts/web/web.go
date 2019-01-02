@@ -48,19 +48,21 @@ func merge(m *ctx.Message, uri string, arg ...string) string {
 	add, e := url.Parse(uri)
 	m.Assert(e)
 
-	if add.Scheme == "" {
-		add.Scheme = m.Conf("protocol")
-	}
-	if add.Host == "" {
-		add.Host = m.Conf("hostname")
-	}
-	if add.Path == "" {
-		add.Path = path.Join(m.Conf("path"), m.Conf("file"))
-	} else if !path.IsAbs(add.Path) {
-		add.Path = path.Join(m.Conf("path"), add.Path)
-	}
-	if add.RawQuery == "" {
-		add.RawQuery = m.Conf("query")
+	if false {
+		if add.Scheme == "" {
+			add.Scheme = m.Conf("protocol")
+		}
+		if add.Host == "" {
+			add.Host = m.Conf("hostname")
+		}
+		if add.Path == "" {
+			add.Path = path.Join(m.Conf("path"), m.Conf("file"))
+		} else if !path.IsAbs(add.Path) {
+			add.Path = path.Join(m.Conf("path"), add.Path)
+		}
+		if add.RawQuery == "" {
+			add.RawQuery = m.Conf("query")
+		}
 	}
 
 	query := add.Query()
