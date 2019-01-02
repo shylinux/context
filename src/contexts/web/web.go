@@ -44,6 +44,46 @@ func proxy(m *ctx.Message, url string) string {
 
 	return "proxy/" + url
 }
+func merge(m *ctx.Message, uri string, arg ...string) string {
+	add, e := url.Parse(uri)
+	m.Assert(e)
+
+	if add.Scheme == "" {
+		add.Scheme = m.Conf("protocol")
+	}
+	if add.Host == "" {
+		add.Host = m.Conf("hostname")
+	}
+	if add.Path == "" {
+		add.Path = path.Join(m.Conf("path"), m.Conf("file"))
+	} else if !path.IsAbs(add.Path) {
+		add.Path = path.Join(m.Conf("path"), add.Path)
+	}
+	if add.RawQuery == "" {
+		add.RawQuery = m.Conf("query")
+	}
+
+	query := add.Query()
+	for i := 0; i < len(arg)-1; i += 2 {
+		value := arg[i+1]
+		if len(arg[i+1]) > 1 {
+			switch arg[i+1][0] {
+			case '$':
+				value = m.Cap(arg[i+1][1:])
+			case '@':
+				value = m.Conf(arg[i+1][1:])
+			}
+		}
+
+		if value == "" {
+			query.Del(arg[i])
+		} else {
+			query.Set(arg[i], value)
+		}
+	}
+	add.RawQuery = query.Encode()
+	return add.String()
+}
 func Merge(m *ctx.Message, uri string, arg ...string) string {
 	uri = strings.Replace(uri, ":/", "://", -1)
 	uri = strings.Replace(uri, ":///", "://", -1)
@@ -397,6 +437,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "工作流"},
 	},
 	Commands: map[string]*ctx.Command{
+		"merge": &ctx.Command{Name: "merge", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			m.Echo(merge(m, arg[0], arg[1:]...))
+		}},
 		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			uri, e := url.Parse(arg[0])
 			m.Assert(e)
@@ -1055,25 +1098,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				// 响应模板
 				group, order := m.Option("componet_group", m.Confx("componet_group")), m.Option("componet_name")
-				userrole := m.Option("userrole", m.Cmd("web.session").Append("userrole"))
 
 				// 会话检查
-				if userrole == "" { // 用户登录
+				if m.Options("right", !m.Confs("login_right") || !m.Confs("componet", "login")) {
+					// 禁用权限
+				} else if userrole := m.Option("userrole", m.Cmd("web.session").Append("userrole")); userrole == "" { // 用户登录
 					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
 				} else if group == "login" { // 登录成功
 					return
 				} else if !m.Options("bench") || !m.Cmds("aaa.work", m.Option("bench")) { // 创建空间
-					m.Append("redirect", fmt.Sprintf("%s?bench=%s", m.Option("index_path"), m.Cmdx("aaa.work", m.Option("sessid"))))
+					m.Append("redirect", merge(m, m.Option("index_url"), "bench", m.Cmdx("aaa.work", m.Option("sessid"), "create", "web")))
 					return
-				} else if !m.Options("right", !m.Confs("login_right") || group == "login" ||
-					m.Cmds("aaa.work", m.Option("bench"), "right", userrole, "componet", m.Option("componet_group"))) { // 没有权限
+				} else if !m.Options("right", m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("userrole"), "componet", m.Option("componet_group"))) { // 没有权限
 					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
 				} else { //n访问成功
 					m.Cmd("aaa.auth", m.Option("bench"), "data", "access_time", m.Time())
+					m.Optionv("session", m.Confv("auth", []string{m.Option("sessid")}))
 					m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
 				}
 
-				m.Log("info", "json: %v group: %v order: %v userrole: %v right: %v", accept_json, group, order, userrole, m.Option("right"))
+				m.Log("info", "json: %v group: %v order: %v userrole: %v right: %v", accept_json, group, order, m.Option("userrole"), m.Option("right"))
 
 				for _, v := range m.Confv("componet", group).([]interface{}) {
 					val := v.(map[string]interface{})
@@ -1143,17 +1187,19 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					// 执行命令
-					if pre_run || m.Cmds("aaa.work", m.Option("bench"), "right", userrole, "componet", m.Option("componet_group"), "command", args[0]) {
+					if pre_run || !m.Options("bench") || m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("userrole"), "componet", m.Option("componet_group"), "command", args[0]) {
 						msg.Cmd(args)
 
-						name_alias := "action." + msg.Option("componet_name")
-						if msg.Options("componet_name_alias") {
-							name_alias = "action." + msg.Option("componet_name_alias")
-						}
+						if m.Options("bench") {
+							name_alias := "action." + msg.Option("componet_name")
+							if msg.Options("componet_name_alias") {
+								name_alias = "action." + msg.Option("componet_name_alias")
+							}
 
-						msg.Put("option", name_alias, map[string]interface{}{
-							"action_time": msg.Time(), "order": m.Option("componet_name_order"), "cmd": args,
-						}).Cmd("aaa.auth", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
+							msg.Put("option", name_alias, map[string]interface{}{
+								"action_time": msg.Time(), "order": m.Option("componet_name_order"), "cmd": args,
+							}).Cmd("aaa.auth", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
+						}
 					}
 
 					// 添加响应

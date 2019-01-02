@@ -28,6 +28,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		}, Help: "路由数量"},
 
 		"bench_disable":  &ctx.Config{Name: "bench_disable", Value: "true", Help: "工作流"},
+		"login_right":    &ctx.Config{Name: "login_right", Value: "1", Help: "默认组件"},
 		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{

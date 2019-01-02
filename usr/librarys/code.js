@@ -30,7 +30,7 @@ function save_clipboard(item) {
     context.GET("", {
         "componet_group": "index",
         "componet_name": "command",
-        "cmd": "bench "+context.Search("bench")+".clipstack"+" '"+JSON.stringify(txt)+"'"
+        "cmd": "aaa.work "+context.Search("bench")+" clipstack '"+JSON.stringify(txt)+"'"
     }, function(msg) {
         alert("保存成功")
     })
@@ -819,7 +819,7 @@ function init_docker() {
         // 事件
         docker.querySelectorAll("li>ul>li").forEach(function(item) {
             if (bench_data.board["key"] == item.dataset["key"]) {
-                item.className = "stick"
+                // item.className = "stick"
             }
 
             item.onclick = function(event) {
@@ -867,7 +867,7 @@ function init_docker() {
                         context.GET("", {
                             "componet_group": "index",
                             "componet_name": "command",
-                            "cmd": "bench "+context.Search("bench")+".comment"+" "+prompt("name"),
+                            "cmd": "aaa.work "+context.Search("bench")+" rename "+prompt("name"),
                         })
                         location.reload()
                         return
@@ -875,7 +875,7 @@ function init_docker() {
                         context.GET("", {
                             "componet_group": "index",
                             "componet_name": "command",
-                            "cmd": "~code bench delete "+context.Search("bench"),
+                            "cmd": "aaa.work "+context.Search("bench")+" delete",
                         })
                         var b = ""
                         document.querySelectorAll("div.workflow>ul.docker>li>ul.fly>li[data-key]").forEach(function(item){

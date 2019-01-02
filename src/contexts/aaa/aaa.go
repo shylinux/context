@@ -159,15 +159,91 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			m.Confv("hash", hs, meta)
 			m.Echo(hs)
 		}},
-		"auth": &ctx.Command{Name: "auth [create type meta] [id] [[ship] type [meta]] [[node] key [val]] [[data] key [val]]", Help: "权限区块链", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"auth": &ctx.Command{Name: "auth [id] [[ship] type [meta]] [[data] key [val]] [[node] key [val]]", Help: "权限区块链", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if len(arg) == 0 { // 节点列表
-				m.Spawn().Cmd("config", "auth").Cmd("select", "parse", "value", "", "fields", "key type meta ship").CopyTo(m)
+				m.Confm("auth", func(key string, node map[string]interface{}) {
+					up := false
+					if ship, ok := node["ship"].(map[string]interface{}); ok {
+						for k, v := range ship {
+							val := v.(map[string]interface{})
+							switch val["ship"].(string) {
+							case "0":
+								if !up {
+									up = true
+									m.Add("append", "up_key", k)
+									m.Add("append", "up_type", val["type"])
+								}
+							}
+						}
+					}
+					if !up {
+						m.Add("append", "up_key", "")
+						m.Add("append", "up_type", "")
+					}
+					m.Add("append", "key", key)
+					m.Add("append", "type", node["type"])
+					m.Add("append", "meta", node["meta"])
+				})
+				m.Table()
 				return
 			}
 
 			s, t, a := "", "", ""
 			if v := m.Confm("auth", arg[0]); v != nil {
 				s, t, arg = arg[0], v["type"].(string), arg[1:]
+			}
+
+			if len(arg) > 0 && arg[0] == "delete" {
+				switch arg[1] {
+				case "data":
+					if data := m.Confm("auth", []string{s, "data"}); data != nil {
+						for _, k := range arg[2:] {
+							m.Log("info", "delete data %s %s %v", s, k, data[k])
+							delete(data, k)
+						}
+					}
+				case "ship":
+					if ship := m.Confm("auth", []string{s, "ship"}); ship != nil {
+						for _, k := range arg[2:] {
+							if val, ok := ship[k].(map[string]interface{}); ok {
+								m.Add("append", "key", k)
+								m.Add("append", "ship", val["ship"])
+								m.Add("append", "type", val["type"])
+								m.Add("append", "meta", val["meta"])
+							}
+
+							m.Log("info", "delete ship %s %s %v", s, k, ship[k])
+							delete(ship, k)
+							if peer := m.Confm("auth", []string{k, "ship"}); peer != nil {
+								m.Log("info", "delete ship %s %s %v", k, s, peer[s])
+								delete(peer, s)
+							}
+						}
+						m.Table()
+					}
+				case "node":
+					if ship := m.Confm("auth", []string{s, "ship"}); ship != nil {
+						for k, _ := range ship {
+							if val, ok := ship[k].(map[string]interface{}); ok {
+								m.Add("append", "key", k)
+								m.Add("append", "ship", val["ship"])
+								m.Add("append", "type", val["type"])
+								m.Add("append", "meta", val["meta"])
+							}
+
+							m.Log("info", "delete ship %s %s %v", s, k, ship[k])
+							delete(ship, k)
+							if peer := m.Confm("auth", []string{k, "ship"}); peer != nil {
+								m.Log("info", "delete ship %s %s %v", k, s, peer[s])
+								delete(peer, s)
+							}
+						}
+						m.Log("info", "delete node %s %v", s, m.Confm("auth", s))
+						delete(m.Confm("auth"), s)
+						m.Table()
+					}
+				}
+				return
 			}
 
 			if len(arg) == 0 { // 查看节点
@@ -434,19 +510,36 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}
 
-			sid, bid := "", ""
-			switch m.Cmdx("aaa.auth", arg[0]) {
+			bid := ""
+			switch m.Conf("auth", []string{arg[0], "type"}) {
 			case "session":
-				sid, bid, arg = arg[0], m.Spawn().Cmd("auth", arg[0], "ship", "bench").Append("key"), arg[1:]
-				defer func() { m.Set("result").Echo(bid) }()
+				if len(arg) == 1 {
+					m.Confm("auth", []string{arg[0], "ship"}, func(key string, ship map[string]interface{}) {
+						m.Add("append", "key", key)
+						m.Add("append", "type", ship["type"])
+						m.Add("append", "meta", ship["meta"])
+						m.Add("append", "create_time", ship["create_time"])
+					})
+					m.Table()
+					return
+				}
+				switch arg[1] {
+				case "create":
+					bid, arg = m.Cmdx("aaa.auth", arg[0], "ship", "bench", arg[2]), arg[3:]
+					m.Cmdx("aaa.auth", bid, "data", "name", "web")
+				case "select":
+					m.Cmd("aaa.auth", arg[0], "ship", "bench").Table(func(maps map[string]string, list []string, line int) bool {
+						if strings.Contains(maps["meta"], arg[2]) || strings.HasPrefix(maps["key"], arg[2]) || strings.HasSuffix(maps["key"], arg[2]) {
+							bid = maps["key"]
+							return false
+						}
+						return true
+					})
+					arg = arg[3:]
+				case "delete":
+				}
 			case "bench":
 				bid, arg = arg[0], arg[1:]
-			}
-
-			if bid == "" { // 创建空间
-				bid = m.Spawn().Cmd("auth", sid, "ship", "bench", "web").Result(0)
-				m.Spawn().Cmd("auth", bid, "data", "create_time", m.Time(), "share", "protected")
-				defer func() { m.Set("result").Echo(bid) }()
 			}
 
 			if len(arg) == 0 {
@@ -455,34 +548,35 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}
 
 			switch arg[0] {
-			case "export":
-				m.Echo(m.Cmd("ctx.config", "auth", bid).Cmd("select", "key", "data").Append("value"))
+			case "delete":
+				m.Cmd("aaa.auth", bid, "delete", "node")
+			case "rename":
+				m.Cmd("aaa.auth", bid, "data", "name", arg[1])
 			case "right":
 				if len(arg) >= 6 {
-					com := m.Cmd("aaa.auth", bid, "ship", "command")
-					for i, v := range com.Meta["meta"] {
-						if v == arg[5] {
-							m.Echo(com.Meta["key"][i])
-							return
+					m.Cmd("aaa.auth", bid, "ship", "command").Table(func(maps map[string]string, list []string, line int) bool {
+						if maps["meta"] == arg[5] {
+							m.Echo(maps["key"])
+							return false
 						}
-					}
-
+						return true
+					})
 				} else if len(arg) >= 4 {
-					com := m.Cmd("aaa.auth", bid, "ship", "componet")
-					for i, v := range com.Meta["meta"] {
-						if v == arg[3] {
-							m.Echo(com.Meta["key"][i])
-							return
+					m.Cmd("aaa.auth", bid, "ship", "componet").Table(func(maps map[string]string, list []string, line int) bool {
+						if maps["meta"] == arg[3] {
+							m.Echo(maps["key"])
+							return false
 						}
-					}
+						return true
+					})
 				}
 
-				cid := m.Cmdx("aaa.auth", "ship", "userrole", arg[1:])
-				if cid != "" {
+				if cid := m.Cmdx("aaa.auth", "ship", "userrole", arg[1:]); cid != "" {
 					m.Cmd("aaa.auth", bid, cid)
+					m.Echo(cid)
 				}
-				m.Echo(cid)
-			case "share":
+			default:
+				m.Cmdx("aaa.auth", bid, "data", arg)
 			}
 		}},
 

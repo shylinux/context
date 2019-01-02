@@ -128,6 +128,9 @@
     table.append td.clip {
         background-color:red;
     }
+    table.append td:hover {
+        background-color:red;
+    }
     code.result pre {
         color:white;
         font-size:14px;
@@ -145,6 +148,7 @@
 </head>
 <body onkeydown="return onaction(event, 'scroll')" onkeyup="return onaction(event, 'keymap')">
 <script>
+    var session ={{option . "session"}}
     var bench_data ={{option . "bench_data"}}
 </script>
 {{end}}
@@ -197,8 +201,8 @@
             <ul class="fly">
                 <li data-action="refresh_fly">+ 刷新工作流(Ctrl+R)</li>
                 <li data-action="create_fly">+ 添加工作流(Ctrl+T)</li>
-                {{range $key, $item := conf . "bench"}}
-                        <li data-key="{{$key}}">{{index $item "modify_time"}} {{index $item "comment"}}({{slice $key 0 6}})</li>
+                {{range $key, $item := work .}}
+                        <li data-key="{{$key}}">{{index $item "create_time"}} {{index $item "data" "name"}}({{slice $key 0 6}})</li>
                 {{end}}
                 <li data-action="rename_fly">+ 命名工作流</li>
                 <li data-action="remove_fly">+ 删除工作流</li>

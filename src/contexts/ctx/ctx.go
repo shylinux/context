@@ -1468,7 +1468,8 @@ func (m *Message) Cmdx(args ...interface{}) string {
 	return m.Cmd(args...).Result(0)
 }
 func (m *Message) Cmdy(args ...interface{}) *Message {
-	return m.Cmd(args...).CopyTo(m)
+	m.Cmd(args...).CopyTo(m)
+	return m
 }
 func (m *Message) Cmds(args ...interface{}) bool {
 	return m.Cmd(args...).Results(0)
@@ -2344,6 +2345,22 @@ var CGI = template.FuncMap{
 		}
 
 		return ""
+	},
+
+	"work": func(m *Message, arg ...interface{}) interface{} {
+		switch len(arg) {
+		case 0:
+			list := map[string]map[string]interface{}{}
+			m.Confm("auth", []string{m.Option("sessid"), "ship"}, func(key string, ship map[string]interface{}) {
+				if ship["type"] == "bench" {
+					if work := m.Confm("auth", key); work != nil {
+						list[key] = work
+					}
+				}
+			})
+			return list
+		}
+		return nil
 	},
 
 	"unescape": func(str string) interface{} {
