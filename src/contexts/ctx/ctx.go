@@ -1491,6 +1491,21 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 	}
 	if len(args) > 1 {
 		switch fun := args[1].(type) {
+		case func(map[string]interface{}):
+			if value, ok := m.Confv(key, args[0]).(map[string]interface{}); ok {
+				fun(value)
+			}
+			return nil
+		case func(int, map[string]interface{}):
+			if value, ok := m.Confv(key, args[0]).([]interface{}); ok {
+				for i, v := range value {
+					if val, ok := v.(map[string]interface{}); ok {
+						fun(i, val)
+					}
+				}
+				return nil
+			}
+			return nil
 		case func(string, map[string]interface{}):
 			if value, ok := m.Confv(key, args[0]).(map[string]interface{}); ok {
 				for k, v := range value {
@@ -2930,9 +2945,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 
 					switch action {
 					case "cmd":
-						if m.Options("command_sso") && !m.Sess("aaa").Cmd("auth", "ship",
-							"userrole", m.Option("sso_userrole"), "componet", m.Option("sso_componet"), "command", m.Option("sso_command"),
-							"data", arg[0]).Results(0) {
+
+						if m.Options("sso_bench") && m.Options("sso_username") &&
+							!m.Cmds("aaa.work", m.Option("sso_bench"), "right", m.Option("sso_username"), "componet", "source", "command", arg[0]) {
+
 							m.Log("info", "sso check %v: %v failure", m.Option("sso_componet"), m.Option("sso_command"))
 							m.Echo("error: ").Echo("no right [%s: %s %s]", m.Option("sso_componet"), m.Option("sso_command"), arg[0])
 							break

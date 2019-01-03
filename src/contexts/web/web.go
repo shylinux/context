@@ -167,7 +167,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 					return
 				}
 
-				msg.Option("username", cas.Username(r))
 				for k, v := range cas.Attributes(r) {
 					for _, val := range v {
 						msg.Add("option", k, val)
@@ -175,6 +174,10 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				}
 
 				if msg.Options("ticket") {
+					msg.Option("username", cas.Username(r))
+					if lark := m.Find("web.chat.lark"); lark != nil {
+						msg.Option("username", lark.Cmdx("user", msg.Option("email"), "id"))
+					}
 					msg.Option("uuid", msg.Option(msg.Conf("cas_uuid")))
 					msg.Option("sessid", msg.Spawn().Cmd("session", "uuid").Result(0))
 
@@ -1104,14 +1107,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				// 会话检查
 				if m.Options("right", !m.Confs("login_right") || !m.Confs("componet", "login")) {
 					// 禁用权限
-				} else if userrole := m.Option("userrole", m.Cmd("web.session").Append("userrole")); userrole == "" { // 用户登录
+				} else if username := m.Option("username", m.Cmd("web.session").Append("username")); username == "" { // 用户登录
 					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
 				} else if group == "login" { // 登录成功
 					return
 				} else if !m.Options("bench") || !m.Cmds("aaa.work", m.Option("bench")) { // 创建空间
 					m.Append("redirect", merge(m, m.Option("index_url"), "bench", m.Cmdx("aaa.work", m.Option("sessid"), "create", "web")))
 					return
-				} else if !m.Options("right", m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("userrole"), "componet", m.Option("componet_group"))) { // 没有权限
+				} else if !m.Options("right", m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "componet", m.Option("componet_group"))) { // 没有权限
 					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
 				} else { //n访问成功
 					m.Cmd("aaa.auth", m.Option("bench"), "data", "access_time", m.Time())
@@ -1119,7 +1122,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
 				}
 
-				m.Log("info", "json: %v group: %v order: %v userrole: %v right: %v", accept_json, group, order, m.Option("userrole"), m.Option("right"))
+				m.Log("info", "json: %v group: %v order: %v username: %v right: %v", accept_json, group, order, m.Option("username"), m.Option("right"))
 
 				for _, v := range m.Confv("componet", group).([]interface{}) {
 					val := v.(map[string]interface{})
@@ -1189,7 +1192,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					// 执行命令
-					if pre_run || !m.Options("bench") || m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("userrole"), "componet", m.Option("componet_group"), "command", args[0]) {
+					if pre_run || !m.Options("bench") || m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "componet", m.Option("componet_group"), "command", args[0]) {
+						msg.Option("sso_bench", m.Option("bench"))
+						msg.Option("sso_username", m.Option("username"))
 						msg.Cmd(args)
 
 						if m.Options("bench") {

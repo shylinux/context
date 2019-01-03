@@ -106,8 +106,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"nuser": &ctx.Cache{Name: "nuser", Value: "0", Help: "用户数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"hash": &ctx.Config{Name: "hash", Value: map[string]interface{}{}, Help: "散列"},
-		"auth": &ctx.Config{Name: "auth", Value: map[string]interface{}{}, Help: "散列"},
+		"hash":        &ctx.Config{Name: "hash", Value: map[string]interface{}{}, Help: "散列"},
+		"auth":        &ctx.Config{Name: "auth", Value: map[string]interface{}{}, Help: "散列"},
+		"auth_expire": &ctx.Config{Name: "auth_expire", Value: "10m", Help: "权限超时"},
 		"auth_type": &ctx.Config{Name: "auth_type", Value: map[string]interface{}{
 			"session":  map[string]interface{}{"unique": true},
 			"bench":    map[string]interface{}{"unique": true},
@@ -269,12 +270,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 				if node := m.Confm("auth", arg[i]); node != nil {
 					if i++; p != "" { // 添加链接
+						d, e := time.ParseDuration(m.Conf("auth_expire"))
+						m.Assert(e)
+						expire := time.Now().Add(d).Unix()
 						m.Confv("auth", []string{p, "ship", arg[i-1]}, map[string]interface{}{
-							"create_time": m.Time(), "type": node["type"], "meta": node["meta"], "ship": "4",
+							"create_time": m.Time(), "type": node["type"], "meta": node["meta"], "ship": "4", "expire_time": expire,
 						})
 
 						m.Confv("auth", []string{arg[i-1], "ship", p}, map[string]interface{}{
-							"create_time": m.Time(), "type": t, "meta": a, "ship": "5",
+							"create_time": m.Time(), "type": t, "meta": a, "ship": "5", "expire_time": expire,
 						})
 
 					}
@@ -332,6 +336,19 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							})
 						}
 						m.Table()
+						return
+					}
+
+					if arg[i] == "check" {
+						has := "false"
+						m.Confm("auth", []string{p, "ship"}, func(k string, ship map[string]interface{}) {
+							if ship["meta"] == arg[i+1] {
+								if ship["expire_time"] == nil || ship["expire_time"].(int64) > time.Now().Unix() {
+									has = k
+								}
+							}
+						})
+						m.Set("result").Echo(has)
 						return
 					}
 
@@ -401,7 +418,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						ps := []string{p}
 						for j := 0; j < len(ps); j++ {
 							if value := m.Confv("auth", []string{ps[j], "data", arg[i]}); value != nil {
-								m.Put("option", "data", value).Cmdy("ctx.trans", "data")
+								m.Set("append").Set("result").Put("option", "data", value).Cmdy("ctx.trans", "data")
 								break
 							}
 
@@ -441,15 +458,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			case 3:
 				if arg[1] == "componet" {
 					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2])
+				} else {
+					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "commond", arg[2])
 				}
 			case 4:
-			case 5:
-				if arg[1] == "componet" && arg[3] == "command" {
-					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2], "command", arg[4])
-				}
 			default:
 				if arg[1] == "componet" && arg[3] == "command" {
-					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2], "command", arg[4], arg[5:])
+					for _, v := range arg[4:] {
+						m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2], "command", v)
+					}
 				}
 			}
 		}},
@@ -556,28 +573,41 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			case "rename":
 				m.Cmd("aaa.auth", bid, "data", "name", arg[1])
 			case "right":
-				if len(arg) >= 6 {
-					m.Cmd("aaa.auth", bid, "ship", "command").Table(func(maps map[string]string, list []string, line int) bool {
-						if maps["meta"] == arg[5] {
-							m.Echo(maps["key"])
-							return false
-						}
+				m.Cmd("aaa.user", arg[1]).Table(func(maps map[string]string, list []string, line int) bool {
+					if line < 0 {
 						return true
-					})
-				} else if len(arg) >= 4 {
-					m.Cmd("aaa.auth", bid, "ship", "componet").Table(func(maps map[string]string, list []string, line int) bool {
-						if maps["meta"] == arg[3] {
-							m.Echo(maps["key"])
-							return false
-						}
-						return true
-					})
-				}
+					}
 
-				if cid := m.Cmdx("aaa.auth", "ship", "userrole", arg[1:]); cid != "" {
-					m.Cmd("aaa.auth", bid, cid)
-					m.Echo(cid)
-				}
+					userrole := maps["meta"]
+					if userrole == "root" {
+						m.Echo("true")
+						return false
+					}
+
+					if len(arg) >= 6 {
+						if m.Cmds("aaa.auth", bid, "ship", "check", arg[5]) {
+							m.Echo("true")
+							return false
+						}
+						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "componet", arg[3], "check", arg[5]); ctx.Right(cid) {
+							m.Cmd("aaa.auth", bid, cid)
+							m.Echo("true")
+							return false
+						}
+					} else if len(arg) >= 4 {
+						if m.Cmds("aaa.auth", bid, "ship", "check", arg[3]) {
+							m.Echo("true")
+							return false
+						}
+						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "check", arg[3]); ctx.Right(cid) {
+							m.Cmd("aaa.auth", bid, cid)
+							m.Echo("true")
+							return false
+						}
+					}
+					return true
+				})
+
 			default:
 				m.Cmdx("aaa.auth", bid, "data", arg)
 			}
