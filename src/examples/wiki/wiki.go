@@ -20,7 +20,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"wiki_dir":   &ctx.Config{Name: "wiki_dir", Value: "usr/wiki", Help: "路由数量"},
-		"wiki_favor": &ctx.Config{Name: "wiki_favor", Value: "lamp.md", Help: "路由数量"},
+		"wiki_favor": &ctx.Config{Name: "wiki_favor", Value: "p.md", Help: "路由数量"},
 		"wiki_list":  &ctx.Config{Name: "wiki_list", Value: []interface{}{}, Help: "路由数量"},
 
 		"wiki_list_show": &ctx.Config{Name: "wiki_list_show", Value: map[string]interface{}{

@@ -199,4 +199,9 @@ window.onload = function(event) {
     init_link()
     init_code()
     init_table()
+    if (!context.isMobile) {
+        var nav = document.querySelector("nav")
+        nav.hidden = false
+        set_layout()
+    }
 }
