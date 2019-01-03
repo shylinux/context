@@ -1109,6 +1109,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					// 禁用权限
 				} else if username := m.Option("username", m.Cmd("web.session").Append("username")); username == "" { // 用户登录
 					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
+					m.Option("right", "true")
 				} else if group == "login" { // 登录成功
 					return
 				} else if !m.Options("bench") || !m.Cmds("aaa.work", m.Option("bench")) { // 创建空间
@@ -1137,8 +1138,24 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 					msg := m.Find(context)
 
-					// 添加固定值
-					if msg != nil {
+					if msg != nil && val["componet_cmd"] != nil {
+						// 添加参数值
+						args := []string{val["componet_cmd"].(string)}
+						if val["arguments"] != nil {
+							for _, v := range val["arguments"].([]interface{}) {
+								switch value := v.(type) {
+								case string:
+									args = append(args, msg.Parse(value))
+								}
+							}
+						}
+
+						// 权限检查
+						if m.Options("bench") && !m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "componet", m.Option("componet_group"), "command", args[0]) {
+							continue
+						}
+
+						// 添加固定值
 						msg.Option("componet_name", val["componet_name"].(string))
 						for k, v := range val {
 							if msg.Option(k) != "" {
@@ -1153,69 +1170,43 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								msg.Put("option", k, value)
 							}
 						}
-					}
-					pre_run, _ := val["pre_run"].(bool)
-					if (!pre_run && order == "") || msg == nil {
-						if msg == nil {
-							msg = m
-						}
-						if accept_json {
-							list = append(list, msg.Meta)
-						} else if val["template"] != nil {
-							m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))
-						}
-						continue
-					}
 
-					// 添加输入值
-					if val["inputs"] != nil {
-						for _, v := range val["inputs"].([]interface{}) {
-							value := v.(map[string]interface{})
-							if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
-								msg.Add("option", value["name"].(string), value["value"])
+						// 添加输入值
+						if val["inputs"] != nil {
+							for _, v := range val["inputs"].([]interface{}) {
+								value := v.(map[string]interface{})
+								if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
+									msg.Add("option", value["name"].(string), value["value"])
+								}
 							}
 						}
-					}
 
-					// 添加参数值
-					args := []string{}
-					if val["componet_cmd"] != nil {
-						args = append(args, val["componet_cmd"].(string))
-					}
-					if val["arguments"] != nil {
-						for _, v := range val["arguments"].([]interface{}) {
-							switch value := v.(type) {
-							case string:
-								args = append(args, msg.Parse(value))
+						// 执行命令
+						if pre_run, _ := val["pre_run"].(bool); pre_run || order != "" {
+							msg.Option("sso_bench", m.Option("bench"))
+							msg.Option("sso_username", m.Option("username"))
+							msg.Cmd(args)
+
+							if m.Options("bench") {
+								name_alias := "action." + msg.Option("componet_name")
+								if msg.Options("componet_name_alias") {
+									name_alias = "action." + msg.Option("componet_name_alias")
+								}
+
+								msg.Put("option", name_alias, map[string]interface{}{
+									"action_time": msg.Time(), "order": m.Option("componet_name_order"), "cmd": args,
+								}).Cmd("aaa.auth", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
 							}
 						}
-					}
-
-					// 执行命令
-					if pre_run || !m.Options("bench") || m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "componet", m.Option("componet_group"), "command", args[0]) {
-						msg.Option("sso_bench", m.Option("bench"))
-						msg.Option("sso_username", m.Option("username"))
-						msg.Cmd(args)
-
-						if m.Options("bench") {
-							name_alias := "action." + msg.Option("componet_name")
-							if msg.Options("componet_name_alias") {
-								name_alias = "action." + msg.Option("componet_name_alias")
-							}
-
-							msg.Put("option", name_alias, map[string]interface{}{
-								"action_time": msg.Time(), "order": m.Option("componet_name_order"), "cmd": args,
-							}).Cmd("aaa.auth", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
-						}
+					} else {
+						msg = m
 					}
 
 					// 添加响应
 					if msg.Appends("directory") {
 						m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
 						return
-					}
-
-					if accept_json {
+					} else if accept_json {
 						list = append(list, msg.Meta)
 					} else if val["template"] != nil {
 						m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))

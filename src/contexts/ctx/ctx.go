@@ -1067,6 +1067,10 @@ func (m *Message) Table(cbs ...func(maps map[string]string, list []string, line 
 	}
 	for i := 0; i < len(m.Meta[m.Meta["append"][0]]); i++ {
 		for _, k := range m.Meta["append"] {
+			if i >= len(m.Meta[k]) {
+				m.Meta[k] = append(m.Meta[k], "")
+			}
+
 			data := m.Meta[k][i]
 			if len(data) > width[k] {
 				width[k] = len(data)
@@ -3372,6 +3376,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				m.Set("result")
 
 				// 解析
+				if len(m.Meta["append"]) == 0 {
+					return
+				}
 				nrow := len(m.Meta[m.Meta["append"][0]])
 				keys := []string{}
 				for i := 0; i < nrow; i++ {

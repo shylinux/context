@@ -118,7 +118,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"display_result": "",
 				},
 				// map[string]interface{}{"componet_name": "download", "componet_help": "download", "template": "componet",
-				// 	"componet_ctx": "cli.shy", "componet_cmd": "source", "arguments": []interface{}{"@cmds"},
+				// 	"componet_ctx": "cli.shy", "componet_cmd": "source", "arguments": []interface{}{"@cmds"},,
 				// 	"display_result": "", "download_file": "",
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "text", "name": "download_file", "value": "data_2006_0102_1504.txt", "class": "file_name"},

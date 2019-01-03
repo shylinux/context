@@ -980,7 +980,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 			}
 		}},
-		"key": &ctx.Command{Name: "key [filename]", Help: "导出私钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"keys": &ctx.Command{Name: "keys [filename]", Help: "导出私钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
 				private := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(aaa.private)}))
 				if m.Echo(private); len(arg) > 0 {
