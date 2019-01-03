@@ -70,7 +70,7 @@ DOTS=etc/dotsfile
 back_dotsfile:
 	cp ~/.zshrc $(DOTS)
 	cp ~/.tmux.conf $(DOTS)
-	cp ~/context/.git/hooks/post-commit $(DOTS)/git_hooks
+	# cp ~/context/.git/hooks/post-commit $(DOTS)/git_hooks
 	cp ~/.vimrc $(DOTS)
 	cp ~/.vim/syntax/shy.vim $(DOTS)
 

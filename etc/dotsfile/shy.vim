@@ -10,9 +10,9 @@ syn match   shOperator			"\~[-_a-zA-Z0-9\.]\+\>"
 syn match   shShellVariables	"\$[-_a-zA-Z0-9]\+\>"
 syn match   shShellVariables	"@[-_a-zA-Z0-9]\+\>"
 
-syn keyword shStatement break cd chdir continue eval exec exit kill newgrp pwd read readonly shift trap ulimit umask wait
+" syn keyword shStatement break cd chdir continue eval exec exit kill newgrp pwd read readonly shift trap ulimit umask wait
 
-syn keyword shStatement if else elif end for
+" syn keyword shStatement if else elif end for
 
 " ctx command
 syn match   shStatement "\(^\|\t\|  \|$(\)cache"
@@ -28,8 +28,10 @@ syn match   shStatement "\(^\|\t\|  \|$(\)source"
 syn match   shCommand "\(^\|\t\|  \|$(\)alias"
 
 " aaa command
-syn match   shCommand "\(^\|\t\|  \|$(\)login"
-syn match   shCommand "\(^\|\t\|  \|$(\)right"
+syn match   shCommand "\(^\|\t\|  \|$(\)hash"
+syn match   shCommand "\(^\|\t\|  \|$(\)auth"
+syn match   shOperator "\<\(data\|ship\|role\)\>"
+syn match   shSubCommand "\<\(username\|userrole\|componet\|command\)\>"
 
 " web command
 syn match   shCommand "\(^\|\t\|  \|$(\)serve"
@@ -49,6 +51,7 @@ hi def link shOperator			Operator
 hi def link shShellVariables	PreProc
 hi def link shStatement			Statement
 hi def link shCommand 	 		Identifier
+hi def link shSubCommand 		String
 
 hi def link shArithmetic		Special
 hi def link shCharClass  		Identifier

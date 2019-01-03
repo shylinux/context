@@ -71,6 +71,7 @@ let g:syntastic_quiet_messages = { "regex": [
             \ "Too many local variables",
             \ "Too many branches",
             \ "Too many statements",
+            \ "Too many return statements",
             \ "Line Too Long",
             \ "defined outside __init__",
             \ "Catching too general exception Exception",
@@ -145,31 +146,14 @@ set splitbelow
 set splitright
 
 autocmd BufReadPost * normal `"
+autocmd BufNewFile,BufReadPost *.shy set filetype=shy
+autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s
 autocmd BufNewFile,BufReadPost *.conf set filetype=nginx
-
-autocmd BufNewFile,BufReadPost *.go call Config("go")
-autocmd BufNewFile,BufReadPost *.sh call Config("sh")
-autocmd BufNewFile,BufReadPost *.shy call Config("shy")
-autocmd BufNewFile,BufReadPost *.py call Config("py")
-autocmd BufNewFile,BufReadPost *.js call Config("js")
-
-fun! Config(language)
-    if a:language == "go"
-        set foldmethod=syntax
-        set foldnestmax=3
-    elseif a:language == "sh"
-    elseif a:language == "shy"
-        set filetype=shy
-        set commentstring=#%s
-    elseif a:language == "py"
-    elseif a:language == "js"
-        let g:javaScript_fold=1
-        set syntax=javaScript
-        set foldmethod=syntax
-    endif
-endfun
+autocmd BufNewFile,BufReadPost *.go set foldmethod=syntax
+autocmd BufNewFile,BufReadPost *.json set foldmethod=syntax
 
 command! RR wa | source ~/.vimrc |e
+command! SS mksession! etc/session.vim
 source ~/.vim_local
 
 let g:colorscheme=1
