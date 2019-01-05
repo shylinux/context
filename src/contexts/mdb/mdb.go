@@ -73,8 +73,142 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 		"csv_col_sep": &ctx.Config{Name: "字段分隔符", Value: "\t", Help: "字段分隔符"},
 		"csv_row_sep": &ctx.Config{Name: "记录分隔符", Value: "\n", Help: "记录分隔符"},
+
+		"temp":      &ctx.Config{Name: "temp", Value: map[string]interface{}{}, Help: "缓存数据"},
+		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
 	},
 	Commands: map[string]*ctx.Command{
+		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			if len(arg) > 2 { // 添加数据
+				if temp := m.Confm("temp", arg[0]); temp == nil {
+					h := m.Cmdx("aaa.hash", arg[0], arg[1])
+					m.Confv("temp", h, map[string]interface{}{
+						"create_time": m.Time(), "expire_time": m.Time("60s"),
+						"type": arg[0], "meta": arg[1], "data": m.Optionv(arg[2]),
+					})
+					arg[2], arg = h, arg[2:]
+				}
+			}
+
+			if len(arg) > 1 {
+				if temp, msg := m.Confm("temp", arg[0]), m; temp != nil {
+					hash, arg := arg[0], arg[1:]
+					switch arg[0] {
+					case "node": // 查看节点
+						m.Put("option", "temp", temp).Cmdy("ctx.trans", "temp")
+						return
+					case "ship": //查看链接
+						for k, v := range temp {
+							val := v.(map[string]interface{})
+							m.Add("append", "key", k)
+							m.Add("append", "create_time", val["create_time"])
+							m.Add("append", "type", val["type"])
+							m.Add("append", "meta", val["meta"])
+						}
+						m.Sort("create_time", "time_r").Table()
+						return
+					case "data": // 查看数据
+						arg = arg[1:]
+					}
+
+					trans := strings.Join(append([]string{hash, "data"}, arg...), ".")
+					h := m.Cmdx("aaa.hash", "trans", trans)
+
+					if len(arg) == 0 || temp["type"].(string) == "trans" {
+						h = hash
+					} else { // 转换数据
+						if view := m.Confm("temp", h); view != nil && false { // 加载缓存
+							msg = m.Spawn()
+							switch data := view["data"].(type) {
+							case map[string][]string:
+								msg.Meta = data
+							case map[string]interface{}:
+								for k, v := range data {
+									switch val := v.(type) {
+									case []interface{}:
+										msg.Add("append", k, val)
+									}
+								}
+								m.Confv("temp", []string{h, "data"}, msg.Meta)
+							}
+							temp = view
+						} else { //  添加缓存
+							msg = m.Put("option", "temp", temp["data"]).Cmd("ctx.trans", "temp", arg)
+
+							m.Confv("temp", h, map[string]interface{}{
+								"create_time": m.Time(), "expire_time": m.Time("60s"),
+								"type": "trans", "meta": trans, "data": msg.Meta,
+								"ship": map[string]interface{}{
+									hash: map[string]interface{}{"create_time": m.Time(), "ship": "0", "type": temp["type"], "meta": temp["meta"]},
+								},
+							})
+							m.Confv("temp", []string{hash, "ship", h}, map[string]interface{}{
+								"create_time": m.Time(), "ship": "1", "type": "trans", "meta": trans,
+							})
+							temp = m.Confm("temp", h)
+						}
+					}
+
+					if m.Options("select") { // 过滤数据
+						chain := strings.Join(m.Optionv("select").([]string), " ")
+						hh := m.Cmdx("aaa.hash", "select", chain, h)
+
+						if view := m.Confm("temp", hh); view != nil { // 加载缓存
+							msg = msg.Spawn()
+							switch data := view["data"].(type) {
+							case map[string][]string:
+								msg.Meta = data
+							case map[string]interface{}:
+								for k, v := range data {
+									switch val := v.(type) {
+									case []interface{}:
+										msg.Add("append", k, val)
+									}
+								}
+								m.Confv("temp", []string{h, "data"}, msg.Meta)
+							}
+						} else { // 添加缓存
+							msg = msg.Spawn().Copy(msg, "append").Cmd("select", m.Optionv("select"))
+
+							m.Confv("temp", hh, map[string]interface{}{
+								"create_time": m.Time(), "expire_time": m.Time("60s"),
+								"type": "select", "meta": chain, "data": msg.Meta,
+								"ship": map[string]interface{}{
+									h: map[string]interface{}{"create_time": m.Time(), "ship": "0", "type": temp["type"], "meta": temp["meta"]},
+								},
+							})
+
+							m.Confv("temp", []string{h, "ship", hh}, map[string]interface{}{
+								"create_time": m.Time(), "ship": "1", "type": "select", "meta": chain,
+							})
+						}
+					}
+
+					msg.CopyTo(m)
+					return
+				}
+			}
+
+			arg, h := ctx.Slice(arg)
+			if h != "" {
+				if temp := m.Confm("temp", h); temp != nil {
+					m.Echo(h)
+					return
+				}
+			}
+
+			// 缓存列表
+			m.Confm("temp", func(key string, temp map[string]interface{}) {
+				if len(arg) == 0 || strings.HasPrefix(key, arg[0]) || strings.HasSuffix(key, arg[0]) || (temp["type"].(string) == arg[0] && (len(arg) == 1 || strings.Contains(temp["meta"].(string), arg[1]))) {
+					m.Add("append", "key", key)
+					m.Add("append", "create_time", temp["create_time"])
+					m.Add("append", "type", temp["type"])
+					m.Add("append", "meta", temp["meta"])
+				}
+			})
+			m.Sort("create_time", "time_r").Table().Cmd("select", m.Optionv("select"))
+		}},
+
 		"open": &ctx.Command{Name: "open [database [username [password [address [protocol [driver]]]]]]",
 			Help: "open打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 服务地址, protocol: 服务协议, driver: 数据库类型",
 			Form: map[string]int{"dbname": 1, "dbhelp": 1},

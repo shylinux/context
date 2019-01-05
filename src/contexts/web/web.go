@@ -568,10 +568,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					var result interface{}
-					defer func() {
-						m.Target().Configs[m.Confx("body_response")] = &ctx.Config{Value: result}
-						m.Log("info", "cache %s", m.Confx("body_response"))
-					}()
 
 					if m.Has("save") {
 						p := m.Option("save")
@@ -594,6 +590,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					switch {
 					case strings.HasPrefix(ct, "application/json"):
 						json.NewDecoder(res.Body).Decode(&result)
+						m.Put("option", "data", result).Cmd("mdb.temp", "url", req.URL.String(), "data")
+
 						if m.Has("parse") {
 							msg := m.Spawn().Put("option", "data", result).Cmd("trans", "data", m.Option("parse"))
 							m.Copy(msg, "append").Copy(msg, "result")
@@ -1106,11 +1104,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				// 会话检查
 				if m.Options("right", !m.Confs("login_right") || !m.Confs("componet", "login")) {
+					m.Log("info", "no limit")
 					// 禁用权限
 				} else if username := m.Option("username", m.Cmd("web.session").Append("username")); username == "" { // 用户登录
+					m.Log("info", "no user")
 					group, order = m.Option("componet_group", "login"), m.Option("componet_name", "")
 					m.Option("right", "true")
+					if m.Options("bench") && !m.Cmds("aaa.work", m.Option("bench")) {
+						m.Append("redirect", merge(m, m.Option("index_url"), "bench", ""))
+						return
+					}
 				} else if group == "login" { // 登录成功
+					m.Log("info", "no login")
 					return
 				} else if !m.Options("bench") || !m.Cmds("aaa.work", m.Option("bench")) { // 创建空间
 					m.Append("redirect", merge(m, m.Option("index_url"), "bench", m.Cmdx("aaa.work", m.Option("sessid"), "create", "web")))
@@ -1197,14 +1202,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 									"action_time": msg.Time(), "order": m.Option("componet_name_order"), "cmd": args,
 								}).Cmd("aaa.auth", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
 							}
+							m.Log("what", "------%vv", msg.Append("directory"))
 						}
 					} else {
 						msg = m
 					}
 
+					m.Log("what", "------%vv", msg.Append("directory"))
 					// 添加响应
 					if msg.Appends("directory") {
+						m.Log("what", "------%vv", msg.Append("directory"))
 						m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
+						m.Log("what", "------%vv", msg.Append("directory"))
 						return
 					} else if accept_json {
 						list = append(list, msg.Meta)

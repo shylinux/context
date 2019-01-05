@@ -1,39 +1,99 @@
 package ctx
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"errors"
 	"io"
 	"math/rand"
 	"os"
-	"regexp"
 	"runtime/debug"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 )
 
-type LOGGER interface {
-	LOG(*Message, string, string)
-}
-
-func Right(arg interface{}) bool {
-	switch str := arg.(type) {
-	case nil:
-		return false
-	case bool:
-		return str
-	case string:
-		switch str {
-		case "", "0", "false", "off", "no", "error: ":
-			return false
+func Int(arg ...interface{}) int {
+	result := 0
+	for _, v := range arg {
+		switch val := v.(type) {
+		case int:
+			result += val
+		case bool:
+			if val {
+				result += 1
+			}
+		case string:
+			if i, e := strconv.Atoi(val); e == nil {
+				result += i
+			}
+		default:
 		}
-		return true
 	}
-	return false
+	return result
+}
+func Right(arg ...interface{}) bool {
+	result := false
+	for _, v := range arg {
+		switch val := v.(type) {
+		case int:
+			result = result || val != 0
+		case bool:
+			result = result || val
+		case string:
+			switch val {
+			case "", "0", "false", "off", "no", "error: ":
+				result = result || false
+				break
+			}
+			result = result || true
+		case error:
+			result = result || false
+		default:
+			result = result || val != nil
+		}
+	}
+	return result
+}
+func Format(arg ...interface{}) string {
+	result := []string{}
+	for _, v := range arg {
+		switch val := v.(type) {
+		case nil:
+			result = result[:0]
+		case uint, uint8, uint16, uint32, uint64:
+			result = append(result, fmt.Sprintf("%d", val))
+		case int, int8, int16, int32, int64:
+			result = append(result, fmt.Sprintf("%d", val))
+		case bool:
+			result = append(result, fmt.Sprintf("%t", val))
+		case string:
+			result = append(result, val)
+		case float64:
+			result = append(result, fmt.Sprintf("%d", int(val)))
+		case time.Time:
+			result = append(result, fmt.Sprintf("%d", val.Unix()))
+		default:
+			if b, e := json.Marshal(val); e == nil {
+				result = append(result, string(b))
+			}
+		}
+	}
+
+	if len(result) > 1 {
+		if n := strings.Count(result[0], "%") - strings.Count(result[0], "%%"); len(result) > n+1 {
+			return fmt.Sprintf(result[0], result[1:n+1]) + strings.Join(result[n+1:], "")
+		} else if len(result) == n+1 {
+			return fmt.Sprintf(result[0], result[1:])
+		}
+	}
+	return strings.Join(result, "")
 }
 func Trans(arg ...interface{}) []string {
 	ls := []string{}
@@ -45,190 +105,230 @@ func Trans(arg ...interface{}) []string {
 			} else {
 				ls = append(ls, val.Meta["detail"]...)
 			}
-		case string:
-			ls = append(ls, val)
-		case bool:
-			ls = append(ls, fmt.Sprintf("%t", val))
-		case int, int8, int16, int32, int64:
-			ls = append(ls, fmt.Sprintf("%d", val))
-		case float64:
-			ls = append(ls, fmt.Sprintf("%d", int(val)))
-		case []interface{}:
+		case []float64:
 			for _, v := range val {
-				switch val := v.(type) {
-				case string:
-					ls = append(ls, val)
-				case bool:
-					ls = append(ls, fmt.Sprintf("%t", val))
-				case int, int8, int16, int32, int64:
-					ls = append(ls, fmt.Sprintf("%d", val))
-				}
-			}
-		case []string:
-			ls = append(ls, val...)
-		case []bool:
-			for _, v := range val {
-				ls = append(ls, fmt.Sprintf("%t", v))
+				ls = append(ls, fmt.Sprintf("%d", int(v)))
 			}
 		case []int:
 			for _, v := range val {
 				ls = append(ls, fmt.Sprintf("%d", v))
 			}
-		case nil:
+		case []bool:
+			for _, v := range val {
+				ls = append(ls, fmt.Sprintf("%t", v))
+			}
+		case []string:
+			ls = append(ls, val...)
+		case map[string]string:
+			for k, v := range val {
+				ls = append(ls, k, v)
+			}
+		case map[string]interface{}:
+			for k, v := range val {
+				ls = append(ls, k, Format(v))
+			}
+		case []interface{}:
+			ls = append(ls, Format(val...))
 		default:
-			ls = append(ls, fmt.Sprintf("%v", val))
+			ls = append(ls, Format(val))
 		}
 	}
 	return ls
 }
-func Chain(m *Message, data interface{}, args ...interface{}) interface{} {
-	// if len(args) == 1 {
-	// 	if arg, ok := args[0].([]string); ok {
-	// 		args = args[:0]
-	// 		for _, v := range arg {
-	// 			args = append(args, v)
-	// 		}
-	// 	}
-	// }
-	//
-	root := data
+func Chain(m *Message, root interface{}, args ...interface{}) interface{} {
 	for i := 0; i < len(args); i += 2 {
-		var parent interface{}
-		parent_key, parent_index := "", 0
-		data, root = root, nil
-
-		keys := []string{}
-		switch arg := args[i].(type) {
-		case map[string]interface{}:
-			args = args[:0]
+		if arg, ok := args[i].(map[string]interface{}); ok {
+			argn := []interface{}{}
 			for k, v := range arg {
-				args = append(args, k, v)
+				argn = append(argn, k, v)
 			}
-			i = -2
+			argn = append(argn, args[i+1:])
+			args, i = argn, -2
 			continue
-		case []interface{}:
-			keys = []string{}
-			for _, v := range arg {
-				keys = append(keys, fmt.Sprintf("%v", v))
-			}
-		case []string:
-			keys = arg
-			keys = strings.Split(strings.Join(arg, "."), ".")
-		case string:
-			keys = strings.Split(arg, ".")
-		case nil:
-			continue
-		default:
-			keys = append(keys, fmt.Sprintf("%v", arg))
 		}
 
-		for j, k := range keys {
+		var parent interface{}
+		parent_key, parent_index := "", 0
+
+		keys := []string{}
+		for _, v := range Trans(args[i]) {
+			keys = append(keys, strings.Split(v, ".")...)
+		}
+
+		data := root
+		for j, key := range keys {
+			index, e := strconv.Atoi(key)
+
+			var next interface{}
 			switch value := data.(type) {
 			case nil:
+				if j == len(keys)-1 {
+					next = args[i+1]
+				}
+
 				if i == len(args)-1 {
 					return nil
 				}
 
-				if _, e := strconv.Atoi(k); e == nil {
-					node := []interface{}{nil}
-					switch p := parent.(type) {
-					case map[string]interface{}:
-						p[parent_key] = node
-					case []interface{}:
-						p[parent_index] = node
-					}
-					if data, parent_index = node, 0; j == len(keys)-1 {
-						node[0] = args[i+1]
-					}
+				if e == nil {
+					data, index = []interface{}{next}, 0
 				} else {
-					node := map[string]interface{}{}
-					switch p := parent.(type) {
-					case map[string]interface{}:
-						p[parent_key] = node
-					case []interface{}:
-						p[parent_index] = node
-					}
-					if data, parent_key = node, k; j == len(keys)-1 {
-						node[k] = args[i+1]
-					}
+					data = map[string]interface{}{key: next}
 				}
-
-				parent, data = data, nil
 			case []string:
-				if index, e := strconv.Atoi(k); e == nil {
-					index = (index+2+len(value)+2)%(len(value)+2) - 2
+				index = (index+2+len(value)+2)%(len(value)+2) - 2
+
+				if j == len(keys)-1 {
 					if i == len(args)-1 {
 						if index < 0 {
 							return ""
 						}
 						return value[index]
 					}
-					switch index {
-					case -1:
-						return append([]string{args[i+1].(string)}, value...)
-					case -2:
-						return append(value, args[i+1].(string))
-					default:
-						value[index] = args[i+1].(string)
-					}
+					next = args[i+1]
 				}
 
-			case map[string]string:
-				if i == len(args)-1 {
-					return value[k]
+				if index == -1 {
+					data, index = append([]string{Format(next)}, value...), 0
+				} else {
+					data, index = append(value, Format(next)), len(value)
 				}
-				value[k] = args[i+1].(string)
+				next = value[index]
+			case map[string]string:
+				if j == len(keys)-1 {
+					if i == len(args)-1 {
+						return value[key] // 读取数据
+					}
+					value[key] = Format(next) // 修改数据
+				}
+				next = value[key]
 			case map[string]interface{}:
 				if j == len(keys)-1 {
 					if i == len(args)-1 {
-						return value[k]
+						return value[key] // 读取数据
 					}
-					value[k] = args[i+1]
+					value[key] = args[i+1] // 修改数据
 				}
-				parent, data, parent_key = data, value[k], k
+				next = value[key]
 			case []interface{}:
-				index, e := strconv.Atoi(k)
-				if e != nil {
-					return nil
-				}
 				index = (index+2+len(value)+2)%(len(value)+2) - 2
 
-				if i == len(args)-1 {
-					if index < 0 {
-						return nil
+				if j == len(keys)-1 {
+					if i == len(args)-1 {
+						if index < 0 {
+							return nil
+						}
+						return value[index] // 读取数据
 					}
-					if j == len(keys)-1 {
-						return value[index]
-					}
-				} else {
-					if index == -1 {
-						value = append([]interface{}{nil}, value...)
-						index = 0
-					} else if index == -2 {
-						value = append(value, nil)
-						index = len(value) - 1
-					}
+					next = args[i+1] // 修改数据
+				}
 
-					if j == len(keys)-1 {
-						value[index] = args[i+1]
-					}
+				if index == -1 {
+					data, index = append([]interface{}{next}, value...), 0
+				} else if index == -2 {
+					data, index = append(value, next), len(value)
+				} else if j == len(keys)-1 {
+					value[index] = next
 				}
-				switch p := parent.(type) {
-				case map[string]interface{}:
-					p[parent_key] = value
-				case []interface{}:
-					p[parent_index] = value
-				}
-				parent, data, parent_index = value, value[index], index
+				next = value[index]
 			}
 
-			if root == nil {
-				root = parent
+			switch p := parent.(type) {
+			case map[string]interface{}:
+				p[parent_key] = data
+			case []interface{}:
+				p[parent_index] = data
+			case nil:
+				root = data
 			}
+
+			parent, data = data, next
+			parent_key, parent_index = key, index
 		}
 	}
 
 	return root
+}
+
+func Action(cmd string, arg ...interface{}) string {
+	switch cmd {
+	case "time":
+		return Format(time.Now())
+	case "rand":
+		return Format(rand.Int())
+	case "uniq":
+		return Format(time.Now(), rand.Int())
+	default:
+		if len(arg) > 0 {
+			return Format(arg...)
+		}
+	}
+	return cmd
+}
+func Hash(arg ...interface{}) (string, []string) {
+	meta := Trans(arg...)
+	for i, v := range meta {
+		meta[i] = Action(v)
+	}
+
+	h := md5.Sum([]byte(strings.Join(meta, "")))
+	return hex.EncodeToString(h[:]), meta
+}
+
+func Array(list []string, index int, arg ...interface{}) []string {
+	if len(arg) == 0 {
+		if -1 < index && index < len(list) {
+			return []string{list[index]}
+		}
+		return []string{""}
+	}
+
+	str := Trans(arg...)
+
+	index = (index+2)%(len(list)+2) - 2
+	if index == -1 {
+		list = append(str, list...)
+	} else if index == -2 {
+		list = append(list, str...)
+	} else {
+		if index < -2 {
+			index += len(list) + 2
+		}
+		if index < 0 {
+			index = 0
+		}
+
+		for i := len(list); i < index+len(str); i++ {
+			list = append(list, "")
+		}
+		for i := 0; i < len(str); i++ {
+			list[index+i] = str[i]
+		}
+	}
+
+	return list
+}
+func Slice(arg []string, args ...interface{}) ([]string, string) {
+	if len(arg) == 0 {
+		return arg, ""
+	}
+	if len(args) == 0 {
+		return arg[1:], arg[0]
+	}
+
+	result := ""
+	switch v := args[0].(type) {
+	case int:
+	case string:
+		if arg[0] == v && len(arg) > 1 {
+			return arg[2:], arg[1]
+		}
+		if len(args) > 1 {
+			return arg, Format(args[1])
+		}
+	}
+
+	return arg, result
 }
 func Elect(last interface{}, args ...interface{}) string {
 	if len(args) > 0 {
@@ -264,39 +364,8 @@ func Elect(last interface{}, args ...interface{}) string {
 	return ""
 }
 
-func Array(m *Message, list []string, index int, arg ...interface{}) []string {
-	if len(arg) == 0 {
-		if -1 < index && index < len(list) {
-			return []string{list[index]}
-		}
-		return []string{""}
-	}
-
-	index = (index+2)%(len(list)+2) - 2
-
-	str := Trans(arg...)
-
-	if index == -1 {
-		index, list = 0, append(str, list...)
-	} else if index == -2 {
-		index, list = len(list), append(list, str...)
-	} else {
-		if index < -2 {
-			index += len(list) + 2
-		}
-		if index < 0 {
-			index = 0
-		}
-
-		for i := len(list); i < index+len(str); i++ {
-			list = append(list, "")
-		}
-		for i := 0; i < len(str); i++ {
-			list[index+i] = str[i]
-		}
-	}
-
-	return list
+type LOGGER interface {
+	LOG(*Message, string, string)
 }
 
 type Cache struct {
@@ -540,13 +609,22 @@ func (m *Message) Code() int {
 	return m.code
 }
 func (m *Message) Time(arg ...interface{}) string {
+	t := m.time
+
+	if len(arg) > 0 {
+		if d, e := time.ParseDuration(arg[0].(string)); e == nil {
+			arg = arg[1:]
+			t.Add(d)
+		}
+	}
+
 	str := m.Conf("time_format")
 	if len(arg) > 1 {
 		str = fmt.Sprintf(arg[0].(string), arg[1:]...)
 	} else if len(arg) > 0 {
 		str = fmt.Sprintf("%v", arg[0])
 	}
-	return m.time.Format(str)
+	return t.Format(str)
 }
 func (m *Message) Message() *Message {
 	return m.message
@@ -1368,7 +1446,15 @@ func (m *Message) Options(key string, arg ...interface{}) bool {
 }
 func (m *Message) Optionv(key string, arg ...interface{}) interface{} {
 	if len(arg) > 0 {
-		m.Put("option", key, arg[0])
+		switch arg[0].(type) {
+		case nil:
+		// case []string:
+		// 	m.Option(key, v...)
+		// case string:
+		// 	m.Option(key, v)
+		default:
+			m.Put("option", key, arg[0])
+		}
 	}
 
 	for msg := m; msg != nil; msg = msg.message {
@@ -1420,7 +1506,7 @@ func (m *Message) Appendi(key string, arg ...interface{}) int {
 	return i
 }
 func (m *Message) Appends(key string, arg ...interface{}) bool {
-	return len(m.Meta["append"]) > 0 && Right(m.Append(key, arg...))
+	return Right(m.Append(key, arg...))
 }
 func (m *Message) Appendv(key string, arg ...interface{}) interface{} {
 	if len(arg) > 0 {
@@ -1553,6 +1639,17 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 					if args := []string{}; x.Form != nil {
 						for i := 0; i < len(arg); i++ {
 							n, ok := x.Form[arg[i]]
+							if n == -1 {
+								j := i + 1
+								for ; j < len(arg); j++ {
+									if _, ok := x.Form[arg[j]]; ok {
+										break
+									}
+									m.Add("option", arg[i], arg[j])
+								}
+								i = j - 1
+								continue
+							}
 							if !ok {
 								args = append(args, arg[i])
 								continue
@@ -2462,7 +2559,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 		"table_row_sep": &Config{Name: "table_row_sep", Value: "\n", Help: "命令列表帮助"},
 
 		"page_offset": &Config{Name: "page_offset", Value: "0", Help: "列表偏移"},
-		"page_limit":  &Config{Name: "page_limit", Value: "100", Help: "列表大小"},
+		"page_limit":  &Config{Name: "page_limit", Value: "10", Help: "列表大小"},
 
 		"time_format": &Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 	},
@@ -2553,7 +2650,15 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							continue
 						}
 						if len(arg) > 1 && k == arg[1] {
-							m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
+							switch help := v.Help.(type) {
+							case []string:
+								m.Echo("%s: %s\n", k, v.Name)
+								for _, v := range help {
+									m.Echo("  %s\n", v)
+								}
+							case string:
+								m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
+							}
 							for k, v := range v.Form {
 								m.Echo("  option: %s(%d)\n", k, v)
 							}
@@ -2722,13 +2827,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 
 					if len(arg) > 1 {
-						msg.Meta[k] = Array(m, msg.Meta[k], index, arg[1:])
+						msg.Meta[k] = Array(msg.Meta[k], index, arg[1:])
 						m.Echo("%v", msg.Meta[k])
 						return
 					}
 
 					if index != -100 {
-						m.Echo(Array(m, msg.Meta[k], index)[0])
+						m.Echo(Array(msg.Meta[k], index)[0])
 						return
 					}
 
@@ -2794,13 +2899,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 
 					if len(arg) > 1 {
-						msg.Meta[k] = Array(m, msg.Meta[k], index, arg[1:])
+						msg.Meta[k] = Array(msg.Meta[k], index, arg[1:])
 						m.Echo("%v", msg.Meta[k])
 						return
 					}
 
 					if index != -100 {
-						m.Echo(Array(m, msg.Meta[k], index)[0])
+						m.Echo(Array(msg.Meta[k], index)[0])
 						return
 					}
 
@@ -3293,10 +3398,55 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 			}},
 
-		"trans": &Command{Name: "trans key [index]", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) {
-			value := m.Optionv(arg[0])
-			if len(arg) > 1 && arg[1] != "" {
-				value = Chain(m, value, arg[1])
+		"trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) {
+			value, arg := m.Optionv(arg[0]), arg[1:]
+
+			view := "data"
+			if len(arg) > 0 {
+				switch arg[0] {
+				case "type", "data", "json":
+					view, arg = arg[0], arg[1:]
+				}
+			}
+
+			limit := m.Confi("page_limit")
+			if len(arg) > 0 && arg[0] == "limit" {
+				limit, arg = Int(arg[1]), arg[2:]
+			}
+
+			chain := strings.Join(arg, ".")
+			if chain != "" {
+				value = Chain(m, value, chain)
+			}
+
+			switch view {
+			case "type": // 查看数据类型
+				switch value := value.(type) {
+				case map[string]interface{}:
+					for k, v := range value {
+						m.Add("append", "key", k)
+						m.Add("append", "type", fmt.Sprintf("%T", v))
+					}
+					m.Sort("key", "str").Table()
+				case []interface{}:
+					for k, v := range value {
+						m.Add("append", "key", k)
+						m.Add("append", "type", fmt.Sprintf("%T", v))
+					}
+					m.Sort("key", "int").Table()
+				case nil:
+				default:
+					m.Add("append", "key", chain)
+					m.Add("append", "type", fmt.Sprintf("%T", value))
+					m.Sort("key", "str").Table()
+				}
+				return
+			case "data":
+			case "json": // 查看文本数据
+				b, e := json.MarshalIndent(value, "", " ")
+				m.Assert(e)
+				m.Echo(string(b))
+				return
 			}
 
 			switch val := value.(type) {
@@ -3323,33 +3473,58 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 				}
 				m.Sort("key", "str").Table()
 			case []interface{}:
+				fields := map[string]int{}
 				for i, v := range val {
+					if i >= limit {
+						break
+					}
 					switch val := v.(type) {
 					case map[string]interface{}:
-						for k, v := range val {
-							switch value := v.(type) {
-							case string:
-								m.Add("append", k, value)
-							case float64:
-								m.Add("append", k, fmt.Sprintf("%d", int(value)))
-							default:
-								b, _ := json.Marshal(value)
-								m.Add("append", k, fmt.Sprintf("%v", string(b)))
+						for k, _ := range val {
+							fields[k]++
+						}
+					}
+				}
+
+				if len(fields) > 0 {
+					for i, v := range val {
+						if i >= limit {
+							break
+						}
+						switch val := v.(type) {
+						case map[string]interface{}:
+							for k, _ := range fields {
+								switch value := val[k].(type) {
+								case nil:
+									m.Add("append", k, "")
+								case string:
+									m.Add("append", k, value)
+								case float64:
+									m.Add("append", k, fmt.Sprintf("%d", int(value)))
+								default:
+									b, _ := json.Marshal(value)
+									m.Add("append", k, fmt.Sprintf("%v", string(b)))
+								}
 							}
 						}
-					case string:
-						m.Add("append", "index", i)
-						m.Add("append", "value", val)
-					case float64:
-						m.Add("append", "index", i)
-						m.Add("append", "value", fmt.Sprintf("%v", int(val)))
-					case nil:
-						m.Add("append", "index", i)
-						m.Add("append", "value", "")
-					default:
-						m.Add("append", "index", i)
-						b, _ := json.Marshal(val)
-						m.Add("append", "value", fmt.Sprintf("%v", string(b)))
+					}
+				} else {
+					for i, v := range val {
+						switch val := v.(type) {
+						case nil:
+							m.Add("append", "index", i)
+							m.Add("append", "value", "")
+						case string:
+							m.Add("append", "index", i)
+							m.Add("append", "value", val)
+						case float64:
+							m.Add("append", "index", i)
+							m.Add("append", "value", fmt.Sprintf("%v", int(val)))
+						default:
+							m.Add("append", "index", i)
+							b, _ := json.Marshal(val)
+							m.Add("append", "value", fmt.Sprintf("%v", string(b)))
+						}
 					}
 				}
 				m.Table()
@@ -3370,10 +3545,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 			}
 		}},
 		"select": &Command{Name: "select key value field",
-			Form: map[string]int{"parse": 2, "group": 1, "order": 2, "limit": 1, "offset": 1, "fields": 1, "format": 2, "trans_map": 3, "vertical": 0, "hide": 1},
+			Form: map[string]int{"parse": 2, "hide": 1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) {
-				msg := m.Spawn()
-				m.Set("result")
+				msg := m.Set("result").Spawn()
 
 				// 解析
 				if len(m.Meta["append"]) == 0 {
@@ -3436,7 +3610,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 					}
 				}
 
-				// 筛选
+				// 隐藏列
 				hides := map[string]bool{}
 				for _, k := range m.Meta["hide"] {
 					hides[k] = true
@@ -3450,6 +3624,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							msg.Add("append", k, m.Meta[k][i])
 						}
 					}
+				}
+
+				// 选择列
+				if m.Option("fields") != "" {
+					msg = m.Spawn()
+					msg.Copy(m, "append", strings.Split(strings.Join(m.Meta["fields"], " "), " ")...)
+					m.Set("append").Copy(msg, "append")
 				}
 
 				// 聚合
@@ -3538,13 +3719,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心",
 							m.Meta[trans[0]][j] = trans[2]
 						}
 					}
-				}
-
-				// 选择列
-				if m.Option("fields") != "" {
-					msg = m.Spawn()
-					msg.Copy(m, "append", strings.Split(m.Option("fields"), " ")...)
-					m.Set("append").Copy(msg, "append")
 				}
 
 				// 格式化
