@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"toolkit"
 )
 
 type AAA struct {
@@ -125,7 +126,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"key":         &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
-		"hash": &ctx.Command{Name: "hash type data... time rand", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"hash": &ctx.Command{Name: "hash type data... time rand", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "hash")
 				return
@@ -159,8 +160,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			m.Log("info", "%s: %v", hs, meta)
 			m.Confv("hash", hs, meta)
 			m.Echo(hs)
+			return
 		}},
-		"auth": &ctx.Command{Name: "auth [id] [[ship] type [meta]] [[data] key [val]] [[node] key [val]]", Help: "权限区块链", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"auth": &ctx.Command{Name: "auth [id] [[ship] type [meta]] [[data] key [val]] [[node] key [val]]", Help: "权限区块链", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 { // 节点列表
 				m.Confm("auth", func(key string, node map[string]interface{}) {
 					up := false
@@ -446,8 +448,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			for _, c := range chain { // 添加链接
 				m.Confv("auth", []interface{}{c["node"], "ship", c["hash"]}, map[string]interface{}{"ship": c["ship"], "type": c["type"], "meta": c["meta"]})
 			}
+			return
 		}},
-		"role": &ctx.Command{Name: "role [name [[componet] componet [[command] command]]]", Help: "用户角色", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"role": &ctx.Command{Name: "role [name [[componet] componet [[command] command]]]", Help: "用户角色", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
 				m.Cmdy("aaa.auth", "ship", "userrole")
@@ -469,8 +472,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 				}
 			}
+			return
 		}},
-		"user": &ctx.Command{Name: "user [role username password] [username]", Help: "用户认证", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"user": &ctx.Command{Name: "user [role username password] [username]", Help: "用户认证", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
 				m.Cmdy("aaa.auth", "ship", "username")
@@ -489,8 +493,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 				}
 			}
+			return
 		}},
-		"sess": &ctx.Command{Name: "sess [sessid [username]]", Help: "会话管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"sess": &ctx.Command{Name: "sess [sessid [username]]", Help: "会话管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
 				m.Cmdy("aaa.auth", "ship", "session")
@@ -520,8 +525,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 				m.Cmdy("aaa.auth", arg[0], "ship", "username", arg[1], arg[2], arg[3])
 			}
+			return
 		}},
-		"work": &ctx.Command{Name: "work [sessid create|select]|[benchid] [right [userrole [componet name [command name [argument name]]]]]", Help: "工作任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"work": &ctx.Command{Name: "work [sessid create|select]|[benchid] [right [userrole [componet name [command name [argument name]]]]]", Help: "工作任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("aaa.auth", "ship", "bench")
 				return
@@ -589,7 +595,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							m.Echo("true")
 							return false
 						}
-						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "componet", arg[3], "check", arg[5]); ctx.Right(cid) {
+						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "componet", arg[3], "check", arg[5]); kit.Right(cid) {
 							m.Cmd("aaa.auth", bid, cid)
 							m.Echo("true")
 							return false
@@ -599,7 +605,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							m.Echo("true")
 							return false
 						}
-						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "check", arg[3]); ctx.Right(cid) {
+						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "check", arg[3]); kit.Right(cid) {
 							m.Cmd("aaa.auth", bid, cid)
 							m.Echo("true")
 							return false
@@ -611,13 +617,14 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			default:
 				m.Cmdx("aaa.auth", bid, "data", arg)
 			}
+			return
 		}},
 
 		"login": &ctx.Command{Name: "login [sessid]|[username password]",
 			Form: map[string]int{"ip": 1, "openid": 1, "cert": 1, "pub": 1, "key": 1},
 			Help: []string{"会话管理", "sessid: 令牌", "username: 账号", "password: 密码",
 				"ip: 主机地址", "openid: 微信登录", "cert: 证书", "pub: 公钥", "key: 私钥"},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if _, ok := c.Server.(*AAA); m.Assert(ok) {
 					method := ""
 					for _, v := range []string{"ip", "openid", "cert", "pub", "key"} {
@@ -626,7 +633,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						}
 					}
 					if method != "" {
-						m.Travel(func(m *ctx.Message, n int) bool {
+						c.Travel(m, func(m *ctx.Message, n int) bool {
 							if n > 0 && m.Cap("method") == method {
 								switch method {
 								case "ip", "openid":
@@ -643,8 +650,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 									}
 								}
 							}
-							return true
-						}, c)
+							return false
+						})
 
 						if m.Results(0) {
 							return
@@ -657,15 +664,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					switch len(arg) {
 					case 2:
-						m.Travel(func(m *ctx.Message, n int) bool {
+						c.Travel(m, func(m *ctx.Message, n int) bool {
 							if n > 0 && m.Cap("method") == "password" && m.Cap("stream") == arg[0] {
 								m.Assert(m.Cap("password") == Password(arg[1]))
 								m.Cap("expire_time", fmt.Sprintf("%d", time.Now().Unix()+int64(m.Confi("expire"))))
 								m.Echo(m.Cap("sessid"))
 								return false
 							}
-							return true
-						}, c)
+							return false
+						})
 
 						if m.Results(0) {
 							m.Append("sessid", m.Result(0))
@@ -690,7 +697,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						return
 					case 1:
 						m.Sess("login", nil)
-						m.Travel(func(m *ctx.Message, n int) bool {
+						c.Travel(m, func(m *ctx.Message, n int) bool {
 							if n > 0 && m.Cap("sessid") == arg[0] {
 								if int64(m.Capi("expire_time")) > time.Now().Unix() {
 									m.Sess("login", m.Target().Message())
@@ -703,21 +710,22 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								return false
 							}
 							return true
-						}, c)
+						})
 					case 0:
-						m.Travel(func(m *ctx.Message, n int) bool {
+						c.Travel(m, func(m *ctx.Message, n int) bool {
 							if n > 0 {
 								m.Add("append", "method", m.Cap("method"))
 								m.Add("append", "stream", m.Cap("stream"))
 							}
-							return true
-						}, c)
+							return false
+						})
 						m.Table()
 					}
 				}
+				return
 			}},
-		"userinfo": &ctx.Command{Name: "userinfo sessid", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Travel(func(m *ctx.Message, n int) bool {
+		"userinfo": &ctx.Command{Name: "userinfo sessid", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			c.Travel(m, func(m *ctx.Message, n int) bool {
 				if m.Cap("sessid") == arg[0] {
 					m.Append("method", m.Cap("method"))
 					m.Append("stream", m.Cap("stream"))
@@ -725,12 +733,13 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Append("login_time", m.Cap("login_time"))
 					m.Append("expire_time", m.Cap("expire_time"))
 				}
-				return true
+				return false
 			})
 			m.Table()
+			return
 		}},
-		"right": &ctx.Command{Name: "right [user [check|owner|share group [order] [add|del]]]", Form: map[string]int{"from": 1}, Help: "权限管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Travel(func(m *ctx.Message, n int) bool {
+		"right": &ctx.Command{Name: "right [user [check|owner|share group [order] [add|del]]]", Form: map[string]int{"from": 1}, Help: "权限管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			c.Travel(m, func(m *ctx.Message, n int) bool {
 				if n == 0 {
 					return true
 				}
@@ -817,9 +826,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 					return false
 				}
-				return true
-			}, c)
+				return false
+			})
 			m.Table()
+			return
 		}},
 
 		"rsa": &ctx.Command{Name: "rsa gen|sign|verify|encrypt|decrypt|cert",
@@ -830,7 +840,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				"签名: rsa sign key content [signfile]",
 				"验签: rsa verify pub content",
 			},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
 					switch arg[0] {
 					case "gen":
@@ -961,16 +971,18 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						m.Echo("%c", c)
 					}
 				}
+				return
 			}},
-		"cert": &ctx.Command{Name: "cert [filename]", Help: "导出证书", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"cert": &ctx.Command{Name: "cert [filename]", Help: "导出证书", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.certificate != nil {
 				certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: aaa.certificate.Raw}))
 				if m.Echo(certificate); len(arg) > 0 {
 					m.Assert(ioutil.WriteFile(arg[0], []byte(certificate), 0666))
 				}
 			}
+			return
 		}},
-		"pub": &ctx.Command{Name: "pub [filename]", Help: "导出公钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"pub": &ctx.Command{Name: "pub [filename]", Help: "导出公钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
 				pub, e := x509.MarshalPKIXPublicKey(aaa.public)
 				m.Assert(e)
@@ -979,16 +991,18 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Assert(ioutil.WriteFile(arg[0], []byte(public), 0666))
 				}
 			}
+			return
 		}},
-		"keys": &ctx.Command{Name: "keys [filename]", Help: "导出私钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"keys": &ctx.Command{Name: "keys [filename]", Help: "导出私钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
 				private := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(aaa.private)}))
 				if m.Echo(private); len(arg) > 0 {
 					m.Assert(ioutil.WriteFile(arg[0], []byte(private), 0666))
 				}
 			}
+			return
 		}},
-		"sign": &ctx.Command{Name: "sign content [signfile]", Help: "数字签名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"sign": &ctx.Command{Name: "sign content [signfile]", Help: "数字签名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
 				h := md5.Sum(Input(arg[0]))
 				b, e := rsa.SignPKCS1v15(crand.Reader, aaa.private, crypto.MD5, h[:])
@@ -999,8 +1013,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
 				}
 			}
+			return
 		}},
-		"verify": &ctx.Command{Name: "verify content signature", Help: "数字验签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"verify": &ctx.Command{Name: "verify content signature", Help: "数字验签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
 				buf := make([]byte, 1024)
 				n, e := base64.StdEncoding.Decode(buf, Input(arg[1]))
@@ -1010,8 +1025,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				h := md5.Sum(Input(arg[0]))
 				m.Echo("%t", rsa.VerifyPKCS1v15(aaa.public, crypto.MD5, h[:], buf) == nil)
 			}
+			return
 		}},
-		"seal": &ctx.Command{Name: "seal content [sealfile]", Help: "数字加密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"seal": &ctx.Command{Name: "seal content [sealfile]", Help: "数字加密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.public != nil {
 				b, e := rsa.EncryptPKCS1v15(crand.Reader, aaa.public, Input(arg[0]))
 				m.Assert(e)
@@ -1021,8 +1037,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
 				}
 			}
+			return
 		}},
-		"deal": &ctx.Command{Name: "deal content", Help: "数字解密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"deal": &ctx.Command{Name: "deal content", Help: "数字解密", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.private != nil {
 				buf := make([]byte, 1024)
 				n, e := base64.StdEncoding.Decode(buf, Input(arg[0]))
@@ -1033,9 +1050,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				m.Assert(e)
 				m.Echo(string(b))
 			}
+			return
 		}},
 
-		"newcipher": &ctx.Command{Name: "newcipher salt", Help: "加密算法", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"newcipher": &ctx.Command{Name: "newcipher salt", Help: "加密算法", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) {
 				salt := md5.Sum(Input(arg[0]))
 				block, e := aes.NewCipher(salt[:])
@@ -1043,8 +1061,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				aaa.encrypt = cipher.NewCBCEncrypter(block, salt[:])
 				aaa.decrypt = cipher.NewCBCDecrypter(block, salt[:])
 			}
+			return
 		}},
-		"encrypt": &ctx.Command{Name: "encrypt content [enfile]", Help: "加密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"encrypt": &ctx.Command{Name: "encrypt content [enfile]", Help: "加密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.encrypt != nil {
 				content := Input(arg[0])
 
@@ -1072,8 +1091,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Assert(ioutil.WriteFile(arg[1], []byte(res), 0666))
 				}
 			}
+			return
 		}},
-		"decrypt": &ctx.Command{Name: "decrypt content [defile]", Help: "解密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"decrypt": &ctx.Command{Name: "decrypt content [defile]", Help: "解密数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if aaa, ok := m.Target().Server.(*AAA); m.Assert(ok) && aaa.decrypt != nil {
 				content := Input(arg[0])
 
@@ -1089,6 +1109,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Assert(ioutil.WriteFile(arg[1], res, 0666))
 				}
 			}
+			return
 		}},
 	},
 }

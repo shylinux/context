@@ -307,7 +307,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	render := m.Target().Commands["/render"]
 	proxy := m.Target().Commands["/proxy/"]
 
-	m.Travel(func(m *ctx.Message, i int) bool {
+	m.Target().Travel(m, func(m *ctx.Message, i int) bool {
 		if h, ok := m.Target().Server.(MUX); ok && m.Cap("register") == "no" {
 			m.Cap("register", "yes")
 
@@ -338,7 +338,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 				h.Handle("/", http.FileServer(http.Dir(m.Cap("directory"))))
 			}
 		}
-		return true
+		return false
 	})
 
 	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: m.Confx("protocol", arg, 2), Help: "服务协议"}
@@ -442,10 +442,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "工作流"},
 	},
 	Commands: map[string]*ctx.Command{
-		"merge": &ctx.Command{Name: "merge", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"merge": &ctx.Command{Name: "merge", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Echo(merge(m, arg[0], arg[1:]...))
+			return
 		}},
-		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			uri, e := url.Parse(arg[0])
 			m.Assert(e)
 			m.Conf("method", "method", "GET", "请求方法")
@@ -463,8 +464,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
 				m.Conf("editor", arg[2])
 			}
+			return
 		}},
-		"cookie": &ctx.Command{Name: "cookie [create]|[name [value]]", Help: "读写浏览器的Cookie, create: 创建cookiejar, name: 变量名, value: 变量值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"cookie": &ctx.Command{Name: "cookie [create]|[name [value]]", Help: "读写浏览器的Cookie, create: 创建cookiejar, name: 变量名, value: 变量值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
 				for k, v := range m.Confv("cookie").(map[string]interface{}) {
@@ -488,11 +490,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Confv("cookie", arg[0], &http.Cookie{Name: arg[0], Value: arg[1]})
 				}
 			}
+			return
 		}},
 		"get": &ctx.Command{Name: "get [method GET|POST] url arg...",
 			Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
 			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "parse": 1, "sub_parse": 3, "save": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 					if m.Has("path_value") {
 						values := []interface{}{}
@@ -553,7 +556,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					res, e := web.Client.Do(req)
 					if e != nil {
 						m.Log("info", "get error %v", e)
-						return
+						return e
 					}
 					m.Assert(e)
 					if m.Confs("logheaders") {
@@ -581,7 +584,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						defer f.Close()
 						m.Log("info", "save file %s %s", p, m.Sess("aaa").Cmd("hash", "file", p).Result(0))
 						m.Echo(p)
-						return
+						return e
 					}
 
 					ct := res.Header.Get("Content-Type")
@@ -595,7 +598,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						if m.Has("parse") {
 							msg := m.Spawn().Put("option", "data", result).Cmd("trans", "data", m.Option("parse"))
 							m.Copy(msg, "append").Copy(msg, "result")
-							return
+							return e
 						}
 						b, _ := json.MarshalIndent(result, "", "  ")
 						result = string(b)
@@ -660,7 +663,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							msg.Put("option", "response", result)
 							msg.Cmd("trans", "response", m.Option("parse"))
 							m.Copy(msg, "append").Copy(msg, "result")
-							return
+							return e
 						}
 						result = string(buf)
 					default:
@@ -670,7 +673,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								header.Add(k, v[0])
 							}
 							io.Copy(w, res.Body)
-							return
+							return e
 						} else {
 							buf, e := ioutil.ReadAll(res.Body)
 							m.Assert(e)
@@ -682,10 +685,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 					m.Echo("%v", result)
 				}
+				return
 			}},
 		"post": &ctx.Command{Name: "post [file fieldname filename]", Help: "post请求",
 			Form: map[string]int{"file": 2, "content_type": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				msg := m.Spawn()
 				parse := "_"
 				if m.Has("file") {
@@ -772,11 +776,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 				msg.Cmd("get", "method", "POST", arg)
 				m.Copy(msg, "result").Copy(msg, "append")
+				return
 			}},
-		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Optionv("request").(*http.Request); ok {
 				action := false
-				m.Travel(func(m *ctx.Message, i int) bool {
+				c.Travel(m, func(m *ctx.Message, i int) bool {
 					for key, v := range m.Target().Commands {
 						method, url := "", ""
 						if strings.HasPrefix(v.Name, "get ") {
@@ -816,12 +821,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			case "linux":
 				m.Spawn().Cmd("open", url)
 			}
+			return
 		}},
 
-		"serve": &ctx.Command{Name: "serve [directory [address [protocol [cert [key]]]]", Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http), cert: 服务证书, key: 服务密钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
-			m.Set("detail", arg...).Target().Start(m)
+		"serve": &ctx.Command{Name: "serve [directory [address [protocol [cert [key]]]]", Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http), cert: 服务证书, key: 服务密钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Set("detail", arg).Target().Start(m)
+			return
 		}},
-		"route": &ctx.Command{Name: "route index content [help]", Help: "添加路由响应, index: 路由, context: 响应, help: 说明", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"route": &ctx.Command{Name: "route index content [help]", Help: "添加路由响应, index: 路由, context: 响应, help: 说明", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mux, ok := m.Target().Server.(MUX); m.Assert(ok) {
 				switch len(arg) {
 				case 0:
@@ -843,23 +850,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if len(arg) > 2 {
 						help = arg[2]
 					}
-					hand := func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+					hand := func(m *ctx.Message, c *ctx.Context, key string, a ...string) (e error) {
 						w := m.Optionv("response").(http.ResponseWriter)
 						template.Must(template.New("temp").Parse(arg[1])).Execute(w, m)
+						return
 					}
 
 					if s, e := os.Stat(arg[1]); e == nil {
 						if s.IsDir() {
 							mux.Handle(arg[0]+"/", http.StripPrefix(arg[0], http.FileServer(http.Dir(arg[1]))))
 						} else if strings.HasSuffix(arg[1], ".shy") {
-							hand = func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+							hand = func(m *ctx.Message, c *ctx.Context, key string, a ...string) (e error) {
 								msg := m.Sess("cli").Cmd("source", arg[1])
 								m.Copy(msg, "result").Copy(msg, "append")
+								return
 							}
 						} else {
-							hand = func(m *ctx.Message, c *ctx.Context, key string, a ...string) {
+							hand = func(m *ctx.Message, c *ctx.Context, key string, a ...string) (e error) {
 								w := m.Optionv("response").(http.ResponseWriter)
 								template.Must(template.ParseGlob(arg[1])).Execute(w, m)
+								return
 							}
 						}
 					}
@@ -875,8 +885,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 			}
+			return
 		}},
-		"template": &ctx.Command{Name: "template [file [directory]]|[name [content]]", Help: "添加模板, content: 模板内容, directory: 模板目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"template": &ctx.Command{Name: "template [file [directory]]|[name [content]]", Help: "添加模板, content: 模板内容, directory: 模板目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				if len(arg) == 0 {
 					for _, v := range web.Template.Templates() {
@@ -908,8 +919,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 				}
 			}
+			return
 		}},
-		"componet": &ctx.Command{Name: "componet [group [order [arg...]]]", Help: "添加组件, group: 组件分组, arg...: 组件参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"componet": &ctx.Command{Name: "componet [group [order [arg...]]]", Help: "添加组件, group: 组件分组, arg...: 组件参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
 				for k, v := range m.Confv("componet").(map[string]interface{}) {
@@ -954,8 +966,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					break
 				}
 			}
+			return
 		}},
-		"session": &ctx.Command{Name: "session [secrete]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"session": &ctx.Command{Name: "session [secrete]", Help: "用户登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			sessid := m.Option("sessid")
 			if sessid == "" || !m.Cmds("aaa.sess", sessid) {
 				if !m.Confs("sess_void") && !m.Options("username") {
@@ -977,8 +990,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 用户角色
 			m.Cmdy("aaa.sess", m.Option("sessid"), "userrole")
 			m.Log("info", "username: %v userrole: %v", m.Meta["username"], m.Meta["userrole"])
+			return
 		}},
-		"bench": &ctx.Command{Name: "bench", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"bench": &ctx.Command{Name: "bench", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			default_com := "default bench"
 			default_cmd := map[string]interface{}{}
 			if len(arg) > 0 && arg[0] == "copy" { // 复制工作流
@@ -1070,9 +1084,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 查看工作流
 			msg := m.Spawn().Put("option", "_cache", bench).Cmd("trans", "_cache", arg[0])
 			m.Copy(msg, "append").Copy(msg, "result")
+			return
 		}},
 
-		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Options("toolkit") {
 				if kit, ok := m.Confv("toolkit", m.Option("toolkit")).(map[string]interface{}); ok {
 					m.Sess("cli").Cmd(kit["cmd"], m.Option("argument")).CopyTo(m)
@@ -1229,8 +1244,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					en.Encode(list)
 				}
 			}
+			return
 		}},
-		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
 			f, h, e := r.FormFile("upload")
 			m.Assert(e)
@@ -1244,20 +1260,23 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			io.Copy(o, f)
 			m.Log("upload", "file: %s", p)
 			m.Append("redirect", m.Option("referer"))
+			return
 		}},
-		"/download/": &ctx.Command{Name: "/download/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/download/": &ctx.Command{Name: "/download/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 			p := m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0)
 			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("hash", "file", p).Result(0))
 			http.ServeFile(w, r, p)
+			return
 		}},
-		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			msg := m.Spawn().Cmd("get", strings.TrimPrefix(key, "/proxy/"), arg)
 			m.Copy(msg, "append").Copy(msg, "result")
+			return
 		}},
 
-		"spide": &ctx.Command{Name: "spide", Help: "spide", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"spide": &ctx.Command{Name: "spide", Help: "spide", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				for k, v := range m.Confv("spide").(map[string]interface{}) {
 					val := v.(map[string]interface{})
@@ -1323,8 +1342,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Copy(msg, "append").Copy(msg, "result")
 			m.Cmd("select", "limit", limit, "offset", offset, "fields", fields)
 
+			return
 		}},
-		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			date := time.Now().Add(time.Hour * 24).Format("2006-01-02")
 			if len(arg) > 0 {
 				date, arg = arg[0], arg[1:]
@@ -1350,6 +1370,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Add("append", "一等座", fields[31])
 			}
 			m.Table()
+			return
 		}},
 	},
 }

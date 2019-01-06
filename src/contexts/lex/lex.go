@@ -282,7 +282,7 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	lex.Configs["compact"] = &ctx.Config{Name: "紧凑模式", Value: "true", Help: "词法状态的共用"}
 
 	if len(arg) > 0 {
-		if _, e := strconv.Atoi(arg[0]); m.Assert(e) {
+		if _, e := strconv.Atoi(arg[0]); e == nil {
 			m.Cap("nlang", arg[0])
 			m.Cap("nline", arg[0])
 		}
@@ -325,12 +325,13 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 		"nhash": &ctx.Config{Name: "nhash", Value: "1", Help: "npage"},
 	},
 	Commands: map[string]*ctx.Command{
-		"spawn": &ctx.Command{Name: "spawn", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"spawn": &ctx.Command{Name: "spawn", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*LEX); m.Assert(ok) {
 				m.Start(fmt.Sprintf("matrix%d", m.Capi("nmat", 1)), "matrix")
 			}
+			return
 		}},
-		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
 				page := lex.index(m, "npage", m.Confx("npage", arg, 2))
 				hash := lex.index(m, "nhash", m.Confx("nhash", arg, 1))
@@ -342,15 +343,17 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 				lex.seed = append(lex.seed, &Seed{page, hash, arg[0]})
 				m.Cap("stream", fmt.Sprintf("%d,%s,%s", m.Capi("nseed", 1), m.Cap("npage"), m.Cap("nhash")))
 			}
+			return
 		}},
-		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
 				page := lex.index(m, "npage", m.Confx("npage", arg, 1))
 				hash, rest, word := lex.parse(m, page, []byte(arg[0]))
 				m.Result(0, hash, string(rest), string(word))
 			}
+			return
 		}},
-		"show": &ctx.Command{Name: "show seed|page|hash|mat", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"show": &ctx.Command{Name: "show seed|page|hash|mat", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
 				if len(arg) == 0 {
 					m.Append("seed", len(lex.seed))
@@ -430,6 +433,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 					m.Table()
 				}
 			}
+			return
 		}},
 	},
 }

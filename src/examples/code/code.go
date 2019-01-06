@@ -208,7 +208,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}, Help: "组件列表"},
 	},
 	Commands: map[string]*ctx.Command{
-		"/counter": &ctx.Command{Name: "/counter", Help: "/counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/counter": &ctx.Command{Name: "/counter", Help: "/counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 {
 				m.Option("name", arg[0])
 			}
@@ -225,11 +225,13 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 			m.Log("info", "%v: %v", m.Option("name"), m.Confv("counter", m.Option("name"), fmt.Sprintf("%d", count)))
 			m.Echo("%d", count)
+			return
 		}},
-		"counter": &ctx.Command{Name: "counter name count", Help: "counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"counter": &ctx.Command{Name: "counter name count", Help: "counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 1 {
 				m.Copy(m.Spawn().Cmd("get", m.Conf("counter_service"), "name", arg[0], "count", arg[1]), "result")
 			}
+			return
 		}},
 	},
 }

@@ -48,7 +48,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		}, Help: "组件列表"},
 	},
 	Commands: map[string]*ctx.Command{
-		"wiki_list": &ctx.Command{Name: "wiki_list sort_field sort_order", Help: "wiki_list", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"wiki_list": &ctx.Command{Name: "wiki_list sort_field sort_order", Help: "wiki_list", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			sort_field, sort_order := "h2", "int_r"
 			if len(arg) > 0 {
 				sort_field, arg = arg[0], arg[1:]
@@ -108,8 +108,9 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				}
 				return true
 			})
+			return
 		}},
-		"wiki_body": &ctx.Command{Name: "wiki_body", Help: "wiki_body", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"wiki_body": &ctx.Command{Name: "wiki_body", Help: "wiki_body", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			which := path.Join(m.Conf("wiki_dir"), m.Confx("wiki_favor", arg, 0))
 			if ls, e := ioutil.ReadFile(which); e == nil {
 
@@ -124,9 +125,10 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				ls = markdown.ToHTML(ls, nil, nil)
 				m.Echo(string(ls))
 			}
+			return
 		}},
 
-		"/wiki_tags": &ctx.Command{Name: "/wiki_tags ", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/wiki_tags": &ctx.Command{Name: "/wiki_tags ", Help: "博客", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 {
 				m.Option("dir", arg[0])
 			}
@@ -193,8 +195,9 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 					yac.Meta = nil
 				}
 			}
+			return
 		}},
-		"/wiki_body": &ctx.Command{Name: "/wiki_body", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/wiki_body": &ctx.Command{Name: "/wiki_body", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			which := path.Join(m.Conf("wiki_dir"), m.Confx("which"))
 			st, _ := os.Stat(which)
 			if ls, e := ioutil.ReadFile(which); e == nil {
@@ -242,7 +245,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 					m.Add("append", "body", string(ls))
 					m.Add("append", "code", "")
 				}
-				return
+				return e
 			}
 
 			if m.Options("query") {
@@ -270,8 +273,9 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 
 			msg := m.Spawn().Cmd("/wiki_list")
 			m.Copy(msg, "append").Copy(msg, "option")
+			return
 		}},
-		"/wiki_list": &ctx.Command{Name: "/wiki_list", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/wiki_list": &ctx.Command{Name: "/wiki_list", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			ls, e := ioutil.ReadDir(path.Join(m.Conf("wiki_dir"), m.Option("which")))
 			m.Option("dir", m.Option("which"))
 			if e != nil {
@@ -305,17 +309,19 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				m.Option("time_format", "2006-01-02 15:04:05")
 				m.Sort("time", "time_r")
 			}
+			return
 		}},
-		"/wiki/": &ctx.Command{Name: "/wiki", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/wiki/": &ctx.Command{Name: "/wiki", Help: "维基", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Option("which", strings.TrimPrefix(key, "/wiki/"))
 			if f, e := os.Stat(path.Join(m.Conf("wiki_dir"), m.Option("which"))); e == nil && !f.IsDir() && (strings.HasSuffix(m.Option("which"), ".json") || strings.HasSuffix(m.Option("which"), ".js") || strings.HasSuffix(m.Option("which"), ".css")) {
 				m.Append("directory", path.Join(m.Conf("wiki_dir"), m.Option("which")))
-				return
+				return e
 			}
 
 			m.Append("template", "wiki")
+			return
 		}},
-		"/wx/": &ctx.Command{Name: "/wx/", Help: "微信", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/wx/": &ctx.Command{Name: "/wx/", Help: "微信", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if !m.Sess("aaa").Cmd("wx").Results(0) {
 				return
 			}
@@ -428,6 +434,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				b, e = xml.Marshal(echo)
 				m.Echo(string(b))
 			}
+			return
 		}},
 	},
 }

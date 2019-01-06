@@ -7,6 +7,7 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"strings"
+	"toolkit"
 )
 
 type MDB struct {
@@ -78,7 +79,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
 	},
 	Commands: map[string]*ctx.Command{
-		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 2 { // 添加数据
 				if temp := m.Confm("temp", arg[0]); temp == nil {
 					h := m.Cmdx("aaa.hash", arg[0], arg[1])
@@ -189,7 +190,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 			}
 
-			arg, h := ctx.Slice(arg)
+			arg, h := kit.Slice(arg)
 			if h != "" {
 				if temp := m.Confm("temp", h); temp != nil {
 					m.Echo(h)
@@ -207,12 +208,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 			})
 			m.Sort("create_time", "time_r").Table().Cmd("select", m.Optionv("select"))
+			return
 		}},
 
 		"open": &ctx.Command{Name: "open [database [username [password [address [protocol [driver]]]]]]",
 			Help: "open打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 服务地址, protocol: 服务协议, driver: 数据库类型",
 			Form: map[string]int{"dbname": 1, "dbhelp": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				dbname := fmt.Sprintf("db%d", m.Capi("nsource", 1))
 				dbhelp := "数据源"
 				if m.Has("dbname") {
@@ -222,8 +224,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					dbname = m.Option("dbhelp")
 				}
 				m.Start(dbname, dbhelp, arg...)
+				return
 			}},
-		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 操作参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 操作参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
 				which := make([]interface{}, 0, len(arg))
 				for _, v := range arg[1:] {
@@ -240,8 +243,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Log("info", "last(%s) nrow(%s)", m.Append("last", id), m.Append("nrow", n))
 				m.Echo("%d", n)
 			}
+			return
 		}},
-		"query": &ctx.Command{Name: "query sql [arg]", Help: "查询数据库, sql: SQL语句, arg: 查询参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"query": &ctx.Command{Name: "query sql [arg]", Help: "查询数据库, sql: SQL语句, arg: 查询参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
 				which := make([]interface{}, 0, len(arg))
 				for _, v := range arg[1:] {
@@ -284,8 +288,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					m.Log("info", "rows(0) cols(0)")
 				}
 			}
+			return
 		}},
-		"db": &ctx.Command{Name: "db [which]", Help: "查看或选择数据库信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"db": &ctx.Command{Name: "db [which]", Help: "查看或选择数据库信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
 				if len(arg) == 0 {
 					msg := m.Spawn().Cmd("query", "show databases")
@@ -302,8 +307,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Assert(m.Spawn().Cmd("exec", fmt.Sprintf("use %s", db)))
 				m.Echo(m.Cap("database", db))
 			}
+			return
 		}},
-		"tab": &ctx.Command{Name: "tab[which [field]]", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"tab": &ctx.Command{Name: "tab[which [field]]", Help: "查看关系表信息，which: 表名, field: 字段名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 				if len(arg) == 0 {
 					msg := m.Spawn().Cmd("query", "show tables")
@@ -326,12 +332,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Copy(msg, "append")
 				m.Table()
 			}
+			return
 		}},
 		"show": &ctx.Command{Name: "show table fields...",
 			Help: "查询数据库, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
 			Form: map[string]int{"like": 2, "eq": 2, "where": 1, "group": 1, "desc": 0, "order": 1, "limit": 1, "offset": 1, "other": -1,
 				"extra_field": 2, "extra_fields": 1, "extra_format": 1, "trans_field": 1, "trans_map": 2},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if _, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 					if len(arg) == 0 {
 						msg := m.Spawn().Cmd("query", "show tables")
@@ -456,15 +463,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					nrow := len(msg.Meta[msg.Meta["append"][0]])
 
 					m.Echo("data: %dx%d ", nrow, ncol)
-					m.Color(31, table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
+					m.Echo(table).Echo(" %s %s %s %s %s %v\n", where, group, order, limit, offset, m.Meta["other"])
 
 					m.Table(func(maps map[string]string, lists []string, line int) bool {
 						for i, v := range lists {
-							if line == -1 {
-								m.Color(32, v)
-							} else {
-								m.Echo(v)
-							}
+							m.Echo(v)
 							if i < len(lists)-1 {
 								m.Echo(m.Conf("csv_col_sep"))
 							}
@@ -473,8 +476,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						return true
 					})
 				}
+				return
 			}},
-		"set": &ctx.Command{Name: "set table [field value] where condition", Help: "查看或选择数据库信息", Form: map[string]int{"where": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"set": &ctx.Command{Name: "set table [field value] where condition", Help: "查看或选择数据库信息", Form: map[string]int{"where": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
 				sql := []string{"update", arg[0], "set"}
 				fields := []string{}
@@ -490,6 +494,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				msg := m.Spawn().Cmd("show", arg[0], fields, "where", m.Option("where"))
 				m.Copy(msg, "result").Copy(msg, "append")
 			}
+			return
 		}},
 	},
 }

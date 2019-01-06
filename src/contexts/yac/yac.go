@@ -246,9 +246,9 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server {
 		return yac
 	}
 
-	yac.Caches["ncell"] = &ctx.Cache{Name: "词法上限", Value: m.Confx("ncell", arg, 0), Help: "词法集合的最大数量"}
-	yac.Caches["nlang"] = &ctx.Cache{Name: "语法上限", Value: m.Confx("nlang", arg, 1), Help: "语法集合的最大数量"}
-	yac.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: m.Confx("nlang", arg, 1), Help: "状态机状态的数量"}
+	yac.Caches["ncell"] = &ctx.Cache{Name: "词法上限", Value: "128", Help: "词法集合的最大数量"}
+	yac.Caches["nlang"] = &ctx.Cache{Name: "语法上限", Value: "32", Help: "语法集合的最大数量"}
+	yac.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "32", Help: "状态机状态的数量"}
 	yac.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "状态机连接的逻辑数量"}
 	yac.Caches["nreal"] = &ctx.Cache{Name: "实点数量", Value: "0", Help: "状态机连接的存储数量"}
 	yac.Caches["nseed"] = &ctx.Cache{Name: "种子数量", Value: "0", Help: "语法模板的数量"}
@@ -323,7 +323,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		"label":       &ctx.Config{Name: "嵌套标记", Value: "####################", Help: "嵌套层级日志的标记"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"init": &ctx.Command{Name: "init", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmd("train", "void", "void", "[\t ]+")
 
 			m.Cmd("train", "key", "key", "[A-Za-z_][A-Za-z_0-9]*")
@@ -367,8 +367,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			m.Cmd("train", "exe", "exe", "$", "(", "cmd", ")")
 
 			m.Cmd("train", "line", "line", "opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}")
+			return
 		}},
-		"train": &ctx.Command{Name: "train page hash word...", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"train": &ctx.Command{Name: "train page hash word...", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				page, ok := yac.page[arg[0]]
 				if !ok {
@@ -398,14 +399,16 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				yac.seed = append(yac.seed, &Seed{page, hash, arg[2:]})
 				m.Cap("stream", fmt.Sprintf("%d,%s,%s", m.Capi("nseed", 1), m.Cap("npage"), m.Cap("nhash")))
 			}
+			return
 		}},
-		"parse": &ctx.Command{Name: "parse page void word...", Help: "解析语句, page: 初始语法, void: 空白语法, word: 解析语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"parse": &ctx.Command{Name: "parse page void word...", Help: "解析语句, page: 初始语法, void: 空白语法, word: 解析语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				str, word, hash := yac.parse(m, m, m.Optioni("page", yac.page[arg[0]]), m.Optioni("void", yac.page[arg[1]]), arg[2], 1)
 				m.Result(str, yac.hand[hash], word)
 			}
+			return
 		}},
-		"scan": &ctx.Command{Name: "scan filename", Help: "解析文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"scan": &ctx.Command{Name: "scan filename", Help: "解析文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				m.Optioni("page", yac.page["line"])
 				m.Optioni("void", yac.page["void"])
@@ -415,8 +418,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					m.Start(fmt.Sprintf("parse%d", m.Capi("nparse", 1)), "parse")
 				}
 			}
+			return
 		}},
-		"show": &ctx.Command{Name: "show seed|page|hash|mat", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"show": &ctx.Command{Name: "show seed|page|hash|mat", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				if len(arg) == 0 {
 					m.Append("seed", len(yac.seed))
@@ -496,6 +500,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					m.Table()
 				}
 			}
+			return
 		}},
 	},
 }
