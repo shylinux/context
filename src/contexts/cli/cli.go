@@ -133,6 +133,7 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 		}
 
 		if m.Option("prompt", cmd.Cmd().Conf("prompt")); cmd.Has("return") {
+			kit.Log("error", "waht ?????")
 			m.Options("scan_end", true)
 			m.Target().Close(m)
 		}
@@ -157,8 +158,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "终端数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"init.shy": &ctx.Config{Name: "init.shy", Value: "etc/init.shy", Help: "启动脚本"},
-		"exit.shy": &ctx.Config{Name: "exit.shy", Value: "etc/exit.shy", Help: "启动脚本"},
+		"init_shy": &ctx.Config{Name: "init_shy", Value: "etc/init.shy", Help: "启动脚本"},
+		"exit_shy": &ctx.Config{Name: "exit_shy", Value: "etc/exit.shy", Help: "启动脚本"},
 
 		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
 		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
@@ -620,31 +621,30 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Add("append", "return", arg[1:])
 			return
 		}},
-		"source": &ctx.Command{Name: "source [stdio [init.shy [exit.shy]]]|[filename [async]]|string", Help: "解析脚本, filename: 文件名, async: 异步执行",
+		"source": &ctx.Command{Name: "source [stdio [init_shy [exit_shy]]]|[filename [async]]|string", Help: "解析脚本, filename: 文件名, async: 异步执行",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if _, ok := m.Source().Server.(*CLI); ok {
-					msg := m.Spawn(c)
-					m.Copy(msg, "target")
+					m.Copy(m.Spawn(c), "target")
 				}
-				m.Cmd("yac.init")
-				m.Cmd("aaa.init")
 
-				if len(arg) == 0 || arg[0] == "stdio" {
-					m.Sess("log", false).Cmd("init")
+				if (len(arg) == 0 || arg[0] == "stdio") && m.Target().Name == "cli" {
+					// 启动终端
+					m.Cmd("yac.init")
+					if m.Start("shy", "shell", "stdio"); m.Cmds("nfs.path", m.Confx("init_shy", arg, 1)) {
+						// msg := m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init_shy"))
 
-					if m.Start("shy", "shell", "stdio"); m.Sess("nfs").Cmd("path", m.Confx("init.shy", arg, 1)).Results(0) {
-						msg := m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init.shy"))
-						m.Cap("ps_target", msg.Append("last_target"))
-						m.Option("prompt", m.Conf("prompt"))
-						m.Find("nfs.stdio").Cmd("prompt")
+						// m.Cap("ps_target", msg.Append("last_target"))
+						// m.Option("prompt", m.Conf("prompt"))
+						// m.Find("nfs.stdio").Cmd("prompt")
 					}
-					if m.Wait(); m.Sess("nfs").Cmd("path", m.Confx("exit.shy", arg, 2)).Results(0) {
-						m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("exit.shy"))
+					if m.Wait(); m.Cmds("nfs.path", m.Confx("exit_shy", arg, 2)) {
+						m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("exit_shy"))
 					}
 					return
 				}
 
-				if m.Sess("nfs").Cmd("path", arg[0]).Results(0) && arg[0] != "bench" {
+				// 运行脚本
+				if m.Cmds("nfs.path", arg[0]) && strings.HasSuffix(arg[0], ".shy") {
 					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
 					if len(arg) < 2 || arg[1] != "async" {
 						m.Wait()
@@ -1137,8 +1137,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Table()
 					return
 				}
-
-				m.Log("what", "wath %v", m.Spawn().Cmd("time"))
 
 				now := int64(m.Sess("cli").Cmd("time").Appendi("timestamp"))
 				begin := now

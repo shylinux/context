@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"regexp"
 	"strconv"
 	"strings"
@@ -106,6 +107,12 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	c.requests = append(c.requests, m)
 	m.source.sessions = append(m.source.sessions, m)
 
+	switch v := m.Gdb("context", "begin", c.Name).(type) {
+	case string:
+		kit.Log("error", "fuck %v", v)
+	case nil:
+	}
+
 	m.Log("begin", "%d context %v %v", m.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
 	for k, x := range c.Configs {
 		if x.Hand != nil {
@@ -124,17 +131,26 @@ func (c *Context) Start(m *Message, arg ...string) bool {
 	if len(arg) > 0 && arg[0] == "sync" {
 		sync, arg = true, arg[1:]
 	}
-	m.Set("detail", arg)
+	if len(arg) > 0 {
+		m.Set("detail", arg)
+	}
 
 	c.requests = append(c.requests, m)
 	m.source.sessions = append(m.source.sessions, m)
+
+	switch v := m.Gdb("context", "start", c.Name).(type) {
+	case string:
+		kit.Log("error", "fuck %v", v)
+	case nil:
+	}
+
 	if m.Hand = true; m.Cap("status") == "start" {
 		return true
 	}
 
 	c.exit = make(chan bool, 2)
 	go m.TryCatch(m, true, func(m *Message) {
-		m.Log(m.Cap("status", "start"), "%d server %v %v", m.root.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
+		m.Log(m.Cap("status", "start"), "%d server %v %v", m.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
 
 		c.message = m
 		if c.exit <- false; c.Server == nil || c.Server.Start(m, m.Meta["detail"]...) {
@@ -260,7 +276,7 @@ func (c *Context) BackTrace(m *Message, hand func(m *Message) (stop bool)) *Cont
 }
 
 type LOGGER interface {
-	LOG(*Message, string, string)
+	Log(*Message, string, string, ...interface{})
 }
 type DEBUG interface {
 	Wait(*Message, ...interface{}) interface{}
@@ -288,16 +304,15 @@ type Message struct {
 }
 
 func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
-	kit.Errorf(fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
-	return m
-	if action == "error" {
-		kit.Errorf(str, arg...)
-	}
-
 	if l := m.Sess("log", false); l != nil {
 		if log, ok := l.target.Server.(LOGGER); ok {
-			log.LOG(m, action, fmt.Sprintf(str, arg...))
+			log.Log(m, action, str, arg...)
+			return m
 		}
+	}
+
+	if action == "error" {
+		kit.Log("error", fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
 	}
 
 	return m
@@ -323,7 +338,7 @@ func (m *Message) Spawn(arg ...interface{}) *Message {
 
 	msg := &Message{
 		time:    time.Now(),
-		code:    m.root.Capi("nmessage", 1),
+		code:    m.Capi("nmessage", 1),
 		source:  m.target,
 		target:  c,
 		message: m,
@@ -385,6 +400,15 @@ func (m *Message) Format(arg ...string) string {
 			meta = append(meta, fmt.Sprintf("%v", m.Meta["append"]))
 		case "result":
 			meta = append(meta, fmt.Sprintf("%v", m.Meta["result"]))
+		case "full":
+			meta = append(meta, fmt.Sprintf("%s\n", m.Format("time", "ship")))
+			meta = append(meta, fmt.Sprintf("detail: %s\n", m.Format("detail")))
+			meta = append(meta, fmt.Sprintf("option: %s\n", m.Format("option")))
+			for k, v := range m.Meta {
+				meta = append(meta, fmt.Sprintf("  %s: %v\n", k, v))
+			}
+			meta = append(meta, fmt.Sprintf("append: %s\n", m.Format("append")))
+			meta = append(meta, fmt.Sprintf("result: %s\n", m.Format("result")))
 		}
 	}
 	return strings.Join(meta, " ")
@@ -478,7 +502,7 @@ func (m *Message) Get(key string, arg ...interface{}) string {
 		}
 
 		index = (index+2)%(len(meta)+2) - 2
-		if index > 0 && index < len(meta) {
+		if index >= 0 && index < len(meta) {
 			return meta[index]
 		}
 	}
@@ -1018,7 +1042,10 @@ func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context
 	context = append(context, m.source)
 
 	for _, s := range context {
-		for c := s; c != nil && !hand(m, s, c, key) && c != c.context; c = c.context {
+		for c := s; c != nil; c = c.context {
+			if hand(m, s, c, key) {
+				return m
+			}
 		}
 	}
 	return m
@@ -1142,7 +1169,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	m = m.Match(key, true, func(m *Message, s *Context, c *Context, key string) bool {
 		if x, ok := c.Commands[key]; ok && x.Hand != nil {
 			m.TryCatch(m, true, func(m *Message) {
-				m.Log("cmd", "%s:%s %s %v %v", c.Name, s.Name, key, arg, m.Meta["option"])
+				m.Log("cmd", "%s %s %v %v", c.Name, key, arg, m.Meta["option"])
 
 				if args := []string{}; x.Form != nil {
 					for i := 0; i < len(arg); i++ {
@@ -1166,7 +1193,12 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 				}
 
 				m.Hand = true
-				x.Hand(m, c, key, arg...)
+				switch v := m.Gdb("command", key, arg).(type) {
+				case string:
+					m.Echo(v)
+				case nil:
+					x.Hand(m, c, key, arg...)
+				}
 			})
 		}
 		return m.Hand
@@ -1245,11 +1277,11 @@ func (m *Message) Confx(key string, args ...interface{}) string {
 	if args = args[1:]; len(args) > 0 {
 		format, args = kit.Format(args[0]), args[1:]
 	}
-
 	arg := []interface{}{format, value}
 	for _, v := range args {
-		args = append(args, v)
+		arg = append(arg, v)
 	}
+
 	return kit.Format(arg...)
 }
 func (m *Message) Confs(key string, arg ...interface{}) bool {
@@ -1318,16 +1350,6 @@ func (m *Message) Capi(key string, arg ...interface{}) int {
 	return n
 }
 func (m *Message) Cap(key string, arg ...interface{}) string {
-	if len(arg) == 0 {
-		if val, ok := m.Gdb("cache", "read", key).(string); ok {
-			return val
-		}
-	} else {
-		if val, ok := m.Gdb("cache", "write", key, arg[0]).(string); ok {
-			return val
-		}
-	}
-
 	var cache *Cache
 	m.Match(key, false, func(m *Message, s *Context, c *Context, key string) bool {
 		if x, ok := c.Caches[key]; ok {
@@ -3157,6 +3179,9 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	return ctx
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
+	gdb := m.Sess("gdb")
+	gdb.Target().Start(gdb)
+
 	m.Cmd("cli.source", arg)
 	return false
 }
@@ -3169,7 +3194,10 @@ func Start(args ...string) bool {
 		args = append(args, os.Args[1:]...)
 	}
 
-	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
-	}
+	ioutil.WriteFile(fmt.Sprintf("bench.pid"), []byte(kit.Format(os.Getpid())), 0666)
+
+	Index.Begin(Pulse, args...)
+	Index.Start(Pulse, args...)
+	Index.Close(Pulse, args...)
 	return false
 }

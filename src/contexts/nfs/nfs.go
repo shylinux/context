@@ -18,7 +18,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
-	"runtime"
+	// "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,8 +28,9 @@ import (
 )
 
 type NFS struct {
-	in     *os.File
-	out    *os.File
+	in  *os.File
+	out *os.File
+
 	pages  []string
 	width  int
 	height int
@@ -207,6 +208,8 @@ func (nfs *NFS) color(str string, attr ...int) *NFS {
 	return nfs
 }
 func (nfs *NFS) print(str string) bool {
+	nfs.out.WriteString(str)
+	return true
 	ls := strings.Split(str, "\n")
 	for i, l := range ls {
 		rest := ""
@@ -237,6 +240,9 @@ func (nfs *NFS) print(str string) bool {
 }
 
 func (nfs *NFS) prompt(arg ...string) string {
+	nfs.out.WriteString("> ")
+	return "> "
+
 	ps := nfs.Option("prompt")
 	if nfs.Caps("windows") {
 		nfs.color(ps)
@@ -585,34 +591,80 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return nfs
 }
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
+	if len(arg) > 0 && arg[0] == "scan" {
+		nfs.Caches["ninput"] = &ctx.Cache{Value: "0"}
+		nfs.Caches["noutput"] = &ctx.Cache{Value: "0"}
+		nfs.Configs["input"] = &ctx.Config{Value: []interface{}{}}
+		nfs.Configs["output"] = &ctx.Config{Value: []interface{}{}}
+
+		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
+			nfs.out = m.Optionv("out").(*os.File)
+		}
+
+		line, bio := "", bufio.NewScanner(nfs)
+		for nfs.prompt(); !m.Options("scan_end"); nfs.prompt() {
+			for bio.Scan() {
+				if line = line + bio.Text(); !strings.HasSuffix(line, "\\") {
+					break
+				}
+				line = strings.TrimSuffix(line, "\\")
+			}
+
+			m.Confv("input", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
+			m.Log("debug", "%s %d %d [%s]", "input", m.Capi("ninput", 1), len(line), line)
+
+			for i := m.Capi("ninput") - 1; i < m.Capi("ninput"); i++ {
+				line = m.Conf("input", []interface{}{i, "line"})
+
+				msg := m.Spawn(m.Source()).Set("detail", line).Set("option", "file_pos", i)
+				m.Back(msg)
+
+				lines := strings.Split(strings.Join(msg.Meta["result"], ""), "\n")
+				for _, line := range lines {
+					if line != "" {
+						m.Log("debug", "%s %d %d [%s]", "output", m.Capi("noutput", 1), len(line), line)
+						m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
+						nfs.print(line)
+						nfs.print("\n")
+					}
+				}
+			}
+
+			line = ""
+		}
+
+		return true
+	}
+
 	nfs.Message = m
 	if len(arg) > 0 && arg[0] == "scan" {
-		nfs.Caches["windows"] = &ctx.Cache{Name: "windows", Value: "false", Help: "termbox"}
-		nfs.Caches["termbox"] = &ctx.Cache{Name: "termbox", Value: "false", Help: "termbox"}
-		nfs.Caches["cursor_pos"] = &ctx.Cache{Name: "cursor_pos", Value: "1", Help: "termbox"}
-
-		nfs.Configs["color"] = &ctx.Config{Name: "color", Value: "false", Help: "color"}
-		nfs.Configs["fgcolor"] = &ctx.Config{Name: "fgcolor", Value: "9", Help: "fgcolor"}
-		nfs.Configs["bgcolor"] = &ctx.Config{Name: "bgcolor", Value: "9", Help: "bgcolor"}
-		nfs.Configs["pscolor"] = &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"}
-		nfs.Configs["statusfgcolor"] = &ctx.Config{Name: "statusfgcolor", Value: "1", Help: "pscolor"}
-		nfs.Configs["statusbgcolor"] = &ctx.Config{Name: "statusbgcolor", Value: "2", Help: "pscolor"}
-
+		// nfs.Caches["windows"] = &ctx.Cache{Name: "windows", Value: "false", Help: "termbox"}
+		// nfs.Caches["termbox"] = &ctx.Cache{Name: "termbox", Value: "false", Help: "termbox"}
+		// nfs.Caches["cursor_pos"] = &ctx.Cache{Name: "cursor_pos", Value: "1", Help: "termbox"}
+		//
+		// nfs.Configs["color"] = &ctx.Config{Name: "color", Value: "false", Help: "color"}
+		// nfs.Configs["fgcolor"] = &ctx.Config{Name: "fgcolor", Value: "9", Help: "fgcolor"}
+		// nfs.Configs["bgcolor"] = &ctx.Config{Name: "bgcolor", Value: "9", Help: "bgcolor"}
+		// nfs.Configs["pscolor"] = &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"}
+		// nfs.Configs["statusfgcolor"] = &ctx.Config{Name: "statusfgcolor", Value: "1", Help: "pscolor"}
+		// nfs.Configs["statusbgcolor"] = &ctx.Config{Name: "statusbgcolor", Value: "2", Help: "pscolor"}
+		//
 		nfs.in = m.Optionv("in").(*os.File)
 		bio := bufio.NewScanner(nfs)
+
 		s, e := nfs.in.Stat()
 		m.Assert(e)
 		m.Capi("size", int(s.Size()))
 
 		if m.Cap("stream", arg[1]) == "stdio" {
 			nfs.out = m.Optionv("out").(*os.File)
-			if !m.Caps("windows", runtime.GOOS == "windows") {
-				termbox.Init()
-				defer termbox.Close()
-				nfs.width, nfs.height = termbox.Size()
-				nfs.Cap("termbox", "true")
-				nfs.Conf("color", "true")
-			}
+			// if !m.Caps("windows", runtime.GOOS == "windows") {
+			// 	termbox.Init()
+			// 	defer termbox.Close()
+			// 	nfs.width, nfs.height = termbox.Size()
+			// 	nfs.Cap("termbox", "true")
+			// 	nfs.Conf("color", "true")
+			// }
 			// if !m.Options("init.shy") {
 			//
 			// 	for _, v := range []string{
@@ -640,8 +692,11 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		line := ""
 		for nfs.prompt(); !m.Options("scan_end") && bio.Scan(); nfs.prompt() {
+			kit.Log("error", "stdio read %v", "text")
 			text := bio.Text()
 			m.Capi("nread", len(text)+1)
+			kit.Log("error", "stdio read %v", text)
+			continue
 
 			if line += text; len(text) > 0 && text[len(text)-1] == '\\' {
 				line = line[:len(line)-1]
@@ -669,6 +724,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			}
 			line = ""
 		}
+
+		kit.Log("error", "stdio read %v", line)
 		if !m.Options("scan_end") {
 			msg := m.Spawn(m.Source()).Set("detail", "return")
 			m.Back(msg)

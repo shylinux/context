@@ -2,42 +2,59 @@ package log
 
 import (
 	"contexts/ctx"
+	"toolkit"
+
 	"fmt"
 	"os"
-	"strings"
-	"time"
 )
 
 type LOG struct {
-	out *os.File
+	file map[string]*os.File
 	*ctx.Context
 }
 
-func (log *LOG) LOG(msg *ctx.Message, action string, str string) {
-	m := log.Context.Message()
+func (log *LOG) Value(msg *ctx.Message, arg ...interface{}) map[string]interface{} {
+	args := append(kit.Trans(arg...), "value")
 
-	if m.Confs("silent", action) {
-		return
-	}
-	if msg.Target() == nil {
-		return
-	}
-	if m.Confs("module", fmt.Sprintf("%s.%s", msg.Target().Name, action)) {
-		return
-	}
+	if value, ok := kit.Chain(log.Configs["output"].Value, args).(map[string]interface{}); ok {
+		if kit.Right(value["source"]) && kit.Format(value["source"]) != msg.Source().Name {
+			return nil
+		}
 
-	color := 0
-	if m.Confs("flag_color") && m.Confs("color", action) {
-		color = m.Confi("color", action)
+		if kit.Right(value["target"]) && kit.Format(value["target"]) != msg.Target().Name {
+			return nil
+		}
+
+		// kit.Log("error", "value %v %v", kit.Format(args), kit.Format(value))
+		return value
 	}
+	return nil
+}
+func (log *LOG) Log(msg *ctx.Message, action string, str string, arg ...interface{}) {
+	m := log.Message()
+	m.Capi("nlog", 1)
 
-	date := time.Now().Format(m.Conf("flag_time"))
-	action = fmt.Sprintf("%d %s(%s->%s)", msg.Code(), action, msg.Source().Name, msg.Target().Name)
+	args := kit.Trans(arg...)
+	for _, v := range []string{action, "bench"} {
+		for i := len(args); i >= 0; i-- {
+			if value := log.Value(m, append([]string{v}, args[:i]...)); kit.Right(value) && kit.Right(value["file"]) {
+				name := kit.Format(value["file"])
+				file, ok := log.file[name]
+				if !ok {
+					if f, e := os.Create(name); e == nil {
+						file, log.file[name] = f, f
+						kit.Log("error", "%s log file %s", "open", name)
+					} else {
+						kit.Log("error", "%s log file %s %s", "open", name, e)
+						continue
+					}
+				}
 
-	if color > 0 {
-		log.out.WriteString(fmt.Sprintf("%s\033[%dm%s %s\033[0m\n", date, color, action, str))
-	} else {
-		log.out.WriteString(fmt.Sprintf("%s%s %s\n", date, action, str))
+				fmt.Fprintln(file, fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), msg.Format(kit.Trans(value["meta"])...),
+					kit.Format(value["color_begin"]), action, fmt.Sprintf(str, arg...), kit.Format(value["color_end"])))
+				return
+			}
+		}
 	}
 }
 
@@ -50,9 +67,7 @@ func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	log.Configs["flag_color"] = &ctx.Config{Name: "flag_color", Value: "true", Help: "模块日志输出颜色"}
-	log.Configs["flag_time"] = &ctx.Config{Name: "flag_time", Value: "2006/01/02 15:04:05 ", Help: "模块日志输出颜色"}
-	log.Configs["bench.log"] = &ctx.Config{Name: "bench.log", Value: "bench.log", Help: "模块日志输出的文件"}
+	log.file = map[string]*os.File{}
 	return log
 }
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
@@ -63,63 +78,30 @@ func (log *LOG) Close(m *ctx.Message, arg ...string) bool {
 	case m.Target():
 	case m.Source():
 	}
-	return true
+	return false
 }
 
-var Pulse *ctx.Message
 var Index = &ctx.Context{Name: "log", Help: "日志中心",
 	Caches: map[string]*ctx.Cache{
-		"nlog": &ctx.Cache{Name: "nlog", Value: "0", Help: "日志屏蔽类型"},
+		"nlog": &ctx.Cache{Name: "nlog", Value: "0", Help: "日志调用数量"},
+		"nout": &ctx.Cache{Name: "nout", Value: "0", Help: "日志输出数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"silent": &ctx.Config{Name: "silent", Value: map[string]interface{}{"cb": true, "find": true}, Help: "日志屏蔽类型"},
-		"module": &ctx.Config{Name: "module", Value: map[string]interface{}{
-			"log":     map[string]interface{}{"cmd": true},
-			"lex":     map[string]interface{}{"cmd": true, "debug": true},
-			"yac":     map[string]interface{}{"cmd": true, "debug": true},
-			"matrix1": map[string]interface{}{"cmd": true, "debug": true},
-		}, Help: "日志屏蔽模块"},
-		"color": &ctx.Config{Name: "color", Value: map[string]interface{}{
-			"debug": 0, "error": 31, "check": 31,
-			"cmd": 32, "conf": 33,
-			"search": 35, "find": 35, "cb": 35, "lock": 35,
-			"begin": 36, "start": 36, "close": 36,
-		}, Help: "日志输出颜色"},
-		"log_name": &ctx.Config{Name: "log_name", Value: "dump", Help: "日志屏蔽类型"},
+		"output": &ctx.Config{Name: "output", Value: map[string]interface{}{
+			"error": map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+			"bench": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}}},
+			"begin": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+			"start": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+			"cmd": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"},
+				"lex": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
+			},
+			"debug": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
+		}, Help: "日志输出配置"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init file", Help: "输出日志, level: 日志类型, string: 日志内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if log, ok := m.Target().Server.(*LOG); ok {
-				log.out = m.Sess("nfs").Cmd("open", m.Confx("bench.log", arg, 0)).Optionv("out").(*os.File)
-				log.out.Truncate(0)
-				fmt.Fprintln(log.out, "\n\n")
-			}
-			return
-		}},
 		"log": &ctx.Command{Name: "log level string...", Help: "输出日志, level: 日志类型, string: 日志内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) && log.out != nil {
-				if m.Confs("silent", arg[0]) {
-					return
-				}
-				msg, ok := m.Optionv("msg").(*ctx.Message)
-				if !ok {
-					msg = m
-				}
-				if m.Confs("module", fmt.Sprintf("%s.%s", msg.Target().Name, arg[0])) {
-					return
-				}
-				color := 0
-				if m.Confs("flag_color") && m.Confs("color", arg[0]) {
-					color = m.Confi("color", arg[0])
-				}
-				date := time.Now().Format(m.Conf("flag_time"))
-				action := fmt.Sprintf("%d %s(%s->%s)", msg.Code(), arg[0], msg.Source().Name, msg.Target().Name)
-				cmd := strings.Join(arg[1:], "")
-				if color > 0 {
-					log.out.WriteString(fmt.Sprintf("%s\033[%dm%s %s\033[0m\n", date, color, action, cmd))
-				} else {
-					log.out.WriteString(fmt.Sprintf("%s%s %s\n", date, action, cmd))
-				}
+			if log, ok := m.Target().Server.(*LOG); m.Assert(ok) {
+				log.Log(m, arg[0], arg[1], arg[2:])
 			}
 			return
 		}},

@@ -22,6 +22,14 @@ func Errorf(str string, args ...interface{}) {
 	}
 	fmt.Fprintf(os.Stderr, str, args...)
 }
+func Log(action string, str string, args ...interface{}) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "%s", str)
+	} else {
+		fmt.Fprintf(os.Stderr, str, args...)
+	}
+	fmt.Fprintln(os.Stderr)
+}
 
 func Int(arg ...interface{}) int {
 	result := 0
@@ -57,8 +65,9 @@ func Right(arg ...interface{}) bool {
 			case "", "0", "false", "off", "no", "error: ":
 				result = result || false
 				break
+			default:
+				result = result || true
 			}
-			result = result || true
 		case error:
 			result = result || false
 		default:
@@ -87,8 +96,8 @@ func Format(arg ...interface{}) string {
 			result = append(result, fmt.Sprintf("%d", int(val)))
 		case time.Time:
 			result = append(result, fmt.Sprintf("%d", val.Format("2006-01-02 15:03:04")))
-		case error:
-			result = append(result, fmt.Sprintf("%v", val))
+		// case error:
+		// 	result = append(result, fmt.Sprintf("%v", val))
 		default:
 			if b, e := json.Marshal(val); e == nil {
 				result = append(result, string(b))
@@ -97,10 +106,17 @@ func Format(arg ...interface{}) string {
 	}
 
 	if len(result) > 1 {
+		args := []interface{}{}
 		if n := strings.Count(result[0], "%") - strings.Count(result[0], "%%"); len(result) > n+1 {
-			return fmt.Sprintf(result[0], result[1:n+1]) + strings.Join(result[n+1:], "")
+			for i := 1; i < n+1; i++ {
+				args = append(args, result[i])
+			}
+			return fmt.Sprintf(result[0], args...) + strings.Join(result[n+1:], "")
 		} else if len(result) == n+1 {
-			return fmt.Sprintf(result[0], result[1:])
+			for i := 1; i < len(result); i++ {
+				args = append(args, result[i])
+			}
+			return fmt.Sprintf(result[0], args...)
 		}
 	}
 	return strings.Join(result, "")
@@ -109,13 +125,17 @@ func Formats(arg ...interface{}) string {
 	result := []string{}
 	for _, v := range arg {
 		switch val := v.(type) {
+		case []interface{}:
+			for _, v := range val {
+				result = append(result, Format(v))
+			}
 		default:
 			if b, e := json.MarshalIndent(val, "", "  "); e == nil {
 				result = append(result, string(b))
 			}
 		}
 	}
-	return strings.Join(result, "")
+	return strings.Join(result, " ")
 }
 func Trans(arg ...interface{}) []string {
 	ls := []string{}
@@ -150,7 +170,9 @@ func Trans(arg ...interface{}) []string {
 				ls = append(ls, k, Format(v))
 			}
 		case []interface{}:
-			ls = append(ls, Format(val...))
+			for _, v := range val {
+				ls = append(ls, Format(v))
+			}
 		default:
 			ls = append(ls, Format(val))
 		}
@@ -294,15 +316,16 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 		for j, key := range keys {
 			index, e := strconv.Atoi(key)
 
+			// Log("error", "chain [%v %v] [%v %v] [%v/%v %v/%v] %v", parent_key, parent_index, key, index, i, len(args), j, len(keys), data)
+
 			var next interface{}
 			switch value := data.(type) {
 			case nil:
-				if j == len(keys)-1 {
-					next = args[i+1]
-				}
-
 				if i == len(args)-1 {
 					return nil
+				}
+				if j == len(keys)-1 {
+					next = args[i+1]
 				}
 
 				if e == nil {
@@ -359,13 +382,13 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 				}
 
 				if index == -1 {
-					data, index = append([]interface{}{next}, value...), 0
+					value, index = append([]interface{}{next}, value...), 0
 				} else if index == -2 {
-					data, index = append(value, next), len(value)
+					value, index = append(value, next), len(value)
 				} else if j == len(keys)-1 {
 					value[index] = next
 				}
-				next = value[index]
+				data, next = value, value[index]
 			}
 
 			switch p := parent.(type) {
