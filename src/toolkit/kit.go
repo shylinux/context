@@ -280,6 +280,14 @@ func Select(value string, args ...interface{}) string {
 
 	switch arg := args[0].(type) {
 	case string:
+		if len(args) > 1 {
+			switch b := args[1].(type) {
+			case bool:
+				if b && arg != "" {
+					return arg
+				}
+			}
+		}
 		if arg != "" {
 			return arg
 		}
@@ -412,6 +420,11 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 	}
 
 	return root
+}
+
+func Duration(arg ...string) time.Duration {
+	d, _ := time.ParseDuration(arg[0])
+	return d
 }
 
 func Time(arg ...string) int {

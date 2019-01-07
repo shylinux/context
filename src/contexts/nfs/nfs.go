@@ -87,6 +87,10 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 				continue
 			}
 
+			if strings.HasPrefix(f.Name(), ".") && dir_type != "both" {
+				continue
+			}
+
 			f, _ := os.Stat(f.Name())
 			if !(dir_type == "file" && f.IsDir() || dir_type == "dir" && !f.IsDir()) && (dir_reg == nil || dir_reg.MatchString(f.Name())) {
 				for _, field := range fields {
@@ -885,6 +889,338 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", ""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
+		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 && arg[0] == "all" {
+				m.Cmdy("nfs.config", "paths")
+				return
+			}
+
+			index := 0
+			if len(arg) > 1 {
+				index, arg = kit.Int(arg[0]), arg[1:]
+			}
+			for i, v := range arg {
+				m.Log("info", "paths %s %s", index+i, v)
+				m.Confv("paths", index+i, v)
+			}
+
+			if p := m.Conf("paths", index); path.IsAbs(p) {
+				m.Echo("%s", p)
+			} else if wd, e := os.Getwd(); m.Assert(e) {
+				m.Echo("%s", path.Join(wd, p))
+			}
+			return
+		}},
+		"dir": &ctx.Command{Name: "dir path [dir_deep] [dir_type both|file|dir] [dir_reg reg] [dir_sort field order] fields...",
+			Help: "查看目录, path: 路径, dir_deep: 递归查询, dir_type: 文件类型, dir_reg: 正则表达式, dir_sort: 排序, fields: 查询字段",
+			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				if len(arg) == 0 {
+					arg = append(arg, "")
+				}
+
+				wd, e := os.Getwd()
+				m.Assert(e)
+				trip := len(wd) + 1
+
+				rg, e := regexp.Compile(m.Option("dir_reg"))
+
+				m.Confm("paths", func(index int, value string) bool {
+					p := path.Join(value, m.Option("dir_root"), kit.Select("", arg))
+					if s, e := os.Stat(p); e == nil {
+						if s.IsDir() {
+							dir(m, p, 0, kit.Right(m.Has("dir_deep")), m.Confx("dir_type"), trip, rg,
+								strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "),
+								m.Conf("time_format"))
+						} else {
+							m.Append("directory", p)
+						}
+						return true
+					}
+					return false
+				})
+
+				if m.Has("dir_sort") {
+					m.Sort(m.Meta["dir_sort"][0], m.Meta["dir_sort"][1:]...)
+				}
+
+				if len(m.Meta["append"]) == 1 {
+					for _, v := range m.Meta[m.Meta["append"][0]] {
+						m.Echo(v).Echo(" ")
+					}
+				} else {
+					m.Table()
+				}
+				return
+			}},
+		"git": &ctx.Command{
+			Name: "git branch|status|diff|log|info arg... [dir path]...",
+			Help: "版本控制, branch: 分支管理, status: 查看状态, info: 查看分支与状态, dir: 指定路径",
+			Form: map[string]int{"dir": 1, "git_info": 1, "git_log": 1, "git_log_form": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				m.Cmdy("cli.system", "git", arg)
+
+				return
+				if len(arg) == 0 {
+					arg = []string{"info"}
+				}
+				cmds := []string{arg[0]}
+				switch arg[0] {
+				case "s":
+					arg[0] = "status"
+				case "b":
+					arg[0] = "branch"
+				case "d":
+					arg[0] = "diff"
+				}
+				if arg[0] == "info" {
+					cmds = strings.Split(m.Confx("git_info"), " ")
+				}
+				wd, e := os.Getwd()
+				m.Assert(e)
+				if !m.Has("dir") {
+					m.Option("dir", m.Confx("dir"))
+				}
+				for _, p := range m.Meta["dir"] {
+					if !path.IsAbs(p) {
+						p = path.Join(wd, p)
+					}
+					m.Echo("path: %s\n", p)
+					for _, c := range cmds {
+						args := []string{}
+						switch c {
+						case "branch", "status", "diff":
+							if c != "status" {
+								args = append(args, "--color")
+							}
+							args = append(args, strings.Split(m.Confx("git_"+c, arg, 1), "  ")...)
+							if len(arg) > 2 {
+								args = append(args, arg[2:]...)
+							}
+						case "difftool":
+							cmd := exec.Command("git", "difftool", "-y")
+							m.Log("info", "cmd: %s %v", "git", "difftool", "-y")
+							cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+							if e := cmd.Start(); e != nil {
+								m.Echo("error: ")
+								m.Echo("%s\n", e)
+							} else if e := cmd.Wait(); e != nil {
+								m.Echo("error: ")
+								m.Echo("%s\n", e)
+							}
+							continue
+						case "csv":
+							cmd := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d")
+							if out, e := cmd.CombinedOutput(); e != nil {
+								m.Echo("error: ")
+								m.Echo("%s\n", e)
+							} else {
+								f, e := os.Create(arg[1])
+								m.Assert(e)
+								defer f.Close()
+
+								type stat struct {
+									date string
+									adds int
+									dels int
+								}
+								stats := []*stat{}
+								list := strings.Split(string(out), "commit: ")
+								for _, v := range list {
+									l := strings.Split(v, "\n")
+									if len(l) > 2 {
+										fs := strings.Split(strings.Trim(l[2], " "), ", ")
+										stat := &stat{date: l[0]}
+										if len(fs) > 2 {
+											adds := strings.Split(fs[1], " ")
+											dels := strings.Split(fs[2], " ")
+											a, e := strconv.Atoi(adds[0])
+											m.Assert(e)
+											stat.adds = a
+											d, e := strconv.Atoi(dels[0])
+											m.Assert(e)
+											stat.dels = d
+										} else {
+											adds := strings.Split(fs[1], " ")
+											a, e := strconv.Atoi(adds[0])
+											m.Assert(e)
+											if adds[1] == "insertions(+)" {
+												stat.adds = a
+											} else {
+												stat.dels = a
+											}
+										}
+
+										stats = append(stats, stat)
+									}
+								}
+
+								fmt.Fprintf(f, "order,date,adds,dels,sum,top,bottom,last\n")
+								l := len(stats)
+								for i := 0; i < l/2; i++ {
+									stats[i], stats[l-i-1] = stats[l-i-1], stats[i]
+								}
+								sum := 0
+								for i, v := range stats {
+									fmt.Fprintf(f, "%d,%s,%d,%d,%d,%d,%d,%d\n", i, v.date, v.adds, v.dels, sum, sum+v.adds, sum-v.dels, sum+v.adds-v.dels)
+									sum += v.adds - v.dels
+								}
+							}
+							continue
+
+						case "log":
+							args = append(args, "--color")
+							args = append(args, strings.Split(m.Confx("git_log"), "  ")...)
+							args = append(args, fmt.Sprintf("--%s", m.Confx("git_log_form")))
+							args = append(args, m.Confx("git_log_skip", arg, 1, "--skip=%s"))
+							args = append(args, m.Confx("git_log_line", arg, 2, "-n %s"))
+						default:
+							args = append(args, arg[1:]...)
+						}
+
+						switch c {
+						case "commit":
+							m.Find("web.code").Cmd("counter", "ncommit", 1)
+						case "push":
+							m.Find("web.code").Cmd("counter", "npush", 1)
+						}
+
+						m.Log("info", "cmd: %s %v", "git", kit.Trans("-C", p, c, args))
+						msg := m.Sess("cli").Cmd("system", "git", "-C", p, c, args)
+						m.Copy(msg, "result").Copy(msg, "append")
+						m.Echo("\n")
+					}
+				}
+				return
+			}},
+
+		"path": &ctx.Command{Name: "path file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			for _, v := range m.Confv("paths").([]interface{}) {
+				p := path.Join(v.(string), arg[0])
+				if _, e := os.Stat(p); e == nil {
+					m.Echo(p)
+					break
+				}
+			}
+			return
+		}},
+		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if p, f, e := open(m, arg[0]); m.Assert(e) {
+				defer f.Close()
+
+				pos := 0
+				if len(arg) > 2 {
+					i, e := strconv.Atoi(arg[2])
+					m.Assert(e)
+					pos = i
+				}
+
+				s, e := strconv.Atoi(m.Confx("buf_size", arg, 1))
+				m.Assert(e)
+				buf := make([]byte, s)
+
+				if l, e := f.ReadAt(buf, int64(pos)); e == io.EOF || m.Assert(e) {
+					m.Log("info", "load %s %d %d", p, l, pos)
+					m.Echo(string(buf[:l]))
+				}
+			}
+			return
+		}},
+		"save": &ctx.Command{Name: "save file string...", Help: "保存文件, file: 保存的文件, string: 保存的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 1 && m.Has("data") {
+				arg = append(arg, m.Option("data"))
+			}
+			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
+				defer f.Close()
+				m.Append("directory", p)
+				m.Echo(p)
+
+				for _, v := range arg[1:] {
+					n, e := fmt.Fprint(f, v)
+					m.Assert(e)
+					m.Log("info", "save %s %d", p, n)
+				}
+			}
+			return
+		}},
+		"export": &ctx.Command{Name: "export filename", Help: "导出数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			name := time.Now().Format(arg[0])
+			_, f, e := open(m, name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+			m.Assert(e)
+			defer f.Close()
+
+			switch {
+			case strings.HasSuffix(arg[0], ".json") && len(m.Meta["append"]) > 0:
+				data := []interface{}{}
+
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					line := map[string]interface{}{}
+					for _, k := range m.Meta["append"] {
+						line[k] = m.Meta[k][i]
+					}
+					data = append(data, line)
+				}
+				en := json.NewEncoder(f)
+				en.SetIndent("", "  ")
+				en.Encode(data)
+
+			case strings.HasSuffix(arg[0], ".csv") && len(m.Meta["append"]) > 0:
+				w := csv.NewWriter(f)
+
+				line := []string{}
+				for _, v := range m.Meta["append"] {
+					line = append(line, v)
+				}
+				w.Write(line)
+
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				for i := 0; i < nrow; i++ {
+					line := []string{}
+					for _, k := range m.Meta["append"] {
+						line = append(line, m.Meta[k][i])
+					}
+					w.Write(line)
+				}
+				w.Flush()
+			default:
+				for _, v := range m.Meta["result"] {
+					f.WriteString(v)
+				}
+			}
+			m.Set("append").Set("result").Add("append", "directory", name).Echo(name)
+			return
+		}},
+		"import": &ctx.Command{Name: "import filename [index]", Help: "导入数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			_, f, e := open(m, arg[0])
+			m.Assert(e)
+			defer f.Close()
+
+			switch {
+			case strings.HasSuffix(arg[0], ".json"):
+				var data interface{}
+				de := json.NewDecoder(f)
+				de.Decode(&data)
+
+				msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", arg[1:])
+				m.Copy(msg, "append").Copy(msg, "result")
+			case strings.HasSuffix(arg[0], ".csv"):
+				r := csv.NewReader(f)
+
+				l, e := r.Read()
+				m.Assert(e)
+				m.Meta["append"] = l
+
+				for l, e = r.Read(); e != nil; l, e = r.Read() {
+					for i, v := range l {
+						m.Add("append", m.Meta["append"][i], v)
+					}
+				}
+				m.Table()
+			}
+			return
+		}},
+
 		"open": &ctx.Command{Name: "open file", Help: "打开文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Has("io") {
 			} else if p, f, e := open(m, arg[0], os.O_RDWR|os.O_CREATE); e == nil {
@@ -1022,46 +1358,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			return
 		}},
-
-		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if p, f, e := open(m, arg[0]); m.Assert(e) {
-				defer f.Close()
-
-				pos := 0
-				if len(arg) > 2 {
-					i, e := strconv.Atoi(arg[2])
-					m.Assert(e)
-					pos = i
-				}
-
-				s, e := strconv.Atoi(m.Confx("buf_size", arg, 1))
-				m.Assert(e)
-				buf := make([]byte, s)
-
-				if l, e := f.ReadAt(buf, int64(pos)); e == io.EOF || m.Assert(e) {
-					m.Log("info", "load %s %d %d", p, l, pos)
-					m.Echo(string(buf[:l]))
-				}
-			}
-			return
-		}},
-		"save": &ctx.Command{Name: "save file string...", Help: "保存文件, file: 保存的文件, string: 保存的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 1 && m.Has("data") {
-				arg = append(arg, m.Option("data"))
-			}
-			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
-				defer f.Close()
-				m.Append("directory", p)
-				m.Echo(p)
-
-				for _, v := range arg[1:] {
-					n, e := fmt.Fprint(f, v)
-					m.Assert(e)
-					m.Log("info", "save %s %d", p, n)
-				}
-			}
-			return
-		}},
 		"print": &ctx.Command{Name: "print file string...", Help: "输出文件, file: 输出的文件, string: 输出的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_APPEND); m.Assert(e) {
 				defer f.Close()
@@ -1070,122 +1366,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					n, e := fmt.Fprint(f, v)
 					m.Assert(e)
 					m.Log("info", "print %s %d", p, n)
-				}
-			}
-			return
-		}},
-		"export": &ctx.Command{Name: "export filename", Help: "导出数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			name := time.Now().Format(arg[0])
-			_, f, e := open(m, name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
-			m.Assert(e)
-			defer f.Close()
-
-			switch {
-			case strings.HasSuffix(arg[0], ".json") && len(m.Meta["append"]) > 0:
-				data := []interface{}{}
-
-				nrow := len(m.Meta[m.Meta["append"][0]])
-				for i := 0; i < nrow; i++ {
-					line := map[string]interface{}{}
-					for _, k := range m.Meta["append"] {
-						line[k] = m.Meta[k][i]
-					}
-					data = append(data, line)
-				}
-				en := json.NewEncoder(f)
-				en.SetIndent("", "  ")
-				en.Encode(data)
-
-			case strings.HasSuffix(arg[0], ".csv") && len(m.Meta["append"]) > 0:
-				w := csv.NewWriter(f)
-
-				line := []string{}
-				for _, v := range m.Meta["append"] {
-					line = append(line, v)
-				}
-				w.Write(line)
-
-				nrow := len(m.Meta[m.Meta["append"][0]])
-				for i := 0; i < nrow; i++ {
-					line := []string{}
-					for _, k := range m.Meta["append"] {
-						line = append(line, m.Meta[k][i])
-					}
-					w.Write(line)
-				}
-				w.Flush()
-			default:
-				for _, v := range m.Meta["result"] {
-					f.WriteString(v)
-				}
-			}
-			m.Set("append").Set("result").Add("append", "directory", name).Echo(name)
-			return
-		}},
-		"import": &ctx.Command{Name: "import filename [index]", Help: "导入数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			_, f, e := open(m, arg[0])
-			m.Assert(e)
-			defer f.Close()
-
-			switch {
-			case strings.HasSuffix(arg[0], ".json"):
-				var data interface{}
-				de := json.NewDecoder(f)
-				de.Decode(&data)
-
-				msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", arg[1:])
-				m.Copy(msg, "append").Copy(msg, "result")
-			case strings.HasSuffix(arg[0], ".csv"):
-				r := csv.NewReader(f)
-
-				l, e := r.Read()
-				m.Assert(e)
-				m.Meta["append"] = l
-
-				for l, e = r.Read(); e != nil; l, e = r.Read() {
-					for i, v := range l {
-						m.Add("append", m.Meta["append"][i], v)
-					}
-				}
-				m.Table()
-			}
-			return
-		}},
-
-		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 0 && arg[0] == "all" {
-				list := m.Confv("paths").([]interface{})
-				for i, v := range list {
-					m.Add("append", "index", i)
-					m.Add("append", "path", v)
-				}
-				m.Table()
-				return
-			} else if len(arg) > 1 {
-				m.Log("info", "paths %s %s", arg[0], arg[1])
-				m.Confv("paths", arg[0], arg[1])
-			} else if len(arg) > 0 {
-				m.Log("info", "paths 0 %s", arg[0])
-				m.Confv("paths", 0, arg[0])
-			}
-
-			p := m.Confv("paths", 0).(string)
-			if path.IsAbs(p) {
-				m.Echo("%s", p)
-				return
-			}
-
-			wd, e := os.Getwd()
-			m.Assert(e)
-			m.Echo("%s", path.Join(wd, p))
-			return
-		}},
-		"path": &ctx.Command{Name: "path file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			for _, v := range m.Confv("paths").([]interface{}) {
-				p := path.Join(v.(string), arg[0])
-				if _, e := os.Stat(p); e == nil {
-					m.Echo(p)
-					break
 				}
 			}
 			return
@@ -1242,189 +1422,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			return
 		}},
-
-		"dir": &ctx.Command{Name: "dir dir [dir_type both|file|dir] [dir_deep] fields...",
-			Help: "查看目录, dir: 目录名, dir_type: 文件类型, dir_deep: 递归查询, fields: 查询字段",
-			Form: map[string]int{"dir_reg": 1, "dir_type": 1, "dir_deep": 0, "dir_sort": 2},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				wd, e := os.Getwd()
-				m.Assert(e)
-				trip := len(wd) + 1
-
-				if len(arg) == 0 {
-					arg = append(arg, "")
-				}
-				dirs := arg[0]
-				if m.Options("dir_root") {
-					dirs = path.Join(m.Option("dir_root"), dirs)
-				}
-
-				rg, e := regexp.Compile(m.Option("dir_reg"))
-
-				for _, v := range m.Confv("paths").([]interface{}) {
-					d := path.Join(v.(string), dirs)
-					if s, e := os.Stat(d); e == nil {
-						if s.IsDir() {
-							dir(m, d, 0, kit.Right(m.Has("dir_deep")), m.Confx("dir_type"), trip, rg,
-								strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "),
-								m.Conf("time_format"))
-						} else {
-							m.Append("directory", d)
-							return e
-						}
-						break
-					}
-				}
-				if m.Has("dir_sort") {
-					m.Sort(m.Meta["dir_sort"][1], m.Meta["dir_sort"][0])
-				}
-
-				if len(m.Meta["append"]) == 1 {
-					for _, v := range m.Meta[m.Meta["append"][0]] {
-						m.Echo(v).Echo(" ")
-					}
-				} else {
-					m.Table()
-				}
-				return
-			}},
-		"git": &ctx.Command{
-			Name: "git branch|status|diff|log|info arg... [dir path]...",
-			Help: "版本控制, branch: 分支管理, status: 查看状态, info: 查看分支与状态, dir: 指定路径",
-			Form: map[string]int{"dir": 1, "git_info": 1, "git_log": 1, "git_log_form": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if len(arg) == 0 {
-					arg = []string{"info"}
-				}
-				cmds := []string{arg[0]}
-				switch arg[0] {
-				case "s":
-					arg[0] = "status"
-				case "b":
-					arg[0] = "branch"
-				case "d":
-					arg[0] = "diff"
-				}
-				if arg[0] == "info" {
-					cmds = strings.Split(m.Confx("git_info"), " ")
-				}
-				wd, e := os.Getwd()
-				m.Assert(e)
-				if !m.Has("dir") {
-					m.Option("dir", m.Confx("dir"))
-				}
-				for _, p := range m.Meta["dir"] {
-					if !path.IsAbs(p) {
-						p = path.Join(wd, p)
-					}
-					m.Echo("path: %s\n", p)
-					for _, c := range cmds {
-						args := []string{}
-						switch c {
-						case "branch", "status", "diff":
-							if c != "status" {
-								args = append(args, "--color")
-							}
-							args = append(args, strings.Split(m.Confx("git_"+c, arg, 1), "  ")...)
-							if len(arg) > 2 {
-								args = append(args, arg[2:]...)
-							}
-						case "difftool":
-							cmd := exec.Command("git", "difftool", "-y")
-							m.Log("info", "cmd: %s %v", "git", "difftool", "-y")
-							cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-							if e := cmd.Start(); e != nil {
-								m.Echo("error: ")
-								m.Echo("%s\n", e)
-							} else if e := cmd.Wait(); e != nil {
-								m.Echo("error: ")
-								m.Echo("%s\n", e)
-							}
-							continue
-						case "csv":
-							cmd := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d")
-							if out, e := cmd.CombinedOutput(); e != nil {
-								m.Echo("error: ")
-								m.Echo("%s\n", e)
-							} else {
-								f, e := os.Create(arg[1])
-								m.Assert(e)
-								defer f.Close()
-
-								type stat struct {
-									date string
-									adds int
-									dels int
-								}
-								stats := []*stat{}
-								list := strings.Split(string(out), "commit: ")
-								for _, v := range list {
-									l := strings.Split(v, "\n")
-									if len(l) > 2 {
-										fs := strings.Split(strings.Trim(l[2], " "), ", ")
-										stat := &stat{date: l[0]}
-										if len(fs) > 2 {
-											adds := strings.Split(fs[1], " ")
-											dels := strings.Split(fs[2], " ")
-											a, e := strconv.Atoi(adds[0])
-											m.Assert(e)
-											stat.adds = a
-											d, e := strconv.Atoi(dels[0])
-											m.Assert(e)
-											stat.dels = d
-										} else {
-											adds := strings.Split(fs[1], " ")
-											a, e := strconv.Atoi(adds[0])
-											m.Assert(e)
-											if adds[1] == "insertions(+)" {
-												stat.adds = a
-											} else {
-												stat.dels = a
-											}
-										}
-
-										stats = append(stats, stat)
-									}
-								}
-
-								fmt.Fprintf(f, "order,date,adds,dels,sum,top,bottom,last\n")
-								l := len(stats)
-								for i := 0; i < l/2; i++ {
-									stats[i], stats[l-i-1] = stats[l-i-1], stats[i]
-								}
-								sum := 0
-								for i, v := range stats {
-									fmt.Fprintf(f, "%d,%s,%d,%d,%d,%d,%d,%d\n", i, v.date, v.adds, v.dels, sum, sum+v.adds, sum-v.dels, sum+v.adds-v.dels)
-									sum += v.adds - v.dels
-								}
-							}
-							continue
-
-						case "log":
-							args = append(args, "--color")
-							args = append(args, strings.Split(m.Confx("git_log"), "  ")...)
-							args = append(args, fmt.Sprintf("--%s", m.Confx("git_log_form")))
-							args = append(args, m.Confx("git_log_skip", arg, 1, "--skip=%s"))
-							args = append(args, m.Confx("git_log_line", arg, 2, "-n %s"))
-						default:
-							args = append(args, arg[1:]...)
-						}
-
-						switch c {
-						case "commit":
-							m.Find("web.code").Cmd("counter", "ncommit", 1)
-						case "push":
-							m.Find("web.code").Cmd("counter", "npush", 1)
-						}
-
-						m.Log("info", "cmd: %s %v", "git", kit.Trans("-C", p, c, args))
-						msg := m.Sess("cli").Cmd("system", "git", "-C", p, c, args)
-						m.Copy(msg, "result").Copy(msg, "append")
-						m.Echo("\n")
-					}
-				}
-				return
-			}},
 	},
 }
 

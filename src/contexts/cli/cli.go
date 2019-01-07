@@ -132,6 +132,129 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
 	},
 	Commands: map[string]*ctx.Command{
+		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
+			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
+			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				for _, v := range m.Meta["result"] {
+					if strings.TrimSpace(v) != "" {
+						arg = append(arg, v)
+					}
+				}
+
+				conf := m.Confm("cmd_combine", arg[0])
+				if v, ok := kit.Chain(conf, "cmd").(string); ok {
+					arg[0] = m.Parse(v)
+				}
+				cmd := exec.Command(arg[0])
+				if v, ok := kit.Chain(conf, "path").(string); ok {
+					cmd.Path = m.Parse(v)
+				}
+				m.Log("info", "cmd.path %v", cmd.Path)
+
+				args := []string{}
+				if list, ok := kit.Chain(conf, "arg").([]interface{}); ok {
+					for _, v := range list {
+						args = append(args, m.Parse(v))
+					}
+				}
+				if args = append(args, arg[1:]...); len(args) > 0 {
+					cmd.Args = args
+				}
+				m.Log("info", "cmd.arg %v", cmd.Args)
+
+				for k, v := range m.Confm("system_env") {
+					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
+				}
+				if list, ok := kit.Chain(conf, "env").([]interface{}); ok {
+					for k, v := range list {
+						cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
+					}
+				}
+				for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
+					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
+				}
+				m.Log("info", "cmd.env %v", cmd.Env)
+				for _, v := range os.Environ() {
+					cmd.Env = append(cmd.Env, v)
+				}
+
+				if m.Options("cmd_dir") {
+					cmd.Dir = m.Option("cmd_dir")
+				} else if v, ok := kit.Chain(conf, "dir").(string); ok {
+					cmd.Dir = m.Parse(v)
+				}
+				m.Log("info", "cmd.dir %v", cmd.Dir)
+
+				if m.Options("cmd_active") || kit.Right(conf["active"]) {
+					cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+					if e := cmd.Start(); e != nil {
+						m.Echo("error: ").Echo("%s\n", e)
+					} else if e := cmd.Wait(); e != nil {
+						m.Echo("error: ").Echo("%s\n", e)
+					}
+				} else {
+					wait := make(chan bool, 1)
+					go func() {
+						out := bytes.NewBuffer(make([]byte, 1024))
+						err := bytes.NewBuffer(make([]byte, 1024))
+						cmd.Stdout = out
+						cmd.Stderr = err
+
+						if e := cmd.Run(); e != nil {
+							m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
+							m.Log("trace", "%s\n", e)
+
+							b, _ := cmd.CombinedOutput()
+							m.Echo("error: %s", string(b))
+							m.Log("trace", "error: %s", string(b))
+						} else {
+							switch m.Option("cmd_parse") {
+							case "json":
+								var data interface{}
+								if json.Unmarshal(out.Bytes(), &data) == nil {
+									msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
+									m.Copy(msg, "append").Copy(msg, "result")
+								} else {
+									m.Echo(out.String())
+								}
+
+							case "csv":
+								data, e := csv.NewReader(out).ReadAll()
+								m.Assert(e)
+								for i := 1; i < len(data); i++ {
+									for j := 0; j < len(data[i]); j++ {
+										m.Add("append", data[0][j], data[i][j])
+									}
+								}
+								m.Table()
+							default:
+								m.Echo(out.String())
+							}
+						}
+						wait <- true
+					}()
+
+					timeout := m.Conf("cmd_timeout")
+					if conf["timeout"] != nil {
+						timeout = conf["timeout"].(string)
+					}
+					if m.Option("timeout") != "" {
+						timeout = m.Option("timeout")
+					}
+
+					d, e := time.ParseDuration(timeout)
+					m.Assert(e)
+
+					select {
+					case <-time.After(d):
+						cmd.Process.Kill()
+						m.Echo("%s: %s timeout", arg[0], m.Conf("cmd_timeout"))
+					case <-wait:
+					}
+				}
+				return
+			}},
 		"alias": &ctx.Command{Name: "alias [short [long...]]|[delete short]|[import module [command [alias]]]",
 			Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名, import导入模块所有命令",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -554,6 +677,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Add("append", "return", arg[1:])
 			return
 		}},
+		"arguments": &ctx.Command{Name: "arguments", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Set("result", m.Optionv("arguments"))
+			return
+		}},
 		"source": &ctx.Command{Name: "source [stdio [init_shy [exit_shy]]]|[filename [async]]|string", Help: "解析脚本, filename: 文件名, async: 异步执行",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if _, ok := m.Source().Server.(*CLI); ok {
@@ -615,10 +742,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}, "parse", "line", "void", strings.Join(arg, " "))
 				return
 			}},
-		"arguments": &ctx.Command{Name: "arguments", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Set("result", m.Optionv("arguments"))
-			return
-		}},
 		"run": &ctx.Command{Name: "run", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				name := path.Join(m.Option("dir_root"), m.Option("download_dir"))
@@ -663,133 +786,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
-		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
-			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
-			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if len(m.Meta["result"]) > 0 {
-					for _, v := range m.Meta["result"] {
-						if strings.TrimSpace(v) != "" {
-							arg = append(arg, v)
-						}
-					}
-				}
-
-				conf := map[string]interface{}{}
-				if m.Confv("cmd_combine", arg[0]) != nil {
-					conf = m.Confv("cmd_combine", arg[0]).(map[string]interface{})
-				}
-
-				if conf["cmd"] != nil {
-					arg[0] = m.Parse(conf["cmd"])
-				}
-				args := []string{}
-				if conf["arg"] != nil {
-					for _, v := range conf["arg"].([]interface{}) {
-						args = append(args, m.Parse(v))
-					}
-				}
-				args = append(args, arg[1:]...)
-				if conf["args"] != nil {
-					for _, v := range conf["args"].([]interface{}) {
-						args = append(args, m.Parse(v))
-					}
-				}
-
-				cmd := exec.Command(arg[0], args...)
-				if conf["path"] != nil {
-					cmd.Path = m.Parse(conf["path"])
-				}
-
-				for k, v := range m.Confv("system_env").(map[string]interface{}) {
-					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
-				}
-				if conf["env"] != nil {
-					for k, v := range conf["env"].(map[string]interface{}) {
-						cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
-					}
-				}
-				for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
-					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
-				}
-				m.Log("info", "cmd.env %v", cmd.Env)
-				for _, v := range os.Environ() {
-					cmd.Env = append(cmd.Env, v)
-				}
-
-				if conf["dir"] != nil {
-					cmd.Dir = m.Parse(conf["dir"])
-				}
-				if m.Options("cmd_dir") {
-					cmd.Dir = m.Option("cmd_dir")
-				}
-
-				if m.Options("cmd_active") || kit.Right(conf["active"]) {
-					cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-					if e := cmd.Start(); e != nil {
-						m.Echo("error: ").Echo("%s\n", e)
-					} else if e := cmd.Wait(); e != nil {
-						m.Echo("error: ").Echo("%s\n", e)
-					}
-				} else {
-					wait := make(chan bool, 1)
-					go func() {
-
-						out := bytes.NewBuffer(make([]byte, 1024))
-						err := bytes.NewBuffer(make([]byte, 1024))
-						cmd.Stdout = out
-						cmd.Stderr = err
-
-						if e := cmd.Run(); e == nil {
-							m.Echo("error: ").Echo("%s", e).Echo(string(err))
-						} else {
-
-							switch m.Option("cmd_parse") {
-							case "json":
-								var data interface{}
-								if json.Unmarshal(out, &data) == nil {
-									msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
-									m.Copy(msg, "append").Copy(msg, "result")
-								} else {
-									m.Echo(string(out))
-								}
-
-							case "csv":
-								data, e := csv.NewReader(bytes.NewReader(out)).ReadAll()
-								m.Assert(e)
-								for i := 1; i < len(data); i++ {
-									for j := 0; j < len(data[i]); j++ {
-										m.Add("append", data[0][j], data[i][j])
-									}
-								}
-								m.Table()
-							default:
-								m.Echo(string(out))
-							}
-						}
-						wait <- true
-					}()
-
-					timeout := m.Conf("cmd_timeout")
-					if conf["timeout"] != nil {
-						timeout = conf["timeout"].(string)
-					}
-					if m.Option("timeout") != "" {
-						timeout = m.Option("timeout")
-					}
-
-					d, e := time.ParseDuration(timeout)
-					m.Assert(e)
-
-					select {
-					case <-time.After(d):
-						cmd.Process.Kill()
-						m.Echo("%s: %s timeout", arg[0], m.Conf("cmd_timeout"))
-					case <-wait:
-					}
-				}
-				return
-			}},
 		"sysinfo": &ctx.Command{Name: "sysinfo", Help: "sysinfo", Hand: sysinfo},
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			mem := &runtime.MemStats{}

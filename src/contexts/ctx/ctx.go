@@ -1252,6 +1252,12 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 	}
 
 	switch fun := args[0].(type) {
+	case func(int, string) bool:
+		for i, v := range table {
+			if fun(i, kit.Format(v)) {
+				break
+			}
+		}
 	case func(map[string]interface{}):
 		fun(value)
 	case func(string, map[string]interface{}):
