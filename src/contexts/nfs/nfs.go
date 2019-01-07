@@ -858,14 +858,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"qr_size":     &ctx.Config{Name: "qr_size", Value: "256", Help: "二维码的默认大小"},
 
 		"pscolor": &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"},
-		"nfs_name": &ctx.Config{Name: "nfs_name", Value: "file", Help: "默认模块命名", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
-			if len(arg) > 0 {
-				return arg[0]
-			}
-			return fmt.Sprintf("%s%d", x.Value, m.Capi("nfile", 1))
-
-		}},
-		"nfs_help": &ctx.Config{Name: "nfs_help", Value: "file", Help: "默认模块帮助"},
 
 		"buf_size": &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
 		"dir_conf": &ctx.Config{Name: "dir_conf", Value: map[string]interface{}{
@@ -873,19 +865,20 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}, Help: "读取文件的缓存区的大小"},
 
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir/all)", Value: "all", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
-		"dir_name":   &ctx.Config{Name: "dir_name(name/tree/path/full)", Value: "name", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 		"dir_fields": &ctx.Config{Name: "dir_fields(time/type/name/size/line/hash)", Value: "time size line filename", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 
-		"git_branch":   &ctx.Config{Name: "git_branch", Value: "--list", Help: "版本控制状态参数"},
-		"git_status":   &ctx.Config{Name: "git_status", Value: "-sb", Help: "版本控制状态参数"},
-		"git_diff":     &ctx.Config{Name: "git_diff", Value: "--stat", Help: "版本控制状态参数"},
-		"git_log":      &ctx.Config{Name: "git_log", Value: "--pretty=%h %an(%ad) %s  --date=format:%m/%d %H:%M  --graph", Help: "版本控制状态参数"},
-		"git_log_form": &ctx.Config{Name: "git_log", Value: "stat", Help: "版本控制状态参数"},
-		"git_log_skip": &ctx.Config{Name: "git_log", Value: "0", Help: "版本控制状态参数"},
-		"git_log_line": &ctx.Config{Name: "git_log", Value: "3", Help: "版本控制状态参数"},
-		"git_path":     &ctx.Config{Name: "git_path", Value: ".", Help: "版本控制默认路径"},
-		"git_info":     &ctx.Config{Name: "git_info", Value: "branch status diff log", Help: "命令集合"},
-
+		"git": &ctx.Config{Name: "git", Value: map[string]interface{}{
+			"args":   []interface{}{"-C", "@git_dir"},
+			"info":   map[string]interface{}{"cmds": []interface{}{"log", "status", "branch"}},
+			"branch": map[string]interface{}{"args": []interface{}{"branch", "-v"}},
+			"status": map[string]interface{}{"args": []interface{}{"status", "-sb"}},
+			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "limit", "--reverse", "pretty", "date"}},
+			"trans": map[string]interface{}{
+				"date":   "--date=format:%m/%d %H:%M",
+				"pretty": "--pretty=format:%h %ad %an %s",
+				"limit":  "10",
+			},
+		}, Help: "命令集合"},
 		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", ""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -953,146 +946,66 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 				return
 			}},
-		"git": &ctx.Command{
-			Name: "git branch|status|diff|log|info arg... [dir path]...",
-			Help: "版本控制, branch: 分支管理, status: 查看状态, info: 查看分支与状态, dir: 指定路径",
-			Form: map[string]int{"dir": 1, "git_info": 1, "git_log": 1, "git_log_form": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				m.Cmdy("cli.system", "git", arg)
+		"git": &ctx.Command{Name: "git", Help: "版本控制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 && arg[0] == "sum" {
+				if out, e := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d").CombinedOutput(); m.Assert(e) {
+					for _, v := range strings.Split(string(out), "commit: ") {
+						if l := strings.Split(v, "\n"); len(l) > 2 {
+							fs := strings.Split(strings.TrimSpace(l[2]), ", ")
+							m.Add("append", "date", l[0])
 
-				return
-				if len(arg) == 0 {
-					arg = []string{"info"}
-				}
-				cmds := []string{arg[0]}
-				switch arg[0] {
-				case "s":
-					arg[0] = "status"
-				case "b":
-					arg[0] = "branch"
-				case "d":
-					arg[0] = "diff"
-				}
-				if arg[0] == "info" {
-					cmds = strings.Split(m.Confx("git_info"), " ")
-				}
-				wd, e := os.Getwd()
-				m.Assert(e)
-				if !m.Has("dir") {
-					m.Option("dir", m.Confx("dir"))
-				}
-				for _, p := range m.Meta["dir"] {
-					if !path.IsAbs(p) {
-						p = path.Join(wd, p)
-					}
-					m.Echo("path: %s\n", p)
-					for _, c := range cmds {
-						args := []string{}
-						switch c {
-						case "branch", "status", "diff":
-							if c != "status" {
-								args = append(args, "--color")
-							}
-							args = append(args, strings.Split(m.Confx("git_"+c, arg, 1), "  ")...)
-							if len(arg) > 2 {
-								args = append(args, arg[2:]...)
-							}
-						case "difftool":
-							cmd := exec.Command("git", "difftool", "-y")
-							m.Log("info", "cmd: %s %v", "git", "difftool", "-y")
-							cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-							if e := cmd.Start(); e != nil {
-								m.Echo("error: ")
-								m.Echo("%s\n", e)
-							} else if e := cmd.Wait(); e != nil {
-								m.Echo("error: ")
-								m.Echo("%s\n", e)
-							}
-							continue
-						case "csv":
-							cmd := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d")
-							if out, e := cmd.CombinedOutput(); e != nil {
-								m.Echo("error: ")
-								m.Echo("%s\n", e)
+							if adds := strings.Split(fs[1], " "); len(fs) > 2 {
+								dels := strings.Split(fs[2], " ")
+								m.Add("append", "adds", adds[0])
+								m.Add("append", "dels", dels[0])
+							} else if adds[1] == "insertions(+)" {
+								m.Add("append", "adds", adds[0])
+								m.Add("append", "dels", "0")
 							} else {
-								f, e := os.Create(arg[1])
-								m.Assert(e)
-								defer f.Close()
-
-								type stat struct {
-									date string
-									adds int
-									dels int
-								}
-								stats := []*stat{}
-								list := strings.Split(string(out), "commit: ")
-								for _, v := range list {
-									l := strings.Split(v, "\n")
-									if len(l) > 2 {
-										fs := strings.Split(strings.Trim(l[2], " "), ", ")
-										stat := &stat{date: l[0]}
-										if len(fs) > 2 {
-											adds := strings.Split(fs[1], " ")
-											dels := strings.Split(fs[2], " ")
-											a, e := strconv.Atoi(adds[0])
-											m.Assert(e)
-											stat.adds = a
-											d, e := strconv.Atoi(dels[0])
-											m.Assert(e)
-											stat.dels = d
-										} else {
-											adds := strings.Split(fs[1], " ")
-											a, e := strconv.Atoi(adds[0])
-											m.Assert(e)
-											if adds[1] == "insertions(+)" {
-												stat.adds = a
-											} else {
-												stat.dels = a
-											}
-										}
-
-										stats = append(stats, stat)
-									}
-								}
-
-								fmt.Fprintf(f, "order,date,adds,dels,sum,top,bottom,last\n")
-								l := len(stats)
-								for i := 0; i < l/2; i++ {
-									stats[i], stats[l-i-1] = stats[l-i-1], stats[i]
-								}
-								sum := 0
-								for i, v := range stats {
-									fmt.Fprintf(f, "%d,%s,%d,%d,%d,%d,%d,%d\n", i, v.date, v.adds, v.dels, sum, sum+v.adds, sum-v.dels, sum+v.adds-v.dels)
-									sum += v.adds - v.dels
-								}
+								m.Add("append", "adds", "0")
+								m.Add("append", "dels", adds[0])
 							}
-							continue
-
-						case "log":
-							args = append(args, "--color")
-							args = append(args, strings.Split(m.Confx("git_log"), "  ")...)
-							args = append(args, fmt.Sprintf("--%s", m.Confx("git_log_form")))
-							args = append(args, m.Confx("git_log_skip", arg, 1, "--skip=%s"))
-							args = append(args, m.Confx("git_log_line", arg, 2, "-n %s"))
-						default:
-							args = append(args, arg[1:]...)
 						}
-
-						switch c {
-						case "commit":
-							m.Find("web.code").Cmd("counter", "ncommit", 1)
-						case "push":
-							m.Find("web.code").Cmd("counter", "npush", 1)
-						}
-
-						m.Log("info", "cmd: %s %v", "git", kit.Trans("-C", p, c, args))
-						msg := m.Sess("cli").Cmd("system", "git", "-C", p, c, args)
-						m.Copy(msg, "result").Copy(msg, "append")
-						m.Echo("\n")
 					}
+					m.Table()
 				}
 				return
-			}},
+			}
+
+			if len(arg) == 0 {
+				m.Cmdy("nfs.config", "git")
+				return
+			}
+
+			wd, e := os.Getwd()
+			m.Assert(e)
+			m.Option("git_dir", wd)
+
+			cmds := []string{}
+			if v := m.Confv("git", []string{arg[0], "cmds"}); v != nil {
+				cmds = append(cmds, kit.Trans(v)...)
+			} else {
+				cmds = append(cmds, arg[0])
+			}
+
+			for _, cmd := range cmds {
+				args := append([]string{}, kit.Trans(m.Confv("git", "args"))...)
+				if v := m.Confv("git", []string{cmd, "args"}); v != nil {
+					args = append(args, kit.Trans(v)...)
+				} else {
+					args = append(args, cmd)
+				}
+				args = append(args, arg[1:]...)
+
+				for i, _ := range args {
+					args[i] = m.Parse(args[i])
+					args[i] = kit.Select(args[i], m.Conf("git", []string{"trans", args[i]}))
+				}
+
+				m.Cmd("cli.system", "git", args).Echo("\n\n").CopyTo(m)
+			}
+			return
+		}},
 
 		"path": &ctx.Command{Name: "path file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			for _, v := range m.Confv("paths").([]interface{}) {

@@ -146,21 +146,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if v, ok := kit.Chain(conf, "cmd").(string); ok {
 					arg[0] = m.Parse(v)
 				}
-				cmd := exec.Command(arg[0])
-				if v, ok := kit.Chain(conf, "path").(string); ok {
-					cmd.Path = m.Parse(v)
-				}
-				m.Log("info", "cmd.path %v", cmd.Path)
 
-				args := []string{}
+				args := []string{arg[0]}
 				if list, ok := kit.Chain(conf, "arg").([]interface{}); ok {
 					for _, v := range list {
 						args = append(args, m.Parse(v))
 					}
 				}
-				if args = append(args, arg[1:]...); len(args) > 0 {
-					cmd.Args = args
+				args = append(args, arg[1:]...)
+				cmd := exec.Command(args[0], args[1:]...)
+
+				if v, ok := kit.Chain(conf, "path").(string); ok {
+					cmd.Path = m.Parse(v)
 				}
+				m.Log("info", "cmd.path %v", cmd.Path)
+
 				m.Log("info", "cmd.arg %v", cmd.Args)
 
 				for k, v := range m.Confm("system_env") {
@@ -204,10 +204,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						if e := cmd.Run(); e != nil {
 							m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
 							m.Log("trace", "%s\n", e)
-
-							b, _ := cmd.CombinedOutput()
-							m.Echo("error: %s", string(b))
-							m.Log("trace", "error: %s", string(b))
 						} else {
 							switch m.Option("cmd_parse") {
 							case "json":

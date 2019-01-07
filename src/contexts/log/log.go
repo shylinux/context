@@ -2,6 +2,7 @@ package log
 
 import (
 	"contexts/ctx"
+	"path"
 	"toolkit"
 
 	"fmt"
@@ -38,7 +39,7 @@ func (log *LOG) Log(msg *ctx.Message, action string, str string, arg ...interfac
 	for _, v := range []string{action, "bench"} {
 		for i := len(args); i >= 0; i-- {
 			if value := log.Value(m, append([]string{v}, args[:i]...)); kit.Right(value) && kit.Right(value["file"]) {
-				name := kit.Format(value["file"])
+				name := path.Join(m.Conf("logdir"), kit.Format(value["file"]))
 				file, ok := log.file[name]
 				if !ok {
 					if f, e := os.Create(name); e == nil {
@@ -67,6 +68,7 @@ func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	os.Mkdir(m.Conf("logdir"), 0770)
 	log.file = map[string]*os.File{}
 	return log
 }
@@ -87,6 +89,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 		"nout": &ctx.Cache{Name: "nout", Value: "0", Help: "日志输出数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"logdir": &ctx.Config{Name: "logdir", Value: "var/log", Help: ""},
 		"output": &ctx.Config{Name: "output", Value: map[string]interface{}{
 			"error": map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
 			"trace": map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},

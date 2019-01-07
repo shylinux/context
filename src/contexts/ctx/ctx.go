@@ -304,9 +304,14 @@ type Message struct {
 }
 
 func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
+
 	if l := m.Sess("log", false); l != nil {
 		if log, ok := l.target.Server.(LOGGER); ok {
 			log.Log(m, action, str, arg...)
+			if action == "error" {
+				log.Log(m, "error", "%s", m.Format("full"))
+				log.Log(m, "error", "%s\n\n", string(debug.Stack()))
+			}
 			return m
 		}
 	}
@@ -927,7 +932,7 @@ func (m *Message) Parse(arg interface{}) string {
 		if len(str) > 1 && str[0] == '@' {
 			return m.Confx(str[1:])
 		}
-		return m.Cmdx(str)
+		return str
 	}
 	return ""
 }
@@ -1135,13 +1140,13 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 		case io.EOF:
 		case nil:
 		default:
-			m.Log("stack", "%s", msg.Format("full"))
+			m.Log("stack", "m: %s", m.Format("full"))
+			m.Log("stack", "msg: %s", msg.Format("full"))
 			m.Log("stack", "%s\n%s\n", e, string(debug.Stack()))
 
 			if len(hand) > 1 {
 				m.TryCatch(msg, safe, hand[1:]...)
 			} else if !safe {
-				m.Log("error", "%s not catch %v", msg.Format(), e)
 				msg.Assert(e)
 			}
 		}
@@ -1233,7 +1238,10 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 	if len(args) > 0 {
 		switch arg := args[0].(type) {
 		case []interface{}:
+			chain, args = arg, args[1:]
 		case []string:
+			chain, args = arg, args[1:]
+		case string:
 			chain, args = arg, args[1:]
 		}
 	}
