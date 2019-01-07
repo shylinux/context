@@ -27,13 +27,11 @@ type Frame struct {
 	list  []string
 }
 type CLI struct {
-	alias  map[string][]string
-	label  map[string]string
-	target *ctx.Context
-	stack  []*Frame
+	label map[string]string
+	stack []*Frame
 
 	*time.Timer
-	*ctx.Context
+	Context *ctx.Context
 }
 
 func (cli *CLI) schedule(m *ctx.Message) string {
@@ -50,74 +48,16 @@ func (cli *CLI) schedule(m *ctx.Message) string {
 
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	c.Caches = map[string]*ctx.Cache{
-		"level":    &ctx.Cache{Name: "level", Value: "0", Help: "嵌套层级"},
-		"parse":    &ctx.Cache{Name: "parse(true/false)", Value: "true", Help: "命令解析"},
-		"last_msg": &ctx.Cache{Name: "last_msg", Value: "0", Help: "前一条消息"},
-		"ps_count": &ctx.Cache{Name: "ps_count", Value: "0", Help: "命令计数"},
-		"ps_target": &ctx.Cache{Name: "ps_target", Value: c.Name, Help: "当前模块", Hand: func(m *ctx.Message, x *ctx.Cache, arg ...string) string {
-			if len(arg) > 0 {
-				if cli, ok := m.Target().Server.(*CLI); ok {
-					if msg := m.Find(arg[0]); msg != nil {
-						cli.target = msg.Target()
-						return arg[0]
-					}
-				}
-			}
-			return x.Value
-		}},
-	}
-	c.Configs = map[string]*ctx.Config{
-		"ps_time": &ctx.Config{Name: "ps_time", Value: "[15:04:05]", Help: "当前时间", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
-			if len(arg) > 0 {
-				return arg[0]
-			}
-			return time.Now().Format(x.Value.(string))
-
-		}},
-		"ps_end": &ctx.Config{Name: "ps_end", Value: "> ", Help: "命令行提示符结尾"},
-		"prompt": &ctx.Config{Name: "prompt(ps_count/ps_time/ps_target/ps_end/...)", Value: "ps_count ps_time ps_target ps_end", Help: "命令行提示符, 以空格分隔, 依次显示缓存或配置信息", Hand: func(m *ctx.Message, x *ctx.Config, arg ...string) string {
-			if len(arg) > 0 {
-				return arg[0]
-			}
-
-			ps := make([]string, 0, 3)
-			for _, v := range strings.Split(x.Value.(string), " ") {
-				if m.Conf(v) != "" {
-					ps = append(ps, m.Conf(v))
-				} else {
-					ps = append(ps, m.Cap(v))
-				}
-			}
-			return strings.Join(ps, "")
-
-		}},
+		"level": &ctx.Cache{Name: "level", Value: "0", Help: "嵌套层级"},
+		"parse": &ctx.Cache{Name: "parse(true/false)", Value: "true", Help: "命令解析"},
 	}
 
-	s := new(CLI)
-	s.Context = c
-	s.target = c
-	s.alias = map[string][]string{
-		"~":  []string{"context"},
-		"!":  []string{"message"},
-		":":  []string{"command"},
-		"::": []string{"command", "list"},
-
-		"pwd":  []string{"nfs.pwd"},
-		"path": []string{"nfs.path"},
-		"dir":  []string{"nfs.dir"},
-		"git":  []string{"nfs.git"},
-		"brow": []string{"web.brow"},
-	}
-
-	return s
+	return &CLI{Context: c}
 }
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	cli.target = m.Target()
 	return cli
 }
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
-	m.Optionv("ps_target", cli.target)
-	m.Option("prompt", m.Conf("prompt"))
 	m.Cap("stream", m.Spawn(m.Sess("yac", false).Target()).Call(func(cmd *ctx.Message) *ctx.Message {
 		if !m.Caps("parse") {
 			switch cmd.Detail(0) {
@@ -132,12 +72,14 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 			}
 		}
 
-		if m.Option("prompt", cmd.Cmd().Conf("prompt")); cmd.Has("return") {
-			kit.Log("error", "waht ?????")
+		if cmd.Cmd(); cmd.Has("return") {
 			m.Options("scan_end", true)
 			m.Target().Close(m)
 		}
-		m.Optionv("ps_target", cli.target)
+
+		m.Optionv("ps_target", cmd.Optionv("ps_target"))
+		m.Set("append").Copy(cmd, "append")
+		m.Set("result").Copy(cmd, "result")
 		return nil
 	}, "scan", arg).Target().Name)
 
@@ -148,8 +90,6 @@ func (cli *CLI) Close(m *ctx.Message, arg ...string) bool {
 	case m.Target():
 	case m.Source():
 	}
-	msg := cli.Message()
-	msg.Append("last_target", msg.Cap("ps_target"))
 	return true
 }
 
@@ -160,13 +100,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Configs: map[string]*ctx.Config{
 		"init_shy": &ctx.Config{Name: "init_shy", Value: "etc/init.shy", Help: "启动脚本"},
 		"exit_shy": &ctx.Config{Name: "exit_shy", Value: "etc/exit.shy", Help: "启动脚本"},
-
-		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
-		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
-
 		"cmd_script": &ctx.Config{Name: "cmd_script", Value: map[string]interface{}{
 			"sh": "bash", "shy": "source", "py": "python",
 		}, Help: "系统命令超时"},
+		"alias": &ctx.Config{Name: "alias", Value: map[string]interface{}{
+			"~":  []string{"context"},
+			"!":  []string{"message"},
+			":":  []string{"command"},
+			"::": []string{"command", "list"},
+
+			"pwd":  []string{"nfs.pwd"},
+			"path": []string{"nfs.path"},
+			"dir":  []string{"nfs.dir"},
+			"git":  []string{"nfs.git"},
+			"brow": []string{"web.brow"},
+		}, Help: "启动脚本"},
+
+		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
+		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
 
 		"source_list": &ctx.Config{Name: "source_list", Value: []interface{}{}, Help: "系统命令超时"},
 		"system_env":  &ctx.Config{Name: "system_env", Value: map[string]interface{}{}, Help: "系统命令超时"},
@@ -184,198 +135,187 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"alias": &ctx.Command{Name: "alias [short [long...]]|[delete short]|[import module [command [alias]]]",
 			Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名, import导入模块所有命令",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-					switch len(arg) {
-					case 0:
-						for k, v := range cli.alias {
-							m.Echo("%s: %v\n", k, v)
+				switch len(arg) {
+				case 0:
+					m.Cmdy("ctx.config", "alias")
+				case 1:
+					m.Cmdy("ctx.config", "alias", arg[0])
+				default:
+					switch arg[0] {
+					case "delete":
+						alias := m.Confm("alias")
+						m.Echo("delete: %s %v\n", arg[1], alias[arg[1]])
+						delete(alias, arg[1])
+					case "import":
+						msg := m.Find(arg[1], false)
+						if msg == nil {
+							msg = m.Find(arg[1], true)
 						}
-					case 1:
-						m.Echo("%s: %v\n", arg[0], cli.alias[arg[0]])
+						if msg == nil {
+							m.Echo("%s not exist", arg[1])
+							return
+						}
+
+						module := msg.Cap("module")
+						for k, _ := range msg.Target().Commands {
+							if len(k) > 0 && k[0] == '/' {
+								continue
+							}
+
+							if len(arg) == 2 {
+								m.Confv("alias", k, []string{module + "." + k})
+								m.Log("info", "import %s.%s", module, k)
+								continue
+							}
+
+							if key := k; k == arg[2] {
+								if len(arg) > 3 {
+									key = arg[3]
+								}
+								m.Confv("alias", key, []string{module + "." + k})
+								m.Log("info", "import %s.%s as %s", module, k, key)
+								break
+							}
+						}
 					default:
-						switch arg[0] {
-						case "delete":
-							m.Echo("delete: %s %v\n", arg[1], cli.alias[arg[1]])
-							delete(cli.alias, arg[1])
-						case "import":
-							msg := m.Find(arg[1], false)
-							if msg == nil {
-								msg = m.Find(arg[1], true)
-							}
-							if msg == nil {
-								m.Echo("%s not exist", arg[1])
-								return
-							}
-							m.Log("info", "import %s", arg[1])
-							module := msg.Cap("module")
-							for k, _ := range msg.Target().Commands {
-								if len(k) > 0 && k[0] == '/' {
-									continue
-								}
-								if len(arg) == 2 {
-									cli.alias[k] = []string{module + "." + k}
-									continue
-								}
-								if key := k; k == arg[2] {
-									if len(arg) > 3 {
-										key = arg[3]
-									}
-									cli.alias[key] = []string{module + "." + k}
-									break
-								}
-							}
-						default:
-							cli.alias[arg[0]] = arg[1:]
-							m.Echo("%s: %v\n", arg[0], cli.alias[arg[0]])
-							m.Log("info", "%s: %v", arg[0], cli.alias[arg[0]])
-						}
+						m.Confv("alias", arg[0], arg[1:])
+						m.Log("info", "%s: %v", arg[0], arg[1:])
 					}
 				}
 				return
 			}},
-		"cmd": &ctx.Command{Name: "cmd word", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				detail := []string{}
-				if a, ok := cli.alias[arg[0]]; ok {
-					detail = append(detail, a...)
-					detail = append(detail, arg[1:]...)
+		"cmd": &ctx.Command{Name: "cmd word", Help: "解析命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			// 解析别名
+			detail := []string{}
+			if alias, ok := m.Confv("alias", arg[0]).([]string); ok {
+				detail, arg = append(detail, alias...), arg[1:]
+			}
+			detail = append(detail, arg...)
+
+			// 目标切换
+			if detail[0] != "context" {
+				target := m.Optionv("ps_target")
+				defer func() { m.Optionv("ps_target", target) }()
+			}
+
+			// 解析脚本
+			msg := m
+			for k, v := range m.Confv("cmd_script").(map[string]interface{}) {
+				if strings.HasSuffix(detail[0], "."+k) {
+					msg = m.Spawn(m.Optionv("ps_target"))
+					detail[0] = m.Cmdx("nfs.path", detail[0])
+					detail = append([]string{v.(string)}, detail...)
+					break
+				}
+			}
+
+			// 解析路由
+			if msg == m {
+				if routes := strings.Split(detail[0], "."); len(routes) > 1 {
+					route := strings.Join(routes[:len(routes)-1], ".")
+					if msg = m.Find(route, false); msg == nil {
+						msg = m.Find(route, true)
+					}
+
+					if msg == nil {
+						m.Echo("%s not exist", route)
+						return
+					}
+					detail[0] = routes[len(routes)-1]
 				} else {
-					detail = append(detail, arg...)
+					msg = m.Spawn(m.Optionv("ps_target"))
 				}
+			}
+			msg.Copy(m, "option").Copy(m, "append")
 
-				if detail[0] != "context" {
-					target := m.Cap("ps_target")
-					defer func() {
-						m.Cap("ps_target", target)
-					}()
-				}
-
-				msg := m
-				for k, v := range m.Confv("cmd_script").(map[string]interface{}) {
-					if strings.HasSuffix(detail[0], "."+k) {
-						detail[0] = m.Sess("nfs").Cmd("path", detail[0]).Result(0)
-						detail = append([]string{v.(string)}, detail...)
-						msg = m.Spawn(cli.target)
+			// 解析命令
+			args, rest := []string{}, []string{}
+			exports := []map[string]string{}
+			exec, execexec := true, false
+			for i := 0; i < len(detail); i++ {
+				switch detail[i] {
+				case "?":
+					if !kit.Right(detail[i+1]) {
+						return
+					}
+					i++
+				case "??":
+					exec = false
+					execexec = execexec || kit.Right(detail[i+1])
+					i++
+				case "<":
+					m.Cmdy("nfs.import", detail[i+1])
+					i++
+				case ">":
+					exports = append(exports, map[string]string{"file": detail[i+1]})
+					i++
+				case ">$":
+					if i == len(detail)-2 {
+						exports = append(exports, map[string]string{"cache": detail[i+1], "index": "result"})
+						i += 1
 						break
 					}
-				}
-
-				if msg == m {
-					if routes := strings.Split(detail[0], "."); len(routes) > 1 {
-						route := strings.Join(routes[:len(routes)-1], ".")
-						if msg = m.Find(route, false); msg == nil {
-							msg = m.Find(route, true)
-						}
-
-						if msg == nil {
-							m.Echo("%s not exist", route)
-							return
-						}
-						detail[0] = routes[len(routes)-1]
-					} else {
-						msg = m.Spawn(cli.target)
+					exports = append(exports, map[string]string{"cache": detail[i+1], "index": detail[i+2]})
+					i += 2
+				case ">@":
+					if i == len(detail)-2 {
+						exports = append(exports, map[string]string{"config": detail[i+1], "index": "result"})
+						i += 1
+						break
 					}
+					exports = append(exports, map[string]string{"config": detail[i+1], "index": detail[i+2]})
+					i += 2
+				case "|":
+					detail, rest = detail[:i], detail[i+1:]
+				case "%":
+					rest = append(rest, "select")
+					detail, rest = detail[:i], append(rest, detail[i+1:]...)
+				default:
+					args = append(args, detail[i])
 				}
-				msg.Copy(m, "append")
-				msg.Copy(m, "option")
-
-				args := []string{}
-				rest := []string{}
-				exec := true
-				execexec := false
-				exports := []map[string]string{}
-				for i := 0; i < len(detail); i++ {
-					switch detail[i] {
-					case "?":
-						if !kit.Right(detail[i+1]) {
-							return
-						}
-						i++
-					case "??":
-						exec = false
-						execexec = execexec || kit.Right(detail[i+1])
-						i++
-					case "<":
-						pipe := m.Sess("nfs").Cmd("import", detail[i+1])
-						msg.Copy(pipe, "append")
-						i++
-					case ">":
-						exports = append(exports, map[string]string{"file": detail[i+1]})
-						i++
-					case ">$":
-						if i == len(detail)-2 {
-							exports = append(exports, map[string]string{"cache": detail[i+1], "index": "result"})
-							i += 1
-							break
-						}
-						exports = append(exports, map[string]string{"cache": detail[i+1], "index": detail[i+2]})
-						i += 2
-					case ">@":
-						if i == len(detail)-2 {
-							exports = append(exports, map[string]string{"config": detail[i+1], "index": "result"})
-							i += 1
-							break
-						}
-						exports = append(exports, map[string]string{"config": detail[i+1], "index": detail[i+2]})
-						i += 2
-					case "|":
-						detail, rest = detail[:i], detail[i+1:]
-					case "%":
-						rest = append(rest, "select")
-						detail, rest = detail[:i], append(rest, detail[i+1:]...)
-					default:
-						args = append(args, detail[i])
-					}
-				}
-
-				if !exec && !execexec {
-					return
-				}
-
-				detail = args
-				msg.Set("detail", detail)
-
-				if msg.Cmd(); msg.Hand {
-					m.Cap("ps_target", msg.Cap("module"))
-				} else {
-					msg.Copy(m, "target").Copy(m, "result").Detail(-1, "system")
-					msg.Cmd()
-				}
-
-				for _, v := range exports {
-					if v["file"] != "" {
-						m.Sess("nfs").Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
-					}
-					if v["cache"] != "" {
-						if v["index"] == "result" {
-							m.Cap(v["cache"], strings.Join(msg.Meta["result"], ""))
-						} else {
-							m.Cap(v["cache"], msg.Append(v["index"]))
-						}
-					}
-					if v["config"] != "" {
-						if v["index"] == "result" {
-							m.Conf(v["config"], strings.Join(msg.Meta["result"], ""))
-						} else {
-							m.Conf(v["config"], msg.Append(v["index"]))
-						}
-					}
-				}
-
-				if len(rest) > 0 {
-					pipe := m.Spawn().Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("cmd", rest)
-
-					msg.Set("result").Set("append")
-					msg.Copy(pipe, "result").Copy(pipe, "append")
-				}
-
-				m.Target().Message().Set("result").Set("append").Copy(msg, "result").Copy(msg, "append")
-				m.Set("append").Copy(msg, "append")
-				m.Set("result").Copy(msg, "result")
-
-				// m.Capi("last_msg", 0, msg.Code())
-				// m.Capi("ps_count", 1)
 			}
+			if !exec && !execexec {
+				return
+			}
+
+			// 执行命令
+			if msg.Set("detail", args).Cmd(); !msg.Hand {
+				msg.Cmd("system", args)
+			}
+
+			// 管道命令
+			if len(rest) > 0 {
+				pipe := m.Spawn().Copy(msg, "option")
+				pipe.Copy(msg, "append").Copy(msg, "result").Cmd("cmd", rest)
+				msg.Set("append").Copy(pipe, "append")
+				msg.Set("result").Copy(pipe, "result")
+			}
+
+			// 导出结果
+			for _, v := range exports {
+				if v["file"] != "" {
+					m.Sess("nfs").Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
+				}
+				if v["cache"] != "" {
+					if v["index"] == "result" {
+						m.Cap(v["cache"], strings.Join(msg.Meta["result"], ""))
+					} else {
+						m.Cap(v["cache"], msg.Append(v["index"]))
+					}
+				}
+				if v["config"] != "" {
+					if v["index"] == "result" {
+						m.Conf(v["config"], strings.Join(msg.Meta["result"], ""))
+					} else {
+						m.Conf(v["config"], msg.Append(v["index"]))
+					}
+				}
+			}
+
+			// 返回结果
+			m.Optionv("ps_target", msg.Target())
+			m.Set("append").Copy(msg, "append")
+			m.Set("result").Copy(msg, "result")
 			return
 		}},
 		"str": &ctx.Command{Name: "str word", Help: "解析字符串", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -383,33 +323,30 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"exe": &ctx.Command{Name: "exe $ ( cmd )", Help: "解析嵌套命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				switch len(arg) {
-				case 1:
-					m.Echo(arg[0])
-				case 2:
-					msg := m.Spawn(cli.target)
-					switch arg[0] {
-					case "$":
-						m.Echo(msg.Cap(arg[1]))
-					case "@":
-						value := msg.Option(arg[1])
-						if value == "" {
-							value = msg.Conf(arg[1])
-						}
+			switch len(arg) {
+			case 1:
+				m.Echo(arg[0])
+			case 2:
+				msg := m.Spawn(m.Optionv("ps_target"))
+				switch arg[0] {
+				case "$":
+					m.Echo(msg.Cap(arg[1]))
+				case "@":
+					value := msg.Option(arg[1])
+					if value == "" {
+						value = msg.Conf(arg[1])
+					}
 
-						m.Echo(value)
-					default:
-						m.Echo(arg[0]).Echo(arg[1])
-					}
+					m.Echo(value)
 				default:
-					switch arg[0] {
-					case "$", "@":
-						m.Result(0, arg[2:len(arg)-1])
-					}
+					m.Echo(arg[0]).Echo(arg[1])
 				}
-				return
-			} //}}}
+			default:
+				switch arg[0] {
+				case "$", "@":
+					m.Result(0, arg[2:len(arg)-1])
+				}
+			}
 			return
 		}},
 		"val": &ctx.Command{Name: "val exp", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -614,10 +551,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, result: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); ok {
-				msg := cli.Message()
-				msg.Result(-2, arg[1:])
-			}
 			m.Add("append", "return", arg[1:])
 			return
 		}},
@@ -630,6 +563,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if (len(arg) == 0 || arg[0] == "stdio") && m.Target().Name == "cli" {
 					// 启动终端
 					m.Cmd("yac.init")
+					m.Optionv("ps_target", m.Target())
 					if m.Start("shy", "shell", "stdio"); m.Cmds("nfs.path", m.Confx("init_shy", arg, 1)) {
 						// msg := m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init_shy"))
 
@@ -682,10 +616,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}},
 		"arguments": &ctx.Command{Name: "arguments", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Source().Server.(*CLI); ok {
-				msg := cli.Message().Spawn().Cmd("detail", arg)
-				m.Copy(msg, "append").Copy(msg, "result")
-			}
+			m.Set("result", m.Optionv("arguments"))
 			return
 		}},
 		"run": &ctx.Command{Name: "run", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -803,45 +734,37 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				} else {
 					wait := make(chan bool, 1)
 					go func() {
-						if m.Has("cmd_error") {
-							if out, e := cmd.CombinedOutput(); e != nil {
-								m.Echo("error: ").Echo("%s\n", e)
-								m.Echo("%s\n", string(out))
-							} else {
-								m.Echo(string(out))
-							}
-						} else {
-							if out, e := cmd.Output(); e != nil {
-								if e == exec.ErrNotFound {
-									m.Echo("error: ").Echo("not found\n")
-								} else {
-									m.Echo("error: ").Echo("%s\n", e)
-									m.Echo("%s\n", string(out))
-								}
-							} else {
-								switch m.Option("cmd_parse") {
-								case "json":
-									var data interface{}
-									if json.Unmarshal(out, &data) == nil {
-										msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
-										m.Copy(msg, "append").Copy(msg, "result")
-									} else {
-										m.Echo(string(out))
-									}
 
-								case "csv":
-									data, e := csv.NewReader(bytes.NewReader(out)).ReadAll()
-									m.Assert(e)
-									for i := 1; i < len(data); i++ {
-										for j := 0; j < len(data[i]); j++ {
-											m.Add("append", data[0][j], data[i][j])
-										}
-									}
-									m.Table()
-								default:
+						out := bytes.NewBuffer(make([]byte, 1024))
+						err := bytes.NewBuffer(make([]byte, 1024))
+						cmd.Stdout = out
+						cmd.Stderr = err
+
+						if e := cmd.Run(); e == nil {
+							m.Echo("error: ").Echo("%s", e).Echo(string(err))
+						} else {
+
+							switch m.Option("cmd_parse") {
+							case "json":
+								var data interface{}
+								if json.Unmarshal(out, &data) == nil {
+									msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
+									m.Copy(msg, "append").Copy(msg, "result")
+								} else {
 									m.Echo(string(out))
 								}
 
+							case "csv":
+								data, e := csv.NewReader(bytes.NewReader(out)).ReadAll()
+								m.Assert(e)
+								for i := 1; i < len(data); i++ {
+									for j := 0; j < len(data[i]); j++ {
+										m.Add("append", data[0][j], data[i][j])
+									}
+								}
+								m.Table()
+							default:
+								m.Echo(string(out))
 							}
 						}
 						wait <- true

@@ -94,6 +94,12 @@ func Format(arg ...interface{}) string {
 			result = append(result, val...)
 		case float64:
 			result = append(result, fmt.Sprintf("%d", int(val)))
+		case *os.File:
+			if s, e := val.Stat(); e == nil {
+				result = append(result, fmt.Sprintf("%T [name: %s]", v, s.Name()))
+			} else {
+				result = append(result, fmt.Sprintf("%T", v))
+			}
 		case time.Time:
 			result = append(result, fmt.Sprintf("%d", val.Format("2006-01-02 15:03:04")))
 		// case error:

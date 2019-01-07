@@ -239,40 +239,6 @@ func (nfs *NFS) print(str string) bool {
 	return true
 }
 
-func (nfs *NFS) prompt(arg ...string) string {
-	nfs.out.WriteString("> ")
-	return "> "
-
-	ps := nfs.Option("prompt")
-	if nfs.Caps("windows") {
-		nfs.color(ps)
-		return ps
-	}
-	line, rest := "", ""
-	if len(arg) > 0 {
-		line = arg[0]
-	}
-	if len(arg) > 1 {
-		rest = arg[1]
-	}
-
-	if !nfs.Caps("windows") && len(nfs.pages) > 0 && nfs.width > 0 {
-		for i := (len(nfs.pages[len(nfs.pages)-1]) - 1) / (nfs.width); i > 0; i-- {
-			nfs.escape("2K").escape("A")
-		}
-		nfs.escape("2K").escape("G").escape("?25h")
-	}
-
-	if len(nfs.pages) > 0 {
-		nfs.pages = nfs.pages[:len(nfs.pages)-1]
-	}
-	nfs.pages = append(nfs.pages, ps+line+rest+"\n")
-
-	if nfs.color(ps, nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
-		nfs.escape("%dD", len(rest))
-	}
-	return ps
-}
 func (nfs *NFS) zone(buf []string, top, height int) (row, col int) {
 	row, col = len(buf)-1, 0
 	for i := nfs.Capi("cursor_pos"); i > top-1; {
@@ -558,6 +524,54 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 	return
 }
 
+func (nfs *NFS) prompt(arg ...string) string {
+	m := nfs.Context.Message()
+	target := m.Optionv("ps_target").(*ctx.Context)
+	nfs.out.WriteString(fmt.Sprintf("%d[%s]%s> ", m.Capi("ninput"), time.Now().Format("15:04:05"), target.Name))
+	return "> "
+
+	ps := nfs.Option("prompt")
+	if nfs.Caps("windows") {
+		nfs.color(ps)
+		return ps
+	}
+	line, rest := "", ""
+	if len(arg) > 0 {
+		line = arg[0]
+	}
+	if len(arg) > 1 {
+		rest = arg[1]
+	}
+
+	if !nfs.Caps("windows") && len(nfs.pages) > 0 && nfs.width > 0 {
+		for i := (len(nfs.pages[len(nfs.pages)-1]) - 1) / (nfs.width); i > 0; i-- {
+			nfs.escape("2K").escape("A")
+		}
+		nfs.escape("2K").escape("G").escape("?25h")
+	}
+
+	if len(nfs.pages) > 0 {
+		nfs.pages = nfs.pages[:len(nfs.pages)-1]
+	}
+	nfs.pages = append(nfs.pages, ps+line+rest+"\n")
+
+	if nfs.color(ps, nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
+		nfs.escape("%dD", len(rest))
+	}
+	return ps
+}
+func (nfs *NFS) printf(arg ...interface{}) *NFS {
+	for _, v := range arg {
+		if nfs.io != nil {
+			fmt.Fprint(nfs.io, kit.Format(v))
+		} else if nfs.out != nil {
+			nfs.out.WriteString(kit.Format(v))
+		}
+	}
+
+	return nfs
+}
+
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	if len(arg) > 0 && (arg[0] == "scan" || arg[0] == "open" || arg[0] == "append") {
 		c.Caches = map[string]*ctx.Cache{
@@ -591,7 +605,22 @@ func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return nfs
 }
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
+
+	if len(arg) > 0 && (arg[0] == "open" || arg[0] == "append") {
+		nfs.out = m.Optionv("out").(*os.File)
+		nfs.in = m.Optionv("in").(*os.File)
+		m.Cap("stream", arg[1])
+
+		if s, e := nfs.in.Stat(); m.Assert(e) {
+			if m.Capi("size", int(s.Size())); arg[0] == "append" {
+				m.Capi("pos", int(s.Size()))
+			}
+		}
+		return false
+	}
+
 	if len(arg) > 0 && arg[0] == "scan" {
+		m.Cap("stream", arg[1])
 		nfs.Caches["ninput"] = &ctx.Cache{Value: "0"}
 		nfs.Caches["noutput"] = &ctx.Cache{Value: "0"}
 		nfs.Configs["input"] = &ctx.Config{Value: []interface{}{}}
@@ -609,30 +638,38 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				}
 				line = strings.TrimSuffix(line, "\\")
 			}
-
 			m.Confv("input", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 			m.Log("debug", "%s %d %d [%s]", "input", m.Capi("ninput", 1), len(line), line)
 
 			for i := m.Capi("ninput") - 1; i < m.Capi("ninput"); i++ {
 				line = m.Conf("input", []interface{}{i, "line"})
 
-				msg := m.Spawn(m.Source()).Set("detail", line).Set("option", "file_pos", i)
-				m.Back(msg)
+				msg := m.Backs(m.Spawn(m.Source()).Set("detail", line).Set("option", "file_pos", i))
 
 				lines := strings.Split(strings.Join(msg.Meta["result"], ""), "\n")
-				for _, line := range lines {
-					if line != "" {
-						m.Log("debug", "%s %d %d [%s]", "output", m.Capi("noutput", 1), len(line), line)
-						m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
-						nfs.print(line)
-						nfs.print("\n")
+				for j := len(lines) - 1; j > 0; j-- {
+					if strings.TrimSpace(lines[j]) != "" {
+						break
 					}
+					lines = lines[:j]
+				}
+				for _, line := range lines {
+					m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
+					m.Log("debug", "%s %d %d [%s]", "output", m.Capi("noutput", 1), len(line), line)
+					nfs.printf(line).printf("\n")
+				}
+
+				if msg.Appends("file_pos0") {
+					i = msg.Appendi("file_pos0") - 1
+					msg.Append("file_pos0", "")
 				}
 			}
-
 			line = ""
 		}
 
+		if !m.Options("scan_end") {
+			m.Backs(m.Spawn(m.Source()).Set("detail", "return"))
+		}
 		return true
 	}
 
@@ -649,12 +686,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		// nfs.Configs["statusfgcolor"] = &ctx.Config{Name: "statusfgcolor", Value: "1", Help: "pscolor"}
 		// nfs.Configs["statusbgcolor"] = &ctx.Config{Name: "statusbgcolor", Value: "2", Help: "pscolor"}
 		//
-		nfs.in = m.Optionv("in").(*os.File)
-		bio := bufio.NewScanner(nfs)
 
-		s, e := nfs.in.Stat()
-		m.Assert(e)
-		m.Capi("size", int(s.Size()))
+		// nfs.in = m.Optionv("in").(*os.File)
+		// bio := bufio.NewScanner(nfs)
+		//
+		// s, e := nfs.in.Stat()
+		// m.Assert(e)
+		// m.Capi("size", int(s.Size()))
 
 		if m.Cap("stream", arg[1]) == "stdio" {
 			nfs.out = m.Optionv("out").(*os.File)
@@ -689,61 +727,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			// 	}
 			// }
 		}
-
-		line := ""
-		for nfs.prompt(); !m.Options("scan_end") && bio.Scan(); nfs.prompt() {
-			kit.Log("error", "stdio read %v", "text")
-			text := bio.Text()
-			m.Capi("nread", len(text)+1)
-			kit.Log("error", "stdio read %v", text)
-			continue
-
-			if line += text; len(text) > 0 && text[len(text)-1] == '\\' {
-				line = line[:len(line)-1]
-				continue
-			}
-			m.Capi("nline", 1)
-			m.Confv("history", -2, line)
-			history := m.Confv("history").([]interface{})
-
-			for i := len(history) - 1; i < len(history); i++ {
-				line = history[i].(string)
-
-				msg := m.Spawn(m.Source()).Set("detail", line)
-				msg.Option("file_pos", i)
-				m.Back(msg)
-
-				for _, v := range msg.Meta["result"] {
-					m.Capi("nwrite", len(v))
-					nfs.print(v)
-				}
-				if msg.Append("file_pos0") != "" {
-					i = msg.Appendi("file_pos0") - 1
-					msg.Append("file_pos0", "")
-				}
-			}
-			line = ""
-		}
-
-		kit.Log("error", "stdio read %v", line)
-		if !m.Options("scan_end") {
-			msg := m.Spawn(m.Source()).Set("detail", "return")
-			m.Back(msg)
-		}
-		return true
-	}
-
-	if len(arg) > 0 && (arg[0] == "open" || arg[0] == "append") {
-		nfs.out = m.Optionv("out").(*os.File)
-		nfs.in = m.Optionv("in").(*os.File)
-		s, e := nfs.in.Stat()
-		m.Assert(e)
-		m.Capi("size", int(s.Size()))
-		m.Cap("stream", arg[1])
-		if arg[0] == "append" {
-			m.Capi("pos", int(s.Size()))
-		}
-		return false
 	}
 
 	m.Cap("stream", m.Option("stream"))
@@ -864,7 +847,7 @@ func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
 var FileNotExist = errors.New("file not exist")
 var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	Caches: map[string]*ctx.Cache{
-		"nfile": &ctx.Cache{Name: "nfile", Value: "-1", Help: "已经打开的文件数量"},
+		"nfile": &ctx.Cache{Name: "nfile", Value: "0", Help: "已经打开的文件数量"},
 	},
 	Configs: map[string]*ctx.Config{
 		"term_simple": &ctx.Config{Name: "term_simple", Value: "false", Help: "二维码的默认大小"},
@@ -902,6 +885,86 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", ""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
+		"open": &ctx.Command{Name: "open file", Help: "打开文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if m.Has("io") {
+			} else if p, f, e := open(m, arg[0], os.O_RDWR|os.O_CREATE); e == nil {
+				m.Put("option", "in", f).Put("option", "out", f)
+				arg[0] = p
+			} else {
+				return nil
+			}
+
+			m.Start(fmt.Sprintf("file%d", m.Capi("nfile")), fmt.Sprintf("file %s", arg[0]), "open", arg[0])
+			m.Echo(arg[0])
+			return
+		}},
+		"read": &ctx.Command{Name: "read [buf_size [pos]]", Help: "读取文件, buf_size: 读取大小, pos: 读取位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.in != nil {
+				if len(arg) > 1 {
+					m.Cap("pos", arg[1])
+				}
+
+				buf := make([]byte, kit.Int(m.Confx("buf_size", arg, 0)))
+				if n, e := nfs.in.ReadAt(buf, int64(m.Capi("pos"))); e == io.EOF || m.Assert(e) {
+					m.Capi("nread", n)
+					if m.Capi("pos", n); n == 0 {
+						m.Cap("pos", "0")
+					}
+				}
+				m.Echo(string(buf))
+			}
+			return
+		}},
+		"write": &ctx.Command{Name: "write string [pos]", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
+				if len(arg) > 1 {
+					m.Cap("pos", arg[1])
+				}
+
+				if len(arg[0]) == 0 {
+					m.Assert(nfs.out.Truncate(int64(m.Capi("pos"))))
+					m.Cap("size", m.Cap("pos"))
+					m.Cap("pos", "0")
+				} else {
+					n, e := nfs.out.WriteAt([]byte(arg[0]), int64(m.Capi("pos")))
+					if m.Capi("nwrite", n); m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
+						m.Cap("size", m.Cap("pos"))
+					}
+					nfs.out.Sync()
+				}
+
+				m.Echo(m.Cap("pos"))
+			}
+			return
+		}},
+
+		"scan": &ctx.Command{Name: "scan file name", Help: "扫描文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				if help := fmt.Sprintf("scan %s", arg[0]); arg[0] == "stdio" {
+					m.Put("option", "in", os.Stdin).Put("option", "out", os.Stdout).Start(arg[0], help, key, arg[0])
+				} else if p, f, e := open(m, arg[0]); m.Assert(e) {
+					m.Put("option", "in", f).Start(fmt.Sprintf("file%s", m.Capi("nfile")), help, key, p)
+				}
+			}
+			return
+		}},
+		"prompt": &ctx.Command{Name: "prompt arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
+				nfs.prompt()
+				for _, v := range arg {
+					nfs.printf(v)
+					m.Echo(v)
+				}
+			}
+			return
+		}},
+		"printf": &ctx.Command{Name: "printf arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				nfs.printf(arg)
+			}
+			return
+		}},
+
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
@@ -942,34 +1005,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
-		"scan": &ctx.Command{Name: "scan file name", Help: "扫描文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-				help := fmt.Sprintf("scan %s", arg[0])
-
-				if arg[0] == "stdio" {
-					m.Optionv("in", os.Stdin)
-					m.Optionv("out", os.Stdout)
-					m.Start(arg[0], help, key, arg[0])
-					return
-				}
-
-				if p, f, e := open(m, arg[0]); m.Assert(e) {
-					m.Optionv("in", f)
-					m.Start(m.Confx("nfs_name", arg, 1), help, key, p)
-				}
-			}
-			return
-		}},
-		"prompt": &ctx.Command{Name: "prompt arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
-				nfs.prompt()
-				for _, v := range arg {
-					nfs.out.WriteString(v)
-					m.Echo(v)
-				}
-			}
-			return
-		}},
 		"exec": &ctx.Command{Name: "exec cmd", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
 				nfs.prompt()
@@ -984,75 +1019,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Echo(v)
 				}
 				nfs.out.WriteString("\n")
-			}
-			return
-		}},
-		"show": &ctx.Command{Name: "show arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
-				for _, v := range arg {
-					nfs.out.WriteString(v)
-					m.Echo(v)
-				}
-			}
-			return
-		}},
-
-		"open": &ctx.Command{Name: "open file name", Help: "打开文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			file := arg[0]
-			if m.Has("io") {
-
-			} else if p, f, e := open(m, file, os.O_RDWR|os.O_CREATE); e == nil {
-				m.Put("option", "in", f).Put("option", "out", f)
-				file = p
-			} else {
-				return nil
-			}
-
-			m.Start(m.Confx("nfs_name", arg, 1), fmt.Sprintf("file %s", file), "open", file)
-			m.Echo(file)
-			return
-		}},
-		"read": &ctx.Command{Name: "read [buf_size [pos]]", Help: "读取文件, buf_size: 读取大小, pos: 读取位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.in != nil {
-				n, e := strconv.Atoi(m.Confx("buf_size", arg, 0))
-				m.Assert(e)
-
-				if len(arg) > 1 {
-					m.Cap("pos", arg[1])
-				}
-
-				buf := make([]byte, n)
-				if n, e = nfs.in.ReadAt(buf, int64(m.Capi("pos"))); e != io.EOF {
-					m.Assert(e)
-				}
-				m.Capi("nread", n)
-				m.Echo(string(buf))
-
-				if m.Capi("pos", n); n == 0 {
-					m.Cap("pos", "0")
-				}
-			}
-			return
-		}},
-		"write": &ctx.Command{Name: "write string [pos]", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
-				if len(arg) > 1 {
-					m.Cap("pos", arg[1])
-				}
-
-				if len(arg[0]) == 0 {
-					m.Assert(nfs.out.Truncate(int64(m.Capi("pos"))))
-					m.Cap("size", m.Cap("pos"))
-					m.Cap("pos", "0")
-				} else {
-					n, e := nfs.out.WriteAt([]byte(arg[0]), int64(m.Capi("pos")))
-					if m.Capi("nwrite", n); m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
-						m.Cap("size", m.Cap("pos"))
-					}
-					nfs.out.Sync()
-				}
-
-				m.Echo(m.Cap("pos"))
 			}
 			return
 		}},

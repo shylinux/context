@@ -2,12 +2,13 @@ package gdb
 
 import (
 	"contexts/ctx"
+	"toolkit"
+
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
-	"toolkit"
 )
 
 type GDB struct {

@@ -218,9 +218,10 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 			s, star = star, 0
 		}
 	}
+
 	if hash == 0 {
 		word = word[:0]
-	} else if out != nil { //执行命令
+	} else if !m.Confs("exec", []string{yac.hand[hash], "disable"}) { //执行命令
 		msg := out.Spawn(m.Source()).Add("detail", yac.hand[hash], word)
 		if m.Back(msg); msg.Hand { //命令替换
 			m.Assert(!msg.Has("return"))
@@ -316,6 +317,10 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "line", "hash": "line", "word": []interface{}{"opt{", "mul{", "stm", "cmd", "}", "}", "mul{", ";", "\n", "#[^\n]*\n", "}"}},
 		}, Help: "语法集合的最大数量"},
 		"info": &ctx.Config{Name: "info", Value: map[string]interface{}{"ncell": 128, "nlang": 64}, Help: "嵌套层级日志的标记"},
+		"exec": &ctx.Config{Name: "info", Value: map[string]interface{}{
+			"line": map[string]interface{}{"disable": true},
+			"word": map[string]interface{}{"disable": true},
+		}, Help: "嵌套层级日志的标记"},
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
