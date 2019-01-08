@@ -1456,6 +1456,7 @@ type CTX struct {
 var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 	Caches: map[string]*Cache{
 		"begin_time": &Cache{Name: "begin_time", Value: "", Help: "启动时间"},
+		"goos":       &Cache{Name: "goos", Value: "linux", Help: "启动时间"},
 		"nserver":    &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
 		"ncontext":   &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
 		"nmessage":   &Cache{Name: "nmessage", Value: "1", Help: "消息数量"},
@@ -3250,6 +3251,7 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	m.target.root = m.target
 	m.root = m
 	m.Cap("begin_time", m.Time())
+	m.Cap("goos", runtime.GOOS)
 	for _, msg := range m.Search("") {
 		msg.target.root = m.target
 		if msg.target == m.target {

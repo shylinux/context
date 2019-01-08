@@ -335,15 +335,38 @@ func (nfs *NFS) View(buf []string, top int, height int) {
 		}
 	}
 }
+
 func (nfs *NFS) Read(p []byte) (n int, err error) {
-	if nfs.Caps("windows") || !nfs.Caps("termbox") || nfs.Confs("term_simple") {
+	m := nfs.Context.Message()
+	if !m.Caps("termbox") {
 		return nfs.in.Read(p)
 	}
 
-	buf := make([]rune, 0, 1024)
-	rest := make([]rune, 0, 1024)
+	what := make([]rune, 0, 1024)
 
-	back := buf
+	for {
+		switch ev := termbox.PollEvent(); ev.Type {
+		case termbox.EventKey:
+			switch ev.Key {
+			case termbox.KeyCtrlC:
+			case termbox.KeyCtrlJ:
+				b := []byte(string(what))
+				n = len(b)
+				copy(p, b)
+				return
+			default:
+				m.Log("bench", "event %v", ev.Ch)
+				what = append(what, ev.Ch)
+			}
+		default:
+		}
+	}
+
+	return
+
+	back := make([]rune, 0, 1024)
+	rest := make([]rune, 0, 1024)
+	buf := back
 
 	history := nfs.Context.Message().Confv("history").([]interface{})
 	his := len(history)
@@ -527,7 +550,6 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 	}
 	return
 }
-
 func (nfs *NFS) prompt(arg ...string) string {
 	m := nfs.Context.Message()
 	target, _ := m.Optionv("ps_target").(*ctx.Context)
@@ -629,6 +651,11 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
 			nfs.out = m.Optionv("out").(*os.File)
+			if m.Cap("goos") != "windows" {
+				termbox.Init()
+				defer termbox.Close()
+				nfs.Caches["termbox"] = &ctx.Cache{Value: "true"}
+			}
 		}
 
 		line, bio := "", bufio.NewScanner(nfs)
