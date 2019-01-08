@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -13,7 +13,6 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"runtime/debug"
 	"sort"
 	"time"
 	"toolkit"
@@ -171,7 +170,7 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 		return true
 	}
 
-	m.Log("close", "%d:%d %v", len(c.requests), len(c.sessions), arg)
+	m.Log("close", "before %d:%d %v", len(c.requests), len(c.sessions), arg)
 	if m.target == c {
 		for i := len(c.requests) - 1; i >= 0; i-- {
 			if msg := c.requests[i]; msg.code == m.code {
@@ -185,7 +184,7 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 		}
 	}
 
-	m.Log("close", "%d:%d %v", len(c.requests), len(c.sessions), arg)
+	m.Log("close", "after %d:%d %v", len(c.requests), len(c.sessions), arg)
 	if len(c.requests) > 0 {
 		return false
 	}
@@ -307,17 +306,21 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 
 	if l := m.Sess("log", false); l != nil {
 		if log, ok := l.target.Server.(LOGGER); ok {
+			if action == "error" {
+				log.Log(m, "error", "chain: %s", m.Format("chain"))
+			}
 			log.Log(m, action, str, arg...)
 			if action == "error" {
-				log.Log(m, "error", "%s", m.Format("full"))
-				log.Log(m, "error", "%s\n\n", string(debug.Stack()))
+				log.Log(m, "error", "stack: %s", m.Format("stack"))
 			}
 			return m
 		}
 	}
 
 	if action == "error" {
+		kit.Log("error", fmt.Sprintf("chain: %s", m.Format("chain")))
 		kit.Log("error", fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
+		kit.Log("error", fmt.Sprintf("stack: %s", m.Format("stack")))
 	}
 
 	return m
@@ -406,25 +409,56 @@ func (m *Message) Format(arg ...string) string {
 		case "result":
 			meta = append(meta, fmt.Sprintf("%v", m.Meta["result"]))
 		case "full":
-			meta = append(meta, fmt.Sprintf("%s\n", m.Format("time", "ship")))
-			meta = append(meta, fmt.Sprintf("detail: %d %v\n", len(m.Meta["detail"]), m.Meta["detail"]))
-			meta = append(meta, fmt.Sprintf("option: %d %v\n", len(m.Meta["option"]), m.Meta["option"]))
-			for _, k := range m.Meta["option"] {
-				if v, ok := m.Data[k]; ok {
-					meta = append(meta, fmt.Sprintf("  %s: %v\n", k, kit.Format(v)))
-				} else if v, ok := m.Meta[k]; ok {
-					meta = append(meta, fmt.Sprintf("  %s: %d %v\n", k, len(v), v))
+		case "chain":
+			ms := []*Message{}
+			if v == "full" {
+				ms = append(ms, m)
+			} else {
+				for msg := m; msg != nil; msg = msg.message {
+					ms = append(ms, msg)
 				}
 			}
-			meta = append(meta, fmt.Sprintf("append: %d %v\n", len(m.Meta["append"]), m.Meta["append"]))
-			for _, k := range m.Meta["append"] {
-				if v, ok := m.Data[k]; ok {
-					meta = append(meta, fmt.Sprintf("  %s: %v\n", k, kit.Format(v)))
-				} else if v, ok := m.Meta[k]; ok {
-					meta = append(meta, fmt.Sprintf("  %s: %d %v\n", k, len(v), v))
+
+			for i := len(ms) - 1; i >= 0; i-- {
+				msg := ms[i]
+
+				meta = append(meta, fmt.Sprintf("\n%s\n", msg.Format("time", "ship")))
+				meta = append(meta, fmt.Sprintf("  detail: %d %v\n", len(msg.Meta["detail"]), msg.Meta["detail"]))
+				meta = append(meta, fmt.Sprintf("  option: %d %v\n", len(msg.Meta["option"]), msg.Meta["option"]))
+				for _, k := range msg.Meta["option"] {
+					if v, ok := msg.Data[k]; ok {
+						meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
+					} else if v, ok := msg.Meta[k]; ok {
+						meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
+					}
+				}
+				meta = append(meta, fmt.Sprintf("  append: %d %v\n", len(msg.Meta["append"]), msg.Meta["append"]))
+				for _, k := range msg.Meta["append"] {
+					if v, ok := msg.Data[k]; ok {
+						meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
+					} else if v, ok := msg.Meta[k]; ok {
+						meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
+					}
+				}
+				meta = append(meta, fmt.Sprintf("  result: %d %v\n", len(msg.Meta["result"]), msg.Meta["result"]))
+			}
+		case "stack":
+			pc := make([]uintptr, 100)
+			pc = pc[:runtime.Callers(2, pc)]
+			frames := runtime.CallersFrames(pc)
+
+			for {
+				frame, more := frames.Next()
+				file := strings.Split(frame.File, "/")
+				name := strings.Split(frame.Function, "/")
+				meta = append(meta, fmt.Sprintf("\n%s:%d\t%s", file[len(file)-1], frame.Line, name[len(name)-1]))
+				if !more {
+					break
 				}
 			}
-			meta = append(meta, fmt.Sprintf("result: %d %v\n", len(m.Meta["result"]), m.Meta["result"]))
+
+		default:
+			meta = append(meta, kit.FileName(v, "time"))
 		}
 	}
 	return strings.Join(meta, " ")
@@ -1140,9 +1174,11 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 		case io.EOF:
 		case nil:
 		default:
-			m.Log("stack", "m: %s", m.Format("full"))
-			m.Log("stack", "msg: %s", msg.Format("full"))
-			m.Log("stack", "%s\n%s\n", e, string(debug.Stack()))
+			m.Log("bench", "chain: %s", msg.Format("chain"))
+			m.Log("bench", "catch: %s", e)
+			m.Log("bench", "stack: %s", msg.Format("stack"))
+
+			m.Log("error", "catch: %s", e)
 
 			if len(hand) > 1 {
 				m.TryCatch(msg, safe, hand[1:]...)
@@ -1619,6 +1655,19 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				}
 			}
 
+			if len(arg) > 0 {
+				switch arg[0] {
+				case "full":
+					m.Echo(m.Format("full"))
+					return
+				case "back":
+					m.Echo(m.Format("back"))
+					return
+				case "stack":
+					m.Echo(m.Format("stack"))
+					return
+				}
+			}
 			if len(arg) > 0 && arg[0] == "spawn" {
 				sub := msg.Spawn()
 				m.Echo("%d", sub.code)
@@ -1986,7 +2035,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						msg.target.Start(msg, arg...)
 						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
 					case "close":
-						msg.target.Close(msg, arg...)
+						msg := m.Spawn()
+						m.target = msg.target.context
+						msg.target.Close(msg.target.message, arg...)
 					}
 				}
 
@@ -3226,8 +3277,6 @@ func Start(args ...string) bool {
 	if len(args) == 0 {
 		args = append(args, os.Args[1:]...)
 	}
-
-	ioutil.WriteFile(fmt.Sprintf("bench.pid"), []byte(kit.Format(os.Getpid())), 0666)
 
 	Index.Begin(Pulse, args...)
 	Index.Start(Pulse, args...)

@@ -18,9 +18,9 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+
 	// "runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 	"toolkit"
@@ -50,31 +50,6 @@ type NFS struct {
 	*ctx.Context
 }
 
-func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
-	if !path.IsAbs(name) {
-		paths := m.Confv("paths").([]interface{})
-		for _, v := range paths {
-			p := path.Join(v.(string), name)
-			if len(arg) > 0 {
-				name = p
-				break
-			}
-			if s, e := os.Stat(p); e == nil && !s.IsDir() {
-				name = p
-				break
-			}
-		}
-	}
-
-	flag := os.O_RDONLY
-	if len(arg) > 0 {
-		flag = arg[0]
-	}
-
-	m.Log("info", "open %s", name)
-	f, e := os.OpenFile(name, flag, 0660)
-	return name, f, e
-}
 func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, trip int, dir_reg *regexp.Regexp, fields []string, format string) {
 	back, e := os.Getwd()
 	m.Assert(e)
@@ -166,6 +141,31 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 			}
 		}
 	}
+}
+func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
+	if !path.IsAbs(name) {
+		paths := m.Confv("paths").([]interface{})
+		for _, v := range paths {
+			p := path.Join(v.(string), name)
+			if len(arg) > 0 {
+				name = p
+				break
+			}
+			if s, e := os.Stat(p); e == nil && !s.IsDir() {
+				name = p
+				break
+			}
+		}
+	}
+
+	flag := os.O_RDONLY
+	if len(arg) > 0 {
+		flag = arg[0]
+	}
+
+	m.Log("info", "open %s", name)
+	f, e := os.OpenFile(name, flag, 0660)
+	return name, f, e
 }
 
 func (nfs *NFS) insert(rest []rune, letters []rune) []rune {
@@ -530,8 +530,9 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 func (nfs *NFS) prompt(arg ...string) string {
 	m := nfs.Context.Message()
-	target := m.Optionv("ps_target").(*ctx.Context)
+	target, _ := m.Optionv("ps_target").(*ctx.Context)
 	nfs.out.WriteString(fmt.Sprintf("%d[%s]%s> ", m.Capi("ninput"), time.Now().Format("15:04:05"), target.Name))
+	return ""
 	return "> "
 
 	ps := nfs.Option("prompt")
@@ -583,11 +584,8 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 			"size":   &ctx.Cache{Name: "size", Value: "0", Help: "size"},
 			"nread":  &ctx.Cache{Name: "nread", Value: "0", Help: "nread"},
 			"nwrite": &ctx.Cache{Name: "nwrite", Value: "0", Help: "nwrite"},
-			"nline":  &ctx.Cache{Name: "缓存命令行数", Value: "0", Help: "缓存命令行数"},
 		}
-		c.Configs = map[string]*ctx.Config{
-			"history": &ctx.Config{Name: "history", Value: []interface{}{}, Help: "读取记录"},
-		}
+		c.Configs = map[string]*ctx.Config{}
 	} else {
 		c.Caches = map[string]*ctx.Cache{
 			"nsend":  &ctx.Cache{Name: "消息发送数量", Value: "0", Help: "消息发送数量"},
@@ -605,7 +603,6 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 }
 func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	nfs.Message = m
-	nfs.width, nfs.height = 1, 1
 	return nfs
 }
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
@@ -700,6 +697,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		if m.Cap("stream", arg[1]) == "stdio" {
 			nfs.out = m.Optionv("out").(*os.File)
+			nfs.width, nfs.height = 1, 1
 			// if !m.Caps("windows", runtime.GOOS == "windows") {
 			// 	termbox.Init()
 			// 	defer termbox.Close()
@@ -836,10 +834,12 @@ func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
 	switch nfs.Context {
 	case m.Target():
 		if nfs.in != nil {
+			m.Log("info", "close in %s", m.Cap("stream"))
 			nfs.in.Close()
 			nfs.in = nil
 		}
 		if nfs.out != nil {
+			m.Log("info", "close out %s", m.Cap("stream"))
 			nfs.out.Close()
 			nfs.out = nil
 		}
@@ -946,7 +946,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 				return
 			}},
-		"git": &ctx.Command{Name: "git", Help: "版本控制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"git": &ctx.Command{Name: "git sum", Help: "版本控制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 && arg[0] == "sum" {
 				if out, e := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d").CombinedOutput(); m.Assert(e) {
 					for _, v := range strings.Split(string(out), "commit: ") {
@@ -1008,29 +1008,23 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"path": &ctx.Command{Name: "path file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			for _, v := range m.Confv("paths").([]interface{}) {
-				p := path.Join(v.(string), arg[0])
+			m.Confm("paths", func(index int, value string) bool {
+				p := path.Join(value, arg[0])
 				if _, e := os.Stat(p); e == nil {
 					m.Echo(p)
-					break
+					return true
 				}
-			}
+				return false
+			})
 			return
 		}},
 		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if p, f, e := open(m, arg[0]); m.Assert(e) {
 				defer f.Close()
 
-				pos := 0
-				if len(arg) > 2 {
-					i, e := strconv.Atoi(arg[2])
-					m.Assert(e)
-					pos = i
-				}
-
-				s, e := strconv.Atoi(m.Confx("buf_size", arg, 1))
-				m.Assert(e)
-				buf := make([]byte, s)
+				pos := kit.Int(kit.Select("0", arg, 2))
+				size := kit.Int(m.Confx("buf_size", arg, 1))
+				buf := make([]byte, size)
 
 				if l, e := f.ReadAt(buf, int64(pos)); e == io.EOF || m.Assert(e) {
 					m.Log("info", "load %s %d %d", p, l, pos)
@@ -1043,7 +1037,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			if len(arg) == 1 && m.Has("data") {
 				arg = append(arg, m.Option("data"))
 			}
-			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
+			if p, f, e := open(m, m.Format(arg[0]), os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
 				defer f.Close()
 				m.Append("directory", p)
 				m.Echo(p)
@@ -1056,58 +1050,16 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			return
 		}},
-		"export": &ctx.Command{Name: "export filename", Help: "导出数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			name := time.Now().Format(arg[0])
-			_, f, e := open(m, name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
-			m.Assert(e)
-			defer f.Close()
-
-			switch {
-			case strings.HasSuffix(arg[0], ".json") && len(m.Meta["append"]) > 0:
-				data := []interface{}{}
-
-				nrow := len(m.Meta[m.Meta["append"][0]])
-				for i := 0; i < nrow; i++ {
-					line := map[string]interface{}{}
-					for _, k := range m.Meta["append"] {
-						line[k] = m.Meta[k][i]
-					}
-					data = append(data, line)
-				}
-				en := json.NewEncoder(f)
-				en.SetIndent("", "  ")
-				en.Encode(data)
-
-			case strings.HasSuffix(arg[0], ".csv") && len(m.Meta["append"]) > 0:
-				w := csv.NewWriter(f)
-
-				line := []string{}
-				for _, v := range m.Meta["append"] {
-					line = append(line, v)
-				}
-				w.Write(line)
-
-				nrow := len(m.Meta[m.Meta["append"][0]])
-				for i := 0; i < nrow; i++ {
-					line := []string{}
-					for _, k := range m.Meta["append"] {
-						line = append(line, m.Meta[k][i])
-					}
-					w.Write(line)
-				}
-				w.Flush()
-			default:
-				for _, v := range m.Meta["result"] {
-					f.WriteString(v)
-				}
-			}
-			m.Set("append").Set("result").Add("append", "directory", name).Echo(name)
-			return
-		}},
 		"import": &ctx.Command{Name: "import filename [index]", Help: "导入数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			_, f, e := open(m, arg[0])
+			p, f, e := open(m, arg[0])
 			m.Assert(e)
 			defer f.Close()
+
+			s, e := f.Stat()
+			m.Option("filepath", p)
+			m.Option("filename", s.Name())
+			m.Option("filesize", s.Size())
+			m.Option("filetime", s.ModTime().Format(m.Conf("time_format")))
 
 			switch {
 			case strings.HasSuffix(arg[0], ".json"):
@@ -1115,8 +1067,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				de := json.NewDecoder(f)
 				de.Decode(&data)
 
-				msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", arg[1:])
-				m.Copy(msg, "append").Copy(msg, "result")
+				m.Put("option", "filedata", data).Cmdy("ctx.trans", "filedata", arg[1:]).CopyTo(m)
 			case strings.HasSuffix(arg[0], ".csv"):
 				r := csv.NewReader(f)
 
@@ -1130,7 +1081,94 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					}
 				}
 				m.Table()
+			default:
+				b, e := ioutil.ReadAll(f)
+				m.Assert(e)
+				m.Echo(string(b))
 			}
+			return
+		}},
+		"export": &ctx.Command{Name: "export filename", Help: "导出数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			tp := false
+			if len(arg) > 0 && arg[0] == "time" {
+				tp, arg = true, arg[1:]
+			}
+
+			p, f, e := open(m, kit.Select(arg[0], m.Format(arg[0]), tp), os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+			m.Assert(e)
+			defer f.Close()
+
+			m.Option("hi", "hello world")
+			m.Option("he", "hello", "world")
+
+			m.Append("he", "hello", "world")
+			m.Append("hi", "nice", "job")
+
+			data := m.Optionv(kit.Select("data", arg, 1))
+			if len(arg) > 0 && arg[0] == "all" {
+				data, arg = m.Meta, arg[1:]
+			}
+
+			switch {
+			case strings.HasSuffix(arg[0], ".json"):
+				if data == nil && len(m.Meta["append"]) > 0 {
+					lines := []interface{}{}
+					nrow := len(m.Meta[m.Meta["append"][0]])
+					for i := 0; i < nrow; i++ {
+						line := map[string]interface{}{}
+						for _, k := range m.Meta["append"] {
+							line[k] = m.Meta[k][i]
+						}
+
+						lines = append(lines, line)
+						data = lines
+					}
+				}
+
+				en := json.NewEncoder(f)
+				en.SetIndent("", "  ")
+				en.Encode(data)
+			case strings.HasSuffix(arg[0], ".csv"):
+				fields := m.Meta["append"]
+				if m.Options("fields") {
+					fields = m.Meta["fields"]
+				}
+
+				if data == nil && len(m.Meta["append"]) > 0 {
+					lines := []interface{}{}
+					nrow := len(m.Meta[m.Meta["append"][0]])
+					for i := 0; i < nrow; i++ {
+						line := []string{}
+						for _, k := range fields {
+							line = append(line, m.Meta[k][i])
+						}
+						lines = append(lines, line)
+						data = lines
+					}
+				}
+
+				if data, ok := data.([]interface{}); ok {
+					w := csv.NewWriter(f)
+					w.Write(fields)
+					for _, v := range data {
+						w.Write(kit.Trans(v))
+					}
+					w.Flush()
+				}
+			case strings.HasSuffix(arg[0], ".png"):
+				if data == nil {
+					data = kit.Format(arg[1:])
+				}
+
+				qr, e := qrcode.New(kit.Format(data), qrcode.Medium)
+				m.Assert(e)
+				m.Assert(qr.Write(256, f))
+			default:
+				f.WriteString(kit.Format(m.Meta["result"]))
+			}
+
+			m.Set("append").Add("append", "directory", p)
+			m.Set("result").Echo(p)
 			return
 		}},
 
@@ -1144,7 +1182,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 
 			m.Start(fmt.Sprintf("file%d", m.Capi("nfile")), fmt.Sprintf("file %s", arg[0]), "open", arg[0])
-			m.Echo(arg[0])
+			m.Append("ps_target1", m.Cap("module"))
+			m.Echo(m.Cap("module"))
 			return
 		}},
 		"read": &ctx.Command{Name: "read [buf_size [pos]]", Help: "读取文件, buf_size: 读取大小, pos: 读取位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -1213,6 +1252,23 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			return
 		}},
+		"exec": &ctx.Command{Name: "exec cmd", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
+				nfs.prompt()
+				for _, v := range arg {
+					nfs.out.WriteString(v)
+				}
+				nfs.out.WriteString("\n")
+
+				msg := m.Find("cli.shell1").Cmd("source", arg)
+				for _, v := range msg.Meta["result"] {
+					nfs.out.WriteString(v)
+					m.Echo(v)
+				}
+				nfs.out.WriteString("\n")
+			}
+			return
+		}},
 
 		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
@@ -1250,88 +1306,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Remote = make(chan bool, 1)
 				nfs.send <- m
 				<-m.Remote
-			}
-			return
-		}},
-
-		"exec": &ctx.Command{Name: "exec cmd", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
-				nfs.prompt()
-				for _, v := range arg {
-					nfs.out.WriteString(v)
-				}
-				nfs.out.WriteString("\n")
-
-				msg := m.Find("cli.shell1").Cmd("source", arg)
-				for _, v := range msg.Meta["result"] {
-					nfs.out.WriteString(v)
-					m.Echo(v)
-				}
-				nfs.out.WriteString("\n")
-			}
-			return
-		}},
-		"print": &ctx.Command{Name: "print file string...", Help: "输出文件, file: 输出的文件, string: 输出的内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if p, f, e := open(m, arg[0], os.O_WRONLY|os.O_CREATE|os.O_APPEND); m.Assert(e) {
-				defer f.Close()
-
-				for _, v := range arg[1:] {
-					n, e := fmt.Fprint(f, v)
-					m.Assert(e)
-					m.Log("info", "print %s %d", p, n)
-				}
-			}
-			return
-		}},
-		"json": &ctx.Command{Name: "json [key value]...", Help: "生成格式化内容, key: 参数名, value: 参数值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 1 {
-				var data interface{}
-				json.Unmarshal([]byte(arg[0]), &data)
-
-				buf, e := json.MarshalIndent(data, "", "  ")
-				m.Assert(e)
-				m.Echo(string(buf))
-				return e
-			}
-
-			if len(arg) > 1 && arg[0] == "file" {
-				var data interface{}
-				f, e := os.Open(arg[1])
-				m.Assert(e)
-				d := json.NewDecoder(f)
-				d.Decode(&data)
-
-				buf, e := json.MarshalIndent(data, "", "  ")
-				m.Assert(e)
-				m.Echo(string(buf))
-				return e
-			}
-
-			data := map[string]interface{}{}
-			for _, k := range m.Meta["option"] {
-				if v, ok := m.Data[k]; ok {
-					data[k] = v
-					continue
-				}
-				data[k] = m.Meta[k]
-			}
-
-			for i := 1; i < len(arg)-1; i += 2 {
-				data[arg[i]] = arg[i+1]
-			}
-
-			buf, e := json.Marshal(data)
-			m.Assert(e)
-			m.Echo(string(buf))
-
-			return
-		}},
-		"genqr": &ctx.Command{Name: "genqr [qr_size size] filename string...", Help: "生成二维码图片, qr_size: 图片大小, filename: 文件名, string: 输出内容", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if size, e := strconv.Atoi(m.Confx("qr_size")); m.Assert(e) {
-				p := path.Join(m.Confv("paths", 0).(string), arg[0])
-				qrcode.WriteFile(strings.Join(arg[1:], ""), qrcode.Medium, size, p)
-				m.Log("info", "genqr %s", p)
-				m.Append("directory", p)
 			}
 			return
 		}},

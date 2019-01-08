@@ -286,6 +286,7 @@ func Select(value string, args ...interface{}) string {
 				if b && arg != "" {
 					return arg
 				}
+				return value
 			}
 		}
 		if arg != "" {
@@ -457,6 +458,27 @@ func Hash(arg ...interface{}) (string, []string) {
 
 	h := md5.Sum([]byte(strings.Join(meta, "")))
 	return hex.EncodeToString(h[:]), meta
+}
+func FileName(name string, meta ...string) string {
+	result, app := strings.Split(name, "."), ""
+	if len(result) > 1 {
+		app, result = result[len(result)-1], result[:len(result)-1]
+	}
+
+	for _, v := range meta {
+		switch v {
+		case "year":
+			result = append(result, "_", time.Now().Format("2006"))
+		case "date":
+			result = append(result, "_", time.Now().Format("0102"))
+		case "time":
+			result = append(result, "_", time.Now().Format("2006_0102_1504"))
+		}
+	}
+	if app != "" {
+		result = append(result, ".", app)
+	}
+	return strings.Join(result, "")
 }
 
 func Action(cmd string, arg ...interface{}) string {

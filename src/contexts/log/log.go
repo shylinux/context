@@ -2,6 +2,7 @@ package log
 
 import (
 	"contexts/ctx"
+	"io/ioutil"
 	"path"
 	"toolkit"
 
@@ -68,8 +69,16 @@ func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	os.Mkdir(m.Conf("logdir"), 0770)
 	log.file = map[string]*os.File{}
+	os.Mkdir(m.Conf("logdir"), 0770)
+	kit.Log("error", "make log dir %s", m.Conf("logdir"))
+	ioutil.WriteFile(m.Conf("logpid"), []byte(kit.Format(os.Getpid())), 0666)
+	kit.Log("error", "save log file %s", m.Conf("logpid"))
+
+	for _, v := range []string{"error", "bench", "debug"} {
+		log.Log(m, v, "hello world\n")
+		log.Log(m, v, "hello world")
+	}
 	return log
 }
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
@@ -90,16 +99,25 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"logdir": &ctx.Config{Name: "logdir", Value: "var/log", Help: ""},
+		"logpid": &ctx.Config{Name: "logpid", Value: "var/log/bench.pid", Help: ""},
 		"output": &ctx.Config{Name: "output", Value: map[string]interface{}{
-			"error": map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
-			"trace": map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
-			"debug": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
+			"error":  map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+			"trace":  map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
+			"debug":  map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
+			"search": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
+			"cbs":    map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
 
 			"bench": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}}},
 			"begin": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
 			"start": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+			"close": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+
 			"cmd": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"},
 				"lex": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
+				"yac": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
+				"cli": map[string]interface{}{
+					"cmd": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+				},
 			},
 		}, Help: "日志输出配置"},
 	},

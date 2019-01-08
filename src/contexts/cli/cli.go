@@ -77,7 +77,11 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 			m.Target().Close(m)
 		}
 
-		m.Optionv("ps_target", cmd.Optionv("ps_target"))
+		v := cmd.Optionv("ps_target")
+		if v != nil {
+			m.Optionv("ps_target", v)
+		}
+
 		m.Set("append").Copy(cmd, "append")
 		m.Set("result").Copy(cmd, "result")
 		return nil
@@ -203,7 +207,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 						if e := cmd.Run(); e != nil {
 							m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
-							m.Log("trace", "%s\n", e)
 						} else {
 							switch m.Option("cmd_parse") {
 							case "json":
@@ -312,8 +315,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			detail = append(detail, arg...)
 
 			// 目标切换
+			target := m.Optionv("ps_target")
 			if detail[0] != "context" {
-				target := m.Optionv("ps_target")
 				defer func() { m.Optionv("ps_target", target) }()
 			}
 
@@ -400,6 +403,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			// 执行命令
 			if msg.Set("detail", args).Cmd(); !msg.Hand {
 				msg.Cmd("system", args)
+			}
+			if msg.Appends("ps_target1") {
+				target = msg.Target()
 			}
 
 			// 管道命令

@@ -4,8 +4,6 @@ import (
 	"contexts/ctx"
 	"toolkit"
 
-	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
@@ -84,10 +82,7 @@ func (gdb *GDB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 	gdb.goon = make(chan os.Signal, 10)
 	gdb.wait = make(chan interface{}, 10)
-	m.Log("error", "pid %d", os.Getpid())
-	kit.Log("error", "pid %d", os.Getpid())
 	signal.Notify(gdb.goon, syscall.Signal(19))
-	ioutil.WriteFile(fmt.Sprintf("%s.pid", gdb.Name), []byte(kit.Format(os.Getpid())), 0666)
 	for {
 		select {
 		case sig := <-gdb.goon:
