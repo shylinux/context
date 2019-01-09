@@ -92,6 +92,8 @@ func Format(arg ...interface{}) string {
 			result = append(result, val)
 		case []string:
 			result = append(result, val...)
+		case []rune:
+			result = append(result, string(val))
 		case float64:
 			result = append(result, fmt.Sprintf("%d", int(val)))
 		case *os.File:
