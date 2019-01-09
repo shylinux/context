@@ -1412,6 +1412,9 @@ func (m *Message) Caps(key string, arg ...interface{}) bool {
 }
 func (m *Message) Capi(key string, arg ...interface{}) int {
 	n := kit.Int(m.Cap(key))
+	if key == "noutput" {
+		m.Log("fuck", "what %v %v %v %v", key, arg, n, n+kit.Int(arg...))
+	}
 	if len(arg) > 0 {
 		return kit.Int(m.Cap(key, n+kit.Int(arg...)))
 	}

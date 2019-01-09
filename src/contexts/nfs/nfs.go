@@ -1,52 +1,39 @@
 package nfs
 
 import (
-	"bufio"
 	"contexts/ctx"
+	"toolkit"
+
 	"crypto/sha1"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/nsf/termbox-go"
 	"github.com/skip2/go-qrcode"
+	"net/url"
+	"regexp"
+	"strings"
+
+	"bufio"
+	"github.com/nsf/termbox-go"
 	"io"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
-
-	// "runtime"
 	"sort"
-	"strings"
 	"time"
-	"toolkit"
-	"unicode"
 )
 
 type NFS struct {
+	io  io.ReadWriter
 	in  *os.File
 	out *os.File
-
-	pages  []string
-	width  int
-	height int
-
-	io io.ReadWriter
 
 	send chan *ctx.Message
 	recv chan *ctx.Message
 	hand map[int]*ctx.Message
 
-	*bufio.Reader
-	*bufio.Writer
-	target *ctx.Context
-	cli    *ctx.Message
-
-	*ctx.Message
 	*ctx.Context
 }
 
@@ -168,205 +155,61 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 	return name, f, e
 }
 
-func (nfs *NFS) insert(rest []rune, letters []rune) []rune {
-	n := len(rest)
-	l := len(letters)
-	rest = append(rest, letters...)
-	for i := n - 1; i >= 0; i-- {
-		rest[i+l] = rest[i]
-	}
-	for i := 0; i < l; i++ {
-		rest[i] = letters[i]
-	}
-	return rest
-}
-func (nfs *NFS) escape(form string, args ...interface{}) *NFS {
-	if !nfs.Caps("windows") {
-		fmt.Fprintf(nfs.out, "\033[%s", fmt.Sprintf(form, args...))
-	}
-	return nfs
-}
-func (nfs *NFS) color(str string, attr ...int) *NFS {
-	if !nfs.Confs("color") {
-		fmt.Fprint(nfs.out, str)
-		return nfs
-	}
-
-	fg := nfs.Confi("fgcolor")
-	if len(attr) > 0 {
-		fg = attr[0]
-	}
-
-	bg := nfs.Confi("bgcolor")
-	if len(attr) > 1 {
-		bg = attr[1]
-	}
-
-	for i := 2; i < len(attr); i++ {
-		nfs.escape("%dm", attr[i])
-	}
-
-	nfs.escape("4%dm", bg).escape("3%dm", fg)
-	fmt.Fprint(nfs.out, str)
-	nfs.escape("0m")
-	return nfs
-}
-func (nfs *NFS) print(str string) bool {
-	nfs.out.WriteString(str)
-	return true
-	ls := strings.Split(str, "\n")
-	for i, l := range ls {
-		rest := ""
-		if len(nfs.pages) > 0 && !strings.HasSuffix(nfs.pages[len(nfs.pages)-1], "\n") {
-			rest = nfs.pages[len(nfs.pages)-1]
-			nfs.pages = nfs.pages[:len(nfs.pages)-1]
-		}
-
-		if rest += l; i < len(ls)-1 {
-			rest += "\n"
-		}
-		nfs.pages = append(nfs.pages, rest)
-		if nfs.Capi("cursor_pos") < nfs.height {
-			nfs.Capi("cursor_pos", 1)
-		}
-	}
-
-	switch {
-	case nfs.out != nil:
-		nfs.color(str)
-	case nfs.io != nil:
-		fmt.Fprint(nfs.io, str)
-	default:
-		return false
-	}
-
-	return true
-}
-
-func (nfs *NFS) zone(buf []string, top, height int) (row, col int) {
-	row, col = len(buf)-1, 0
-	for i := nfs.Capi("cursor_pos"); i > top-1; {
-		if i -= len(buf[row]) / nfs.width; len(buf[row])%nfs.width > 0 {
-			i--
-		}
-		if i < top-1 {
-			col -= (i - (top - 1)) * nfs.width
-		} else if i > (top-1) && row > 0 {
-			row--
-		}
-	}
-	return
-}
-func (nfs *NFS) page(buf []string, row, col, top, height int, status bool) {
-	nfs.escape("2J").escape("H")
-	begin := row
-
-	for i := 0; i < height-1; i++ {
-		if row >= len(buf) {
-			nfs.color("~\n")
-			continue
-		}
-
-		if len(buf[row])-col > nfs.width {
-			nfs.color(buf[row][col : col+nfs.width])
-			col += nfs.width
-			continue
-		}
-
-		nfs.color(buf[row][col:])
-		col = 0
-		row++
-	}
-
-	if status {
-		nfs.escape("E").color(fmt.Sprintf("pages: %d/%d", begin, len(nfs.pages)), nfs.Confi("statusfgcolor"), nfs.Confi("statusbgcolor"))
-	}
-}
-func (nfs *NFS) View(buf []string, top int, height int) {
-
-	row, col := nfs.zone(buf, top, height)
-	nfs.page(buf, row, col, top, height, true)
-
-	for {
-		switch ev := termbox.PollEvent(); ev.Type {
-		case termbox.EventKey:
-			switch ev.Key {
-			case termbox.KeyCtrlC:
-				return
-			default:
-				switch ev.Ch {
-				case 'f':
-					for i := 0; i < height; i++ {
-						if len(buf[row][col:]) > nfs.width {
-							col += nfs.width
-						} else {
-							if col = 0; row < len(buf)-nfs.height {
-								row++
-							}
-						}
-					}
-				case 'b':
-					for i := 0; i < height; i++ {
-						if col -= nfs.width; col < 0 {
-							if col = 0; row > 0 {
-								row--
-							}
-						}
-					}
-				case 'j':
-					if len(buf[row][col:]) > nfs.width {
-						col += nfs.width
-					} else {
-						if col = 0; row < len(buf)-nfs.height {
-							row++
-						}
-					}
-				case 'k':
-					if col -= nfs.width; col < 0 {
-						if col = 0; row > 0 {
-							row--
-						}
-					}
-				case 'q':
-					return
-				}
-				nfs.page(buf, row, col, top, height, true)
-			}
-		}
-	}
-}
-
 func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS {
 	m := nfs.Context.Message()
 	m.Log("term", "%s %v", action, args)
+
+	switch action {
+	case "init":
+		termbox.Init()
+		termbox.SetInputMode(termbox.InputEsc)
+		termbox.SetInputMode(termbox.InputMouse)
+		m.Cap("termbox", "true")
+	}
 
 	width, height := termbox.Size()
 	left := msg.Confi("term", "left")
 	top := msg.Confi("term", "top")
 	right := msg.Confi("term", "right")
 	bottom := msg.Confi("term", "bottom")
+
 	x := m.Confi("term", "cursor_x")
 	y := m.Confi("term", "cursor_y")
 	bg := termbox.Attribute(msg.Confi("term", "bgcolor"))
 	fg := termbox.Attribute(msg.Confi("term", "fgcolor"))
+
 	begin_row := m.Confi("term", "begin_row")
 	begin_col := m.Confi("term", "begin_col")
+	end_row := m.Confi("term", "end_row")
+	end_col := m.Confi("term", "end_col")
 
 	switch action {
+	case "init":
+		m.Conf("term", "width", width)
+		m.Conf("term", "height", height)
+		m.Conf("term", "left", 0)
+		m.Conf("term", "top", 0)
+		m.Conf("term", "right", width)
+		m.Conf("term", "bottom", height)
+	case "exit":
+		m.Cap("termbox", "false")
+		termbox.Close()
 	case "resize":
 		if len(args) > 1 {
 			msg.Conf("term", "right", args[0])
 			msg.Conf("term", "bottom", args[1])
 			right = msg.Confi("term", "right")
 			bottom = msg.Confi("term", "bottom")
+		} else {
+			msg.Conf("term", "right", right)
+			msg.Conf("term", "bottom", bottom)
 		}
 		fallthrough
 	case "clear":
-		if len(args) > 0 {
-			bg = termbox.Attribute(kit.Int(args[0]))
-		}
-		if len(args) > 1 {
-			fg = termbox.Attribute(kit.Int(args[1]))
+		if len(args) == 0 {
+			top = m.Confi("term", "prompt_y")
+		} else if kit.Format(args[0]) == "all" {
+			// nothing
 		}
 
 		if m.Caps("termbox") {
@@ -416,34 +259,85 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 			termbox.Flush()
 		}
 	case "scroll":
+		n := 1
 		if len(args) > 0 {
-			begin_row += kit.Int(args[0])
-		} else {
-			begin_rowrow++
+			n = kit.Int(args[0])
 		}
-		if len(args) > 1 {
-			begin_col += kit.Int(args[1])
+		m.Log("term", "<<<< scroll page (%v, %v) (%v, %v)", begin_row, begin_col, end_row, end_col)
+
+		// 向下滚动
+		for i := begin_row; n > 0 && i < end_row; i++ {
+			line := []rune(m.Conf("output", []interface{}{i, "line"}))
+
+			for j, l := begin_col, left; n > 0; j, l = j+1, l+1 {
+				if j >= len(line)-1 {
+					begin_row, begin_col = i+1, 0
+					n--
+					break
+				} else if l >= right-1 && !m.Confs("term", "wrap") {
+					begin_row, begin_col = i, j
+					n--
+
+				} else if line[j] == '\n' || (l >= right-1 && m.Confs("term", "wrap")) {
+					begin_row, begin_col = i, j+1
+					n--
+				}
+			}
 		}
-		m.Conf("term", "begin_row", begin_row)
-		m.Conf("term", "begin_col", begin_col)
-	case "refresh":
-		noutput := m.Confi("noutput")
-		for i := begin_row; i < noutput; i++ {
-			if i < 0 {
-				nfs.Term(m, "print", "\n")
+
+		// 向上滚动
+		for i := begin_row; n < 0 && i >= 0; i-- {
+			line := []rune(m.Conf("output", []interface{}{i, "line"}))
+			if begin_col == 0 {
+				i--
+				line = []rune(m.Conf("output", []interface{}{i, "line"}))
+				begin_col = len(line)
 			}
 
-			line := m.Conf("noutput", []interface{}{i, "line"})
-
-			nfs.Term(m, "print")
+			for j, l := begin_col-1, right-1; n < 0; j, l = j-1, l-1 {
+				if j <= 0 {
+					begin_row, begin_col = i, 0
+					n++
+					break
+				} else if line[j-1] == '\n' || l <= left {
+					begin_row, begin_col = i, j
+					n++
+				}
+			}
 		}
-		m.Confv("output", "begin_row", begin_row)
+
+		m.Log("term", ">>>> scroll page (%v, %v) (%v, %v)", begin_row, begin_col, end_row, end_col)
+		m.Conf("term", "begin_row", begin_row)
+		m.Conf("term", "begin_col", begin_col)
+
+		fallthrough
+	case "refresh":
+		m.Log("term", "<<<< refresh page (%v, %v) (%v, %v)", begin_row, begin_col, end_row, end_col)
+
+		noutput := m.Capi("noutput")
+
+		nfs.Term(m, "clear", "all")
+		for i := begin_row; i < noutput; i++ {
+			line := m.Conf("output", []interface{}{i, "line"})
+			m.Conf("term", "end_row", i)
+			m.Conf("term", "end_col", 0)
+			if begin_col < len(line) {
+				nfs.Term(m, "print", line[begin_col:])
+			}
+		}
+
+		end_row = m.Confi("term", "end_row")
+		end_col = m.Confi("term", "end_col")
+		m.Log("term", ">>>> refresh page (%v, %v) (%v, %v)", begin_row, begin_col, end_row, end_col)
+		nfs.prompt()
 
 	case "print":
+		m.Log("term", "page (%v, %v) (%v, %v)", begin_row, begin_col, end_row, end_col)
 		if m.Caps("termbox") {
 			for _, v := range kit.Format(args...) {
 				if x < right && y < bottom {
 					termbox.SetCell(x, y, v, fg, bg)
+					end_col++
 				}
 
 				if v > 255 {
@@ -465,6 +359,8 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 			}
 			termbox.Flush()
 		}
+		m.Conf("term", "end_col", end_col)
+		m.Log("term", "page (%v, %v) (%v, %v)", begin_row, begin_col, end_row, end_col)
 	}
 	return nfs
 }
@@ -475,74 +371,79 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 	}
 
 	what := make([]rune, 0, 1024)
+	which := m.Capi("ninput")
 
-	termbox.SetInputMode(termbox.InputEsc)
-	termbox.SetInputMode(termbox.InputMouse)
 	for {
-		ev := termbox.PollEvent()
-		m.Log("bench", "what type: %#v", ev)
-		switch ev.Type {
+		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventInterrupt:
 		case termbox.EventResize:
-			termbox.Flush()
-			// width, height := termbox.Size()
+			nfs.Term(m, "resize")
 		case termbox.EventMouse:
 			switch ev.Key {
 			case termbox.MouseLeft:
 				nfs.Term(m, "window", ev.MouseX, ev.MouseY)
 				nfs.prompt()
 			case termbox.MouseMiddle:
-				m.Log("bench", "mouse middle %v %v", ev.MouseX, ev.MouseY)
 			case termbox.MouseRight:
 				nfs.Term(m, "resize", ev.MouseX, ev.MouseY)
 			case termbox.MouseRelease:
-				m.Log("bench", "mouse release %v %v", ev.MouseX, ev.MouseY)
 			case termbox.MouseWheelUp:
-				m.Log("bench", "mouse wheel up %v %v", ev.MouseX, ev.MouseY)
+				nfs.Term(m, "scroll", -ev.N)
 			case termbox.MouseWheelDown:
-				m.Log("bench", "mouse down up %v %v", ev.MouseX, ev.MouseY)
+				nfs.Term(m, "scroll", ev.N)
 			}
 		case termbox.EventError:
 		case termbox.EventNone:
 		case termbox.EventRaw:
 		case termbox.EventKey:
 			switch ev.Key {
-			case termbox.KeyCtrlH:
-				what = what[:len(what)-1]
-				nfs.Term(m, "delete", 1)
+			case termbox.KeyCtrlP: // termbox.KeyBackspace
+				if which--; which < 0 {
+					which = m.Capi("ninput") - 1
+				}
+				if v := m.Conf("input", []interface{}{which, "line"}); v != "" {
+					what = []rune(v)
+					m.Log("term", "what %v %v", which, what)
+					nfs.prompt(what)
+				}
 
-			case termbox.KeyCtrlW:
+			case termbox.KeyCtrlN: // termbox.KeyBackspace
+				if which++; which >= m.Capi("ninput") {
+					which = 0
+				}
+				if v := m.Conf("input", []interface{}{which, "line"}); v != "" {
+					what = []rune(v)
+					m.Log("term", "what %v %v", which, what)
+					nfs.prompt(what)
+				}
+
+			case termbox.KeyCtrlH: // termbox.KeyBackspace
+				if len(what) > 0 {
+					what = what[:len(what)-1]
+				}
+				nfs.prompt(what)
+
+			case termbox.KeyCtrlU:
 				what = what[:0]
-				nfs.Term(m, "delete")
-				nfs.prompt()
+				nfs.prompt(what)
 
 			case termbox.KeyCtrlL:
-				nfs.Term(m, "window", 0, 0)
-				nfs.Term(m, "clear", 1)
-				nfs.prompt()
+				nfs.Term(m, "window", m.Confi("term", "left"), m.Confi("term", "top"))
+				nfs.prompt(what)
+
+			case termbox.KeyCtrlJ, termbox.KeyEnter:
+				what = append(what, '\n')
+				n = copy(p, []byte(string(what)))
+				return
 
 			case termbox.KeyCtrlC:
-				nfs.Term(m, "print", "hello")
-				termbox.Close()
-				os.Exit(0)
-				return
-			case termbox.KeyCtrlV:
-				nfs.Term(m, "clear")
-				nfs.Term(m, "flush")
-			case termbox.KeyCtrlJ:
-				what = append(what, '\n')
-				nfs.Term(m, "cursor", m.Conf("term", "left"), m.Confi("term", "cursor_y")+1)
-
-				b := []byte(string(what))
-				n = len(b)
-				copy(p, b)
+				nfs.Term(m, "exit")
 				return
 
-			case termbox.KeyCtrlX:
-				b := []byte(string(what))
-				n = len(b)
-				copy(p, b)
-				return
+			case termbox.KeyCtrlE:
+				nfs.Term(m, "scroll")
+			case termbox.KeyCtrlY:
+				nfs.Term(m, "scroll", -1)
 
 			case termbox.KeyTab:
 				what = append(what, '\t')
@@ -550,252 +451,43 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 			case termbox.KeySpace:
 				what = append(what, ' ')
 				nfs.Term(m, "print", " ")
-			case termbox.KeyEnter:
-				what = append(what, '\n')
-				nfs.Term(m, "cursor", m.Conf("term", "left"), m.Confi("term", "cursor_y")+1)
 			default:
 				what = append(what, ev.Ch)
 				nfs.Term(m, "print", string(ev.Ch))
 			}
-		default:
 		}
 	}
-
-	return
-
-	back := make([]rune, 0, 1024)
-	rest := make([]rune, 0, 1024)
-	buf := back
-
-	history := nfs.Context.Message().Confv("history").([]interface{})
-	his := len(history)
-
-	tab := []string{}
-	tabi := 0
-
-	for {
-		switch ev := termbox.PollEvent(); ev.Type {
-		case termbox.EventKey:
-			switch ev.Key {
-			case termbox.KeyCtrlC:
-				termbox.Close()
-				nfs.out = nil
-				b := []byte("return\n")
-				n = len(b)
-				copy(p, b)
-				return
-
-				os.Exit(1)
-
-			case termbox.KeyCtrlV:
-				nfs.View(nfs.pages, 1, nfs.height)
-				row, col := nfs.zone(nfs.pages, 1, nfs.height)
-				nfs.page(nfs.pages, row, col, 1, nfs.Capi("cursor_pos"), false)
-
-			case termbox.KeyCtrlL:
-				nfs.escape("2J").escape("H")
-				nfs.Cap("cursor_pos", "1")
-
-			case termbox.KeyCtrlJ, termbox.KeyCtrlM:
-				buf = append(buf, rest...)
-				buf = append(buf, '\n')
-				nfs.color("\n")
-
-				b := []byte(string(buf))
-				n = len(b)
-				copy(p, b)
-				return
-
-			case termbox.KeyCtrlP:
-				for i := 0; i < len(history); i++ {
-					his = (his + len(history) - 1) % len(history)
-					if strings.HasPrefix(history[his].(string), string(buf)) {
-						rest = rest[:0]
-						rest = append(rest, []rune(history[his].(string)[len(buf):])...)
-						break
-					}
-				}
-
-			case termbox.KeyCtrlN:
-				for i := 0; i < len(history); i++ {
-					his = (his + len(history) + 1) % len(history)
-					if strings.HasPrefix(history[his].(string), string(buf)) {
-						rest = rest[:0]
-						rest = append(rest, []rune(history[his].(string)[len(buf):])...)
-						break
-					}
-				}
-
-			case termbox.KeyCtrlA:
-				if len(buf) == 0 {
-					continue
-				}
-				rest = nfs.insert(rest, buf)
-				buf = buf[:0]
-
-			case termbox.KeyCtrlE:
-				if len(rest) == 0 {
-					continue
-				}
-				buf = append(buf, rest...)
-				rest = rest[:0]
-
-			case termbox.KeyCtrlB:
-				if len(buf) == 0 {
-					continue
-				}
-				rest = nfs.insert(rest, []rune{buf[len(buf)-1]})
-				buf = buf[:len(buf)-1]
-
-			case termbox.KeyCtrlF:
-				if len(rest) == 0 {
-					continue
-				}
-				buf = append(buf, rest[0])
-				rest = rest[1:]
-
-			case termbox.KeyCtrlW:
-				if len(buf) > 0 {
-					c := buf[len(buf)-1]
-					for len(buf) > 0 && unicode.IsSpace(c) && unicode.IsSpace(buf[len(buf)-1]) {
-						buf = buf[:len(buf)-1]
-					}
-
-					for len(buf) > 0 && unicode.IsPunct(c) && unicode.IsPunct(buf[len(buf)-1]) {
-						buf = buf[:len(buf)-1]
-					}
-
-					for len(buf) > 0 && unicode.IsLetter(c) && unicode.IsLetter(buf[len(buf)-1]) {
-						buf = buf[:len(buf)-1]
-					}
-
-					for len(buf) > 0 && unicode.IsDigit(c) && unicode.IsDigit(buf[len(buf)-1]) {
-						buf = buf[:len(buf)-1]
-					}
-				}
-			case termbox.KeyCtrlH:
-				if len(buf) == 0 {
-					continue
-				}
-				buf = buf[:len(buf)-1]
-
-			case termbox.KeyCtrlD:
-				if len(rest) == 0 {
-					continue
-				}
-				rest = rest[1:]
-
-			case termbox.KeyCtrlU:
-				if len(buf) > 0 {
-					back = back[:0]
-					back = append(back, buf...)
-				}
-
-				tab = tab[:0]
-
-				buf = buf[:0]
-
-			case termbox.KeyCtrlK:
-				if len(rest) > 0 {
-					back = append([]rune{}, rest...)
-				}
-				rest = rest[:0]
-
-			case termbox.KeyCtrlY:
-				buf = append(buf, back...)
-
-			case termbox.KeyCtrlT:
-				if l := len(buf); l > 1 {
-					buf[l-1], buf[l-2] = buf[l-2], buf[l-1]
-				}
-
-			case termbox.KeyCtrlI:
-				if len(tab) == 0 {
-					tabi = 0
-					// prefix := string(buf)
-					// nfs.Message.BackTrace(func(m *ctx.Message) bool {
-					// 	for k, _ := range m.Target().Commands {
-					// 		if strings.HasPrefix(k, prefix) {
-					// 			tab = append(tab, k[len(prefix):])
-					// 		}
-					// 	}
-					// 	return true
-					// }, nfs.Optionv("ps_target").(*ctx.Context))
-				}
-
-				if tabi >= 0 && tabi < len(tab) {
-					rest = append(rest[:0], []rune(tab[tabi])...)
-					tabi = (tabi + 1) % len(tab)
-				}
-
-			case termbox.KeySpace:
-				tab = tab[:0]
-				buf = append(buf, ' ')
-
-				if len(rest) == 0 {
-					nfs.color(" ")
-					continue
-				}
-
-			default:
-				tab = tab[:0]
-				buf = append(buf, ev.Ch)
-				if len(rest) == 0 {
-					nfs.color(string(ev.Ch))
-				}
-			}
-			nfs.prompt(string(buf), string(rest))
-		}
-	}
-	return
 }
-func (nfs *NFS) prompt(arg ...string) string {
+func (nfs *NFS) printf(arg ...interface{}) *NFS {
+	m := nfs.Context.Message()
+
+	line := kit.Format(arg...)
+	m.Log("term", "noutput %s", m.Cap("noutput", m.Capi("noutput")+1))
+	m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": kit.Format(arg...)})
+
+	if m.Caps("termbox") {
+		nfs.Term(m, "clear").Term(m, "print", line)
+		m.Conf("term", "prompt_y", m.Conf("term", "cursor_y"))
+		m.Conf("term", "end_row", m.Confi("term", "end_row")+1)
+	} else {
+		nfs.out.WriteString(line)
+	}
+	return nfs
+}
+func (nfs *NFS) prompt(arg ...interface{}) *NFS {
 	m := nfs.Context.Message()
 
 	target, _ := m.Optionv("ps_target").(*ctx.Context)
 	line := fmt.Sprintf("%d[%s]%s> ", m.Capi("ninput"), time.Now().Format("15:04:05"), target.Name)
 	m.Conf("prompt", line)
 
-	nfs.Term(m, "print", line)
-	return line
-
-	ps := nfs.Option("prompt")
-	if nfs.Caps("windows") {
-		nfs.color(ps)
-		return ps
+	line += kit.Format(arg...)
+	if m.Caps("termbox") {
+		m.Conf("term", "prompt_y", m.Conf("term", "cursor_y"))
+		nfs.Term(m, "clear").Term(m, "print", line)
+	} else {
+		nfs.out.WriteString(line)
 	}
-	line, rest := "", ""
-	if len(arg) > 0 {
-		line = arg[0]
-	}
-	if len(arg) > 1 {
-		rest = arg[1]
-	}
-
-	if !nfs.Caps("windows") && len(nfs.pages) > 0 && nfs.width > 0 {
-		for i := (len(nfs.pages[len(nfs.pages)-1]) - 1) / (nfs.width); i > 0; i-- {
-			nfs.escape("2K").escape("A")
-		}
-		nfs.escape("2K").escape("G").escape("?25h")
-	}
-
-	if len(nfs.pages) > 0 {
-		nfs.pages = nfs.pages[:len(nfs.pages)-1]
-	}
-	nfs.pages = append(nfs.pages, ps+line+rest+"\n")
-
-	if nfs.color(ps, nfs.Confi("pscolor")).color(line).color(rest); len(rest) > 0 {
-		nfs.escape("%dD", len(rest))
-	}
-	return ps
-}
-func (nfs *NFS) printf(arg ...interface{}) *NFS {
-	m := nfs.Context.Message()
-
-	line := kit.Format(arg...)
-	m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": kit.Format(arg...)})
-
-	nfs.Term(m, "print", line)
 	return nfs
 }
 
@@ -824,7 +516,6 @@ func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 
 }
 func (nfs *NFS) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	nfs.Message = m
 	return nfs
 }
 func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
@@ -846,21 +537,15 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		m.Cap("stream", arg[1])
 		nfs.Caches["ninput"] = &ctx.Cache{Value: "0"}
 		nfs.Caches["noutput"] = &ctx.Cache{Value: "0"}
+		nfs.Caches["termbox"] = &ctx.Cache{Value: "0"}
 		nfs.Configs["input"] = &ctx.Config{Value: []interface{}{}}
 		nfs.Configs["output"] = &ctx.Config{Value: []interface{}{}}
 		nfs.Configs["prompt"] = &ctx.Config{Value: ""}
 
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
-			nfs.out = m.Optionv("out").(*os.File)
-			if m.Cap("goos") != "windows" {
-				termbox.Init()
-				defer termbox.Close()
-				width, height := termbox.Size()
-				m.Confi("term", "width", width)
-				m.Confi("term", "height", height)
-				m.Confi("term", "right", width)
-				m.Confi("term", "bottom", height)
-				nfs.Caches["termbox"] = &ctx.Cache{Value: "true"}
+			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" {
+				nfs.Term(m, "init")
+				defer nfs.Term(m, "exit")
 			}
 		}
 
@@ -872,27 +557,16 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				}
 				line = strings.TrimSuffix(line, "\\")
 			}
-			m.Confv("input", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 			m.Log("debug", "%s %d %d [%s]", "input", m.Capi("ninput", 1), len(line), line)
+			m.Confv("input", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 
 			for i := m.Capi("ninput") - 1; i < m.Capi("ninput"); i++ {
 				line = m.Conf("input", []interface{}{i, "line"})
 
 				msg := m.Backs(m.Spawn(m.Source()).Set("detail", line).Set("option", "file_pos", i))
 
-				lines := strings.Split(strings.Join(msg.Meta["result"], ""), "\n")
-				for j := len(lines) - 1; j > 0; j-- {
-					if strings.TrimSpace(lines[j]) != "" {
-						break
-					}
-					lines = lines[:j]
-				}
-
-				for _, line := range lines {
-					m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
-					m.Log("debug", "%s %d %d [%s]", "output", m.Capi("noutput", 1), len(line), line)
-					nfs.printf(line)
-				}
+				nfs.printf(m.Conf("prompt"), line, "\n")
+				nfs.printf(msg.Meta["result"])
 
 				if msg.Appends("file_pos0") {
 					i = msg.Appendi("file_pos0") - 1
@@ -906,63 +580,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			m.Backs(m.Spawn(m.Source()).Set("detail", "return"))
 		}
 		return true
-	}
-
-	nfs.Message = m
-	if len(arg) > 0 && arg[0] == "scan" {
-		// nfs.Caches["windows"] = &ctx.Cache{Name: "windows", Value: "false", Help: "termbox"}
-		// nfs.Caches["termbox"] = &ctx.Cache{Name: "termbox", Value: "false", Help: "termbox"}
-		// nfs.Caches["cursor_pos"] = &ctx.Cache{Name: "cursor_pos", Value: "1", Help: "termbox"}
-		//
-		// nfs.Configs["color"] = &ctx.Config{Name: "color", Value: "false", Help: "color"}
-		// nfs.Configs["fgcolor"] = &ctx.Config{Name: "fgcolor", Value: "9", Help: "fgcolor"}
-		// nfs.Configs["bgcolor"] = &ctx.Config{Name: "bgcolor", Value: "9", Help: "bgcolor"}
-		// nfs.Configs["pscolor"] = &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"}
-		// nfs.Configs["statusfgcolor"] = &ctx.Config{Name: "statusfgcolor", Value: "1", Help: "pscolor"}
-		// nfs.Configs["statusbgcolor"] = &ctx.Config{Name: "statusbgcolor", Value: "2", Help: "pscolor"}
-		//
-
-		// nfs.in = m.Optionv("in").(*os.File)
-		// bio := bufio.NewScanner(nfs)
-		//
-		// s, e := nfs.in.Stat()
-		// m.Assert(e)
-		// m.Capi("size", int(s.Size()))
-
-		if m.Cap("stream", arg[1]) == "stdio" {
-			nfs.out = m.Optionv("out").(*os.File)
-			nfs.width, nfs.height = 1, 1
-			// if !m.Caps("windows", runtime.GOOS == "windows") {
-			// 	termbox.Init()
-			// 	defer termbox.Close()
-			// 	nfs.width, nfs.height = termbox.Size()
-			// 	nfs.Cap("termbox", "true")
-			// 	nfs.Conf("color", "true")
-			// }
-			// if !m.Options("init.shy") {
-			//
-			// 	for _, v := range []string{
-			// 		// "say you are so pretty",
-			// 		"context web serve ./ :9094",
-			// 	} {
-			// 		m.Back(m.Spawn(m.Source()).Set("detail", v))
-			// 	}
-			// 	for _, v := range []string{
-			// 		"say you are so pretty",
-			// 		"context web brow 'http://localhost:9094'",
-			// 	} {
-			// 		nfs.history = append(nfs.history, v)
-			// 		m.Capi("nline", 1)
-			// 	}
-			// 	for _, v := range []string{
-			// 		"say you are so pretty\n",
-			// 		"your can brow 'http://localhost:9094'\n",
-			// 		"press \"brow\" then press Enter\n",
-			// 	} {
-			// 		nfs.print(fmt.Sprintf(v))
-			// 	}
-			// }
-		}
 	}
 
 	m.Cap("stream", m.Option("stream"))
@@ -1082,7 +699,6 @@ func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
 	return true
 }
 
-var FileNotExist = errors.New("file not exist")
 var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	Caches: map[string]*ctx.Cache{
 		"nfile": &ctx.Cache{Name: "nfile", Value: "0", Help: "已经打开的文件数量"},
@@ -1091,21 +707,13 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"term": &ctx.Config{Name: "term", Value: map[string]interface{}{
 			"width": 80, "height": "24",
 
-			"left": 10, "top": 10, "right": 80, "bottom": 24,
-			"cursor_x": 10, "cursor_y": 10, "fgcolor": 0, "bgcolor": 2,
+			"left": 0, "top": 0, "right": 80, "bottom": 24,
+			"cursor_x": 0, "cursor_y": 0, "fgcolor": 0, "bgcolor": 0,
 			"prompt": "", "wrap": "false",
 			"begin_row": 0, "begin_col": 0, "end_row": 0, "end_col": 0,
 		}, Help: "二维码的默认大小"},
-		"term_simple": &ctx.Config{Name: "term_simple", Value: "false", Help: "二维码的默认大小"},
-		"qr_size":     &ctx.Config{Name: "qr_size", Value: "256", Help: "二维码的默认大小"},
 
-		"pscolor": &ctx.Config{Name: "pscolor", Value: "2", Help: "pscolor"},
-
-		"buf_size": &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
-		"dir_conf": &ctx.Config{Name: "dir_conf", Value: map[string]interface{}{
-			"dir_root": "usr",
-		}, Help: "读取文件的缓存区的大小"},
-
+		"buf_size":   &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir/all)", Value: "all", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
 		"dir_fields": &ctx.Config{Name: "dir_fields(time/type/name/size/line/hash)", Value: "time size line filename", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 
@@ -1478,36 +1086,23 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			return
 		}},
-		"prompt": &ctx.Command{Name: "prompt arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
-				nfs.prompt()
-				for _, v := range arg {
-					nfs.printf(v)
-					m.Echo(v)
-				}
-			}
-			return
-		}},
 		"printf": &ctx.Command{Name: "printf arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
 				nfs.printf(arg)
 			}
 			return
 		}},
-		"exec": &ctx.Command{Name: "exec cmd", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
-				nfs.prompt()
-				for _, v := range arg {
-					nfs.out.WriteString(v)
-				}
-				nfs.out.WriteString("\n")
-
-				msg := m.Find("cli.shell1").Cmd("source", arg)
-				for _, v := range msg.Meta["result"] {
-					nfs.out.WriteString(v)
-					m.Echo(v)
-				}
-				nfs.out.WriteString("\n")
+		"prompt": &ctx.Command{Name: "prompt arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				nfs.prompt(arg)
+			}
+			return
+		}},
+		"action": &ctx.Command{Name: "action cmd", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				msg := m.Cmd("cli.source", arg)
+				nfs.printf(msg.Conf("prompt"), arg, "\n")
+				nfs.printf(msg.Meta["result"])
 			}
 			return
 		}},
