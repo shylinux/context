@@ -448,6 +448,9 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 			case termbox.KeyCtrlL:
 				nfs.Term(m, "clear", "all").Term(m, "flush")
 				nfs.prompt(what)
+				if len(what) < index {
+					index = 0
+				}
 				nfs.shadow(what[index:], help, color)
 
 			case termbox.KeyCtrlJ, termbox.KeyEnter:
