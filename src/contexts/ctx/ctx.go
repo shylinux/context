@@ -386,20 +386,60 @@ func (m *Message) Target() *Context {
 func (m *Message) Message() *Message {
 	return m.message
 }
-func (m *Message) Format(arg ...string) string {
+func (m *Message) Format(arg ...interface{}) string {
 	if len(arg) == 0 {
 		arg = append(arg, "time", "ship")
 	}
 
 	meta := []string{}
 	for _, v := range arg {
-		switch v {
+		switch kit.Format(v) {
+		case "summary":
+			msg := arg[1].(*Message)
+			ms := make([]*Message, 0, 1024)
+			ms = append(ms, msg.message, msg)
+
+			for i := 0; i < len(ms); i++ {
+				msg := ms[i]
+				if m.Add("append", "index", i); msg == nil {
+					m.Add("append", "message", "")
+					m.Add("append", "time", "")
+					m.Add("append", "code", "")
+					m.Add("append", "source", "")
+					m.Add("append", "target", "")
+					m.Add("append", "details", "")
+					m.Add("append", "options", "")
+					continue
+				}
+
+				if msg.message != nil {
+					m.Add("append", "message", msg.message.code)
+				} else {
+					m.Add("append", "message", "")
+				}
+				m.Add("append", "time", msg.time.Format("15:04:05"))
+				m.Add("append", "code", msg.code)
+				m.Add("append", "source", msg.source.Name)
+				m.Add("append", "target", msg.target.Name)
+				m.Add("append", "details", fmt.Sprintf("%v", msg.Meta["detail"]))
+				m.Add("append", "options", fmt.Sprintf("%v", msg.Meta["option"]))
+
+				if i == 0 {
+					continue
+				}
+
+				if len(ms) < 30 && len(arg) > 2 && arg[2] == "deep" {
+					ms = append(ms, ms[i].messages...)
+				}
+			}
+			m.Table()
 		case "time":
 			meta = append(meta, m.Time())
 		case "code":
 			meta = append(meta, kit.Format(m.code))
 		case "ship":
 			meta = append(meta, fmt.Sprintf("%d(%s->%s)", m.code, m.source.Name, m.target.Name))
+
 		case "detail":
 			meta = append(meta, fmt.Sprintf("%v", m.Meta["detail"]))
 		case "option":
@@ -408,6 +448,7 @@ func (m *Message) Format(arg ...string) string {
 			meta = append(meta, fmt.Sprintf("%v", m.Meta["append"]))
 		case "result":
 			meta = append(meta, fmt.Sprintf("%v", m.Meta["result"]))
+
 		case "full":
 		case "chain":
 			ms := []*Message{}
@@ -458,7 +499,7 @@ func (m *Message) Format(arg ...string) string {
 			}
 
 		default:
-			meta = append(meta, kit.FileName(v, "time"))
+			meta = append(meta, kit.FileName(kit.Format(v), "time"))
 		}
 	}
 	return strings.Join(meta, " ")
@@ -1658,17 +1699,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 			if len(arg) > 0 {
 				switch arg[0] {
-				case "full":
-					m.Echo(m.Format("full"))
-					return
-				case "back":
-					m.Echo(m.Format("back"))
-					return
-				case "stack":
-					m.Echo(m.Format("stack"))
+				case "time", "code", "ship", "full", "chain", "stack":
+					m.Echo(m.Format(arg[0]))
 					return
 				}
 			}
+
 			if len(arg) > 0 && arg[0] == "spawn" {
 				sub := msg.Spawn()
 				m.Echo("%d", sub.code)
@@ -1681,41 +1717,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				return
 			}
 
-			if msg.message != nil {
-				m.Add("append", "time", msg.message.time.Format("15:04:05"))
-				m.Add("append", "code", msg.message.code)
-				m.Add("append", "source", msg.message.source.Name)
-				m.Add("append", "target", msg.message.target.Name)
-				if msg.message.Meta != nil {
-					m.Add("append", "details", fmt.Sprintf("%v", msg.message.Meta["detail"]))
-					m.Add("append", "options", fmt.Sprintf("%v", msg.message.Meta["option"]))
-				} else {
-					m.Add("append", "details", "")
-					m.Add("append", "options", "")
-				}
-			} else {
-				m.Add("append", "time", "")
-				m.Add("append", "code", "")
-				m.Add("append", "source", "")
-				m.Add("append", "target", "")
-				m.Add("append", "details", "")
-				m.Add("append", "options", "")
-			}
-			m.Add("append", "time", msg.time.Format("15:04:05"))
-			m.Add("append", "code", msg.code)
-			m.Add("append", "source", msg.source.Name)
-			m.Add("append", "target", msg.target.Name)
-			m.Add("append", "details", fmt.Sprintf("%v", msg.Meta["detail"]))
-			m.Add("append", "options", fmt.Sprintf("%v", msg.Meta["option"]))
-			for _, v := range msg.messages {
-				m.Add("append", "time", v.time.Format("15:04:05"))
-				m.Add("append", "code", v.code)
-				m.Add("append", "source", v.source.Name)
-				m.Add("append", "target", v.target.Name)
-				m.Add("append", "details", fmt.Sprintf("%v", v.Meta["detail"]))
-				m.Add("append", "options", fmt.Sprintf("%v", v.Meta["option"]))
-			}
-			m.Table()
+			m.Format("summary", msg, "deep")
+			msg.CopyTo(m)
 			return
 		}},
 		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {

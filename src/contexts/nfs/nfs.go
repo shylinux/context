@@ -157,9 +157,7 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 
 func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS {
 	m := nfs.Context.Message()
-	// if action != "print" {
-	m.Log("term", "%s %v", action, args)
-	// }
+	m.Log("debug", "%s %v", action, args)
 
 	switch action {
 	case "init":
@@ -182,7 +180,6 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 	y := m.Confi("term", "cursor_y")
 	bg := termbox.Attribute(msg.Confi("term", "bgcolor"))
 	fg := termbox.Attribute(msg.Confi("term", "fgcolor"))
-	m.Log("fuck", "what %v %v", bg, fg)
 
 	begin_row := m.Confi("term", "begin_row")
 	begin_col := m.Confi("term", "begin_col")
@@ -252,7 +249,7 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 		if len(args) > 0 {
 			n = kit.Int(args[0])
 		}
-		m.Log("term", "<<<< scroll page (%v, %v)", begin_row, begin_col)
+		m.Log("debug", "<<<< scroll page (%v, %v)", begin_row, begin_col)
 
 		// 向下滚动
 		for i := begin_row; n > 0 && i < m.Capi("noutput"); i++ {
@@ -297,7 +294,7 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 			}
 		}
 
-		m.Log("term", ">>>> scroll page (%v, %v)", begin_row, begin_col)
+		m.Log("debug", ">>>> scroll page (%v, %v)", begin_row, begin_col)
 		m.Conf("term", "begin_row", begin_row)
 		m.Conf("term", "begin_col", begin_col)
 
@@ -334,7 +331,6 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 				}
 
 				if y >= bottom {
-					m.Log("fuck", "scroll %v", m.Option("scroll"))
 					if !m.Options("scroll") {
 						nfs.Term(m, "scroll")
 					}
@@ -406,7 +402,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				}
 				if v := m.Conf("input", []interface{}{which, "line"}); v != "" {
 					what = []rune(v)
-					m.Log("term", "what %v %v", which, what)
+					m.Log("debug", "what %v %v", which, what)
 					nfs.prompt(what)
 				}
 			case termbox.KeyCtrlN:
@@ -415,7 +411,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				}
 				if v := m.Conf("input", []interface{}{which, "line"}); v != "" {
 					what = []rune(v)
-					m.Log("term", "what %v %v", which, what)
+					m.Log("debug", "what %v %v", which, what)
 					nfs.prompt(what)
 				}
 
@@ -577,7 +573,7 @@ func (nfs *NFS) printf(arg ...interface{}) *NFS {
 	if !strings.HasSuffix(line, "\n") {
 		line += "\n"
 	}
-	m.Log("term", "noutput %s", m.Cap("noutput", m.Capi("noutput")+1))
+	m.Log("debug", "noutput %s", m.Cap("noutput", m.Capi("noutput")+1))
 	m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 
 	if m.Caps("termbox") {
@@ -1268,6 +1264,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
+
 					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
 						nfs, _ := sub.Target().Server.(*NFS)
 						sub1.Remote = make(chan bool, 1)
@@ -1283,6 +1280,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
+
 					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
 						nfs, _ := sub.Target().Server.(*NFS)
 						sub1.Remote = make(chan bool, 1)

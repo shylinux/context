@@ -52,7 +52,7 @@ func (log *LOG) Log(msg *ctx.Message, action string, str string, arg ...interfac
 					}
 				}
 
-				fmt.Fprintln(file, fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), msg.Format(kit.Trans(value["meta"])...),
+				fmt.Fprintln(file, fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), msg.Format(value["meta"].([]interface{})...),
 					kit.Format(value["color_begin"]), action, fmt.Sprintf(str, arg...), kit.Format(value["color_end"])))
 				return
 			}

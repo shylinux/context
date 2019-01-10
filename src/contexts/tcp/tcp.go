@@ -122,29 +122,19 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	return true
 }
 func (tcp *TCP) Close(m *ctx.Message, arg ...string) bool {
-	return false
 	switch tcp.Context {
 	case m.Target():
 		if tcp.Listener != nil {
-			m.Log("info", "%d close %v", m.Capi("nlisten", -1)+1, m.Cap("stream"))
+			m.Log("info", " close %v", m.Cap("stream"))
 			tcp.Listener.Close()
 			tcp.Listener = nil
 		}
 		if tcp.Conn != nil {
-			m.Log("info", "%d close %v", m.Capi("nclient", -1)+1, m.Cap("stream"))
+			m.Log("info", " close %v", m.Cap("stream"))
 			tcp.Conn.Close()
 			tcp.Conn = nil
 		}
 	case m.Source():
-		if tcp.Conn != nil {
-			msg := m.Spawn(tcp.Context)
-			if !tcp.Context.Close(msg, arg...) {
-				return false
-			}
-		}
-	}
-	if m.Target() == Index {
-		return false
 	}
 	return true
 }
@@ -192,9 +182,11 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 		"ifconfig": &ctx.Command{Name: "ifconfig", Help: "网络配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if ifs, e := net.Interfaces(); m.Assert(e) {
 				for _, v := range ifs {
+
 					if ips, e := v.Addrs(); m.Assert(e) {
 						for _, x := range ips {
 							ip := x.String()
+
 							if !strings.Contains(ip, ":") && len(ip) > 0 && len(v.HardwareAddr) > 0 {
 								m.Add("append", "index", v.Index)
 								m.Add("append", "name", v.Name)

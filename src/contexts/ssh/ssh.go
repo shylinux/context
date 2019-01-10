@@ -46,9 +46,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Sess("nfs").Call(func(sub *ctx.Message) *ctx.Message {
 				sub.Start(fmt.Sprintf("host%d", m.Capi("nhost", 1)), "远程主机")
-				sub.Spawn().Cmd("pwd", "")
+				// sub.Spawn().Cmd("pwd", "")
 				return sub
 			}, m.Meta["detail"])
+
 			if !m.Caps("domain") {
 				m.Cap("domain", m.Cap("hostname", m.Conf("hostname")))
 			}
