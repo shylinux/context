@@ -430,6 +430,21 @@ func Duration(arg ...string) time.Duration {
 	return d
 }
 
+func Action(cmd string, arg ...interface{}) string {
+	switch cmd {
+	case "time":
+		return Format(time.Now())
+	case "rand":
+		return Format(rand.Int())
+	case "uniq":
+		return Format(time.Now(), rand.Int())
+	default:
+		if len(arg) > 0 {
+			return Format(arg...)
+		}
+	}
+	return cmd
+}
 func Time(arg ...string) int {
 	if len(arg) == 0 {
 		return Int(time.Now())
@@ -483,21 +498,6 @@ func FileName(name string, meta ...string) string {
 	return strings.Join(result, "")
 }
 
-func Action(cmd string, arg ...interface{}) string {
-	switch cmd {
-	case "time":
-		return Format(time.Now())
-	case "rand":
-		return Format(rand.Int())
-	case "uniq":
-		return Format(time.Now(), rand.Int())
-	default:
-		if len(arg) > 0 {
-			return Format(arg...)
-		}
-	}
-	return cmd
-}
 func Check(e error) bool {
 	if e != nil {
 		panic(e)

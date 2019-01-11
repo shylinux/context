@@ -224,7 +224,6 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 	} else if !m.Confs("exec", []string{yac.hand[hash], "disable"}) { //执行命令
 		msg := out.Spawn(m.Source()).Add("detail", yac.hand[hash], word)
 		if m.Back(msg); msg.Hand { //命令替换
-			m.Assert(!msg.Has("return"))
 			word = msg.Meta["result"]
 		}
 	}
@@ -249,6 +248,7 @@ func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server {
 }
 func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) {
 	if len(arg) > 0 && arg[0] == "scan" {
+		m.Cap("stream", arg[1])
 		m.Sess("nfs").Call(func(input *ctx.Message) *ctx.Message {
 			_, word, _ := yac.parse(m, input, m.Optioni("page"), m.Optioni("void"), input.Detail(0)+"\n", 1)
 			input.Result(0, word)
@@ -341,6 +341,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				yac.mat = make([]map[byte]*State, m.Confi("info", "nlang"))
 				yac.state = map[State]*State{}
 
+				if len(arg) > 0 {
+					yac.lex = m.Sess(arg[0])
+				}
 				m.Confm("seed", func(line int, seed map[string]interface{}) {
 					m.Spawn().Cmd("train", seed["page"], seed["hash"], seed["word"])
 				})
@@ -386,14 +389,22 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 			return
 		}},
-		"scan": &ctx.Command{Name: "scan filename", Help: "解析文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"scan": &ctx.Command{Name: "scan filename modulename", Help: "解析文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				m.Optioni("page", yac.page["line"])
 				m.Optioni("void", yac.page["void"])
-				if len(arg) > 0 {
-					m.Start(fmt.Sprintf("parse%d", m.Capi("nparse", 1)), "parse", key, arg[0])
+
+				name := ""
+				if len(arg) > 1 {
+					name = arg[1]
 				} else {
-					m.Start(fmt.Sprintf("parse%d", m.Capi("nparse", 1)), "parse")
+					name = fmt.Sprintf("parse%d", m.Capi("nparse", 1))
+				}
+
+				if len(arg) > 0 {
+					m.Start(name, "parse", key, arg[0])
+				} else {
+					m.Start(name, "parse")
 				}
 			}
 			return

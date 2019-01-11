@@ -58,7 +58,7 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return cli
 }
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
-	m.Cap("stream", m.Spawn(m.Sess("yac", false).Target()).Call(func(cmd *ctx.Message) *ctx.Message {
+	m.Cap("stream", m.Sess("yac").Call(func(cmd *ctx.Message) *ctx.Message {
 		if !m.Caps("parse") {
 			switch cmd.Detail(0) {
 			case "if":
@@ -81,9 +81,6 @@ func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
 		if v != nil {
 			m.Optionv("ps_target", v)
 		}
-
-		m.Set("append").Copy(cmd, "append")
-		m.Set("result").Copy(cmd, "result")
 		return nil
 	}, "scan", arg).Target().Name)
 
@@ -136,6 +133,45 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
 	},
 	Commands: map[string]*ctx.Command{
+		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmdy("dir", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
+				return
+			}
+
+			// 解析脚本文件
+			if m.Cmds("nfs.path", arg[0]) {
+				switch path.Ext(arg[0]) {
+				case "":
+				case ".shy":
+					m.Option("scan_end", "false")
+					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
+					m.Wait()
+				default:
+					m.Cmdy("system", m.Conf("cmd_script", strings.TrimPrefix(path.Ext(arg[0]), ".")), arg)
+				}
+				return
+			}
+
+			// 解析终端命令
+			if arg[0] == "stdio" {
+				m.Option("scan_end", "false")
+				m.Start("shy", "shell", "stdio", "engine")
+				m.Wait()
+				return
+			}
+
+			// 解析代码片段
+			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
+				switch msg.Cmd().Detail(0) {
+				case "cmd":
+					m.Set("append").Copy(msg, "append")
+					m.Set("result").Copy(msg, "result")
+				}
+				return nil
+			}, "parse", "line", "void", strings.Join(arg, " "))
+			return
+		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
 			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
 			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1},
@@ -163,9 +199,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if v, ok := kit.Chain(conf, "path").(string); ok {
 					cmd.Path = m.Parse(v)
 				}
-				m.Log("info", "cmd.path %v", cmd.Path)
-
-				m.Log("info", "cmd.arg %v", cmd.Args)
+				m.Log("info", "cmd %v %v", cmd.Path, cmd.Args)
 
 				for k, v := range m.Confm("system_env") {
 					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
@@ -200,11 +234,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				} else {
 					wait := make(chan bool, 1)
 					go func() {
-						out := bytes.NewBuffer(make([]byte, 1024))
-						err := bytes.NewBuffer(make([]byte, 1024))
+						out := bytes.NewBuffer(make([]byte, 0, 1024))
+						err := bytes.NewBuffer(make([]byte, 0, 1024))
 						cmd.Stdout = out
 						cmd.Stderr = err
-
 						if e := cmd.Run(); e != nil {
 							m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
 						} else {
@@ -254,6 +287,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				return
 			}},
+
 		"alias": &ctx.Command{Name: "alias [short [long...]]|[delete short]|[import module [command [alias]]]",
 			Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名, import导入模块所有命令",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -681,80 +715,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"arguments": &ctx.Command{Name: "arguments", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Set("result", m.Optionv("arguments"))
-			return
-		}},
-		"source": &ctx.Command{Name: "source [stdio [init_shy [exit_shy]]]|[filename [async]]|string", Help: "解析脚本, filename: 文件名, async: 异步执行",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if _, ok := m.Source().Server.(*CLI); ok {
-					m.Copy(m.Spawn(c), "target")
-				}
-
-				if (len(arg) == 0 || arg[0] == "stdio") && m.Target().Name == "cli" {
-					// 启动终端
-					m.Cmd("yac.init")
-					m.Optionv("ps_target", m.Target())
-					if m.Start("shy", "shell", "stdio"); m.Cmds("nfs.path", m.Confx("init_shy", arg, 1)) {
-						// msg := m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("init_shy"))
-
-						// m.Cap("ps_target", msg.Append("last_target"))
-						// m.Option("prompt", m.Conf("prompt"))
-						// m.Find("nfs.stdio").Cmd("prompt")
-					}
-					if m.Wait(); m.Cmds("nfs.path", m.Confx("exit_shy", arg, 2)) {
-						m.Spawn().Add("option", "scan_end", "false").Cmd("source", m.Conf("exit_shy"))
-					}
-					return
-				}
-
-				// 运行脚本
-				if m.Cmds("nfs.path", arg[0]) && strings.HasSuffix(arg[0], ".shy") {
-					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
-					if len(arg) < 2 || arg[1] != "async" {
-						m.Wait()
-					} else {
-						m.Options("async", true)
-					}
-					return
-				}
-
-				// m.Confv("source_list", -1, map[string]interface{}{
-				// 	"source_time": m.Time(),
-				// 	"source_ctx":  m.Option("current_ctx"),
-				// 	"source_cmd":  strings.Join(arg, " "),
-				// })
-				//
-				if m.Options("current_ctx") {
-					args := []string{"context", m.Option("current_ctx")}
-					arg = append(args, arg...)
-					m.Option("current_ctx", "")
-				} else {
-					if !strings.HasPrefix(arg[0], "context") {
-						args := []string{"context", m.Source().Name}
-						arg = append(args, arg...)
-					}
-				}
-
-				m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
-					switch msg.Cmd().Detail(0) {
-					case "cmd":
-						m.Set("append").Copy(msg, "append")
-						m.Set("result").Copy(msg, "result")
-					}
-					return nil
-				}, "parse", "line", "void", strings.Join(arg, " "))
-				return
-			}},
-		"run": &ctx.Command{Name: "run", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				name := path.Join(m.Option("dir_root"), m.Option("download_dir"))
-				msg := m.Sess("nfs").Add("option", "dir_reg", ".*\\.(sh|shy|py)$").Add("option", "dir_root", "").Cmd("dir", name, "dir_deep")
-				m.Copy(msg, "append").Copy(msg, "result")
-				return
-			}
-
-			// name := path.Join(m.Option("dir_root"), m.Option("download_dir"), arg[0])
-			msg := m.Spawn(c).Cmd("cmd", arg[0], arg[1:])
-			m.Copy(msg, "append").Copy(msg, "result")
 			return
 		}},
 

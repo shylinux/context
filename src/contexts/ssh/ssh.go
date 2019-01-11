@@ -2,8 +2,8 @@ package ssh
 
 import (
 	"contexts/ctx"
-	"fmt"
 	"strings"
+	"toolkit"
 )
 
 type SSH struct {
@@ -37,32 +37,52 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"domain": &ctx.Cache{Name: "domain", Value: "", Help: "主机域名"},
 	},
 	Configs: map[string]*ctx.Config{
+		"host": &ctx.Config{Name: "host", Value: map[string]interface{}{}, Help: "主机数量"},
+
 		"hostname": &ctx.Config{Name: "hostname", Value: "com", Help: "主机数量"},
 
 		"domain.json": &ctx.Config{Name: "domain.json", Value: "var/domain.json", Help: "主机数量"},
 		"domain.png":  &ctx.Config{Name: "domain.png", Value: "var/domain.png", Help: "主机数量"},
 	},
 	Commands: map[string]*ctx.Command{
-		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Sess("nfs").Call(func(sub *ctx.Message) *ctx.Message {
-				sub.Start(fmt.Sprintf("host%d", m.Capi("nhost", 1)), "远程主机")
-				// sub.Spawn().Cmd("pwd", "")
-				return sub
-			}, m.Meta["detail"])
-
-			if !m.Caps("domain") {
-				m.Cap("domain", m.Cap("hostname", m.Conf("hostname")))
+		"remote": &ctx.Command{Name: "remote listen|dial|send args...", Help: "网络监听", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmdy("ctx.config", "host")
+				return
 			}
-			// m.Spawn(m.Target()).Cmd("save")
+
+			host := m.Confm("host", arg[0])
+			if host != nil {
+				arg = arg[1:]
+			}
+
+			switch arg[0] {
+			case "listen", "dial":
+				m.Call(func(sub *ctx.Message) *ctx.Message {
+					h, _ := kit.Hash("host", m.Option("ms_source"), "uniq")
+					m.Log("fuck", "what %v", sub.Format())
+					m.Confv("host", h, map[string]interface{}{
+						"module": sub.Cap("module"),
+						"type":   arg[0],
+					})
+					return nil
+				}, "nfs.remote", arg)
+
+			case "exec":
+				m.Find(kit.Format(host["module"]), true).CallBack(true, func(sub *ctx.Message) *ctx.Message {
+					m.Copy(sub)
+					return nil
+				}, arg[1:])
+			}
+
 			return
 		}},
-		"dial": &ctx.Command{Name: "dial address [security [protocol]]", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Sess("nfs").CallBack(true, func(sub *ctx.Message) *ctx.Message {
-				sub.Target().Start(sub)
-				return sub
-			}, m.Meta["detail"])
+
+		"demo": &ctx.Command{Name: "demo", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Echo("demo")
 			return
 		}},
+
 		"send": &ctx.Command{Name: "send [domain str] cmd arg...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) {
 				origin, domain := "", ""
@@ -138,6 +158,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
+
 		"pwd": &ctx.Command{Name: "pwd [hostname]", Help: "主机域名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Echo(m.Cap("domain"))

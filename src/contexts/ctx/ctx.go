@@ -105,6 +105,7 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	c.message = m
 	c.requests = append(c.requests, m)
 	m.source.sessions = append(m.source.sessions, m)
+	c.exit = make(chan bool, 3)
 
 	switch v := m.Gdb("context", "begin", c.Name).(type) {
 	case string:
@@ -147,7 +148,6 @@ func (c *Context) Start(m *Message, arg ...string) bool {
 		return true
 	}
 
-	c.exit = make(chan bool, 2)
 	go m.TryCatch(m, true, func(m *Message) {
 		m.Log(m.Cap("status", "start"), "%d server %v %v", m.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
 
@@ -170,10 +170,10 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 		return true
 	}
 
-	m.Log("close", "before %d:%d %v", len(c.requests), len(c.sessions), arg)
 	if m.target == c {
 		for i := len(c.requests) - 1; i >= 0; i-- {
 			if msg := c.requests[i]; msg.code == m.code {
+				m.Log("close", "request %d/%d", i, len(c.requests)-1)
 				if c.Server == nil || c.Server.Close(m, arg...) {
 					for j := i; j < len(c.requests)-1; j++ {
 						c.requests[j] = c.requests[j+1]
@@ -184,7 +184,6 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 		}
 	}
 
-	m.Log("close", "after %d:%d %v", len(c.requests), len(c.sessions), arg)
 	if len(c.requests) > 0 {
 		return false
 	}
@@ -200,9 +199,7 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 
 	if c.context != nil {
 		m.Log("close", "%d context %v", m.root.Capi("ncontext", -1), arg)
-		if c.Name != "stdio" {
-			delete(c.context.contexts, c.Name)
-		}
+		delete(c.context.contexts, c.Name)
 		c.exit <- true
 	}
 	return true
@@ -1112,6 +1109,7 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 		if x, ok := msg.Sessions[key]; ok {
 			if spawn {
 				x = m.Spawn(x.target)
+				x.callback = func(sub *Message) *Message { return sub }
 			}
 			return x
 		}
@@ -1292,12 +1290,18 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 					arg = args
 				}
 
+				target := m.target
+				m.target = s
+
 				m.Hand = true
 				switch v := m.Gdb("command", key, arg).(type) {
 				case string:
 					m.Echo(v)
 				case nil:
 					x.Hand(m, c, key, arg...)
+				}
+				if m.target == s {
+					m.target = target
 				}
 			})
 		}
@@ -3266,11 +3270,18 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	return ctx
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
-	gdb := m.Sess("gdb")
-	gdb.Target().Start(gdb)
+	m.Optionv("ps_target", Index)
+
+	m.Cmd("log.init")
+	m.Cmd("gdb.init")
+	if m.Cmd("yac.init", "lex"); len(arg) == 0 {
+		m.Cap("stream", "shy")
+		m.Cmd("cli.source", "init.shy").Cmd("cli.source", "stdio").Cmd("cli.source", "exit.shy")
+		return true
+	}
 
 	m.Cmd("cli.source", arg)
-	return false
+	return true
 }
 func (ctx *CTX) Close(m *Message, arg ...string) bool {
 	return true
@@ -3283,8 +3294,9 @@ func Start(args ...string) bool {
 		args = append(args, os.Args[1:]...)
 	}
 
-	Index.Begin(Pulse, args...)
-	Index.Start(Pulse, args...)
-	Index.Close(Pulse, args...)
-	return false
+	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
+		return Index.Close(Pulse, args...)
+	}
+
+	return Index.message.Wait()
 }

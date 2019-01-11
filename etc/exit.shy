@@ -1,8 +1,0 @@
-
-~web
-    config save web.json bench
-~aaa
-    config save auth.json hash auth
-~stdio
-    config save history.json history
-

@@ -1,15 +1,2 @@
-~stdio
-config load history.json
-~aaa
-    # config load auth.json
-~web
-config load web.json
-
-~aaa
-    role root componet index command source
-    user root shy shy
-
-source etc/local.shy
-source etc/spide.shy
-~aaa
-
+~ssh
+    remote listen :9090

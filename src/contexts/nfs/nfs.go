@@ -31,7 +31,6 @@ type NFS struct {
 	out *os.File
 
 	send chan *ctx.Message
-	recv chan *ctx.Message
 	hand map[int]*ctx.Message
 
 	*ctx.Context
@@ -311,31 +310,29 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 		nfs.Term(m, "print", m.Conf("prompt"))
 
 	case "print":
-		if m.Caps("termbox") {
-			for _, v := range kit.Format(args...) {
-				if x < right && y < bottom {
-					termbox.SetCell(x, y, v, fg, bg)
-				}
+		for _, v := range kit.Format(args...) {
+			if x < right && y < bottom {
+				termbox.SetCell(x, y, v, fg, bg)
+			}
 
-				if v > 255 {
-					x++
-				}
-				if x++; v == '\n' || (x >= right && m.Confs("term", "wrap")) {
-					x, y = left, y+1
-				}
+			if v > 255 {
+				x++
+			}
+			if x++; v == '\n' || (x >= right && m.Confs("term", "wrap")) {
+				x, y = left, y+1
+			}
 
-				if x < right && y < bottom {
-					m.Conf("term", "cursor_x", x)
-					m.Conf("term", "cursor_y", y)
-					termbox.SetCursor(x, y)
-				}
+			if x < right && y < bottom {
+				m.Conf("term", "cursor_x", x)
+				m.Conf("term", "cursor_y", y)
+				termbox.SetCursor(x, y)
+			}
 
-				if y >= bottom {
-					if !m.Options("scroll") {
-						nfs.Term(m, "scroll")
-					}
-					break
+			if y >= bottom {
+				if !m.Options("scroll") {
+					nfs.Term(m, "scroll")
 				}
+				break
 			}
 		}
 	case "color":
@@ -460,6 +457,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 			case termbox.KeyCtrlC:
 				nfs.Term(m, "exit")
+				n = copy(p, []byte("return\n"))
 				return
 
 			case termbox.KeyCtrlE:
@@ -572,16 +570,14 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 func (nfs *NFS) printf(arg ...interface{}) *NFS {
 	m := nfs.Context.Message()
 
-	line := kit.Format(arg...)
-	if !strings.HasSuffix(line, "\n") {
-		line += "\n"
-	}
+	line := strings.TrimRight(kit.Format(arg...), "\n")
 	m.Log("debug", "noutput %s", m.Cap("noutput", m.Capi("noutput")+1))
 	m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 
 	if m.Caps("termbox") {
 		nfs.Term(m, "clear").Term(m, "print", line).Term(m, "flush")
-		m.Conf("term", "prompt_y", m.Confi("term", "cursor_y"))
+		m.Conf("term", "prompt_y", m.Confi("term", "cursor_y")+1)
+		m.Conf("term", "cursor_y", m.Confi("term", "cursor_y")+1)
 	} else {
 		nfs.out.WriteString(line)
 	}
@@ -589,8 +585,11 @@ func (nfs *NFS) printf(arg ...interface{}) *NFS {
 }
 func (nfs *NFS) prompt(arg ...interface{}) *NFS {
 	m := nfs.Context.Message()
-
 	target, _ := m.Optionv("ps_target").(*ctx.Context)
+	if target == nil {
+		target = nfs.Context
+	}
+
 	line := fmt.Sprintf("%d[%s]%s> ", m.Capi("ninput"), time.Now().Format("15:04:05"), target.Name)
 	m.Conf("prompt", line)
 
@@ -598,7 +597,7 @@ func (nfs *NFS) prompt(arg ...interface{}) *NFS {
 	if m.Caps("termbox") {
 		m.Conf("term", "prompt_y", m.Conf("term", "cursor_y"))
 		nfs.Term(m, "clear").Term(m, "print", line).Term(m, "flush")
-	} else {
+	} else if nfs.out != nil {
 		nfs.out.WriteString(line)
 	}
 	return nfs
@@ -640,6 +639,32 @@ func (nfs *NFS) shadow(args ...interface{}) *NFS {
 	}
 
 	return nfs
+}
+
+func (nfs *NFS) Send(meta string, arg ...interface{}) *NFS {
+	m := nfs.Context.Message()
+
+	n, e := fmt.Fprintf(nfs.io, "%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(arg[0])))
+	m.Assert(e)
+	m.Capi("nwrite", n)
+	return nfs
+}
+func (nfs *NFS) Recv(line string) (field string, value string) {
+	m := nfs.Context.Message()
+
+	m.Log("recv", "%d [%s]", len(line), line)
+	m.Capi("nread", len(line)+1)
+
+	word := strings.Split(line, ": ")
+	field, e := url.QueryUnescape(word[0])
+	m.Assert(e)
+	if len(word) == 1 {
+		return
+	}
+
+	value, e = url.QueryUnescape(word[1])
+	m.Assert(e)
+	return
 }
 
 func (nfs *NFS) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
@@ -703,11 +728,19 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		line, bio := "", bufio.NewScanner(nfs)
 		for nfs.prompt(); !m.Options("scan_end"); nfs.prompt() {
 			for bio.Scan() {
-				if line = line + bio.Text(); !strings.HasSuffix(line, "\\") {
+				if text := bio.Text(); text == "" {
+					continue
+				} else if !strings.HasSuffix(text, "\\") {
+					line += text
 					break
+				} else {
+					line += strings.TrimSuffix(text, "\\")
 				}
-				line = strings.TrimSuffix(line, "\\")
 			}
+			if line == "" {
+				line = "return"
+			}
+
 			m.Log("debug", "%s %d %d [%s]", "input", m.Capi("ninput", 1), len(line), line)
 			m.Confv("input", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 
@@ -726,108 +759,73 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			}
 			line = ""
 		}
-
-		if !m.Options("scan_end") {
-			m.Backs(m.Spawn(m.Source()).Set("detail", "return"))
-		}
-		return true
+		return false
 	}
 
-	m.Cap("stream", m.Option("stream"))
+	m.Cap("stream", m.Option("ms_source"))
 	nfs.io = m.Optionv("io").(io.ReadWriter)
-	nfs.hand = map[int]*ctx.Message{}
 	nfs.send = make(chan *ctx.Message, 10)
-	nfs.recv = make(chan *ctx.Message, 10)
+	nfs.hand = map[int]*ctx.Message{}
 
 	go func() { //发送消息队列
 		for {
 			select {
 			case msg := <-nfs.send:
-				head, body := "detail", "option"
-				if msg.Hand {
-					head, body = "result", "append"
-					send_code := msg.Option("send_code")
-					msg.Append("send_code1", send_code)
-					m.Log("info", "%s recv: %v %v", msg.Option("recv_code"), msg.Meta[head], msg.Meta[body])
-				} else {
-					msg.Option("send_code", m.Capi("nsend", 1))
-					m.Log("info", "%d send: %v %v", m.Capi("nsend"), msg.Meta[head], msg.Meta[body])
-					nfs.hand[m.Capi("nsend")] = msg
+				code, meta, body := "0", "detail", "option"
+				if msg.Options("remote_code") { // 发送响应
+					code, meta, body = msg.Option("remote_code"), "result", "append"
+				} else { // 发送请求
+					code = kit.Format(m.Capi("nsend", 1))
+					nfs.hand[kit.Int(code)] = msg
 				}
 
-				for _, v := range msg.Meta[head] {
-					n, e := fmt.Fprintf(nfs.io, "%s: %s\n", head, url.QueryEscape(v))
-					m.Assert(e)
-					m.Capi("nwrite", n)
+				nfs.Send("code", code)
+				for _, v := range msg.Meta[meta] {
+					nfs.Send(meta, v)
 				}
 				for _, k := range msg.Meta[body] {
 					for _, v := range msg.Meta[k] {
-						n, e := fmt.Fprintf(nfs.io, "%s: %s\n", url.QueryEscape(k), url.QueryEscape(v))
-						m.Assert(e)
-						m.Capi("nwrite", n)
+						nfs.Send(k, v)
 					}
 				}
-
-				n, e := fmt.Fprintf(nfs.io, "\n")
-				m.Assert(e)
-				m.Capi("nwrite", n)
 			}
 		}
 	}()
 
-	go func() { //接收消息队列
-		var e error
-		var msg *ctx.Message
-		head, body := "", ""
+	//接收消息队列
+	msg, code, head, body := m, "0", "result", "append"
+	for bio := bufio.NewScanner(nfs.io); bio.Scan(); {
 
-		for bio := bufio.NewScanner(nfs.io); bio.Scan(); {
-			if msg == nil {
-				msg = m.Sess("target")
-			}
-			if msg.Meta == nil {
-				msg.Meta = map[string][]string{}
-			}
-			line := bio.Text()
-			m.Log("recv", "(%s) %s", head, line)
-			m.Capi("nread", len(line)+1)
-			if len(line) == 0 {
-				if head == "detail" {
-					m.Log("info", "%d recv: %v %v %v", m.Capi("nrecv", 1), msg.Meta[head], msg.Meta[body], msg.Meta)
-					msg.Option("recv_code", m.Cap("nrecv"))
-					nfs.recv <- msg
-				} else {
-					m.Log("info", "%d send: %v %v %v", msg.Appendi("send_code1"), msg.Meta[head], msg.Meta[body], msg.Meta)
-					h := nfs.hand[msg.Appendi("send_code1")]
-					h.Copy(msg, "result").Copy(msg, "append")
-					h.Remote <- true
-				}
-				msg, head, body = nil, "", "append"
-				continue
-			}
+		switch field, value := nfs.Recv(bio.Text()); field {
+		case "code":
+			msg, code = m.Sess("ms_target"), value
+			msg.Meta = map[string][]string{}
 
-			word := strings.Split(line, ": ")
-			word[0], e = url.QueryUnescape(word[0])
-			m.Assert(e)
-			word[1], e = url.QueryUnescape(word[1])
-			m.Assert(e)
-			switch word[0] {
-			case "detail":
-				head, body = "detail", "option"
-				msg.Add(word[0], word[1])
-			case "result":
-				head, body = "result", "append"
-				msg.Add(word[0], word[1])
-			default:
-				msg.Add(body, word[0], word[1])
+		case "detail":
+			head, body = "detail", "option"
+			msg.Add(field, value)
+
+		case "result":
+			head, body = "result", "append"
+			msg.Add(field, value)
+
+		case "":
+			if head == "detail" { // 接收请求
+				msg.Option("remote_code", code)
+				msg.Call(func(sub *ctx.Message) *ctx.Message {
+					nfs.send <- msg.Copy(sub, "append").Copy(sub, "result")
+					return nil
+				})
+			} else { // 接收响应
+				h := nfs.hand[kit.Int(code)]
+				h.Copy(msg, "result").Copy(msg, "append").Back(h)
 			}
+			msg, code, head, body = nil, "0", "result", "append"
+
+		default:
+			msg.Add(body, field, value)
 		}
-	}()
 
-	for {
-		select {
-		case msg := <-nfs.recv:
-			nfs.send <- msg.Cmd()
-		}
 	}
 
 	return true
@@ -1237,7 +1235,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				if help := fmt.Sprintf("scan %s", arg[0]); arg[0] == "stdio" {
 					m.Put("option", "in", os.Stdin).Put("option", "out", os.Stdout).Start(arg[0], help, key, arg[0])
 				} else if p, f, e := open(m, arg[0]); m.Assert(e) {
-					m.Put("option", "in", f).Start(fmt.Sprintf("file%s", m.Capi("nfile")), help, key, p)
+					m.Put("option", "in", f).Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), help, key, p)
 				}
 			}
 			return
@@ -1263,44 +1261,19 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
-		"listen": &ctx.Command{Name: "listen args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"remote": &ctx.Command{Name: "remote listen|dial args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
+					sub.Sess("ms_target", m.Source())
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
-
-					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
-						nfs, _ := sub.Target().Server.(*NFS)
-						sub1.Remote = make(chan bool, 1)
-						nfs.send <- sub1
-						<-sub1.Remote
-						return nil
-					})
-				}, m.Meta["detail"])
+					return sub
+				}, arg)
 			}
-			return
-		}},
-		"dial": &ctx.Command{Name: "dial args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
-					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")
-
-					return sub.Sess("target", m.Source()).Call(func(sub1 *ctx.Message) *ctx.Message {
-						nfs, _ := sub.Target().Server.(*NFS)
-						sub1.Remote = make(chan bool, 1)
-						nfs.send <- sub1
-						<-sub1.Remote
-						return nil
-					})
-				}, m.Meta["detail"])
-			}
-
 			return
 		}},
 		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.io != nil {
-				m.Remote = make(chan bool, 1)
-				nfs.send <- m
-				<-m.Remote
+				nfs.send <- m.Set("detail", arg)
 			}
 			return
 		}},

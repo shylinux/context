@@ -79,8 +79,10 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 		m.Log("info", "%s dial %s", m.Cap("nclient"),
 			m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr())))
 
+		m.Option("ms_source", tcp.Context.Name)
 		m.Put("option", "io", tcp).Back(m.Spawn(m.Source()))
 		return false
+
 	case "accept":
 		c, e := m.Optionv("io").(net.Conn)
 		m.Assert(e)
@@ -89,9 +91,11 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 		m.Log("info", "%s accept %s", m.Cap("nclient"),
 			m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr())))
 
+		m.Option("ms_source", tcp.Context.Name)
 		m.Put("option", "io", tcp).Back(m.Spawn(m.Source()))
 		return false
-	default:
+
+	case "listen":
 		if m.Caps("security") {
 			m.Sess("aaa", m.Sess("aaa").Cmd("login", "cert", m.Cap("certfile"), "key", m.Cap("keyfile"), "tcp"))
 			cert, e := tls.LoadX509KeyPair(m.Cap("certfile"), m.Cap("keyfile"))
