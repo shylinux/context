@@ -133,12 +133,13 @@ func Formats(arg ...interface{}) string {
 	result := []string{}
 	for _, v := range arg {
 		switch val := v.(type) {
-		case []interface{}:
-			for _, v := range val {
-				result = append(result, Format(v))
-			}
+		// case []interface{}:
+		// 	for _, v := range val {
+		// 		result = append(result, Format(v))
+		// 	}
 		default:
-			if b, e := json.MarshalIndent(val, "", "  "); e == nil {
+			if b, e := json.MarshalIndent(val, "  ", "  "); e == nil {
+				Log("fuck", "what %v", b)
 				result = append(result, string(b))
 			}
 		}
@@ -155,6 +156,7 @@ func Trans(arg ...interface{}) []string {
 		// 	} else {
 		// 		ls = append(ls, val.Meta["detail"]...)
 		// 	}
+		case nil:
 		case []float64:
 			for _, v := range val {
 				ls = append(ls, fmt.Sprintf("%d", int(v)))
@@ -293,6 +295,14 @@ func Select(value string, args ...interface{}) string {
 		}
 		if arg != "" {
 			return arg
+		}
+	case []interface{}:
+		index := 0
+		if len(args) > 1 {
+			index = Int(args[1])
+		}
+		if index < len(arg) && Format(arg[index]) != "" {
+			return Format(arg[index])
 		}
 	case []string:
 		index := 0
