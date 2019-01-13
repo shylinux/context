@@ -34,6 +34,7 @@ type Command struct {
 	Form map[string]int
 	Name string
 	Help interface{}
+	Auto func(m *Message, c *Context, key string, arg ...string) (ok bool)
 	Hand func(m *Message, c *Context, key string, arg ...string) (e error)
 }
 type Server interface {
@@ -273,6 +274,9 @@ func (c *Context) BackTrace(m *Message, hand func(m *Message) (stop bool)) *Cont
 
 	m.target = target
 	return target
+}
+func (c *Context) Sub(key string) *Context {
+	return c.contexts[key]
 }
 
 type LOGGER interface {
@@ -1344,7 +1348,11 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 				case string:
 					m.Echo(v)
 				case nil:
-					x.Hand(m, c, key, arg...)
+					if m.Options("auto_cmd") {
+						x.Auto(m, c, key, arg...)
+					} else {
+						x.Hand(m, c, key, arg...)
+					}
 				}
 				if m.target == s {
 					m.target = target
@@ -1676,6 +1684,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 								m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
 							}
 							for k, v := range v.Form {
+								m.Add("append", "arg", k)
+								m.Add("append", "len", v)
 								m.Echo("  option: %s(%d)\n", k, v)
 							}
 							return
@@ -2065,10 +2075,31 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							msg = msg.Sess("cli").Cmd("cmd", arg)
 						}
 						msg.CopyTo(m)
+
 					case "switch":
 						m.target = msg.target
+
 					case "list":
+						cs := []*Context{}
+						if msg.target.Name != "ctx" {
+							cs = append(cs, msg.target.context)
+						}
 						msg.Target().Travel(msg, func(msg *Message, n int) bool {
+							cs = append(cs, msg.target)
+							return false
+						})
+
+						for _, v := range cs {
+							if msg.target = v; v == nil {
+								m.Add("append", "name", "")
+								m.Add("append", "ctx", "")
+								m.Add("append", "msg", "")
+								m.Add("append", "status", "")
+								m.Add("append", "stream", "")
+								m.Add("append", "help", "")
+								continue
+							}
+
 							m.Add("append", "name", msg.target.Name)
 							if msg.target.context != nil {
 								m.Add("append", "ctx", msg.target.context.Name)
@@ -2079,14 +2110,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							m.Add("append", "status", msg.Cap("status"))
 							m.Add("append", "stream", msg.Cap("stream"))
 							m.Add("append", "help", msg.target.Help)
-							return false
-						})
+						}
+
 					case "spawn":
 						msg.target.Spawn(msg, arg[0], arg[1]).Begin(msg, arg[2:]...)
 						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+
 					case "start":
 						msg.target.Start(msg, arg...)
 						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+
 					case "close":
 						msg := m.Spawn()
 						m.target = msg.target.context

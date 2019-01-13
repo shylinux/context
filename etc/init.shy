@@ -1,2 +1,4 @@
 ~ssh
     remote listen :9090
+
+~stdio
