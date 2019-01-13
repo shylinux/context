@@ -1018,6 +1018,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Table()
 					return
 				}
+				switch arg[0] {
+				case "stop":
+					if timer := m.Confm("timer", arg[1]); timer != nil {
+						timer["stop"] = true
+					}
+					cli.schedule(m)
+					return
+				case "start":
+					if timer := m.Confm("timer", arg[1]); timer != nil {
+						timer["stop"] = false
+					}
+					cli.schedule(m)
+					return
+				case "delete":
+					delete(m.Confm("timer"), arg[1])
+					cli.schedule(m)
+					return
+				}
 
 				now := int64(m.Sess("cli").Cmd("time").Appendi("timestamp"))
 				begin := now
@@ -1046,6 +1064,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					"repeat":      repeat,
 					"order":       order,
 					"done":        false,
+					"stop":        false,
 					"time":        arg[0],
 					"cmd":         arg[1:],
 					"msg":         0,
@@ -1062,18 +1081,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 								if m.Conf("timer_next") == "" {
 									break
 								}
-								timer := m.Confv("timer", m.Conf("timer_next")).(map[string]interface{})
-								m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
 
-								msg := m.Sess("cli").Cmd("source", timer["cmd"])
-								timer["result"] = msg.Meta["result"]
-								timer["msg"] = msg.Code()
+								if timer := m.Confm("timer", m.Conf("timer_next")); timer != nil && !kit.Right(timer["stop"]) {
+									m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
 
-								if timer["repeat"].(bool) {
-									timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
-								} else {
-									timer["done"] = true
+									msg := m.Sess("cli").Cmd("source", timer["cmd"])
+									timer["result"] = msg.Meta["result"]
+									timer["msg"] = msg.Code()
+
+									if timer["repeat"].(bool) {
+										timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
+									} else {
+										timer["done"] = true
+									}
 								}
+
 								cli.schedule(m)
 							}
 						}

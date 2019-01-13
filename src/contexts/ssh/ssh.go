@@ -2,12 +2,15 @@ package ssh
 
 import (
 	"contexts/ctx"
+	"encoding/base64"
+	"fmt"
+	"os"
+	"path"
 	"strings"
 	"toolkit"
 )
 
 type SSH struct {
-	peer map[string]*ctx.Message
 	*ctx.Context
 }
 
@@ -20,270 +23,212 @@ func (ssh *SSH) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	ssh.Caches["hostname"] = &ctx.Cache{Name: "hostname", Value: "", Help: "主机数量"}
 	return ssh
 }
 func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
-	m.Cap("stream", m.Source().Name)
-	return false
+	return true
 }
 func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
-	return false
+	return true
 }
 
 var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Caches: map[string]*ctx.Cache{
-		"nhost":  &ctx.Cache{Name: "主机数量", Value: "0", Help: "主机数量"},
-		"domain": &ctx.Cache{Name: "domain", Value: "", Help: "主机域名"},
+		"nhost":    &ctx.Cache{Name: "nhost", Value: "0", Help: "主机数量"},
+		"hostname": &ctx.Cache{Name: "hostname", Value: "shy", Help: "本机域名"},
 	},
 	Configs: map[string]*ctx.Config{
-		"host": &ctx.Config{Name: "host", Value: map[string]interface{}{}, Help: "主机数量"},
-
-		"hostname": &ctx.Config{Name: "hostname", Value: "com", Help: "主机数量"},
-
-		"domain.json": &ctx.Config{Name: "domain.json", Value: "var/domain.json", Help: "主机数量"},
-		"domain.png":  &ctx.Config{Name: "domain.png", Value: "var/domain.png", Help: "主机数量"},
+		"host":     &ctx.Config{Name: "host", Value: map[string]interface{}{}, Help: "主机信息"},
+		"hostname": &ctx.Config{Name: "hostname", Value: "com", Help: "主机域名"},
+		"current":  &ctx.Config{Name: "current", Value: "", Help: "当前主机"},
+		"timer":    &ctx.Config{Name: "timer", Value: "", Help: "当前主机"},
 	},
 	Commands: map[string]*ctx.Command{
-		"remote": &ctx.Command{Name: "remote listen|dial|send args...", Help: "网络监听", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"remote": &ctx.Command{Name: "remote listen|dial args...", Help: "远程连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "host")
 				return
 			}
 
-			host := m.Confm("host", arg[0])
-			if host != nil {
-				arg = arg[1:]
-			}
-
 			switch arg[0] {
+			case "redial":
+				if !m.Caps("hostname") {
+					m.Cmdx("remote", "dial", arg[1:])
+				}
 			case "listen", "dial":
-				m.Call(func(sub *ctx.Message) *ctx.Message {
-					h, _ := kit.Hash("host", m.Option("ms_source"), "uniq")
-					m.Log("fuck", "what %v", sub.Format())
-					m.Confv("host", h, map[string]interface{}{
-						"module": sub.Cap("module"),
-						"type":   arg[0],
-					})
+				m.Call(func(nfs *ctx.Message) *ctx.Message {
+					if arg[0] == "dial" {
+						if m.Confs("timer") {
+							m.Conf("timer", m.Cmdx("cli.timer", "delete", m.Conf("timer")))
+						}
+						m.Spawn(nfs.Target()).Call(func(cmd *ctx.Message) *ctx.Message {
+							m.Cap("stream", nfs.Format("target"))
+							m.Cap("hostname", cmd.Result(0))
+
+							m.Confv("host", cmd.Result(1), map[string]interface{}{
+								"module":      nfs.Format("target"),
+								"create_time": m.Time(),
+								"access_time": m.Time(),
+							})
+							if !m.Confs("current") {
+								m.Conf("current", cmd.Result(1))
+							}
+
+							nfs.Free(func(nfs *ctx.Message) bool {
+								m.Conf("timer", m.Cmdx("cli.timer", "repeat", "10s", "context", "ssh", "remote", "redial", arg[1:]))
+
+								m.Log("info", "delete host %s", cmd.Result(1))
+								delete(m.Confm("host"), cmd.Result(1))
+								m.Cap("hostname", "")
+								m.Cap("stream", "")
+								return true
+							})
+							return nil
+						}, "send", "recv", "add", m.Conf("hostname"))
+					}
 					return nil
 				}, "nfs.remote", arg)
 
-			case "exec":
-				m.Find(kit.Format(host["module"]), true).CallBack(true, func(sub *ctx.Message) *ctx.Message {
-					m.Copy(sub)
-					return nil
-				}, arg[1:])
-			}
-
-			return
-		}},
-
-		"demo": &ctx.Command{Name: "demo", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo("demo")
-			return
-		}},
-
-		"send": &ctx.Command{Name: "send [domain str] cmd arg...", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) {
-				origin, domain := "", ""
-				if len(arg) > 1 && arg[0] == "domain" {
-					origin, arg = arg[1], arg[2:]
-					if d := strings.TrimPrefix(origin, m.Cap("domain")); len(d) > 0 && d[0] == '.' {
-						domain = d[1:]
-					} else if d == "" {
-						domain = d
+			case "recv":
+				switch arg[1] {
+				case "add":
+					if host := m.Confm("host", arg[2]); host == nil {
+						m.Confv("host", arg[2], map[string]interface{}{
+							"module":      m.Format("source"),
+							"create_time": m.Time(),
+							"access_time": m.Time(),
+						})
+					} else if len(arg) > 3 && arg[3] == kit.Format(host["token"]) {
+						host["access_time"] = m.Time()
+						host["module"] = m.Format("source")
 					} else {
-						domain = origin
+						arg[2] = fmt.Sprintf("%s_%d", arg[2], m.Capi("nhost", 1))
+						m.Confv("host", arg[2], map[string]interface{}{
+							"module":      m.Format("source"),
+							"create_time": m.Time(),
+							"access_time": m.Time(),
+						})
+					}
+					if !m.Confs("current") {
+						m.Conf("current", arg[2])
 					}
 
-					if domain == "" { //本地执行
-						msg := m.Spawn().Cmd(arg)
-						m.Copy(msg, "result").Copy(msg, "append")
-						return
-					}
-				} else {
-					if m.Has("send_code") { //本地执行
-						msg := m.Spawn().Cmd(arg)
-						m.Copy(msg, "result").Copy(msg, "append")
-					} else { //对端执行
-						msg := m.Spawn(ssh.Message().Source())
-						msg.Cmd("send", arg)
-						m.Copy(msg, "result").Copy(msg, "append")
-					}
-					return
-				}
-
-				match := false
-				host := strings.SplitN(domain, ".", 2)
-				c.Travel(m, func(m *ctx.Message, i int) bool {
-					if i == 0 {
+					m.Echo(arg[2]).Echo(m.Cap("hostname")).Back(m)
+					m.Sess("ms_source", false).Free(func(msg *ctx.Message) bool {
+						m.Log("info", "delete host %s", arg[2])
+						delete(m.Confm("host"), arg[2])
 						return true
-					}
-					if m.Cap("hostname") == host[0] || "*" == host[0] {
-						ssh, ok := m.Target().Server.(*SSH)
-						m.Assert(ok)
-						msg := m.Spawn(ssh.Message().Source())
-
-						if len(host) > 1 {
-							msg.Cmd("send", "domain", host[1], arg)
-						} else {
-							msg.Cmd("send", arg)
-						}
-						m.Copy(msg, "result").Copy(msg, "append")
-
-						if !match {
-							match = !m.Appends("domain_miss")
-						}
-						return host[0] == "*"
-					}
-					return false
-				})
-
-				if match {
-					return
-				}
-				if m.Target() == c && m.Has("send_code") {
-					m.Appends("domain_miss", true)
-					return
-				}
-				if m.Cap("domain") == m.Conf("hostname") {
-					m.Appends("domain_miss", true)
-					return
-				}
-
-				// 向上路由
-				msg := m.Spawn(c.Message().Source())
-				msg.Cmd("send", "domain", origin, arg)
-				m.Copy(msg, "result").Copy(msg, "append")
-			}
-			return
-		}},
-
-		"pwd": &ctx.Command{Name: "pwd [hostname]", Help: "主机域名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				m.Echo(m.Cap("domain"))
-				return
-			}
-
-			if m.Options("send_code") {
-				if m.Target() == c {
-					msg := m.Spawn().Cmd("send", "pwd", m.Confx("hostname", arg, 0))
-					m.Cap("hostname", msg.Result(0))
-					m.Cap("domain", msg.Result(1))
-				} else {
-					hostname := arg[0]
-					c.Travel(m, func(m *ctx.Message, line int) bool {
-						if hostname == m.Cap("hostname") {
-							hostname += m.Cap("nhost")
-							return false
-						}
-						return false
 					})
-					m.Echo(m.Cap("hostname", hostname))
-					m.Echo("%s.%s", m.Cap("domain"), m.Cap("hostname"))
 				}
-				return
-			}
 
-			if m.Target() == c {
-				m.Conf("hostname", arg[0])
-				msg := m.Spawn().Cmd("send", "pwd", arg[0])
-				m.Cap("hostname", msg.Result(0))
-				m.Cap("domain", msg.Result(1))
-			} else {
-				m.Spawn().Cmd("send", "pwd", arg[0])
-			}
-			m.Echo(m.Cap("domain"))
-			return
-		}},
-		"hello": &ctx.Command{Name: "hello request", Help: "加密请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			aaa := m.Target().Message().Sess("aaa", false)
-			for _, k := range m.Meta["seal"] {
-				for i, v := range m.Meta[k] {
-					m.Meta[k][i] = m.Spawn(aaa).Cmd("deal", v).Result(0)
-				}
-			}
-			for _, k := range m.Meta["encrypt"] {
-				for i, v := range m.Meta[k] {
-					m.Meta[k][i] = m.Spawn(aaa).Cmd("decrypt", v).Result(0)
-				}
-			}
+			default:
+				names := strings.SplitN(arg[0], ".", 2)
+				if names[0] == "" { // 本地执行
+					host := m.Confm("host", m.Option("hostname"))
 
-			if len(arg) == 0 {
-				if !m.Has("mi") {
-					cert := aaa.Spawn().Cmd("certificate")
-					m.Echo(cert.Result(0))
+					msg := m.Find(kit.Format(host["cm_target"])).Cmd(arg[1:])
+					m.Copy(msg, "append").Copy(msg, "result")
+					host["cm_target"] = msg.Cap("module")
+
+					m.Back(m)
+					return
+				}
+
+				m.Option("hostname", m.Cap("hostname"))
+				sync := !m.Options("remote_code") //同步或异步
+				if arg[1] == "async" {
+					sync, arg = false, arg[2:]
+				} else if arg[1] == "sync" {
+					sync, arg = true, arg[2:]
 				} else {
-					msg := m.Sess("aaa").Cmd("login", m.Option("mi"), m.Option("mi"))
-					m.Echo(msg.Result(0))
-					msg.Sess("aaa").Cmd("newcipher", m.Option("mi"))
+					arg = arg[1:]
 				}
+
+				rest := kit.Select("", names, 1)
+				if names[0] == "*" {
+					m.Confm("host", func(name string, host map[string]interface{}) {
+						m.Find(kit.Format(host["module"]), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
+							return m.Copy(sub)
+						}, "send", "", arg)
+					})
+
+				} else if m.Confm("host", names[0], func(host map[string]interface{}) {
+					m.Find(kit.Format(host["module"]), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
+						return m.Copy(sub)
+					}, "send", rest, arg)
+					m.Log("fuck", "m %v", m.Meta)
+
+				}) == nil {
+					m.Find(m.Cap("stream"), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
+						return m.Copy(sub)
+					}, "send", strings.Join(names, "."), arg)
+				}
+			}
+			return
+		}},
+		"sh": &ctx.Command{Name: "sh [[host] name] cmd...", Help: "发送命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Echo(m.Conf("current"))
 				return
 			}
 
-			msg := m.Spawn().Copy(m, "option").Cmd(arg)
-			m.Copy(msg, "result").Copy(msg, "append")
+			if arg[0] == "host" {
+				m.Conf("current", arg[1])
+				arg = arg[2:]
+			} else if m.Confm("host", arg[0]) != nil {
+				m.Conf("current", arg[0])
+				arg = arg[1:]
+			}
 
+			msg := m.Cmd("ssh.remote", m.Conf("current"), arg)
+			m.Copy(msg, "result")
 			return
 		}},
-		"shake": &ctx.Command{
-			Name: "shake [domain host] cmd... [seal option...][encrypt option...]",
-			Help: "加密通信",
-			Form: map[string]int{"seal": -1, "encrypt": -1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if ssh, ok := m.Target().Server.(*SSH); m.Assert(ok) {
-					if len(arg) == 0 {
-						for k, v := range ssh.peer {
-							m.Echo("%s: %s\n", k, v.Cap("stream"))
-						}
-						return
-					}
-
-					peer := "peer"
-					args := []string{}
-					if len(arg) > 1 && arg[0] == "domain" {
-						args = append(args, "domain", arg[1])
-						peer, arg = arg[1], arg[2:]
-					}
-					if ssh.peer == nil {
-						ssh.peer = map[string]*ctx.Message{}
-					}
-					user, ok := ssh.peer[peer]
-					if !ok {
-						user = m.Sess("aaa").Cmd("login", "cert", m.Spawn().Cmd("send", args, "hello"), peer)
-						ssh.peer[peer] = user
-						mi := user.Cap("sessid")
-
-						remote := m.Spawn().Add("option", mi, m.Spawn(user).Cmd("seal", mi)).Add("option", "seal", mi).Cmd("send", args, "hello")
-						m.Spawn(user).Cmd("newcipher", mi)
-						user.Cap("remote", "remote", remote.Result(0), "远程会话")
-						user.Cap("remote_mi", "remote_mi", mi, "远程密钥")
-					}
-
-					msg := m.Spawn(ssh.Message().Source()).Copy(m, "option")
-					msg.Option("hello", "world")
-					msg.Option("world", "hello")
-					for _, k := range msg.Meta["seal"] {
-						for i, v := range msg.Meta[k] {
-							msg.Meta[k][i] = msg.Spawn(user).Cmd("seal", v).Result(0)
-						}
-					}
-					for _, k := range msg.Meta["encrypt"] {
-						for i, v := range msg.Meta[k] {
-							msg.Meta[k][i] = msg.Spawn(user).Cmd("encrypt", v).Result(0)
-						}
-					}
-					msg.Detail("send", args, "hello", arg)
-					ssh.Message().Back(msg)
-					m.Copy(msg, "result").Copy(msg, "append")
-				}
+		"cp": &ctx.Command{Name: "cp [[host] name] filename", Help: "发送文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Echo(m.Conf("current"))
 				return
-			}},
-		"save": &ctx.Command{Name: "save", Help: "远程执行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			json := m.Sess("nfs")
-			json.Put("option", "data", map[string]string{"domain": m.Cap("domain")})
-			json.Cmd("json", m.Conf("domain.json"))
-			m.Sess("nfs").Cmd("genqr", m.Conf("domain.png"), json.Result(0))
+			}
+
+			if arg[0] == "host" {
+				m.Conf("current", arg[1])
+				arg = arg[2:]
+			} else if m.Confm("host", arg[0]) != nil {
+				m.Conf("current", arg[0])
+				arg = arg[1:]
+			}
+
+			if arg[0] == "save" {
+				buf, e := base64.StdEncoding.DecodeString(m.Option("filebuf"))
+				m.Assert(e)
+
+				f, e := os.OpenFile(path.Join("tmp", m.Option("filename")), os.O_RDWR|os.O_CREATE, 0666)
+				f.WriteAt(buf, int64(m.Optioni("filepos")))
+				return e
+			}
+
+			p := m.Cmdx("nfs.path", arg[0])
+			f, e := os.Open(p)
+			m.Assert(e)
+			s, e := f.Stat()
+			m.Assert(e)
+
+			buf := make([]byte, 1024)
+
+			for i := int64(0); i < s.Size(); i += 1024 {
+				n, _ := f.ReadAt(buf, i)
+				if n == 0 {
+					break
+				}
+
+				buf = buf[:n]
+				msg := m.Spawn()
+				msg.Option("filename", arg[0])
+				msg.Option("filesize", s.Size())
+				msg.Option("filepos", i)
+				msg.Option("filebuf", base64.StdEncoding.EncodeToString(buf))
+				msg.Cmd("remote", m.Conf("current"), "cp", "save", arg[0])
+			}
 			return
 		}},
 	},

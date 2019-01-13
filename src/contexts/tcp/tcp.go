@@ -79,8 +79,9 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 		m.Log("info", "%s dial %s", m.Cap("nclient"),
 			m.Cap("stream", fmt.Sprintf("%s->%s", tcp.LocalAddr(), tcp.RemoteAddr())))
 
+		m.Sess("tcp", m)
 		m.Option("ms_source", tcp.Context.Name)
-		m.Put("option", "io", tcp).Back(m.Spawn(m.Source()))
+		m.Put("option", "io", tcp).Back()
 		return false
 
 	case "accept":
@@ -91,8 +92,9 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 		m.Log("info", "%s accept %s", m.Cap("nclient"),
 			m.Cap("stream", fmt.Sprintf("%s<-%s", tcp.LocalAddr(), tcp.RemoteAddr())))
 
+		m.Sess("tcp", m)
 		m.Option("ms_source", tcp.Context.Name)
-		m.Put("option", "io", tcp).Back(m.Spawn(m.Source()))
+		m.Put("option", "io", tcp).Back()
 		return false
 
 	case "listen":
@@ -118,8 +120,8 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	for {
 		c, e := tcp.Accept()
 		m.Assert(e)
-		m.Spawn(Index).Put("option", "io", c).Call(func(com *ctx.Message) *ctx.Message {
-			return com.Spawn(m.Source())
+		m.Spawn(Index).Put("option", "io", c).Call(func(sub *ctx.Message) *ctx.Message {
+			return sub.Spawn(m.Source())
 		}, "accept", c.RemoteAddr().String(), m.Cap("security"), m.Cap("protocol"))
 	}
 

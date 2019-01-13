@@ -156,6 +156,9 @@ func (c *Context) Start(m *Message, arg ...string) bool {
 			c.Close(m, m.Meta["detail"]...)
 			c.exit <- true
 		}
+	}, func(m *Message) {
+		c.Close(m, m.Meta["detail"]...)
+		c.exit <- true
 	})
 
 	if sync {
@@ -173,8 +176,9 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 	if m.target == c {
 		for i := len(c.requests) - 1; i >= 0; i-- {
 			if msg := c.requests[i]; msg.code == m.code {
-				m.Log("close", "request %d/%d", i, len(c.requests)-1)
 				if c.Server == nil || c.Server.Close(m, arg...) {
+					m.Log("close", "request %d/%d", i, len(c.requests)-1)
+					msg.Free()
 					for j := i; j < len(c.requests)-1; j++ {
 						c.requests[j] = c.requests[j+1]
 					}
@@ -289,6 +293,7 @@ type Message struct {
 	Data map[string]interface{}
 
 	callback func(msg *Message) (sub *Message)
+	freedoms []func(msg *Message) (done bool)
 	Sessions map[string]*Message
 
 	messages []*Message
@@ -436,6 +441,13 @@ func (m *Message) Format(arg ...interface{}) string {
 			meta = append(meta, kit.Format(m.code))
 		case "ship":
 			meta = append(meta, fmt.Sprintf("%d(%s->%s)", m.code, m.source.Name, m.target.Name))
+		case "source":
+			target := m.target
+			m.target = m.source
+			meta = append(meta, m.Cap("module"))
+			m.target = target
+		case "target":
+			meta = append(meta, m.Cap("module"))
 
 		case "detail":
 			meta = append(meta, fmt.Sprintf("%v", m.Meta["detail"]))
@@ -609,18 +621,7 @@ func (m *Message) Has(key ...string) bool {
 	return false
 }
 func (m *Message) CopyTo(msg *Message, arg ...string) *Message {
-	if m == msg {
-		return m
-	}
-	if len(arg) == 0 {
-		if msg.Hand {
-			msg.Copy(m, "append").Copy(m, "result")
-		} else {
-			msg.Copy(m, "option")
-		}
-	} else {
-		msg.Copy(m, arg...)
-	}
+	msg.Copy(m, arg...)
 	return m
 }
 func (m *Message) Copy(msg *Message, arg ...string) *Message {
@@ -629,7 +630,7 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 	}
 	if len(arg) == 0 {
 		if msg.Hand {
-			arg = append(arg, "append")
+			arg = append(arg, "append", "result")
 		} else {
 			arg = append(arg, "option")
 		}
@@ -1010,6 +1011,9 @@ func (m *Message) Parse(arg interface{}) string {
 }
 
 func (m *Message) Find(name string, root ...bool) *Message {
+	if name == "" {
+		return m.Spawn()
+	}
 	target := m.target.root
 	if len(root) > 0 && !root[0] {
 		target = m.target
@@ -1118,9 +1122,16 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 	return nil
 }
 func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context, c *Context, key string) bool) *Message {
+	if m == nil {
+		return m
+	}
+
 	if strings.Contains(key, ".") {
 		arg := strings.Split(key, ".")
 		m, key = m.Sess(arg[0], spawn), arg[1]
+	}
+	if m == nil {
+		return m
 	}
 
 	context := []*Context{m.target}
@@ -1141,26 +1152,41 @@ func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context
 	return m
 }
 func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
+	if m == nil {
+		return m
+	}
 	if m.callback = cb; len(arg) > 0 || len(m.Meta["detail"]) > 0 {
+		m.Log("call", m.Format("detail", "option"))
 		m.Cmd(arg...)
 	}
 	return m
 }
-func (m *Message) Back(msg *Message) *Message {
-	if msg == nil || m.callback == nil {
+func (m *Message) Back(ms ...*Message) *Message {
+	if m.callback == nil {
 		return m
 	}
 
-	if msg.Hand {
-		m.Log("cbs", msg.Format("ship", "result", "append"))
-	} else {
-		m.Log("cbs", msg.Format("ship", "detail", "option"))
+	if len(ms) == 0 {
+		ms = append(ms, m.Spawn(m.source).Copy(m, "append").Copy(m, "result"))
 	}
 
-	if sub := m.callback(msg); sub != nil && m.message != nil && m.message != m {
-		m.message.Back(sub)
+	ns := []*Message{}
+
+	for _, msg := range ms {
+		if msg.Hand {
+			m.Log("back", msg.Format("ship", "result", "append"))
+		} else {
+			m.Log("back", msg.Format("ship", "detail", "option"))
+		}
+
+		if sub := m.callback(msg); sub != nil && m.message != nil && m.message != m {
+			ns = append(ns, sub)
+		}
 	}
 
+	if len(ns) > 0 {
+		m.message.Back(ns...)
+	}
 	return m
 }
 func (m *Message) Backs(msg *Message) *Message {
@@ -1172,14 +1198,31 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 		return m.Call(cb, arg...)
 	}
 
-	wait := make(chan *Message)
+	wait := make(chan *Message, 10)
 	go m.Call(func(sub *Message) *Message {
 		msg := cb(sub)
+		m.Log("sync", m.Format("done", "result", "append"))
 		wait <- m
 		return msg
 	}, arg...)
 
+	m.Log("sync", m.Format("wait", "result", "append"))
 	return <-wait
+}
+func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
+	if len(cbs) == 0 {
+		for i := len(m.freedoms) - 1; i >= 0; i-- {
+			m.Log("free", "%d/%d", i, len(m.freedoms)-1)
+			if !m.freedoms[i](m) {
+				break
+			}
+			m.freedoms = m.freedoms[:i]
+		}
+		return m
+	}
+
+	m.freedoms = append(m.freedoms, cbs...)
+	return m
 }
 
 func (m *Message) Assert(e interface{}, msg ...string) bool {
@@ -1204,7 +1247,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool {
 	}
 
 	m.Log("error", "%v", e)
-	panic(m.Set("result", "error: ", kit.Format(e), "\n"))
+	panic(e)
 }
 func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message {
 	defer func() {
@@ -1235,6 +1278,9 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 }
 func (m *Message) Start(name string, help string, arg ...string) bool {
 	return m.Set("detail", arg).target.Spawn(m, name, help).Begin(m).Start(m)
+}
+func (m *Message) Close(arg ...string) bool {
+	return m.Target().Close(m, arg...)
 }
 func (m *Message) Wait() bool {
 	if m.target.exit != nil {
@@ -1523,7 +1569,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 		"list_help":     &Config{Name: "list_help", Value: "list command", Help: "命令列表帮助"},
 		"table_compact": &Config{Name: "table_compact", Value: "false", Help: "命令列表帮助"},
-		"table_col_sep": &Config{Name: "table_col_sep", Value: "\t", Help: "命令列表帮助"},
+		"table_col_sep": &Config{Name: "table_col_sep", Value: "  ", Help: "命令列表帮助"},
 		"table_row_sep": &Config{Name: "table_row_sep", Value: "\n", Help: "命令列表帮助"},
 		"table_space":   &Config{Name: "table_space", Value: " ", Help: "命令列表帮助"},
 
@@ -1701,28 +1747,27 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				}
 			}
 
-			if len(arg) > 0 {
-				switch arg[0] {
-				case "time", "code", "ship", "full", "chain", "stack":
-					m.Echo(m.Format(arg[0]))
-					return
-				}
+			if len(arg) == 0 {
+				m.Format("summary", msg, "deep")
+				msg.CopyTo(m)
+				return
 			}
 
-			if len(arg) > 0 && arg[0] == "spawn" {
+			switch arg[0] {
+			case "time", "code", "ship", "full", "chain", "stack":
+				m.Echo(msg.Format(arg[0]))
+			case "spawn":
 				sub := msg.Spawn()
 				m.Echo("%d", sub.code)
-				return
-			}
-
-			if len(arg) > 0 {
+			case "call":
+			case "back":
+				msg.Back(m)
+			case "free":
+				msg.Free()
+			default:
 				msg = msg.Spawn().Cmd(arg)
 				m.Copy(msg, "append").Copy(msg, "result")
-				return
 			}
-
-			m.Format("summary", msg, "deep")
-			msg.CopyTo(m)
 			return
 		}},
 		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
@@ -2343,6 +2388,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					})
 					m.Sort("key", "str").Table()
 					return
+				case 1:
+					m.Echo(m.Cap(arg[0]))
 				case 2:
 					if arg[0] == "delete" {
 						delete(m.target.Caches, arg[1])
