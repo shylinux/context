@@ -1,4 +1,8 @@
 ~ssh
     remote listen :9090
+~aaa
+    user root shy shy
+~web
+    serve
 
 ~stdio

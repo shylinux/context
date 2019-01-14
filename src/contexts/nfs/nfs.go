@@ -878,29 +878,27 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 	nfs.echo = make(chan *ctx.Message, 10)
 	nfs.hand = map[int]*ctx.Message{}
 
-	go func() { //发送消息队列
-		for {
-			msg, code, meta, body := m, 0, "detail", "option"
-			select {
-			case msg = <-nfs.send:
-				code = msg.Code()
-				nfs.hand[code] = msg
-			case msg = <-nfs.echo:
-				code, meta, body = msg.Optioni("remote_code"), "result", "append"
-			}
-
-			nfs.Send("code", code)
-			for _, v := range msg.Meta[meta] {
-				nfs.Send(meta, v)
-			}
-			for _, k := range msg.Meta[body] {
-				for _, v := range msg.Meta[k] {
-					nfs.Send(k, v)
-				}
-			}
-			nfs.Send("")
+	m.GoLoop(m, func(m *ctx.Message) {
+		msg, code, meta, body := m, 0, "detail", "option"
+		select {
+		case msg = <-nfs.send:
+			code = msg.Code()
+			nfs.hand[code] = msg
+		case msg = <-nfs.echo:
+			code, meta, body = msg.Optioni("remote_code"), "result", "append"
 		}
-	}()
+
+		nfs.Send("code", code)
+		for _, v := range msg.Meta[meta] {
+			nfs.Send(meta, v)
+		}
+		for _, k := range msg.Meta[body] {
+			for _, v := range msg.Meta[k] {
+				nfs.Send(k, v)
+			}
+		}
+		nfs.Send("")
+	})
 
 	//接收消息队列
 	msg, code, head, body := m, "0", "result", "append"

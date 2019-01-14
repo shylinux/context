@@ -233,7 +233,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}
 				} else {
 					wait := make(chan bool, 1)
-					go func() {
+					m.GoFunc(m, func(m *ctx.Message) {
 						out := bytes.NewBuffer(make([]byte, 0, 1024))
 						err := bytes.NewBuffer(make([]byte, 0, 1024))
 						cmd.Stdout = out
@@ -265,7 +265,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 							}
 						}
 						wait <- true
-					}()
+					})
 
 					timeout := m.Conf("cmd_timeout")
 					if conf["timeout"] != nil {
@@ -1073,34 +1073,31 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				if cli.Timer == nil { // 创建时间队列
 					cli.Timer = time.NewTimer((time.Duration)((action - now) / int64(m.Confi("time_unit")) * 1000000000))
-					go func() {
-						for {
-							select {
-							case <-cli.Timer.C:
-								m.Log("info", "timer %s", m.Conf("timer_next"))
-								if m.Conf("timer_next") == "" {
-									break
-								}
-
-								if timer := m.Confm("timer", m.Conf("timer_next")); timer != nil && !kit.Right(timer["stop"]) {
-									m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
-
-									msg := m.Sess("cli").Cmd("source", timer["cmd"])
-									timer["result"] = msg.Meta["result"]
-									timer["msg"] = msg.Code()
-
-									if timer["repeat"].(bool) {
-										timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
-									} else {
-										timer["done"] = true
-									}
-								}
-
-								cli.schedule(m)
+					m.GoLoop(m, func(m *ctx.Message) {
+						select {
+						case <-cli.Timer.C:
+							m.Log("info", "timer %s", m.Conf("timer_next"))
+							if m.Conf("timer_next") == "" {
+								break
 							}
+
+							if timer := m.Confm("timer", m.Conf("timer_next")); timer != nil && !kit.Right(timer["stop"]) {
+								m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
+
+								msg := m.Sess("cli").Cmd("source", timer["cmd"])
+								timer["result"] = msg.Meta["result"]
+								timer["msg"] = msg.Code()
+
+								if timer["repeat"].(bool) {
+									timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
+								} else {
+									timer["done"] = true
+								}
+							}
+
+							cli.schedule(m)
 						}
-						cli.Timer = nil
-					}()
+					})
 				}
 
 				// 调度任务

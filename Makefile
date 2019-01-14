@@ -1,24 +1,22 @@
 
-BENCH=src/examples/bench.go
+BENCH=src/examples/app/bench.go
 
 install:
-	@go get github.com/go-sql-driver/mysql
-	@go get github.com/go-cas/cas
 	@go get github.com/nsf/termbox-go
 	@go get github.com/skip2/go-qrcode
+	@go get github.com/go-sql-driver/mysql
 	@go get github.com/gomarkdown/markdown
 	@go get github.com/PuerkitoBio/goquery
+	@go get github.com/go-cas/cas
 	GOPATH=$(PWD):$(GOPATH) go install $(BENCH)
 	@date
 	# bench web.code.counter nmake 1
 
 install_all: install
-	touch etc/local.shy
-	touch etc/local_exit.shy
 	touch etc/init.shy
 	touch etc/exit.shy
-	touch etc/login.txt
-	touch etc/history.txt
+	touch etc/local.shy
+	touch etc/local_exit.shy
 
 run:
 	etc/bootstrap.sh
@@ -51,33 +49,30 @@ tar_all: tar linux64 darwin win64
 	mv bench.win64.exe tar/bin/
 	tar zcvf tar.tgz tar
 
-linux64:
-	GOARCH=amd64 GOOS=linux go build -o bench.linux64 $(BENCH)
-linux32:
-	GOARCH=386 GOOS=linux go build -o bench.linux32 $(BENCH)
 linux_arm:
 	GOARCH=arm GOOS=linux go build -o bench.linux.arm $(BENCH)
+linux32:
+	GOARCH=386 GOOS=linux go build -o bench.linux32 $(BENCH)
+linux64:
+	GOARCH=amd64 GOOS=linux go build -o bench.linux64 $(BENCH)
 darwin:
 	GOARCH=amd64 GOOS=darwin go build -o bench.darwin $(BENCH)
-
-win64:
-	GOARCH=amd64 GOOS=windows go build -o bench.win64.exe $(BENCH)
 win32:
 	GOARCH=386 GOOS=windows go build -o bench.win32.exe $(BENCH)
+win64:
+	GOARCH=amd64 GOOS=windows go build -o bench.win64.exe $(BENCH)
 
 
 DOTS=etc/dotsfile
 back_dotsfile:
 	cp ~/.zshrc $(DOTS)
 	cp ~/.tmux.conf $(DOTS)
-	# cp ~/context/.git/hooks/post-commit $(DOTS)/git_hooks
 	cp ~/.vimrc $(DOTS)
 	cp ~/.vim/syntax/shy.vim $(DOTS)
 
 load_dotsfile:\
    	~/.zshrc\
    	~/.tmux.conf\
-   	~/context/.git/hooks/post-commit\
    	~/.vimrc\
    	~/.vim/syntax/shy.vim
 
