@@ -175,22 +175,22 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 		return nfs.in.Read(p)
 	}
 
-	scroll_count := 0
-	which := m.Capi("ninput")
-	what := make([]rune, 0, 1024)
-	rest := make([]rune, 0, 1024)
-	back := make([]rune, 0, 1024)
-
-	m.Optionv("auto_target", m.Optionv("ps_target"))
-	m.Option("auto_cmd", "")
-	defer func() { m.Option("auto_cmd", "") }()
-
-	frame, table, index, pick := map[string]interface{}{}, []map[string]string{}, 0, 0
-	if change, f, t, i := nfs.Auto(what, ":", 0); change {
-		frame, table, index, pick = f, t, i, 0
-	}
-
 	m.TryCatch(m, true, func(m *ctx.Message) {
+		scroll_count := 0
+		which := m.Capi("ninput")
+		what := make([]rune, 0, 1024)
+		rest := make([]rune, 0, 1024)
+		back := make([]rune, 0, 1024)
+
+		m.Optionv("auto_target", m.Optionv("ps_target"))
+		m.Option("auto_cmd", "")
+		defer func() { m.Option("auto_cmd", "") }()
+
+		frame, table, index, pick := map[string]interface{}{}, []map[string]string{}, 0, 0
+		if change, f, t, i := nfs.Auto(what, ":", 0); change {
+			frame, table, index, pick = f, t, i, 0
+		}
+
 		for {
 			switch ev := termbox.PollEvent(); ev.Type {
 			case termbox.EventInterrupt:
@@ -227,8 +227,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 						which = m.Capi("ninput") - 1
 					}
 					if v := m.Conf("input", []interface{}{which, "line"}); v != "" {
-						what, rest := what[:0], rest[:0]
-						what = append(what, []rune(v)...)
+						what, rest = append(what[:0], []rune(v)...), rest[:0]
 						nfs.prompt(what).shadow(rest)
 					}
 				case termbox.KeyCtrlN:
@@ -236,8 +235,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 						which = 0
 					}
 					if v := m.Conf("input", []interface{}{which, "line"}); v != "" {
-						what, rest := what[:0], rest[:0]
-						what = append(what, []rune(v)...)
+						what, rest = append(what[:0], []rune(v)...), rest[:0]
 						nfs.prompt(what).shadow(rest)
 					}
 
@@ -371,7 +369,11 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 							frame, table, index, pick = f, t, i, 0
 						}
 
-						nfs.shadow(what[index:], table, frame)
+						if nfs.shadow(what[index:], table, frame); len(table) > 0 {
+							rest = append(rest[:0], []rune(table[0][kit.Format(frame["field"])])...)
+							nfs.prompt(what).shadow(rest)
+							nfs.shadow(what[index:], table, frame)
+						}
 					}
 
 				default:

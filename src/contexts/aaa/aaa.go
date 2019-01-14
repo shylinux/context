@@ -33,6 +33,18 @@ type AAA struct {
 	*ctx.Context
 }
 
+func Auto(m *ctx.Message, arg ...string) {
+	msg := m.Spawn().Add("option", "auto_cmd", "").Cmd("auth", arg)
+	msg.Table(func(maps map[string]string, list []string, line int) bool {
+		if line >= 0 {
+			m.Add("append", "value", maps["key"])
+			m.Add("append", "name", fmt.Sprintf("%s: %s", maps["type"], maps["meta"]))
+			m.Add("append", "help", fmt.Sprintf("%s", maps["create_time"]))
+		}
+		return true
+	})
+}
+
 func Password(pwd string) string {
 	bs := md5.Sum([]byte(fmt.Sprintln("password:%s", pwd)))
 	return hex.EncodeToString(bs[:])
@@ -450,83 +462,112 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}
 			return
 		}},
-		"role": &ctx.Command{Name: "role [name [[componet] componet [[command] command]]]", Help: "用户角色", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch len(arg) {
-			case 0:
-				m.Cmdy("aaa.auth", "ship", "userrole")
-			case 1:
-				m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet")
-			case 2:
-				m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "commond")
-			case 3:
-				if arg[1] == "componet" {
-					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2])
-				} else {
-					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "commond", arg[2])
+		"role": &ctx.Command{Name: "role [name [[componet] componet [[command] command]]]", Help: "用户角色",
+			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
+				switch len(arg) {
+				case 0:
+					Auto(m, "ship", "userrole")
 				}
-			case 4:
-			default:
-				if arg[1] == "componet" && arg[3] == "command" {
-					for _, v := range arg[4:] {
-						m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2], "command", v)
+				return true
+			},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				switch len(arg) {
+				case 0:
+					m.Cmdy("aaa.auth", "ship", "userrole")
+				case 1:
+					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet")
+				case 2:
+					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "commond")
+				case 3:
+					if arg[1] == "componet" {
+						m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2])
+					} else {
+						m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "commond", arg[2])
 					}
-				}
-			}
-			return
-		}},
-		"user": &ctx.Command{Name: "user [role username password] [username]", Help: "用户认证", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch len(arg) {
-			case 0:
-				m.Cmdy("aaa.auth", "ship", "username")
-			case 1:
-				m.Cmdy("aaa.auth", "ship", "username", arg[0], "userrole")
-			case 3:
-				if m.Cmds("aaa.auth", "ship", "username", arg[0]) && (arg[1] == "password" || arg[1] == "uuid") {
-					m.Cmdy("aaa.auth", "username", arg[0], arg[1], arg[2])
-					break
-				}
-				fallthrough
-			default:
-				for i := 1; i < len(arg); i += 2 {
-					if m.Cmd("aaa.auth", "ship", "username", arg[i], "userrole", arg[0]); i < len(arg)-1 {
-						m.Cmd("aaa.auth", "ship", "username", arg[i], "password", arg[i+1])
-					}
-				}
-			}
-			return
-		}},
-		"sess": &ctx.Command{Name: "sess [sessid [username]]", Help: "会话管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch len(arg) {
-			case 0:
-				m.Cmdy("aaa.auth", "ship", "session")
-			case 1:
-				m.Cmdy("aaa.auth", arg[0])
-
-			case 2:
-				switch arg[1] {
-				case "username":
-					m.Cmdy("aaa.auth", arg[0], "ship", "username")
-				case "userrole":
-					for _, user := range m.Cmd("aaa.auth", m.Option("sessid"), "username").Meta["meta"] {
-						for _, role := range m.Cmd("aaa.user", user).Meta["meta"] {
-							m.Add("append", "username", user)
-							m.Add("append", "userrole", role)
+				case 4:
+				default:
+					if arg[1] == "componet" && arg[3] == "command" {
+						for _, v := range arg[4:] {
+							m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2], "command", v)
 						}
 					}
-					m.Table()
+				}
+				return
+			}},
+		"user": &ctx.Command{Name: "user [role username password] [username]", Help: "用户认证",
+			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
+				switch len(arg) {
+				case 0:
+					Auto(m, "ship", "username")
+				}
+				return true
+			},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				switch len(arg) {
+				case 0:
+					m.Cmdy("aaa.auth", "ship", "username")
+				case 1:
+					m.Cmd("aaa.auth", "ship", "username", arg[0], "userrole").CopyTo(m, "append")
+				case 3:
+					if m.Cmds("aaa.auth", "ship", "username", arg[0]) && (arg[1] == "password" || arg[1] == "uuid") {
+						m.Cmdy("aaa.auth", "username", arg[0], arg[1], arg[2])
+						break
+					}
+					fallthrough
 				default:
-					m.Cmdy("aaa.auth", arg[0], "ship", "username", arg[1], "userrole")
+					for i := 1; i < len(arg); i += 2 {
+						if m.Cmd("aaa.auth", "ship", "username", arg[i], "userrole", arg[0]); i < len(arg)-1 {
+							m.Cmd("aaa.auth", "ship", "username", arg[i], "password", arg[i+1])
+						}
+					}
 				}
-			case 3:
-			case 4:
-				if arg[0] == "create" {
-					m.Cmdy("aaa.auth", "ship", "session", arg[1], arg[2], arg[3])
-					break
+				return
+			}},
+		"sess": &ctx.Command{Name: "sess [sessid [username]]", Help: "会话管理",
+			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
+				switch len(arg) {
+				case 0:
+					Auto(m, "ship", "session")
+				case 1:
+					m.Auto("username", "username", "查看用户")
+					m.Auto("userrole", "userrole", "查看角色")
 				}
-				m.Cmdy("aaa.auth", arg[0], "ship", "username", arg[1], arg[2], arg[3])
-			}
-			return
-		}},
+				return true
+			},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				switch len(arg) {
+				case 0:
+					m.Cmdy("aaa.auth", "ship", "session")
+				case 1:
+					m.Cmdy("aaa.auth", arg[0])
+
+				case 2:
+					switch arg[1] {
+					case "username":
+						m.Cmd("aaa.auth", arg[0], "ship", "username").CopyTo(m, "append").Table()
+					case "userrole":
+						for _, user := range m.Cmd("aaa.auth", arg[0], "ship", "username").Meta["meta"] {
+							msg := m.Cmd("aaa.user", user)
+							for _, role := range msg.Meta["meta"] {
+								m.Log("fuck", "what %v", user)
+								m.Add("append", "username", user)
+								m.Add("append", "userrole", role)
+							}
+						}
+						m.Table()
+					default:
+						m.Cmd("aaa.auth", arg[0], "ship", "username", arg[1], "userrole").CopyTo(m, "append").Table()
+					}
+				case 3:
+				case 4:
+					if arg[0] == "create" {
+						m.Cmdy("aaa.auth", "ship", "session", arg[1], arg[2], arg[3])
+						break
+					}
+					m.Cmdy("aaa.auth", arg[0], "ship", "username", arg[1], arg[2], arg[3])
+				}
+				return
+			}},
 		"work": &ctx.Command{Name: "work [sessid create|select]|[benchid] [right [userrole [componet name [command name [argument name]]]]]", Help: "工作任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("aaa.auth", "ship", "bench")
@@ -579,41 +620,26 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			case "rename":
 				m.Cmd("aaa.auth", bid, "data", "name", arg[1])
 			case "right":
-				m.Cmd("aaa.user", arg[1]).Table(func(maps map[string]string, list []string, line int) bool {
-					if line < 0 {
-						return true
-					}
+				if arg[1] == "root" {
+					m.Echo("true")
+					return
+				}
 
-					userrole := maps["meta"]
-					if userrole == "root" {
+				if len(arg) >= 6 {
+					if m.Cmds("aaa.auth", bid, "ship", "check", arg[5]) {
 						m.Echo("true")
-						return false
+					} else if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", arg[1], "componet", arg[3], "check", arg[5]); kit.Right(cid) {
+						m.Cmd("aaa.auth", bid, cid)
+						m.Echo("true")
 					}
-
-					if len(arg) >= 6 {
-						if m.Cmds("aaa.auth", bid, "ship", "check", arg[5]) {
-							m.Echo("true")
-							return false
-						}
-						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "componet", arg[3], "check", arg[5]); kit.Right(cid) {
-							m.Cmd("aaa.auth", bid, cid)
-							m.Echo("true")
-							return false
-						}
-					} else if len(arg) >= 4 {
-						if m.Cmds("aaa.auth", bid, "ship", "check", arg[3]) {
-							m.Echo("true")
-							return false
-						}
-						if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", userrole, "check", arg[3]); kit.Right(cid) {
-							m.Cmd("aaa.auth", bid, cid)
-							m.Echo("true")
-							return false
-						}
+				} else if len(arg) >= 4 {
+					if m.Cmds("aaa.auth", bid, "ship", "check", arg[3]) {
+						m.Echo("true")
+					} else if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", arg[1], "check", arg[3]); kit.Right(cid) {
+						m.Cmd("aaa.auth", bid, cid)
+						m.Echo("true")
 					}
-					return true
-				})
-
+				}
 			default:
 				m.Cmdx("aaa.auth", bid, "data", arg)
 			}

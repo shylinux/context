@@ -663,6 +663,14 @@ func (m *Message) Echo(str string, arg ...interface{}) *Message {
 	}
 	return m.Add("result", str)
 }
+func (m *Message) Auto(arg ...string) *Message {
+	for i := 0; i < len(arg); i += 3 {
+		m.Add("append", "value", arg[i])
+		m.Add("append", "name", arg[i+1])
+		m.Add("append", "help", arg[i+2])
+	}
+	return m
+}
 
 func (m *Message) Insert(meta string, index int, arg ...interface{}) string {
 	if m.Meta == nil {
@@ -1364,7 +1372,9 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 					m.Echo(v)
 				case nil:
 					if m.Options("auto_cmd") {
-						x.Auto(m, c, key, arg...)
+						if x.Auto != nil {
+							x.Auto(m, c, key, arg...)
+						}
 					} else {
 						x.Hand(m, c, key, arg...)
 					}
