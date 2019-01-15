@@ -1,9 +1,9 @@
 ~ssh
     remote listen :9090
 ~aaa
-    user root shy shy
+    role tech componet index command source
+    user tech shy shy
 ~web
     serve
 
 ~aaa
-    user root shy shy

@@ -531,6 +531,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				case 1:
 					m.Auto("username", "username", "查看用户")
 					m.Auto("userrole", "userrole", "查看角色")
+					m.Auto("bench", "bench", "查看空间")
+					m.Auto("ip", "ip", "查看设备")
+					m.Cmd("aaa.auth", arg[0], "ship", "username").Table(func(node map[string]string) {
+						m.Auto(node["meta"], node["type"], node["create_time"])
+					})
 				}
 				return true
 			},
@@ -543,108 +548,131 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 				case 2:
 					switch arg[1] {
-					case "username":
-						m.Cmd("aaa.auth", arg[0], "ship", "username").CopyTo(m, "append").Table()
+					case "username", "ip", "bench":
+						m.Cmd("aaa.auth", arg[0], "ship", arg[1]).CopyTo(m, "append").Table()
+
 					case "userrole":
-						for _, user := range m.Cmd("aaa.auth", arg[0], "ship", "username").Meta["meta"] {
-							msg := m.Cmd("aaa.user", user)
-							for _, role := range msg.Meta["meta"] {
-								m.Log("fuck", "what %v", user)
-								m.Add("append", "username", user)
-								m.Add("append", "userrole", role)
-							}
-						}
+						m.Cmd("aaa.auth", arg[0], "ship", "username").Table(func(user map[string]string) {
+							m.Cmd("aaa.user", user).Table(func(role map[string]string) {
+								m.Add("append", "username", user["meta"])
+								m.Add("append", "userrole", role["meta"])
+							})
+						})
 						m.Table()
+
 					default:
 						m.Cmd("aaa.auth", arg[0], "ship", "username", arg[1], "userrole").CopyTo(m, "append").Table()
 					}
+
 				case 3:
+					m.Cmdy("aaa.auth", "ship", "session", arg[0], arg[1], arg[2])
+
 				case 4:
-					if arg[0] == "create" {
-						m.Cmdy("aaa.auth", "ship", "session", arg[1], arg[2], arg[3])
-						break
-					}
 					m.Cmdy("aaa.auth", arg[0], "ship", "username", arg[1], arg[2], arg[3])
 				}
 				return
 			}},
-		"work": &ctx.Command{Name: "work [sessid create|select]|[benchid] [right [userrole [componet name [command name [argument name]]]]]", Help: "工作任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				m.Cmdy("aaa.auth", "ship", "bench")
-				return
-			}
+		"work": &ctx.Command{Name: "work [sessid create|select]|[benchid] [right [userrole [componet name [command name [argument name]]]]]", Help: "工作任务",
+			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (goon bool) {
+				switch len(arg) {
+				case 0:
+					Auto(m, "ship", "bench")
+					Auto(m, "ship", "session")
+				default:
+					switch m.Conf("auth", []string{arg[0], "type"}) {
+					case "session":
+						if len(arg) == 1 {
+							m.Auto("create", "create", "创建空间")
+							m.Auto("select", "select", "查找空间")
+						} else {
 
-			bid := ""
-			switch m.Conf("auth", []string{arg[0], "type"}) {
-			case "session":
-				if len(arg) == 1 {
-					m.Confm("auth", []string{arg[0], "ship"}, func(key string, ship map[string]interface{}) {
-						m.Add("append", "key", key)
-						m.Add("append", "type", ship["type"])
-						m.Add("append", "meta", ship["meta"])
-						m.Add("append", "create_time", ship["create_time"])
-					})
-					m.Table()
-					return
-				}
-				switch arg[1] {
-				case "create":
-					bid, arg = m.Cmdx("aaa.auth", arg[0], "ship", "bench", arg[2]), arg[3:]
-					m.Cmd("aaa.auth", bid, "data", "name", "web")
-					defer func() { m.Set("result").Echo(bid) }()
-				case "select":
-					m.Cmd("aaa.auth", arg[0], "ship", "bench").Table(func(maps map[string]string, list []string, line int) bool {
-						if strings.Contains(maps["meta"], arg[2]) || strings.HasPrefix(maps["key"], arg[2]) || strings.HasSuffix(maps["key"], arg[2]) {
-							bid = maps["key"]
-							return false
 						}
-						return true
-					})
-					arg = arg[3:]
-				case "delete":
+					case "bench":
+						if len(arg) == 1 {
+							m.Auto("delete", "delete", "删除空间")
+							m.Auto("rename", "rename", "命名空间")
+							m.Auto("right", "right [username [componet [command]]]", "权限检查")
+						} else {
+						}
+					default:
+						m.Auto("invalid id")
+					}
 				}
-			case "bench":
-				bid, arg = arg[0], arg[1:]
-			default:
-				return
-			}
-
-			if len(arg) == 0 {
-				m.Echo(bid)
-				return
-			}
-
-			switch arg[0] {
-			case "delete":
-				m.Cmd("aaa.auth", bid, "delete", "node")
-			case "rename":
-				m.Cmd("aaa.auth", bid, "data", "name", arg[1])
-			case "right":
-				if arg[1] == "root" {
-					m.Echo("true")
+				return true
+			},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				if len(arg) == 0 {
+					m.Cmdy("aaa.auth", "ship", "bench")
 					return
 				}
 
-				if len(arg) >= 6 {
-					if m.Cmds("aaa.auth", bid, "ship", "check", arg[5]) {
-						m.Echo("true")
-					} else if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", arg[1], "componet", arg[3], "check", arg[5]); kit.Right(cid) {
-						m.Cmd("aaa.auth", bid, cid)
-						m.Echo("true")
+				bid := ""
+				switch m.Conf("auth", []string{arg[0], "type"}) {
+				case "session":
+					if len(arg) == 1 {
+						m.Confm("auth", []string{arg[0], "ship"}, func(key string, ship map[string]interface{}) {
+							m.Add("append", "key", key)
+							m.Add("append", "type", ship["type"])
+							m.Add("append", "meta", ship["meta"])
+							m.Add("append", "create_time", ship["create_time"])
+						})
+						m.Table()
+						return
 					}
-				} else if len(arg) >= 4 {
-					if m.Cmds("aaa.auth", bid, "ship", "check", arg[3]) {
-						m.Echo("true")
-					} else if cid := m.Cmdx("aaa.auth", bid, "ship", "userrole", arg[1], "check", arg[3]); kit.Right(cid) {
-						m.Cmd("aaa.auth", bid, cid)
-						m.Echo("true")
+					switch arg[1] {
+					case "create":
+						bid, arg = m.Cmdx("aaa.auth", arg[0], "ship", "bench", arg[2]), arg[3:]
+						m.Cmd("aaa.auth", bid, "data", "name", "web")
+						defer func() { m.Set("result").Echo(bid) }()
+					case "select":
+						m.Cmd("aaa.auth", arg[0], "ship", "bench").Table(func(node map[string]string) {
+							if strings.Contains(node["meta"], arg[2]) || strings.HasPrefix(node["key"], arg[2]) || strings.HasSuffix(node["key"], arg[2]) {
+								bid = node["key"]
+							}
+						})
+						arg = arg[3:]
 					}
+				case "bench":
+					bid, arg = arg[0], arg[1:]
+				default:
+					return
 				}
-			default:
-				m.Cmdx("aaa.auth", bid, "data", arg)
-			}
-			return
-		}},
+
+				if len(arg) == 0 {
+					m.Echo(bid)
+					return
+				}
+
+				switch arg[0] {
+				case "delete":
+					m.Cmd("aaa.auth", bid, "delete", "node")
+				case "rename":
+					m.Cmd("aaa.auth", bid, "data", "name", arg[1])
+				case "right":
+					m.Cmd("aaa.auth", "ship", "username", arg[1], "userrole").Table(func(node map[string]string) {
+						if node["meta"] == "root" {
+							m.Echo("true")
+						} else if len(arg) >= 4 {
+							if m.Cmds("aaa.auth", bid, "ship", "check", arg[3]) {
+								m.Echo("true")
+							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "componet", arg[2], "check", arg[3]); kit.Right(cid) {
+								m.Cmd("aaa.auth", bid, cid)
+								m.Echo("true")
+							}
+						} else if len(arg) >= 3 {
+							if m.Cmds("aaa.auth", bid, "ship", "check", arg[2]) {
+								m.Echo("true")
+							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "check", arg[2]); kit.Right(cid) {
+								m.Cmd("aaa.auth", bid, cid)
+								m.Echo("true")
+							}
+						}
+					})
+				default:
+					m.Cmdx("aaa.auth", bid, arg)
+				}
+				return
+			}},
 
 		"login": &ctx.Command{Name: "login [sessid]|[username password]",
 			Form: map[string]int{"ip": 1, "openid": 1, "cert": 1, "pub": 1, "key": 1},

@@ -840,9 +840,24 @@ func (m *Message) Appendv(key string, arg ...interface{}) interface{} {
 	}
 	return nil
 }
-func (m *Message) Table(cbs ...func(maps map[string]string, list []string, line int) (goon bool)) *Message {
+func (m *Message) Table(cbs ...interface{}) *Message {
 	if len(m.Meta["append"]) == 0 {
 		return m
+	}
+
+	if len(cbs) > 0 {
+		switch cb := cbs[0].(type) {
+		case func(map[string]string):
+			nrow := len(m.Meta[m.Meta["append"][0]])
+			line := map[string]string{}
+			for i := 0; i < nrow; i++ {
+				for _, k := range m.Meta["append"] {
+					line[k] = m.Meta[k][i]
+				}
+				cb(line)
+			}
+			return m
+		}
 	}
 
 	//计算列宽
@@ -862,7 +877,7 @@ func (m *Message) Table(cbs ...func(maps map[string]string, list []string, line 
 	space := m.Confx("table_space")
 	var cb func(maps map[string]string, list []string, line int) (goon bool)
 	if len(cbs) > 0 {
-		cb = cbs[0]
+		cb = cbs[0].(func(maps map[string]string, list []string, line int) (goon bool))
 	} else {
 		row := m.Confx("table_row_sep")
 		col := m.Confx("table_col_sep")

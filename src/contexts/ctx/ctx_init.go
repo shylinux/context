@@ -529,11 +529,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					switch action {
 					case "cmd":
 
-						if m.Options("sso_bench") && m.Options("sso_username") &&
-							!m.Cmds("aaa.work", m.Option("sso_bench"), "right", m.Option("sso_username"), "componet", "source", "command", arg[0]) {
+						m.Log("fuck", "what %v", m.Option("bench"))
+						m.Log("fuck", "what %v", m.Option("username"))
 
-							m.Log("info", "sso check %v: %v failure", m.Option("sso_componet"), m.Option("sso_command"))
-							m.Echo("error: ").Echo("no right [%s: %s %s]", m.Option("sso_componet"), m.Option("sso_command"), arg[0])
+						if m.Options("bench") && m.Options("username") &&
+							!m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "source", arg[0]) {
+
+							m.Log("info", "check %v: %v failure", m.Option("componet"), arg[0])
+							m.Echo("error: ").Echo("no right [%s: %s]", m.Option("componet"), arg[0])
 							break
 						}
 

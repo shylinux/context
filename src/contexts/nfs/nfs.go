@@ -1061,6 +1061,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Log("fuck", "what %v", m.Format("stack", "chain"))
 			if len(arg) > 0 && arg[0] == "all" {
 				m.Cmdy("nfs.config", "paths")
 				return
