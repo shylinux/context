@@ -103,12 +103,6 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	m.source.sessions = append(m.source.sessions, m)
 	c.exit = make(chan bool, 3)
 
-	switch v := m.Gdb("context", "begin", c.Name).(type) {
-	case string:
-		kit.Log("error", "fuck %v", v)
-	case nil:
-	}
-
 	m.Log("begin", "%d context %v %v", m.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
 	for k, x := range c.Configs {
 		if x.Hand != nil {
@@ -133,12 +127,6 @@ func (c *Context) Start(m *Message, arg ...string) bool {
 
 	c.requests = append(c.requests, m)
 	m.source.sessions = append(m.source.sessions, m)
-
-	switch v := m.Gdb("context", "start", c.Name).(type) {
-	case string:
-		kit.Log("error", "fuck %v", v)
-	case nil:
-	}
 
 	if m.Hand = true; m.Cap("status") == "start" {
 		return true
@@ -589,7 +577,7 @@ func (m *Message) Has(key ...string) bool {
 	return false
 }
 func (m *Message) CopyTo(msg *Message, arg ...string) *Message {
-	msg.Copy(m, arg...)
+	msg.Copy(m, "append").Copy(m, "result")
 	return m
 }
 func (m *Message) Copy(msg *Message, arg ...string) *Message {
@@ -1332,7 +1320,7 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 }
 
 func (m *Message) Cmdy(args ...interface{}) *Message {
-	m.Cmd(args...).CopyTo(m)
+	m.Cmd(args...).CopyTo(m, "append").CopyTo(m, "result")
 	return m
 }
 func (m *Message) Cmdx(args ...interface{}) string {
@@ -1353,6 +1341,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	key, arg := m.Meta["detail"][0], m.Meta["detail"][1:]
 
 	m = m.Match(key, true, func(m *Message, s *Context, c *Context, key string) bool {
+		m.Hand = false
 		if x, ok := c.Commands[key]; ok && x.Hand != nil {
 			m.TryCatch(m, true, func(m *Message) {
 				m.Log("cmd", "%s %s %v %v", c.Name, key, arg, m.Meta["option"])
@@ -1467,10 +1456,11 @@ func (m *Message) Confx(key string, args ...interface{}) string {
 	switch arg := args[0].(type) {
 	case []string:
 		if len(args) > 1 {
-			value, args = kit.Select(value, arg, args[1]), args[1:]
+			value = kit.Select(value, arg, args[1])
 		} else {
 			value = kit.Select(value, arg)
 		}
+		args = args[1:]
 	case map[string]interface{}:
 		value = kit.Select(value, kit.Format(arg[key]))
 	case string:

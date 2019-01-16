@@ -9,7 +9,7 @@ import (
 	"toolkit"
 )
 
-func sysinfo(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+func sysinfo(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 	sys := &syscall.Sysinfo_t{}
 	syscall.Sysinfo(sys)
 
@@ -34,4 +34,5 @@ func sysinfo(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
 	m.Append("fper", fmt.Sprintf("%d%%", fs.Ffree*100/fs.Files))
 
 	m.Table()
+	return
 }

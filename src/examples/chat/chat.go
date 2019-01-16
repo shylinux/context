@@ -24,7 +24,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		"toutiao_site":  &ctx.Config{Name: "toutiao_site", Value: "https://www.toutiao.com/search/?keyword=%s", Help: "聊天记录"},
 	},
 	Commands: map[string]*ctx.Command{
-		"/chat": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"/chat": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 
@@ -42,13 +42,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				return
 			}
 			m.Confv("chat_msg", "-1", data)
+			return
 		}},
-		"talk": &ctx.Command{Name: "talk", Help: "talk", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"talk": &ctx.Command{Name: "talk", Help: "talk", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Confs("default") {
 				m.Echo(m.Conf("default"))
 			}
+			return
 		}},
-		"weather": &ctx.Command{Name: "weather where field", Help: "weather", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"weather": &ctx.Command{Name: "weather where field", Help: "weather", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			where := "beijing"
 			if len(arg) > 0 {
 				where, arg = arg[0], arg[1:]
@@ -82,13 +84,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			default:
 				m.Cmd("select", "date", arg[0], "vertical")
 			}
+			return
 		}},
-		"calendar": &ctx.Command{Name: "calendar", Help: "calendar", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"calendar": &ctx.Command{Name: "calendar", Help: "calendar", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			msg := m.Spawn().Cmd("get", m.Conf("calendar_site"),
 				"parse", "div.almanac-hd")
 			m.Copy(msg, "append").Copy(msg, "result")
+			return
 		}},
-		"topic": &ctx.Command{Name: "topic", Help: "topic", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"topic": &ctx.Command{Name: "topic", Help: "topic", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			limit := "10"
 			if len(arg) > 0 {
 				limit, arg = arg[0], arg[1:]
@@ -104,8 +108,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			m.Copy(msg, "append").Copy(msg, "result")
 			m.Cmd("select", "limit", limit)
+			return
 		}},
-		"pedia": &ctx.Command{Name: "pedia", Help: "pedia", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"pedia": &ctx.Command{Name: "pedia", Help: "pedia", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			msg := m.Spawn().Cmd("get", fmt.Sprintf("%s/%s", m.Conf("pedia_site"), arg[0]),
 				"parse", "div.mw-parser-output>p,div.mw-parser-output>ul",
 				"sub_parse", "content", "", "text",
@@ -124,8 +129,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			m.Copy(msg, "append").Copy(msg, "result")
 			m.Cmd("select", "limit", limit, "offset", offset)
+			return
 		}},
-		"baike": &ctx.Command{Name: "baike", Help: "baike", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"baike": &ctx.Command{Name: "baike", Help: "baike", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			msg := m.Spawn().Cmd("get", fmt.Sprintf("%s/%s", m.Conf("baike_site"), arg[0]),
 				"parse", "div.mw-body",
 				"sub_parse", "content", "p", "text",
@@ -144,8 +150,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			m.Copy(msg, "append").Copy(msg, "result")
 			m.Cmd("select", "limit", limit, "offset", offset)
+			return
 		}},
-		"sinas": &ctx.Command{Name: "sinas", Help: "sinas", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"sinas": &ctx.Command{Name: "sinas", Help: "sinas", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			msg := m.Spawn().Cmd("get", fmt.Sprintf(m.Conf("sinas_site"), arg[0]),
 				"parse", "div.box-result.clearfix",
 				"sub_parse", "title", "h2", "text",
@@ -164,8 +171,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			m.Copy(msg, "append").Copy(msg, "result")
 			m.Cmd("select", "limit", limit, "offset", offset)
+			return
 		}},
-		"zhihu": &ctx.Command{Name: "zhihu", Help: "zhihu", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+		"zhihu": &ctx.Command{Name: "zhihu", Help: "zhihu", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			msg := m.Spawn().Cmd("get", fmt.Sprintf(m.Conf("zhihu_site"), arg[0]),
 				"parse", "div.SearchMain div.Card.SearchResult-Card",
 				"sub_parse", "title", "", "text",
@@ -184,8 +192,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			m.Copy(msg, "append").Copy(msg, "result")
 			m.Cmd("select", "limit", limit, "offset", offset)
+			return
 		}},
-		"toutiao": &ctx.Command{Name: "toutiao", Help: "toutiao", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) {
+
+		"toutiao": &ctx.Command{Name: "toutiao", Help: "toutiao", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			msg := m.Spawn().Cmd("get", fmt.Sprintf(m.Conf("toutiao_site"), arg[0]),
 				"parse", "div.articleCard",
 				"sub_parse", "title", "", "text",
@@ -204,6 +214,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			m.Copy(msg, "append").Copy(msg, "result")
 			m.Cmd("select", "limit", limit, "offset", offset)
+			return
 		}},
 	},
 }

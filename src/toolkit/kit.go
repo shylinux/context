@@ -115,7 +115,7 @@ func Format(arg ...interface{}) string {
 
 	if len(result) > 1 {
 		args := []interface{}{}
-		if n := strings.Count(result[0], "%") - strings.Count(result[0], "%%"); len(result) > n+1 {
+		if n := strings.Count(result[0], "%") - strings.Count(result[0], "%%"); len(result) > n {
 			for i := 1; i < n+1; i++ {
 				args = append(args, result[i])
 			}

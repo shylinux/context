@@ -340,6 +340,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 				case termbox.KeyCtrlG:
 				case termbox.KeyCtrlX:
+					m.Options("show_shadow", !m.Options("show_shadow"))
 				case termbox.KeyCtrlS:
 
 				case termbox.KeyCtrlZ:
@@ -416,7 +417,7 @@ func (nfs *NFS) Auto(what []rune, trigger string, index int) (change bool, frame
 			m.Optionv("auto_target", auto_target)
 			trigger = ":"
 		case "command":
-			m.Option("arg_index", index+1)
+			m.Option("arg_index", index)
 			auto_cmd = m.Option("auto_cmd", m.Option("auto_key"))
 			trigger = "="
 		case "argument":
@@ -471,7 +472,7 @@ func (nfs *NFS) Auto(what []rune, trigger string, index int) (change bool, frame
 }
 func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS {
 	m := nfs.Context.Message()
-	m.Log("debug", "%s %v", action, args)
+	// m.Log("debug", "%s %v", action, args)
 
 	switch action {
 	case "init":
@@ -563,7 +564,6 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 		if len(args) > 0 {
 			n = kit.Int(args[0])
 		}
-		m.Log("debug", "<<<< scroll page (%v, %v)", begin_row, begin_col)
 
 		// 向下滚动
 		for i := begin_row; n > 0 && i < m.Capi("noutput"); i++ {
@@ -608,7 +608,6 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 			}
 		}
 
-		m.Log("debug", ">>>> scroll page (%v, %v)", begin_row, begin_col)
 		m.Conf("term", "begin_row", begin_row)
 		m.Conf("term", "begin_col", begin_col)
 
@@ -697,7 +696,7 @@ func (nfs *NFS) shadow(args ...interface{}) *NFS {
 	case []rune:
 		if len(args) == 1 {
 			nfs.Term(m, "color", m.Confi("term", "rest_bg"), m.Confi("term", "rest_fg"), string(arg))
-		} else {
+		} else if m.Options("show_shadow") {
 			cmd := strings.Split(string(arg), " ")
 			switch table := args[1].(type) {
 			case []map[string]string:
@@ -716,6 +715,9 @@ func (nfs *NFS) shadow(args ...interface{}) *NFS {
 							nfs.Term(m, "color", 0, fg, "\n", kit.Format(line["format"]))
 						}
 						i++
+						if i > 10 {
+							break
+						}
 					}
 				}
 				frame["lines"] = i
@@ -739,6 +741,7 @@ func (nfs *NFS) printf(arg ...interface{}) *NFS {
 		m.Conf("term", "cursor_y", m.Confi("term", "cursor_y")+1)
 	} else {
 		nfs.out.WriteString(line)
+		nfs.out.WriteString("\n")
 	}
 	return nfs
 }
@@ -832,8 +835,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
 			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" {
-				nfs.Term(m, "init")
-				defer nfs.Term(m, "exit")
+				// nfs.Term(m, "init")
+				// defer nfs.Term(m, "exit")
 			}
 		}
 
