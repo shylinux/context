@@ -49,23 +49,6 @@ func merge(m *ctx.Message, uri string, arg ...string) string {
 	add, e := url.Parse(uri)
 	m.Assert(e)
 
-	if false {
-		if add.Scheme == "" {
-			add.Scheme = m.Conf("protocol")
-		}
-		if add.Host == "" {
-			add.Host = m.Conf("hostname")
-		}
-		if add.Path == "" {
-			add.Path = path.Join(m.Conf("path"), m.Conf("file"))
-		} else if !path.IsAbs(add.Path) {
-			add.Path = path.Join(m.Conf("path"), add.Path)
-		}
-		if add.RawQuery == "" {
-			add.RawQuery = m.Conf("query")
-		}
-	}
-
 	query := add.Query()
 	for i := 0; i < len(arg)-1; i += 2 {
 		value := arg[i+1]
@@ -87,49 +70,21 @@ func merge(m *ctx.Message, uri string, arg ...string) string {
 	add.RawQuery = query.Encode()
 	return add.String()
 }
-func Merge(m *ctx.Message, uri string, arg ...string) string {
-	uri = strings.Replace(uri, ":/", "://", -1)
-	uri = strings.Replace(uri, ":///", "://", -1)
+func Merge(m *ctx.Message, client map[string]interface{}, uri string, arg ...string) string {
 	add, e := url.Parse(uri)
 	m.Assert(e)
-	adds := []string{m.Confx("protocol", add.Scheme, "%s://"), m.Confx("hostname", add.Host)}
 
-	if dir, file := path.Split(add.EscapedPath()); path.IsAbs(dir) {
-		adds = append(adds, dir)
-		adds = append(adds, file)
-	} else {
-		adds = append(adds, m.Conf("path"))
-		if dir == "" && file == "" {
-			adds = append(adds, m.Conf("file"))
-		} else {
-			adds = append(adds, dir)
-			adds = append(adds, file)
-		}
+	add.Scheme = kit.Select(kit.Format(client["protocol"]), add.Scheme)
+	add.Host = kit.Select(kit.Format(client["hostname"]), add.Host)
+
+	if add.Path == "" {
+		add.Path = path.Join(kit.Format(client["path"]), kit.Format(client["file"]))
+	} else if !path.IsAbs(add.Path) {
+		add.Path = path.Join(kit.Format(client["path"]), add.Path)
 	}
 
-	args := []string{}
-	for i := 0; i < len(arg)-1; i += 2 {
-		value := arg[i+1]
-		if len(arg[i+1]) > 1 {
-			switch arg[i+1][0] {
-			case '$':
-				value = m.Cap(arg[i+1][1:])
-			case '@':
-				value = m.Conf(arg[i+1][1:])
-			}
-		}
-		args = append(args, arg[i]+"="+url.QueryEscape(value))
-	}
-
-	query := strings.Join(args, "&")
-	if query == "" {
-		query = add.RawQuery
-	} else if add.RawQuery != "" {
-		query = add.RawQuery + "&" + query
-	}
-	adds = append(adds, m.Confx("query", query, "?%s"))
-
-	return strings.Join(adds, "")
+	add.RawQuery = kit.Select(kit.Format(client["query"]), add.RawQuery)
+	return merge(m, add.String(), arg...)
 }
 
 func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) bool {
@@ -380,6 +335,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"client": &ctx.Config{Name: "client", Value: map[string]interface{}{}, Help: "浏览器配置"},
+		"cookie": &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "浏览器配置"},
+
+		"config":          &ctx.Config{Name: "config", Value: "false", Help: "输出请求"},
 		"log_uri":         &ctx.Config{Name: "log_uri", Value: "false", Help: "输出请求"},
 		"method":          &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
 		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
@@ -441,80 +400,66 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "工作流"},
 	},
 	Commands: map[string]*ctx.Command{
+		"/demo": &ctx.Command{Name: "/demo", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Append("hello", "world")
+			return
+		}},
 		"merge": &ctx.Command{Name: "merge", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Echo(merge(m, arg[0], arg[1:]...))
 			return
 		}},
-		"client": &ctx.Command{Name: "client address [output [editor]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			uri, e := url.Parse(arg[0])
-			m.Assert(e)
-			m.Conf("method", "method", "GET", "请求方法")
-			m.Conf("protocol", "protocol", uri.Scheme, "服务协议")
-			m.Conf("hostname", "hostname", uri.Host, "服务主机")
-
-			dir, file := path.Split(uri.EscapedPath())
-			m.Conf("path", "path", dir, "服务路由")
-			m.Conf("file", "file", file, "服务文件")
-			m.Conf("query", "query", uri.RawQuery, "服务参数")
-
-			if m.Conf("output", "output", "stdout", "文件缓存"); len(arg) > 1 {
-				m.Conf("output", arg[1])
-			}
-			if m.Conf("editor", "editor", "vim", "文件编辑器"); len(arg) > 2 {
-				m.Conf("editor", arg[2])
-			}
-			return
-		}},
-		"cookie": &ctx.Command{Name: "cookie [create]|[name [value]]", Help: "读写浏览器的Cookie, create: 创建cookiejar, name: 变量名, value: 变量值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"client": &ctx.Command{Name: "client [which [address]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
-				for k, v := range m.Confv("cookie").(map[string]interface{}) {
-					m.Echo("%s: %v\n", k, v.(*http.Cookie).Value)
-				}
+				m.Cmdy("ctx.config", "client")
 			case 1:
-				if arg[0] == "create" {
-					m.Target().Configs["cookie"] = &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "cookie"}
-					break
-				}
-				if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
-					m.Echo("%s", v.Value)
-				}
+				m.Cmdy("ctx.config", "client", arg[0])
 			default:
-				if m.Confv("cookie") == nil {
-					m.Target().Configs["cookie"] = &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "cookie"}
-				}
-				if v, ok := m.Confv("cookie", arg[0]).(*http.Cookie); ok {
-					v.Value = arg[1]
-				} else {
-					m.Confv("cookie", arg[0], &http.Cookie{Name: arg[0], Value: arg[1]})
-				}
+				uri, e := url.Parse(arg[1])
+				m.Assert(e)
+				dir, file := path.Split(uri.EscapedPath())
+
+				m.Confv("client", arg[0], map[string]interface{}{
+					"method":   "GET",
+					"protocol": uri.Scheme,
+					"hostname": uri.Host,
+					"path":     dir,
+					"file":     file,
+					"query":    uri.RawQuery,
+				})
 			}
 			return
 		}},
-		"get": &ctx.Command{Name: "get [method GET|POST] url arg...",
-			Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"method": 1, "headers": 2, "content_type": 1, "body": 1, "path_value": 1, "body_response": 1, "parse": 1, "sub_parse": 3, "save": 1},
+		"cookie": &ctx.Command{Name: "cookie [which [name [value]]]", Help: "读写浏览器的Cookie, create: 创建cookiejar, name: 变量名, value: 变量值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch len(arg) {
+			case 0:
+				m.Cmdy("ctx.config", "cookie")
+				return
+			case 1:
+				m.Cmdy("ctx.config", "cookie", arg[0])
+				return
+			case 2:
+				m.Confv("cookie", arg[:2])
+			default:
+				m.Confv("cookie", arg[:2], arg[2])
+			}
+			m.Echo(m.Conf("cookie", arg[:2]))
+			return
+		}},
+		"get": &ctx.Command{Name: "get [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
+			Form: map[string]int{"which": 1, "method": 1, "headers": 2, "content_type": 1, "body": 1, "parse": 1, "temp": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-					if m.Has("path_value") {
-						values := []interface{}{}
-						for _, v := range strings.Split(m.Option("path_value"), " ") {
-							if len(v) > 1 && v[0] == '$' {
-								values = append(values, m.Cap(v[1:]))
-							} else {
-								values = append(values, v)
-							}
-						}
-						arg[0] = fmt.Sprintf(arg[0], values...)
+					which := m.Option("which")
+					client := m.Confm("client", which)
+					if c := m.Confm("client", arg[0]); c != nil {
+						which, client, arg = arg[0], c, arg[1:]
 					}
 
-					method := m.Conf("method")
-					if m.Has("method") {
-						method = m.Option("method")
-					}
-					uri := Merge(m, arg[0], arg[1:]...)
+					method := kit.Select(kit.Format(client["method"]), m.Option("method"))
+					uri := Merge(m, client, arg[0], arg[1:]...)
+
 					body, _ := m.Optionv("body").(io.Reader)
-
 					if method == "POST" && body == nil {
 						if index := strings.Index(uri, "?"); index > 0 {
 							uri, body = uri[:index], strings.NewReader(uri[index+1:])
@@ -523,6 +468,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
+					m.Log("info", "%s %s", req.Method, req.URL)
 
 					for i := 0; i < len(m.Meta["headers"]); i += 2 {
 						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
@@ -530,16 +476,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if m.Options("content_type") {
 						req.Header.Set("Content-Type", m.Option("content_type"))
 					}
-					switch cs := m.Confv("cookie").(type) {
-					case map[string]interface{}:
-						for _, v := range cs {
-							req.AddCookie(v.(*http.Cookie))
-						}
-					}
-
-					m.Log("info", "%s %s", req.Method, req.URL)
-					if m.Confs("log_uri") {
-						m.Echo("%s: %s\n", req.Method, req.URL)
+					for k, v := range m.Confm("cookie", which) {
+						req.AddCookie(&http.Cookie{Name: k, Value: kit.Format(v)})
+						m.Log("info", "set-cookie %s: %v", k, v)
 					}
 					if m.Confs("logheaders") {
 						for k, v := range req.Header {
@@ -548,59 +487,29 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					if web.Client == nil {
-						d, e := time.ParseDuration(m.Conf("client_timeout"))
-						m.Assert(e)
-						web.Client = &http.Client{Timeout: d}
+						web.Client = &http.Client{Timeout: kit.Duration(m.Conf("client_timeout"))}
 					}
+
 					res, e := web.Client.Do(req)
-					if e != nil {
-						m.Log("info", "get error %v", e)
-						return e
-					}
-					m.Assert(e)
-					if m.Confs("logheaders") {
+					if m.Assert(e); m.Confs("logheaders") {
 						for k, v := range res.Header {
 							m.Log("info", "%s: %v", k, v)
 						}
 					}
 
-					for _, v := range res.Cookies() {
-						m.Confv("cookie", v.Name, v)
-						m.Log("info", "set-cookie %s: %v", v.Name, v.Value)
-					}
-
-					var result interface{}
-
-					if m.Has("save") {
-						p := m.Option("save")
-						if !strings.Contains(m.Option("save"), "/") {
-							p = path.Join(m.Sess("nfs").Cmd("pwd").Result(0), m.Option("save"))
-						}
-
-						f, e := os.Create(p)
-						m.Assert(e)
-						io.Copy(f, res.Body)
-						defer f.Close()
-						m.Log("info", "save file %s %s", p, m.Sess("aaa").Cmd("hash", "file", p).Result(0))
-						m.Echo(p)
-						return e
-					}
-
 					ct := res.Header.Get("Content-Type")
 					m.Log("info", "content: %s", ct)
+					var result interface{}
 
+					parse := m.Option("parse")
+					if !m.Has("temp") {
+						m.Option("temp", "")
+					}
 					switch {
-					case strings.HasPrefix(ct, "application/json"):
+					case strings.HasPrefix(ct, "application/javascript") || strings.HasPrefix(ct, "application/json") || parse == "json":
 						json.NewDecoder(res.Body).Decode(&result)
-						m.Put("option", "data", result).Cmd("mdb.temp", "url", req.URL.String(), "data")
+						m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri, "data", m.Meta["temp"])
 
-						if m.Has("parse") {
-							msg := m.Spawn().Put("option", "data", result).Cmd("trans", "data", m.Option("parse"))
-							m.Copy(msg, "append").Copy(msg, "result")
-							return e
-						}
-						b, _ := json.MarshalIndent(result, "", "  ")
-						result = string(b)
 					case strings.HasPrefix(ct, "text/html"):
 						page, e := goquery.NewDocumentFromReader(res.Body)
 						m.Assert(e)
@@ -653,36 +562,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						})
 						m.Table()
 						result = ""
-					case strings.HasPrefix(ct, "text"):
+
+					default:
 						buf, e := ioutil.ReadAll(res.Body)
 						m.Assert(e)
-						if m.Has("parse") {
-							json.Unmarshal(buf, &result)
-							msg := m.Spawn()
-							msg.Put("option", "response", result)
-							msg.Cmd("trans", "response", m.Option("parse"))
-							m.Copy(msg, "append").Copy(msg, "result")
-							return e
-						}
+
+						m.Append("Content-Type", ct)
 						result = string(buf)
-					default:
-						if w, ok := m.Optionv("response").(http.ResponseWriter); ok {
-							header := w.Header()
-							for k, v := range res.Header {
-								header.Add(k, v[0])
-							}
-							io.Copy(w, res.Body)
-							return e
-						} else {
-							buf, e := ioutil.ReadAll(res.Body)
-							m.Assert(e)
-
-							m.Append("Content-Type", ct)
-							result = string(buf)
-						}
-
+						m.Echo(string(buf))
 					}
-					m.Echo("%v", result)
 				}
 				return
 			}},

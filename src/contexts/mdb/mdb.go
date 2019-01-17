@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -123,7 +124,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 								m.Confv("temp", []string{h, "data"}, msg.Meta)
 							}
 							temp = view
-						} else { //  添加缓存
+						} else if arg[0] == "" { //  添加缓存
+							b, _ := json.MarshalIndent(temp["data"], "", "  ")
+							m.Echo(string(b))
+						} else {
 							msg = m.Put("option", "temp", temp["data"]).Cmd("ctx.trans", "temp", arg)
 
 							m.Confv("temp", h, map[string]interface{}{

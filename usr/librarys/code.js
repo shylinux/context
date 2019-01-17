@@ -891,7 +891,7 @@ function init_docker() {
                 }
 
                 // 切换工作流
-                if (data["key"] && data["key"] != bench["key"]) {
+                if (data["key"] && data["key"] != context.Search("bench")) {
                     context.Search("bench", data["key"])
                     return
                 }
