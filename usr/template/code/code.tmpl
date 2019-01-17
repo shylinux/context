@@ -192,7 +192,7 @@
                 <li data-action="create_cmd">+ 添加命令行(Ctrl+M)</li>
                 {{if $bench}}
                     {{range $index, $cmd := index $bench "commands"}}
-                        <li class="command{{$index}}" data-cmd="{{$index}}">{{index $cmd "now"|option}} {{$index}}: {{index $cmd "cmd"|option}}</li>
+                        <li class="cmd{{$index}}" data-cmd="{{$index}}">{{index $cmd "now"|option}} {{$index}}: {{index $cmd "cmd"|option}}</li>
                     {{end}}
                 {{end}}
             </ul>
@@ -215,6 +215,7 @@
 {{define "componet"}}
 <fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "componet_ctx"}}.{{option .Meta "componet_cmd"}})</legend>
     {{$form_type := option . "form_type"|meta}}
+    {{$msg := .}}
 
     {{if eq $form_type "upload"}}
     {{end}}
@@ -223,25 +224,26 @@
           data-componet_name="{{option . "componet_name"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
-             onsubmit="onaction(event,'upload')"
+              onsubmit="onaction(event,'upload')"
           {{end}}
           >
           <input style="display:none"></input>
           {{range $index, $input := option . "inputs"}}
               <div>
                   {{$type := index $input "type"}}
+                  {{$value := index $input "value" | parse $msg}}
                   {{if index $input "label"}}
                       <label>{{index $input "label"}} : </label>
                   {{end}}
                   {{if eq $type "button"}}
-                      <input type="button" onclick="return onaction(event, 'command')" value="{{index $input "value"}}">
+                      <input type="button" onclick="return onaction(event, 'cmd')" value="{{$value}}">
                   {{else if eq $type "submit"}}
-                      <input type="submit" value="{{index $input "value"}}">
+                      <input type="submit" value="{{$value}}">
                   {{else if eq $type "file"}}
                       <input type="file" name="{{index $input "name"}}">
                   {{else if eq $type "choice"}}
                       {{$default_value := index $input "value"}}
-                      <select name="{{index $input "name"}}" onchange="return onaction(event, 'command')">
+                      <select name="{{index $input "name"}}" onchange="return onaction(event, 'cmd')">
                           {{range $index, $value := index $input "choice"}}
                               {{$val := index $value "value"}}
                               {{if eq $default_value $val}}
@@ -255,14 +257,14 @@
                       <input
                           type="password"
                           name="{{index $input "name"}}"
-                          value="{{index $input "value"}}"
+                          value="{{$value}}"
                           class="{{index $input "class"}}"
                           onclick="return onaction(event, 'click')"
                           onkeyup="return onaction(event, 'input')">
                   {{else}}
                       <input
                           name="{{index $input "name"}}"
-                          value="{{index $input "value"}}"
+                          value="{{$value}}"
                           class="{{index $input "class"}}"
                           {{if index $input "clipstack"}}
                               list="{{index $input "clipstack"}}"

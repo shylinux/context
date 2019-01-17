@@ -482,6 +482,15 @@ var CGI = template.FuncMap{
 		}
 		return nil
 	},
+	"parse": func(m *Message, arg ...string) interface{} {
+		switch len(arg) {
+		case 1:
+			if len(arg[0]) > 0 {
+				return m.Parse(arg[0])
+			}
+		}
+		return nil
+	},
 
 	"unescape": func(str string) interface{} {
 		return template.HTML(str)

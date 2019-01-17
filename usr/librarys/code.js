@@ -29,7 +29,7 @@ function save_clipboard(item) {
 
     context.GET("", {
         "componet_group": "index",
-        "componet_name": "command",
+        "componet_name": "cmd",
         "cmd": "aaa.work "+context.Search("bench")+" clipstack '"+JSON.stringify(txt)+"'"
     }, function(msg) {
         alert("保存成功")
@@ -67,7 +67,7 @@ function copy_to_clipboard(text, skip_blur, skip_docker) {
             }
 
             if (event.shiftKey) {
-                var cmd = document.querySelector("form.option.command"+code.current_cmd+" input[name=cmd]")
+                var cmd = document.querySelector("form.option.cmd"+code.current_cmd+" input[name=cmd]")
                 cmd && (cmd.value += " "+text)
                 return
             }
@@ -138,14 +138,14 @@ function del_command(target) {
     }
 
     for (;order < code.ncommand; order++) {
-        var input = document.querySelector("form.option.command"+order+" input[name=cmd]")
+        var input = document.querySelector("form.option.cmd"+order+" input[name=cmd]")
         if (input) {
             input.focus()
             return
         }
     }
     for (;order >= 0; order--) {
-        var input = document.querySelector("form.option.command"+(order? order: "")+" input[name=cmd]")
+        var input = document.querySelector("form.option.cmd"+(order? order: "")+" input[name=cmd]")
         code.ncommand = order+1
         if (input) {
             input.focus()
@@ -165,7 +165,7 @@ function shrink_command_result() {
 }
 function add_command(init) {
     var order = code.ncommand
-    var name = "command"+code.ncommand++
+    var name = "cmd"+code.ncommand++
 
     var fieldset = append_child(document.querySelector("body"), "fieldset")
     append_child(fieldset, "legend", {"innerText": name})
@@ -174,7 +174,7 @@ function add_command(init) {
         "className": "option "+name,
         "dataset": {
             "componet_group": "index",
-            "componet_name": "command",
+            "componet_name": "cmd",
             "componet_name_alias": name,
             "componet_name_order": order,
         }
@@ -216,7 +216,7 @@ function send_command(form, cb) {
     }
 
     var order = (data["componet_name_order"]||"")
-    var cmd = document.querySelector("div.workflow>ul>li>ul>li.command"+order)
+    var cmd = document.querySelector("div.workflow>ul>li>ul>li.cmd"+order)
     cmd && (cmd.innerText = format_date(new Date())+" "+order+": "+data["cmd"])
 
     context.GET("", data, function(msg) {
@@ -387,7 +387,7 @@ function onaction(event, action, arg) {
                         })
                         break
                     case "0":
-                        document.querySelector("form.option.command input[name=cmd]").focus()
+                        document.querySelector("form.option.cmd input[name=cmd]").focus()
                         break
                     case "1":
                     case "2":
@@ -398,7 +398,7 @@ function onaction(event, action, arg) {
                     case "7":
                     case "8":
                     case "9":
-                        document.querySelector("form.option.command"+event.key+" input[name=cmd]").focus()
+                        document.querySelector("form.option.cmd"+event.key+" input[name=cmd]").focus()
                         break
                 }
                 return
@@ -443,15 +443,15 @@ function onaction(event, action, arg) {
                             var item = document.querySelectorAll("div.workflow>ul>li>ul.txt>li[data-text]")
                             target.value += item[parseInt(event.key)-1].dataset["text"]
                         } else {
-                            var item = document.querySelectorAll("table.append.command"+(parseInt(option.dataset.componet_name_order)-1)+" td")
+                            var item = document.querySelectorAll("table.append.cmd"+(parseInt(option.dataset.componet_name_order)-1)+" td")
                             if (event.shiftKey) {
-                                var item = document.querySelectorAll("table.append.command1 td")
+                                var item = document.querySelectorAll("table.append.cmd td")
                             }
                             target.value += item[parseInt(event.key)-1].innerText
                         }
                         break
                     case "0":
-                        var pre_pre = document.querySelector("code.result.command"+(parseInt(option.dataset.componet_name_order)-1)+" pre")
+                        var pre_pre = document.querySelector("code.result.cmd"+(parseInt(option.dataset.componet_name_order)-1)+" pre")
                         target.value += pre_pre.innerText
                         break
                     case "a":
@@ -536,7 +536,7 @@ function onaction(event, action, arg) {
                         break
                     case "i":
                         for (var order = (parseInt(option.dataset["componet_name_order"])||0)+1; order < code.ncommand; order++) {
-                            var input = document.querySelector("form.option.command"+order+" input[name=cmd]")
+                            var input = document.querySelector("form.option.cmd"+order+" input[name=cmd]")
                             if (input) {
                                 input.focus()
                                 return
@@ -545,7 +545,7 @@ function onaction(event, action, arg) {
                         break
                     case "o":
                         for (var order = parseInt(option.dataset["componet_name_order"])-1; order >= 0; order--) {
-                            var input = document.querySelector("form.option.command"+(order? order: "")+" input[name=cmd]")
+                            var input = document.querySelector("form.option.cmd"+(order? order: "")+" input[name=cmd]")
                             if (input) {
                                 input.focus()
                                 return
@@ -575,7 +575,7 @@ function onaction(event, action, arg) {
                 check_option(target.form, target)
             }
             break
-        case "command":
+        case "cmd":
             check_option(target.form, target, function(msg) {
                 if (target["value"] == "login") {
                     location.reload()
@@ -640,7 +640,7 @@ function init_download(event) {
 
     function change(dir, show, run) {
         if ((dir.endsWith(".sh") || dir.endsWith(".shy") || dir.endsWith(".py")) && !show) {
-            var command = document.querySelector("form.option.command")
+            var command = document.querySelector("form.option.cmd")
             var cmd = command["cmd"]
             cmd.value = "run "+ dir.split("/").pop()
             cmd.focus()
@@ -652,10 +652,10 @@ function init_download(event) {
 
         option["dir"].value = dir
         if (dir == "" || dir.endsWith("/")) {
-            context.Cookie("download_dir", option["dir"].value)
+            context.Cookie("current_dir", option["dir"].value)
         }
         send_command(option)
-        option["dir"].value = context.Cookie("download_dir")
+        option["dir"].value = context.Cookie("current_dir")
 
     }
     insert_button(append, "root", function(event) {
@@ -695,7 +695,7 @@ function init_download(event) {
         })
     }
 
-    (option["dir"].value = context.Search("download_dir")) && send_command(option)
+    (option["dir"].value = context.Search("current_dir")) && send_command(option)
 
     add_sort(append, "filename", function(event) {
         var dir = event.target.innerText
@@ -728,20 +728,23 @@ function init_context() {
     add_sort(append, "name", function(event) {
         change(event.target.innerText.trim())
     })
+
+    option["ctx"].value = context.Cookie("current_ctx")
+    send_command(option)
 }
 function init_command() {
-    var option = document.querySelector("form.option.command")
+    var option = document.querySelector("form.option.cmd")
     if (!option) {
         return
     }
-    option.dataset["componet_name_alias"] = "command"
+    option.dataset["componet_name_alias"] = "cmd"
     option.dataset["componet_name_order"] = 0
 
     var action = bench_data.action
-    if (action && action["command"]) {
-        var option = document.querySelector("form.option.command")
+    if (action && action["cmd"]) {
+        var option = document.querySelector("form.option.cmd")
         var cmd = option.querySelector("input[name=cmd]")
-        cmd.value = action["command"].cmd[1]
+        cmd.value = action["cmd"].cmd[1]
         check_option(option)
     }
 
@@ -755,10 +758,10 @@ function init_command() {
 
     for (var i = 1; i <= max; i++) {
         var fieldset = add_command(true)
-        if (action["command"+i]) {
+        if (action["cmd"+i]) {
             var option = fieldset.querySelector("form.option")
             var cmd = option.querySelector("input[name=cmd]")
-            cmd.value = action["command"+i].cmd[1]
+            cmd.value = action["cmd"+i].cmd[1]
             check_option(option)
         }
     }
@@ -818,9 +821,9 @@ function init_docker() {
 
         // 事件
         docker.querySelectorAll("li>ul>li").forEach(function(item) {
-            if (bench_data.board["key"] == item.dataset["key"]) {
-                // item.className = "stick"
-            }
+            // if (bench_data.board["key"] == item.dataset["key"]) {
+            //     // item.className = "stick"
+            // }
 
             item.onclick = function(event) {
                 var target = event.target
@@ -836,7 +839,7 @@ function init_docker() {
                             return
                         }
                         if (event.shiftKey) {
-                            var cmd = document.querySelector("form.option.command"+code.current_cmd+" input[name=cmd]")
+                            var cmd = document.querySelector("form.option.cmd"+code.current_cmd+" input[name=cmd]")
                             cmd && (cmd.value += " "+text)
                             return
                         }
@@ -866,7 +869,7 @@ function init_docker() {
                     case "rename_fly":
                         context.GET("", {
                             "componet_group": "index",
-                            "componet_name": "command",
+                            "componet_name": "cmd",
                             "cmd": "aaa.work "+context.Search("bench")+" rename "+prompt("name"),
                         })
                         location.reload()
@@ -874,7 +877,7 @@ function init_docker() {
                     case "remove_fly":
                         context.GET("", {
                             "componet_group": "index",
-                            "componet_name": "command",
+                            "componet_name": "cmd",
                             "cmd": "aaa.work "+context.Search("bench")+" delete",
                         })
                         var b = ""
@@ -894,7 +897,7 @@ function init_docker() {
                 }
 
                 // 切换命令行
-                var cmd = document.querySelector("form.option.command"+data["cmd"]+" input[name=cmd]")
+                var cmd = document.querySelector("form.option.cmd"+data["cmd"]+" input[name=cmd]")
                 cmd && cmd.focus()
             }
         })

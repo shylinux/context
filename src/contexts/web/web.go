@@ -1130,6 +1130,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					tmpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl"))
 				}
 
+				// 权限检查
 				if m.Confs("login_check") {
 					if m.Option("username", m.Cmdx("web.session", "login")) == "" { // 没有登录
 						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
@@ -1144,6 +1145,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Append("redirect", merge(m, m.Option("index_url"), "bench", bench))
 						return
 					}
+					m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
 				}
 
 				// 响应模板
@@ -1207,12 +1209,17 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						// 执行命令
 						if order != "" || kit.Right(val["pre_run"]) {
+							if list := m.Confv("auth", []string{m.Option("bench"), "data", "action", msg.Option("componet_name"), "cmd"}); list != nil && order == "" {
+								args = kit.Trans(list)
+							}
+
 							if msg.Cmd(args); m.Options("bench") {
 								name_alias := "action." + kit.Select(msg.Option("componet_name"), msg.Option("componet_name_alias"))
 
 								msg.Put("option", name_alias, map[string]interface{}{
 									"cmd": args, "order": m.Option("componet_name_order"), "action_time": msg.Time(),
 								}).Cmd("web.session", "bench", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
+
 							}
 						}
 					} else {
@@ -1245,7 +1252,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Assert(e)
 			defer f.Close()
 
-			p := path.Join(m.Conf("directory"), m.Option("download_dir"), h.Filename)
+			p := path.Join(m.Conf("directory"), m.Option("current_dir"), h.Filename)
 			o, e := os.Create(p)
 			m.Assert(e)
 			defer o.Close()

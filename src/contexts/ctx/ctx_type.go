@@ -584,13 +584,6 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 	if m == msg {
 		return m
 	}
-	if len(arg) == 0 {
-		if msg.Hand {
-			arg = append(arg, "append", "result")
-		} else {
-			arg = append(arg, "option")
-		}
-	}
 
 	for i := 0; i < len(arg); i++ {
 		meta := arg[i]
@@ -600,16 +593,6 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 			m.target = msg.target
 		case "callback":
 			m.callback = msg.callback
-		// case "session":
-		// 	if len(arg) == 0 {
-		// 		for k, v := range msg.Sessions {
-		// 			m.Sessions[k] = v
-		// 		}
-		// 	} else {
-		// 		for _, k := range arg {
-		// 			m.Sessions[k] = msg.Sessions[k]
-		// 		}
-		// 	}
 		case "detail", "result":
 			if len(msg.Meta[meta]) > 0 {
 				m.Add(meta, msg.Meta[meta][0], msg.Meta[meta][1:])
@@ -1218,14 +1201,6 @@ func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context
 		return m
 	}
 
-	if strings.Contains(key, ".") {
-		arg := strings.Split(key, ".")
-		m, key = m.Sess(arg[0], spawn), arg[1]
-	}
-	if m == nil {
-		return m
-	}
-
 	context := []*Context{m.target}
 	for _, v := range []string{"aaa", "cli"} {
 		if msg := m.Sess(v, false); msg != nil && msg.target != nil {
@@ -1320,7 +1295,7 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 }
 
 func (m *Message) Cmdy(args ...interface{}) *Message {
-	m.Cmd(args...).CopyTo(m, "append").CopyTo(m, "result")
+	m.Cmd(args...).CopyTo(m)
 	return m
 }
 func (m *Message) Cmdx(args ...interface{}) string {
@@ -1337,8 +1312,15 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	if len(args) > 0 {
 		m.Set("detail", kit.Trans(args...))
 	}
-
 	key, arg := m.Meta["detail"][0], m.Meta["detail"][1:]
+
+	if strings.Contains(key, ".") {
+		arg := strings.Split(key, ".")
+		m, key = m.Sess(arg[0]), arg[1]
+	}
+	if m == nil {
+		return m
+	}
 
 	m = m.Match(key, true, func(m *Message, s *Context, c *Context, key string) bool {
 		m.Hand = false

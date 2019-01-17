@@ -17,6 +17,45 @@ import (
 type CTX struct {
 }
 
+func (ctx *CTX) Spawn(m *Message, c *Context, arg ...string) Server {
+	s := new(CTX)
+	return s
+}
+func (ctx *CTX) Begin(m *Message, arg ...string) Server {
+	m.Sess(m.target.Name, m)
+	m.target.root = m.target
+	m.root = m
+	m.Cap("begin_time", m.Time())
+	m.Cap("goos", runtime.GOOS)
+	for _, msg := range m.Search("") {
+		msg.target.root = m.target
+		if msg.target == m.target {
+			continue
+		}
+		msg.target.Begin(msg, arg...)
+		m.Sess(msg.target.Name, msg)
+	}
+	return ctx
+}
+func (ctx *CTX) Start(m *Message, arg ...string) bool {
+	m.Optionv("ps_target", Index)
+
+	m.Cmd("log.init")
+	m.Cmd("gdb.init")
+	if m.Cmd("yac.init", "lex"); len(arg) == 0 {
+		m.Cap("stream", "shy")
+		m.Cmd("cli.source", "init.shy").Cmd("cli.source", "stdio").Cmd("cli.source", "exit.shy")
+		return true
+	}
+
+	m.Cmd("cli.source", arg)
+	return true
+}
+func (ctx *CTX) Close(m *Message, arg ...string) bool {
+	return true
+}
+
+var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
 var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 	Caches: map[string]*Cache{
 		"begin_time": &Cache{Name: "begin_time", Value: "", Help: "启动时间"},
@@ -528,15 +567,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 					switch action {
 					case "cmd":
-
-						m.Log("fuck", "what %v", m.Option("bench"))
-						m.Log("fuck", "what %v", m.Option("username"))
-
+						componet := "source"
 						if m.Options("bench") && m.Options("username") &&
-							!m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "source", arg[0]) {
-
-							m.Log("info", "check %v: %v failure", m.Option("componet"), arg[0])
-							m.Echo("error: ").Echo("no right [%s: %s]", m.Option("componet"), arg[0])
+							!m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), componet, arg[0]) {
+							m.Log("info", "check %v: %v failure", componet, arg[0])
+							m.Echo("error: ").Echo("no right [%s: %s]", componet, arg[0])
 							break
 						}
 
@@ -1272,46 +1307,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}},
 	},
 }
-
-func (ctx *CTX) Spawn(m *Message, c *Context, arg ...string) Server {
-	s := new(CTX)
-	return s
-}
-func (ctx *CTX) Begin(m *Message, arg ...string) Server {
-	m.Sess(m.target.Name, m)
-	m.target.root = m.target
-	m.root = m
-	m.Cap("begin_time", m.Time())
-	m.Cap("goos", runtime.GOOS)
-	for _, msg := range m.Search("") {
-		msg.target.root = m.target
-		if msg.target == m.target {
-			continue
-		}
-		msg.target.Begin(msg, arg...)
-		m.Sess(msg.target.Name, msg)
-	}
-	return ctx
-}
-func (ctx *CTX) Start(m *Message, arg ...string) bool {
-	m.Optionv("ps_target", Index)
-
-	m.Cmd("log.init")
-	m.Cmd("gdb.init")
-	if m.Cmd("yac.init", "lex"); len(arg) == 0 {
-		m.Cap("stream", "shy")
-		m.Cmd("cli.source", "init.shy").Cmd("cli.source", "stdio").Cmd("cli.source", "exit.shy")
-		return true
-	}
-
-	m.Cmd("cli.source", arg)
-	return true
-}
-func (ctx *CTX) Close(m *Message, arg ...string) bool {
-	return true
-}
-
-var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
 
 func Start(args ...string) bool {
 	if len(args) == 0 {

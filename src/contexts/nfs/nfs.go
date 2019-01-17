@@ -49,7 +49,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 				continue
 			}
 
-			if strings.HasPrefix(f.Name(), ".") && dir_type != "both" {
+			if strings.HasPrefix(f.Name(), ".") && dir_type != "all" {
 				continue
 			}
 
@@ -184,6 +184,8 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 		m.Optionv("auto_target", m.Optionv("ps_target"))
 		m.Option("auto_cmd", "")
+		m.Options("show_shadow", m.Confs("show_shadow"))
+
 		defer func() { m.Option("auto_cmd", "") }()
 
 		frame, table, index, pick := map[string]interface{}{}, []map[string]string{}, 0, 0
@@ -306,14 +308,16 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 					nfs.Term(m, "refresh").Term(m, "flush")
 					nfs.prompt(what).shadow(rest)
 				case termbox.KeyCtrlL:
+					m.Confi("term", "begin_row", m.Capi("noutput"))
+					m.Confi("term", "begin_col", 0)
 					nfs.Term(m, "clear", "all").Term(m, "flush")
 					nfs.prompt(what).shadow(rest)
 
-				case termbox.KeyCtrlO:
+				case termbox.KeyCtrlT:
 					m.Option("scroll", true)
 					nfs.Term(m, "scroll", 1).Term(m, "flush")
 					m.Option("scroll", false)
-				case termbox.KeyCtrlT:
+				case termbox.KeyCtrlO:
 					m.Option("scroll", true)
 					nfs.Term(m, "scroll", -1).Term(m, "flush")
 					m.Option("scroll", false)
@@ -346,21 +350,25 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				case termbox.KeyCtrlZ:
 
 				case termbox.KeyTab:
-					if index > len(what) {
-						nfs.shadow("", table, frame)
-					} else {
-						if lines := kit.Int(frame["lines"]); lines > 0 {
-							pick = (pick + 1) % lines
-						}
-						nfs.shadow(what[index:], table, frame, pick)
-						rest = append(rest[:0], []rune(kit.Format(frame["pick"]))[len(what)-index:]...)
-						nfs.prompt(what).shadow(rest)
-						nfs.shadow(what[index:], table, frame, pick)
-					}
-
+					m.Options("show_shadow", true)
+					// if index > len(what) {
+					// 	nfs.shadow("", table, frame)
+					// } else {
+					// 	if lines := kit.Int(frame["lines"]); lines > 0 {
+					// 		pick = (pick + 1) % lines
+					// 	}
+					// 	nfs.shadow(what[index:], table, frame, pick)
+					// 	rest = append(rest[:0], []rune(kit.Format(frame["pick"]))[len(what)-index:]...)
+					// 	nfs.prompt(what).shadow(rest)
+					// 	nfs.shadow(what[index:], table, frame, pick)
+					// }
+					//
 				case termbox.KeySpace:
 					what = append(what, ' ')
 					nfs.prompt(what).shadow(rest)
+					if !m.Options("show_shadow") {
+						break
+					}
 
 					if index > len(what) {
 						nfs.shadow("", table, frame)
@@ -380,6 +388,9 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				default:
 					what = append(what, ev.Ch)
 					nfs.prompt(what).shadow(rest)
+					if !m.Options("show_shadow") {
+						break
+					}
 
 					if change, f, t, i := nfs.Auto(what, Format(ev.Ch), len(what)); change {
 						frame, table, index, pick = f, t, i, 0
@@ -564,6 +575,7 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 		if len(args) > 0 {
 			n = kit.Int(args[0])
 		}
+		m.Options("on_scroll", true)
 
 		// 向下滚动
 		for i := begin_row; n > 0 && i < m.Capi("noutput"); i++ {
@@ -621,40 +633,71 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 			}
 			begin_col = 0
 		}
-		nfs.Term(m, "print", m.Conf("prompt"))
+		// nfs.Term(m, "print", "\n")
+		// nfs.Term(m, "print", m.Conf("prompt"))
+		m.Options("on_scroll", false)
 
 	case "print":
-		for _, v := range kit.Format(args...) {
-			if x < right && y < bottom {
-				termbox.SetCell(x, y, v, fg, bg)
+		list := kit.Format(args...)
+		n := strings.Count(list, "\n") + y - bottom
+
+		for _, v := range list {
+			if x < right {
+				if termbox.SetCell(x, y, v, fg, bg); v > 255 {
+					x++
+				}
 			}
 
-			if v > 255 {
-				x++
-			}
 			if x++; v == '\n' || (x >= right && m.Confs("term", "wrap")) {
 				x, y = left, y+1
+				if y >= bottom {
+					if m.Options("on_scroll") {
+						break
+					}
+					if n%bottom > 0 {
+						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
+
+						nfs.Term(m, "scroll", n%bottom+1)
+						n -= n % bottom
+						x = m.Confi("term", "cursor_x")
+						y = m.Confi("term", "cursor_y")
+
+						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
+					} else if n > 0 {
+						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
+
+						nfs.Term(m, "scroll", bottom)
+						n -= bottom
+						x = m.Confi("term", "cursor_x")
+						y = m.Confi("term", "cursor_y")
+
+						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
+					}
+				}
 			}
 
-			if x < right && y < bottom {
+			if x < right {
 				m.Conf("term", "cursor_x", x)
 				m.Conf("term", "cursor_y", y)
 				termbox.SetCursor(x, y)
 			}
-
-			if y >= bottom {
-				if !m.Options("scroll") {
-					nfs.Term(m, "scroll")
-				}
-				break
-			}
 		}
+
+		if m.Options("on_scroll") {
+			x = 0
+			y = y + 1
+			m.Conf("term", "cursor_x", x)
+			m.Conf("term", "cursor_y", y)
+			termbox.SetCursor(x, y)
+		}
+
 	case "color":
 		msg.Conf("term", "bgcolor", kit.Int(args[0])+1)
 		msg.Conf("term", "fgcolor", kit.Int(args[1])+1)
 		nfs.Term(m, "print", args[2:]...)
 		msg.Conf("term", "fgcolor", fg)
 		msg.Conf("term", "bgcolor", bg)
+
 	case "shadow":
 		x := m.Confi("term", "cursor_x")
 		y := m.Confi("term", "cursor_y")
@@ -696,7 +739,7 @@ func (nfs *NFS) shadow(args ...interface{}) *NFS {
 	case []rune:
 		if len(args) == 1 {
 			nfs.Term(m, "color", m.Confi("term", "rest_bg"), m.Confi("term", "rest_fg"), string(arg))
-		} else if m.Options("show_shadow") {
+		} else {
 			cmd := strings.Split(string(arg), " ")
 			switch table := args[1].(type) {
 			case []map[string]string:
@@ -835,8 +878,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
 			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" {
-				// nfs.Term(m, "init")
-				// defer nfs.Term(m, "exit")
+				nfs.Term(m, "init")
+				defer nfs.Term(m, "exit")
 			}
 		}
 
@@ -984,7 +1027,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"scroll_count": "5",
 			"begin_row":    0, "begin_col": 0,
 
-			"shadow": "hello",
+			"shadow":      "hello",
+			"show_shadow": "false",
 
 			"rest_fg": "0",
 			"rest_bg": "7",
@@ -1064,7 +1108,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Log("fuck", "what %v", m.Format("stack", "chain"))
 			if len(arg) > 0 && arg[0] == "all" {
 				m.Cmdy("nfs.config", "paths")
 				return
@@ -1231,7 +1274,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			if len(arg) == 1 && m.Has("data") {
 				arg = append(arg, m.Option("data"))
 			}
-			if p, f, e := open(m, m.Format(arg[0]), os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
+			if p, f, e := open(m, kit.Format(arg[0]), os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
 				defer f.Close()
 				m.Append("directory", p)
 				m.Echo(p)
@@ -1291,12 +1334,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			p, f, e := open(m, kit.Select(arg[0], m.Format(arg[0]), tp), os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 			m.Assert(e)
 			defer f.Close()
-
-			m.Option("hi", "hello world")
-			m.Option("he", "hello", "world")
-
-			m.Append("he", "hello", "world")
-			m.Append("hi", "nice", "job")
 
 			data := m.Optionv(kit.Select("data", arg, 1))
 			if len(arg) > 0 && arg[0] == "all" {

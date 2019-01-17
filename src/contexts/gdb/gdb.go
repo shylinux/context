@@ -82,7 +82,7 @@ func (gdb *GDB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 	gdb.goon = make(chan os.Signal, 10)
 	gdb.wait = make(chan interface{}, 10)
-	signal.Notify(gdb.goon, syscall.Signal(19))
+	signal.Notify(gdb.goon, syscall.Signal(30))
 	for {
 		select {
 		case sig := <-gdb.goon:
