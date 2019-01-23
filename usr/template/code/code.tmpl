@@ -22,6 +22,7 @@
     }
 </style>
 <style>
+{{$toolkit_view := conf . "route" "toolkit_view"}}
     div.workflow {
         color:#e6dd37;
         font-size:14px;
@@ -32,12 +33,12 @@
         height:20px;
         overflow:scroll;
         position:fixed;
-        top:{{conf . "docker_view" "top"}}px;
-        left:{{conf . "docker_view" "left"}}px;
+        top:{{index $toolkit_view "top"}}px;
+        left:{{index $toolkit_view "left"}}px;
     }
     div.workflow:hover, div.workflow.max {
-        width:{{conf . "docker_view" "width"}}px;
-        height:{{conf . "docker_view" "height"}}px;
+        width:{{index $toolkit_view "width"}}px;
+        height:{{index $toolkit_view "height"}}px;
     }
     div.workflow div:hover, div.workflow li li:hover {
         background-color:red;
@@ -121,6 +122,7 @@
         cursor:pointer;
     }
     table.append td {
+        max-width:1200px;
         font-family:monospace;
         padding-left: 10px;
         padding-right: 20px;
@@ -168,13 +170,12 @@
 </fieldset>
 {{end}}
 
-{{define "docker"}}
-{{$key := option . "bench"}}
+{{define "toolkit"}}
+{{$bench_data := option . "bench_data"}}
 {{$username := option . "username"|option}}
-{{$bench := conf . "bench" $key}}
 <div class="workflow">
     <div>&nbsp;bench (Ctrl+B)</div>
-    <ul class="docker">
+    <ul class="toolkit">
         <li><div>粘贴板</div>
             <ul class="txt">
                 <li data-action="save_txt">+ 保存粘贴板(Ctrl+S)</li>
@@ -190,10 +191,8 @@
 
                 <li class="stick" data-action="shrink_cmd">+ 折叠命令行(Ctrl+Z)</li>
                 <li data-action="create_cmd">+ 添加命令行(Ctrl+M)</li>
-                {{if $bench}}
-                    {{range $index, $cmd := index $bench "commands"}}
-                        <li class="cmd{{$index}}" data-cmd="{{$index}}">{{index $cmd "now"|option}} {{$index}}: {{index $cmd "cmd"|option}}</li>
-                    {{end}}
+                {{range $index, $cmd := index $bench_data "commands"}}
+                    <li class="cmd{{$index}}" data-cmd="{{$index}}">{{index $cmd "now"|option}} {{$index}}: {{index $cmd "cmd"|option}}</li>
                 {{end}}
             </ul>
         </li>
@@ -213,7 +212,7 @@
 {{end}}
 
 {{define "componet"}}
-<fieldset><legend title="{{option .Meta "componet_help"}}">{{option .Meta "componet_help"}}({{option .Meta "componet_ctx"}}.{{option .Meta "componet_cmd"}})</legend>
+<fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "name"}}({{option .Meta "help"}})</legend>
     {{$form_type := option . "form_type"|meta}}
     {{$msg := .}}
 
@@ -302,8 +301,8 @@
 {{end}}
 
 {{define "tail"}}
-<script src="/librarys/context.js"></script>
-<script src="/librarys/code.js"></script>
+<script src="/static/librarys/context.js"></script>
+<script src="/static/librarys/code.js"></script>
 </body>
 {{end}}
 

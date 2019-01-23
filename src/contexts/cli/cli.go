@@ -134,20 +134,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Commands: map[string]*ctx.Command{
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
-				m.Cmdy("dir", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
+				m.Cmdy("dir", "", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
 				return
 			}
 
 			// 解析脚本文件
-			if m.Cmds("nfs.path", arg[0]) {
-				switch path.Ext(arg[0]) {
+			if p := m.Cmdx("nfs.path", arg[0]); p != "" {
+				arg[0] = p
+				switch path.Ext(p) {
 				case "":
 				case ".shy":
 					m.Option("scan_end", "false")
 					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
 					m.Wait()
 				default:
-					m.Cmdy("system", m.Conf("cmd_script", strings.TrimPrefix(path.Ext(arg[0]), ".")), arg)
+					m.Cmdy("system", m.Conf("cmd_script", strings.TrimPrefix(path.Ext(p), ".")), arg)
 				}
 				return
 			}

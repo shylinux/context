@@ -598,6 +598,9 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 				m.Add(meta, msg.Meta[meta][0], msg.Meta[meta][1:])
 			}
 		case "option", "append":
+			if msg.Meta[meta] == nil {
+				break
+			}
 			if i == len(arg)-1 {
 				arg = append(arg, msg.Meta[meta]...)
 			}
@@ -605,9 +608,8 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 			for i++; i < len(arg); i++ {
 				if v, ok := msg.Data[arg[i]]; ok {
 					m.Put(meta, arg[i], v)
-				}
-				if v, ok := msg.Meta[arg[i]]; ok {
-					m.Add(meta, arg[i], v)
+				} else if v, ok := msg.Meta[arg[i]]; ok {
+					m.Set(meta, arg[i], v) // TODO fuck Add
 				}
 			}
 		default:
@@ -818,6 +820,18 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 
 	if len(cbs) > 0 {
 		switch cb := cbs[0].(type) {
+		case func(map[string]string) bool:
+			nrow := len(m.Meta[m.Meta["append"][0]])
+			line := map[string]string{}
+			for i := 0; i < nrow; i++ {
+				for _, k := range m.Meta["append"] {
+					line[k] = m.Meta[k][i]
+				}
+				if !cb(line) {
+					break
+				}
+			}
+			return m
 		case func(map[string]string):
 			nrow := len(m.Meta[m.Meta["append"][0]])
 			line := map[string]string{}
@@ -1331,16 +1345,19 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 				if args := []string{}; x.Form != nil {
 					for i := 0; i < len(arg); i++ {
 						if n, ok := x.Form[arg[i]]; ok {
-
 							if n < 0 {
 								n += len(arg) - i
 							}
-							for j := i + 1; j <= i+n; j++ {
+							for j := i + 1; j <= i+n && j < len(arg); j++ {
 								if _, ok := x.Form[arg[j]]; ok {
 									n = j - i - 1
 								}
 							}
-							m.Add("option", arg[i], arg[i+1:i+1+n])
+							if i+1+n > len(arg) {
+								m.Add("option", arg[i], arg[i+1:])
+							} else {
+								m.Add("option", arg[i], arg[i+1:i+1+n])
+							}
 							i += n
 						} else {
 							args = append(args, arg[i])
@@ -1406,9 +1423,23 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 	}
 
 	switch fun := args[0].(type) {
+	case func(int, string):
+		for i, v := range table {
+			fun(i, kit.Format(v))
+		}
 	case func(int, string) bool:
 		for i, v := range table {
 			if fun(i, kit.Format(v)) {
+				break
+			}
+		}
+	case func(string, string):
+		for k, v := range value {
+			fun(k, kit.Format(v))
+		}
+	case func(string, string) bool:
+		for k, v := range value {
+			if fun(k, kit.Format(v)) {
 				break
 			}
 		}

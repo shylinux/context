@@ -49,17 +49,15 @@ func merge(m *ctx.Message, uri string, arg ...string) string {
 	add, e := url.Parse(uri)
 	m.Assert(e)
 
+	args := []interface{}{}
+	for i := 0; i < strings.Count(add.RawQuery, "%s") && len(arg) > 0; i++ {
+		args, arg = append(args, arg[0]), arg[1:]
+	}
+	add.RawQuery = fmt.Sprintf(add.RawQuery, args...)
+
 	query := add.Query()
 	for i := 0; i < len(arg)-1; i += 2 {
-		value := arg[i+1]
-		if len(arg[i+1]) > 1 {
-			switch arg[i+1][0] {
-			case '$':
-				value = m.Cap(arg[i+1][1:])
-			case '@':
-				value = m.Conf(arg[i+1][1:])
-			}
-		}
+		value := m.Parse(arg[i+1])
 
 		if value == "" {
 			query.Del(arg[i])
@@ -81,6 +79,9 @@ func Merge(m *ctx.Message, client map[string]interface{}, uri string, arg ...str
 		add.Path = path.Join(kit.Format(client["path"]), kit.Format(client["file"]))
 	} else if !path.IsAbs(add.Path) {
 		add.Path = path.Join(kit.Format(client["path"]), add.Path)
+		if strings.HasSuffix(uri, "/") {
+			add.Path += "/"
+		}
 	}
 
 	add.RawQuery = kit.Select(kit.Format(client["query"]), add.RawQuery)
@@ -88,7 +89,7 @@ func Merge(m *ctx.Message, client map[string]interface{}, uri string, arg ...str
 }
 
 func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) bool {
-	if msg.Confs("cas_url") && !msg.Confs("skip_cas") {
+	if msg.Confs("login", "cas_url") && !msg.Confs("login", "skip_cas") {
 		if !cas.IsAuthenticated(r) {
 			r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
 			cas.RedirectToLogin(w, r)
@@ -102,7 +103,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		}
 
 		if msg.Options("ticket") {
-			msg.Option("uuid", msg.Option(msg.Conf("cas_uuid")))
+			msg.Option("uuid", msg.Option(msg.Conf("login", "cas_uuid")))
 			msg.Option("username", cas.Username(r))
 			if lark := msg.Find("web.chat.lark"); lark != nil {
 				msg.Option("username", lark.Cmdx("user", msg.Option("email"), "id"))
@@ -139,7 +140,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				msg.Option(v.Name, v.Value)
 			}
 
-			r.ParseMultipartForm(int64(msg.Confi("multipart_bsize")))
+			r.ParseMultipartForm(int64(msg.Confi("serve", "form_size")))
 			if r.ParseForm(); len(r.PostForm) > 0 {
 				for k, v := range r.PostForm {
 					msg.Log("info", "%s: %v", k, v)
@@ -209,21 +210,24 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("index_module", m.Cap("module"))
 		r.Header.Set("index_url", r.URL.String())
 		r.Header.Set("index_path", r.URL.Path)
+		if r.URL.Path == "/" && m.Confs("serve", "index") {
+			r.URL.Path = m.Conf("serve", "index")
+		}
 	}
 
-	if index && m.Confs("logheaders") {
+	if index && m.Confs("serve", "logheaders") {
 		for k, v := range r.Header {
 			m.Log("info", "%s: %v", k, v)
 		}
 		m.Log("info", "")
 	}
 
-	if r.URL.Path == "/" && m.Confs("root_index") {
-		r.URL.Path = m.Conf("root_index")
+	if r.URL.Path == "/" && m.Confs("route", "index") {
+		r.URL.Path = m.Conf("route", "index")
 	}
 	web.ServeMux.ServeHTTP(w, r)
 
-	if index && m.Confs("logheaders") {
+	if index && m.Confs("serve", "logheaders") {
 		for k, v := range w.Header() {
 			m.Log("info", "%s: %v", k, v)
 		}
@@ -240,23 +244,18 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	web.Configs["skip_cas"] = &ctx.Config{Name: "skip_cas", Value: "false", Help: "默认路由"}
-	web.Configs["root_index"] = &ctx.Config{Name: "root_index", Value: "/render", Help: "默认路由"}
-	web.Configs["logheaders"] = &ctx.Config{Name: "logheaders(yes/no)", Value: "no", Help: "日志输出报文头"}
-	web.Configs["template_sub"] = &ctx.Config{Name: "template_sub", Value: web.Context.Name, Help: "模板文件"}
-
-	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: m.Confx("directory", arg, 0), Help: "服务目录"}
+	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: kit.Select(m.Conf("serve", "directory"), arg, 0), Help: "服务目录"}
 	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "模块路由"}
 	web.Caches["register"] = &ctx.Cache{Name: "register(yes/no)", Value: "no", Help: "是否已初始化"}
 	web.Caches["master"] = &ctx.Cache{Name: "master(yes/no)", Value: "no", Help: "服务入口"}
 
 	web.ServeMux = http.NewServeMux()
 	web.Template = template.New("render").Funcs(ctx.CGI)
-	web.Template.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl"))
+	web.Template.ParseGlob(path.Join(m.Conf("serve", "template_dir"), m.Cap("route"), "/*.tmpl"))
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
-	m.Cap("directory", m.Confx("directory", arg, 0))
+	m.Cap("directory", kit.Select(m.Conf("serve", "directory"), arg, 0))
 
 	render := m.Target().Commands["/render"]
 	proxy := m.Target().Commands["/proxy/"]
@@ -267,7 +266,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 
 			p := m.Target().Context()
 			if s, ok := p.Server.(MUX); ok {
-				m.Log("info", "route: /%s <- /%s", p.Name, m.Target().Name)
+				m.Log("info", "route: /%s <- %s", p.Name, m.Cap("route"))
 				s.Handle(m.Cap("route"), http.StripPrefix(path.Dir(m.Cap("route")), h))
 			}
 
@@ -288,20 +287,20 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 			}
 
 			if m.Cap("directory") != "" {
-				m.Log("info", "route: %s <- [%s]\n", m.Cap("route"), m.Cap("directory"))
-				h.Handle("/", http.FileServer(http.Dir(m.Cap("directory"))))
+				m.Log("info", "route: %sstatic/ <- [%s]\n", m.Cap("route"), m.Cap("directory"))
+				h.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(m.Cap("directory")))))
 			}
 		}
 		return false
 	})
 
-	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: m.Confx("protocol", arg, 2), Help: "服务协议"}
-	web.Caches["address"] = &ctx.Cache{Name: "address", Value: m.Confx("address", arg, 1), Help: "服务地址"}
+	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: kit.Select(m.Conf("serve", "protocol"), arg, 2), Help: "服务协议"}
+	web.Caches["address"] = &ctx.Cache{Name: "address", Value: kit.Select(m.Conf("serve", "address"), arg, 1), Help: "服务地址"}
 	m.Log("info", "%d %s://%s", m.Capi("nserve", 1), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
 
 	var handler http.Handler
-	if cas_url, e := url.Parse(m.Conf("cas_url")); e == nil && m.Confs("cas_url") {
-		m.Log("info", "cas url: %s", m.Conf("cas_url"))
+	if cas_url, e := url.Parse(m.Conf("login", "cas_url")); e == nil && m.Confs("login", "cas_url") {
+		m.Log("info", "cas url: %s", m.Conf("login", "cas_url"))
 		client := cas.NewClient(&cas.Options{URL: cas_url})
 		handler = client.Handle(web)
 	} else {
@@ -311,8 +310,8 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: handler}
 
 	if m.Caps("master", true); m.Cap("protocol") == "https" {
-		web.Caches["cert"] = &ctx.Cache{Name: "cert", Value: m.Confx("cert", arg, 3), Help: "服务证书"}
-		web.Caches["key"] = &ctx.Cache{Name: "key", Value: m.Confx("key", arg, 4), Help: "服务密钥"}
+		web.Caches["cert"] = &ctx.Cache{Name: "cert", Value: kit.Select(m.Conf("serve", "cert"), arg, 3), Help: "服务证书"}
+		web.Caches["key"] = &ctx.Cache{Name: "key", Value: kit.Select(m.Conf("serve", "key"), arg, 4), Help: "服务密钥"}
 		m.Log("info", "cert [%s]", m.Cap("cert"))
 		m.Log("info", "key [%s]", m.Cap("key"))
 		web.Server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
@@ -322,10 +321,6 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	return true
 }
 func (web *WEB) Close(m *ctx.Message, arg ...string) bool {
-	switch web.Context {
-	case m.Target():
-	case m.Source():
-	}
 	return true
 }
 
@@ -335,202 +330,245 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"nroute": &ctx.Cache{Name: "nroute", Value: "0", Help: "路由数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"client": &ctx.Config{Name: "client", Value: map[string]interface{}{}, Help: "浏览器配置"},
-		"cookie": &ctx.Config{Name: "cookie", Value: map[string]interface{}{}, Help: "浏览器配置"},
-
-		"config":          &ctx.Config{Name: "config", Value: "false", Help: "输出请求"},
-		"log_uri":         &ctx.Config{Name: "log_uri", Value: "false", Help: "输出请求"},
-		"method":          &ctx.Config{Name: "method", Value: "GET", Help: "请求方法"},
-		"body_response":   &ctx.Config{Name: "body_response", Value: "response", Help: "响应缓存"},
-		"multipart_bsize": &ctx.Config{Name: "multipart_bsize", Value: "102400", Help: "缓存大小"},
-		"brow_home":       &ctx.Config{Name: "brow_home", Value: "http://localhost:9094", Help: "浏览服务"},
-		"spide":           &ctx.Config{Name: "spide", Value: map[string]interface{}{}, Help: "浏览服务"},
-		"client_timeout":  &ctx.Config{Name: "client_timeout", Value: "100s", Help: "浏览服务"},
-
-		"directory": &ctx.Config{Name: "directory", Value: "usr", Help: "服务目录"},
-		"protocol":  &ctx.Config{Name: "protocol", Value: "http", Help: "服务协议"},
-		"address":   &ctx.Config{Name: "address", Value: ":9094", Help: "服务地址"},
-		"site":      &ctx.Config{Name: "site", Value: "", Help: "网站地址"},
-		"cert":      &ctx.Config{Name: "cert", Value: "etc/cert.pem", Help: "证书"},
-		"key":       &ctx.Config{Name: "key", Value: "etc/key.pem", Help: "密钥"},
-
-		"login_check": &ctx.Config{Name: "login_check", Value: "1", Help: "登录认证"},
-		"sess_void":   &ctx.Config{Name: "sess_void", Value: "0", Help: "匿名会话"},
-		"cas_url":     &ctx.Config{Name: "cas_url", Value: "", Help: "单点登录"},
-		"cas_uuid":    &ctx.Config{Name: "cas_uuid", Value: "email", Help: "单点登录"},
-
-		"toolkit": &ctx.Config{Name: "toolkit", Value: map[string]interface{}{
-			"time": map[string]interface{}{
-				"cmd": "time",
+		"spide": &ctx.Config{Name: "spide", Value: map[string]interface{}{
+			"": map[string]interface{}{
+				"client": map[string]interface{}{},
+				"header": map[string]interface{}{},
+				"cookie": map[string]interface{}{},
 			},
-		}, Help: "小工具"},
-
-		"library_dir":      &ctx.Config{Name: "library_dir", Value: "usr/librarys", Help: "脚本目录"},
-		"template_dir":     &ctx.Config{Name: "template_dir", Value: "usr/template", Help: "模板目录"},
-		"template_debug":   &ctx.Config{Name: "template_debug", Value: "true", Help: "模板调试"},
-		"componet_context": &ctx.Config{Name: "component_context", Value: "nfs", Help: "默认模块"},
-		"componet_command": &ctx.Config{Name: "component_command", Value: "pwd", Help: "默认命令"},
-		"componet_group":   &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
+		}, Help: "爬虫配置"},
+		"serve": &ctx.Config{Name: "serve", Value: map[string]interface{}{
+			"loggheaders": true,
+			"form_size":   "102400",
+			"directory":   "usr",
+			"protocol":    "http",
+			"address":     ":9094",
+			"cert":        "etc/cert.pem",
+			"key":         "etc/key.pem",
+			"site":        "",
+			"index":       "/code/",
+		}, Help: "服务配置"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
+			"check":     true,
+			"sess_void": false,
+			"cas_url":   "",
+			"cas_uuid":  "email",
+		}, Help: "认证配置"},
+		"route": &ctx.Config{Name: "route", Value: map[string]interface{}{
+			"index":          "/render",
+			"template_dir":   "usr/template",
+			"template_debug": true,
+			"componet_index": "index",
+			"toolkit_view": map[string]interface{}{
+				"top": 96, "left": 472, "width": 600, "height": 300,
+			},
+		}, Help: "功能配置"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+			"login": []interface{}{},
 			"index": []interface{}{
-				map[string]interface{}{"componet_name": "head", "template": "head"},
-				map[string]interface{}{"componet_name": "clipbaord", "componet_help": "clipbaord", "template": "clipboard"},
-				map[string]interface{}{"componet_name": "time", "componet_help": "time", "template": "componet",
-					"componet_ctx": "cli", "componet_cmd": "time", "arguments": []interface{}{"@string"},
-					"inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "time_format",
-							"label": "format", "value": "2006-01-02 15:04:05",
-						},
-						map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-						map[string]interface{}{"type": "button", "label": "refresh"},
-					},
-				},
-				map[string]interface{}{"componet_name": "tail", "template": "tail"},
+				map[string]interface{}{"name": "head", "template": "head"},
+				map[string]interface{}{"name": "clipbaord", "template": "clipboard"},
+				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
 		}, Help: "组件列表"},
-
-		"bench_disable": &ctx.Config{Name: "bench_disable", Value: "false", Help: "工作流"},
-		"bench":         &ctx.Config{Name: "bench", Value: map[string]interface{}{}, Help: "工作流"},
-		"bench_view": &ctx.Config{Name: "bench_view", Value: map[string]interface{}{
-			"base": []interface{}{"key", "share", "comment", "creator", "create_time", "modify_time", "commands"},
-			"link": []interface{}{"share", "comment", "creator", "link"},
-		}, Help: "工作流"},
-		"docker_view": &ctx.Config{Name: "docker_view", Value: map[string]interface{}{
-			"top": 200, "left": 10, "width": 480, "height": 320,
-		}, Help: "工作流"},
+		"toolkit": &ctx.Config{Name: "toolkit", Value: map[string]interface{}{
+			"time": map[string]interface{}{"cmd": "time"},
+		}, Help: "工具列表"},
 	},
 	Commands: map[string]*ctx.Command{
-		"/demo": &ctx.Command{Name: "/demo", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Append("hello", "world")
-			return
-		}},
-		"merge": &ctx.Command{Name: "merge", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo(merge(m, arg[0], arg[1:]...))
-			return
-		}},
-		"client": &ctx.Command{Name: "client [which [address]]", Help: "添加浏览器配置, address: 默认地址, output: 输出路径, editor: 编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"spide": &ctx.Command{Name: "spide [which [client|cookie [name [value]]]]", Help: "爬虫配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
-				m.Cmdy("ctx.config", "client")
+				m.Cmdy("ctx.config", "spide")
 			case 1:
-				m.Cmdy("ctx.config", "client", arg[0])
-			default:
-				uri, e := url.Parse(arg[1])
-				m.Assert(e)
-				dir, file := path.Split(uri.EscapedPath())
-
-				m.Confv("client", arg[0], map[string]interface{}{
-					"method":   "GET",
-					"protocol": uri.Scheme,
-					"hostname": uri.Host,
-					"path":     dir,
-					"file":     file,
-					"query":    uri.RawQuery,
-				})
-			}
-			return
-		}},
-		"cookie": &ctx.Command{Name: "cookie [which [name [value]]]", Help: "读写浏览器的Cookie, create: 创建cookiejar, name: 变量名, value: 变量值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch len(arg) {
-			case 0:
-				m.Cmdy("ctx.config", "cookie")
-				return
-			case 1:
-				m.Cmdy("ctx.config", "cookie", arg[0])
-				return
+				m.Cmdy("ctx.config", "spide", arg[0])
 			case 2:
-				m.Confv("cookie", arg[:2])
+				m.Cmdy("ctx.config", "spide", strings.Join(arg[:2], "."))
 			default:
-				m.Confv("cookie", arg[:2], arg[2])
+				switch arg[1] {
+				case "client":
+					if len(arg) == 3 {
+						m.Cmdy("ctx.config", "spide", strings.Join(arg[:3], "."))
+						break
+					}
+
+					if arg[2] == "new" {
+						if uri, e := url.Parse(arg[3]); e == nil {
+							dir, file := path.Split(uri.EscapedPath())
+							m.Confv("spide", arg[0], map[string]interface{}{
+								"cookie": map[string]interface{}{},
+								"header": map[string]interface{}{},
+								"client": map[string]interface{}{
+									"logheaders": false,
+									"timeout":    "100s",
+									"method":     "GET",
+									"protocol":   uri.Scheme,
+									"hostname":   uri.Host,
+									"path":       dir,
+									"file":       file,
+									"query":      uri.RawQuery,
+									"url":        arg[3],
+								},
+							})
+						}
+						break
+					}
+
+					m.Cmd("ctx.config", "spide", strings.Join(arg[:3], "."), arg[3])
+				case "cookie", "header":
+					if len(arg) == 3 {
+						m.Cmdy("ctx.config", "spide", strings.Join(arg[:3], "."))
+						break
+					}
+					m.Cmdy("ctx.config", "spide", strings.Join(arg[:3], "."), arg[3])
+				default:
+					m.Cmd("ctx.config", "spide", strings.Join(arg[:2], "."), arg[2])
+				}
 			}
-			m.Echo(m.Conf("cookie", arg[:2]))
 			return
 		}},
-		"get": &ctx.Command{Name: "get [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"which": 1, "method": 1, "headers": 2, "content_type": 1, "body": 1, "parse": 1, "temp": -1},
+		"get": &ctx.Command{Name: "get [which] name [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
+			Form: map[string]int{"which": 1, "method": 1, "headers": 2, "content_type": 1, "file": 2, "body": 1, "parse": 1, "temp": -1, "save": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				if len(arg) == 0 {
+					m.Cmdy("web.spide")
+					return
+				}
+				if len(arg) == 1 {
+					m.Cmdy("web.spide", arg[0])
+					return
+				}
+
+				uri_arg := ""
 				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-					which := m.Option("which")
-					client := m.Confm("client", which)
-					if c := m.Confm("client", arg[0]); c != nil {
+					which, client := m.Option("which"), m.Confm("spide", []string{m.Option("which"), "client"})
+					if c := m.Confm("spide", []string{arg[0], "client"}); c != nil {
 						which, client, arg = arg[0], c, arg[1:]
 					}
 
 					method := kit.Select(kit.Format(client["method"]), m.Option("method"))
 					uri := Merge(m, client, arg[0], arg[1:]...)
 
-					body, _ := m.Optionv("body").(io.Reader)
-					if method == "POST" && body == nil {
-						if index := strings.Index(uri, "?"); index > 0 {
-							uri, body = uri[:index], strings.NewReader(uri[index+1:])
+					body, ok := m.Optionv("body").(io.Reader)
+					if method == "POST" && !ok {
+						uuu, e := url.Parse(uri)
+						m.Assert(e)
+
+						if m.Has("file") {
+							writer := multipart.NewWriter(&bytes.Buffer{})
+							defer writer.Close()
+
+							for k, v := range uuu.Query() {
+								for _, v := range v {
+									writer.WriteField(k, v)
+								}
+							}
+
+							file, e := os.Open(m.Cmdx("nfs.path", m.Meta["file"][1]))
+							m.Assert(e)
+							defer file.Close()
+
+							part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+							m.Assert(e)
+							io.Copy(part, file)
+
+							m.Option("content_type", writer.FormDataContentType())
+						} else if index := strings.Index(uri, "?"); index > 0 {
+							switch m.Option("content_type") {
+							case "application/json":
+								var data interface{}
+								for k, v := range uuu.Query() {
+									if len(v) == 1 {
+										data = kit.Chain(data, k, v[0])
+									} else {
+										data = kit.Chain(data, k, v)
+									}
+								}
+
+								b, e := json.Marshal(data)
+								m.Assert(e)
+								m.Log("info", "json %v", string(b))
+								body = bytes.NewReader(b)
+
+							default:
+								m.Log("info", "body %v", string(uri[index+1:]))
+								body = strings.NewReader(uri[index+1:])
+								m.Option("content_type", "application/x-www-form-urlencoded")
+							}
+							uri, uri_arg = uri[:index], "?"+uuu.RawQuery
 						}
 					}
 
+					m.Log("info", "%s %s", method, uri)
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
 					m.Log("info", "%s %s", req.Method, req.URL)
 
+					m.Confm("spide", []string{which, "header"}, func(key string, value string) {
+						req.Header.Set(key, value)
+						m.Log("info", "header %v %v", key, value)
+					})
 					for i := 0; i < len(m.Meta["headers"]); i += 2 {
 						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
 					}
 					if m.Options("content_type") {
 						req.Header.Set("Content-Type", m.Option("content_type"))
 					}
-					for k, v := range m.Confm("cookie", which) {
-						req.AddCookie(&http.Cookie{Name: k, Value: kit.Format(v)})
-						m.Log("info", "set-cookie %s: %v", k, v)
-					}
-					if m.Confs("logheaders") {
+					m.Confm("spide", []string{which, "cookie"}, func(key string, value string) {
+						req.AddCookie(&http.Cookie{Name: key, Value: value})
+						m.Log("info", "set-cookie %s: %v", key, value)
+					})
+					if kit.Right(client["logheaders"]) {
 						for k, v := range req.Header {
 							m.Log("info", "%s: %s", k, v)
 						}
+						m.Log("info", "")
 					}
 
 					if web.Client == nil {
-						web.Client = &http.Client{Timeout: kit.Duration(m.Conf("client_timeout"))}
+						web.Client = &http.Client{Timeout: kit.Duration(kit.Format(client["timeout"]))}
 					}
 
 					res, e := web.Client.Do(req)
-					if m.Assert(e); m.Confs("logheaders") {
+					m.Log("info", "response %v %v", res.StatusCode, res.Status)
+					if m.Assert(e); kit.Right(client["logheaders"]) {
 						for k, v := range res.Header {
 							m.Log("info", "%s: %v", k, v)
 						}
 					}
-
-					ct := res.Header.Get("Content-Type")
-					m.Log("info", "content: %s", ct)
-					var result interface{}
-
-					parse := m.Option("parse")
-					if !m.Has("temp") {
-						m.Option("temp", "")
+					for _, v := range res.Cookies() {
+						m.Conf("spide", []string{which, "cookie", v.Name}, v.Value)
+						m.Log("info", "get-cookie %s: %v", v.Name, v.Value)
 					}
-					switch {
-					case strings.HasPrefix(ct, "application/javascript") || strings.HasPrefix(ct, "application/json") || parse == "json":
-						json.NewDecoder(res.Body).Decode(&result)
-						m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri, "data", m.Meta["temp"])
 
-					case strings.HasPrefix(ct, "text/html"):
+					var result interface{}
+					ct := res.Header.Get("Content-Type")
+					parse := kit.Select(kit.Format(client["parse"]), m.Option("parse"))
+					m.Log("info", "parse: %s content: %s", parse, ct)
+
+					switch {
+					case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
+						if json.NewDecoder(res.Body).Decode(&result); !m.Has("temp") {
+							m.Option("temp", "")
+						}
+						m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
+
+					case parse == "html":
 						page, e := goquery.NewDocumentFromReader(res.Body)
 						m.Assert(e)
 
-						query := page.Find("html")
-						if m.Has("parse") {
-							query = query.Find(m.Option("parse"))
-						}
-
-						query.Each(func(n int, s *goquery.Selection) {
-							if m.Options("sub_parse") {
-								for i := 0; i < len(m.Meta["sub_parse"])-2; i += 3 {
-									item := s.Find(m.Meta["sub_parse"][i+1])
-									if m.Meta["sub_parse"][i+1] == "" {
+						page.Find(kit.Select("html", m.Option("parse_chain"))).Each(func(n int, s *goquery.Selection) {
+							if m.Options("parse_select") {
+								for i := 0; i < len(m.Meta["parse_select"])-2; i += 3 {
+									item := s.Find(m.Meta["parse_select"][i+1])
+									if m.Meta["parse_select"][i+1] == "" {
 										item = s
 									}
-									if v, ok := item.Attr(m.Meta["sub_parse"][i+2]); ok {
-										m.Add("append", m.Meta["sub_parse"][i], v)
+									if v, ok := item.Attr(m.Meta["parse_select"][i+2]); ok {
+										m.Add("append", m.Meta["parse_select"][i], v)
 										m.Log("info", "item attr %v", v)
 									} else {
-										m.Add("append", m.Meta["sub_parse"][i], strings.Replace(item.Text(), "\n", "", -1))
+										m.Add("append", m.Meta["parse_select"][i], strings.Replace(item.Text(), "\n", "", -1))
 										m.Log("info", "item text %v", item.Text())
 									}
 								}
@@ -561,153 +599,67 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						})
 						m.Table()
-						result = ""
 
 					default:
-						buf, e := ioutil.ReadAll(res.Body)
-						m.Assert(e)
+						if m.Options("save") {
+							f, e := os.Create(m.Option("save"))
+							m.Assert(e)
+							defer f.Close()
 
-						m.Append("Content-Type", ct)
-						result = string(buf)
-						m.Echo(string(buf))
-					}
-				}
-				return
-			}},
-		"post": &ctx.Command{Name: "post [file fieldname filename]", Help: "post请求",
-			Form: map[string]int{"file": 2, "content_type": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				msg := m.Spawn()
-				parse := "_"
-				if m.Has("file") {
-					file, e := os.Open(m.Meta["file"][1])
-					m.Assert(e)
-					defer file.Close()
-
-					buf := &bytes.Buffer{}
-					writer := multipart.NewWriter(buf)
-					writer.SetBoundary(fmt.Sprintf("\r\n--%s--\r\n", writer.Boundary()))
-					part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
-					m.Assert(e)
-
-					for i := 1; i < len(arg)-1; i += 2 {
-						if arg[i] == "parse" {
-							parse = arg[i+1]
-							continue
-						}
-						value := arg[i+1]
-						if len(arg[i+1]) > 1 {
-							switch arg[i+1][0] {
-							case '$':
-								value = m.Cap(arg[i+1][1:])
-							case '@':
-								value = m.Conf(arg[i+1][1:])
-							}
-						}
-						writer.WriteField(arg[i], value)
-					}
-
-					io.Copy(part, file)
-					writer.Close()
-					msg.Optionv("body", buf)
-					msg.Option("content_type", writer.FormDataContentType())
-					msg.Option("headers", "Content-Length", buf.Len())
-				} else if m.Option("content_type") == "json" {
-					data := map[string]interface{}{}
-					for i := 1; i < len(arg)-1; i += 2 {
-						if arg[i] == "parse" {
-							parse = arg[i+1]
-							continue
-						}
-						switch arg[i+1] {
-						case "false":
-							data[arg[i]] = false
-						case "true":
-							data[arg[i]] = true
-						default:
-							if len(arg[i+1]) > 1 && arg[i+1][0] == '$' {
-								data[arg[i]] = m.Cap(arg[i+1][1:])
-							} else {
-								data[arg[i]] = arg[i+1]
-							}
-						}
-					}
-
-					b, e := json.Marshal(data)
-					m.Assert(e)
-					m.Log("info", "json %v", string(b))
-
-					msg.Optionv("body", bytes.NewReader(b))
-					msg.Option("content_type", "application/json")
-					arg = arg[:1]
-				} else if m.Option("content_type") == "json_fmt" {
-					data := []interface{}{}
-					for _, v := range arg[2:] {
-						if len(v) > 1 && v[0] == '$' {
-							v = m.Cap(v[1:])
-						} else if len(v) > 1 && v[0] == '@' {
-							v = m.Cap(v[1:])
-						}
-						data = append(data, v)
-					}
-					msg.Optionv("body", strings.NewReader(fmt.Sprintf(arg[1], data...)))
-					msg.Option("content_type", "application/json")
-					arg = arg[:1]
-				} else {
-					msg.Option("content_type", "application/x-www-form-urlencoded")
-				}
-
-				if parse != "_" {
-					arg = append(arg, "parse")
-					arg = append(arg, parse)
-				}
-				msg.Cmd("get", "method", "POST", arg)
-				m.Copy(msg, "result").Copy(msg, "append")
-				return
-			}},
-		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if _, ok := m.Optionv("request").(*http.Request); ok {
-				action := false
-				c.Travel(m, func(m *ctx.Message, i int) bool {
-					for key, v := range m.Target().Commands {
-						method, url := "", ""
-						if strings.HasPrefix(v.Name, "get ") {
-							method, url = "get", strings.TrimPrefix(v.Name, "get ")
-						} else if strings.HasPrefix(v.Name, "post ") {
-							method, url = "post", strings.TrimPrefix(v.Name, "post ")
+							n, e := io.Copy(f, res.Body)
+							m.Assert(e)
+							m.Log("info", "save %d %s", n, m.Option("save"))
+							m.Echo(m.Option("save"))
 						} else {
-							continue
-						}
-
-						if len(arg) == 0 {
-							m.Add("append", "method", method)
-							m.Add("append", "request", url)
-						} else if strings.HasPrefix(url, arg[0]) {
-							msg := m.Spawn().Cmd(key, arg[1:])
-							m.Copy(msg, "append").Copy(msg, "result")
-							action = true
-							return false
+							buf, e := ioutil.ReadAll(res.Body)
+							m.Assert(e)
+							m.Echo(string(buf))
 						}
 					}
-					return true
-				})
-
-				if !action {
-					msg := m.Spawn().Cmd("get", arg)
-					m.Copy(msg, "append").Copy(msg, "result")
 				}
 				return
-			}
-
-			url := m.Confx("brow_home", arg, 0)
+			}},
+		"post": &ctx.Command{Name: "post args...", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy("web.get", "method", "POST", arg)
+			return
+		}},
+		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch runtime.GOOS {
 			case "windows":
-				m.Sess("cli").Cmd("system", "explorer", url)
+				m.Cmd("cli.system", "explorer", arg[0])
 			case "darwin":
-				m.Sess("cli").Cmd("system", "open", url)
-			case "linux":
-				m.Spawn().Cmd("open", url)
+				m.Cmd("cli.system", "open", arg[0])
+			default:
+				m.Cmd("web.get", arg[0])
 			}
+			return
+		}},
+		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			date := time.Now().Add(time.Hour * 24).Format("2006-01-02")
+			if len(arg) > 0 {
+				date, arg = arg[0], arg[1:]
+			}
+			to := "QFK"
+			if len(arg) > 0 {
+				to, arg = arg[0], arg[1:]
+			}
+			from := "BJP"
+			if len(arg) > 0 {
+				from, arg = arg[0], arg[1:]
+			}
+			m.Echo("%s->%s %s\n", from, to, date)
+
+			m.Cmd("web.get", fmt.Sprintf("https://kyfw.12306.cn/otn/leftTicket/queryX?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT", date, from, to), "temp", "data.result")
+			for _, v := range m.Meta["value"] {
+				fields := strings.Split(v, "|")
+				m.Add("append", "车次--", fields[3])
+				m.Add("append", "出发----", fields[8])
+				m.Add("append", "到站----", fields[9])
+				m.Add("append", "时长----", fields[10])
+				m.Add("append", "二等座", fields[30])
+				m.Add("append", "一等座", fields[31])
+			}
+			m.Table()
 			return
 		}},
 
@@ -733,10 +685,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 					}
 				default:
-					help := "dynamic route"
-					if len(arg) > 2 {
-						help = arg[2]
-					}
+					help := kit.Select("dynamic route", arg, 2)
 					hand := func(m *ctx.Message, c *ctx.Context, key string, a ...string) (e error) {
 						w := m.Optionv("response").(http.ResponseWriter)
 						template.Must(template.New("temp").Parse(arg[1])).Execute(w, m)
@@ -748,8 +697,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							mux.Handle(arg[0]+"/", http.StripPrefix(arg[0], http.FileServer(http.Dir(arg[1]))))
 						} else if strings.HasSuffix(arg[1], ".shy") {
 							hand = func(m *ctx.Message, c *ctx.Context, key string, a ...string) (e error) {
-								msg := m.Sess("cli").Cmd("source", arg[1])
-								m.Copy(msg, "result").Copy(msg, "append")
+								m.Cmdy("cli.source", arg[1])
 								return
 							}
 						} else {
@@ -811,46 +759,23 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"componet": &ctx.Command{Name: "componet [group [order [arg...]]]", Help: "添加组件, group: 组件分组, arg...: 组件参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
-				for k, v := range m.Confv("componet").(map[string]interface{}) {
-					for i, val := range v.([]interface{}) {
-						value := val.(map[string]interface{})
-						m.Add("append", "group", k)
-						m.Add("append", "order", i)
-						m.Add("append", "componet_name", value["componet_name"])
-						m.Add("append", "componet_help", value["componet_help"])
-						m.Add("append", "componet_ctx", value["componet_ctx"])
-						m.Add("append", "componet_cmd", value["componet_cmd"])
-					}
-				}
-				m.Sort("group").Table()
+				m.Cmdy("ctx.config", "componet")
 			case 1:
-				for i, val := range m.Confv("componet", arg[0]).([]interface{}) {
-					value := val.(map[string]interface{})
-					m.Add("append", "order", i)
-					m.Add("append", "componet_name", value["componet_name"])
-					m.Add("append", "componet_help", value["componet_help"])
-					m.Add("append", "componet_ctx", value["componet_ctx"])
-					m.Add("append", "componet_cmd", value["componet_cmd"])
-				}
-				m.Table()
+				m.Cmdy("ctx.config", "componet", arg[0])
 			case 2:
-				value := m.Confv("componet", []interface{}{arg[0], arg[1]}).(map[string]interface{})
-				for k, v := range value {
-					m.Add("append", k, v)
-				}
-				m.Table()
+				m.Cmdy("ctx.config", "componet", strings.Join(arg, "."))
 			default:
-				if com, ok := m.Confv("componet", []interface{}{arg[0], arg[1]}).(map[string]interface{}); ok {
-					for i := 2; i < len(arg)-1; i += 2 {
-						com[arg[i]] = arg[i+1]
-					}
-				} else {
-					m.Confv("componet", []interface{}{arg[0], arg[1]}, map[string]interface{}{
-						"componet_name": arg[2], "componet_help": arg[3],
-						"componet_ctx": m.Confx("componet_context", arg, 4),
-						"componet_cmd": m.Confx("componet_command", arg, 5),
+				switch arg[0] {
+				case "create":
+					m.Confm("componet", arg[1:3], map[string]interface{}{
+						"name": arg[3], "help": arg[4],
+						"componet_ctx": arg[5], "componet_cmd": arg[6],
 					})
-					break
+				default:
+					componet := m.Confm("componet", arg[:2])
+					for i := 2; i < len(arg)-1; i += 2 {
+						componet[arg[i]] = arg[i+1]
+					}
 				}
 			}
 			return
@@ -860,8 +785,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			username := m.Option("username")
-			sessid := m.Option("sessid")
+			sessid, username := m.Option("sessid"), m.Option("username")
 
 			switch arg[0] {
 			case "login":
@@ -896,101 +820,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			return
 		}},
-		"bench": &ctx.Command{Name: "bench", Help: "任务列表", Form: map[string]int{"view": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			default_com := "default bench"
-			default_cmd := map[string]interface{}{}
-			if len(arg) > 0 && arg[0] == "copy" { // 复制工作流
-				bench := m.Confv("bench", arg[1]).(map[string]interface{})
-				for k, v := range bench["commands"].(map[string]interface{}) {
-					default_cmd[k] = v
-				}
-				arg[0] = "create"
-				default_com = bench["comment"].(string)
-				m.Option("bench", "")
-			}
 
-			if len(arg) > 0 && arg[0] == "create" { // 创建工作流
-				create_time := time.Now().Format(m.Conf("time_format"))
-				key := m.Option("bench")
-				if key == "" {
-					key = m.Sess("aaa").Cmd("hash", "bench", m.Option("remote_addr"), "time", "rand").Result(0)
-				}
-
-				link := fmt.Sprintf("%s?bench=%s", m.Conf("site"), key)
-				if _, ok := m.Confv("bench", key).(map[string]interface{}); !ok {
-					m.Log("info", "%s create bench  %s", m.Option("username"), key)
-					m.Confv("bench", key, map[string]interface{}{
-						"remote_addr": m.Option("remote_addr"),
-						"modify_time": create_time,
-						"create_time": create_time,
-						"creator":     m.Option("username"),
-						"share":       "protected",
-						"link":        link,
-						"comment":     default_com,
-						"key":         key,
-						"commands":    default_cmd,
-					})
-				}
-
-				m.Append("key", key)
-				m.Echo(link)
-				return
-			}
-
-			if len(arg) > 0 && arg[0] == "check" { // 检查工作流
-				bench := m.Confv("bench", m.Option("bench")).(map[string]interface{})
-				if bench["creator"].(string) != arg[1] {
-					switch bench["share"].(string) {
-					case "private":
-						m.Echo("private")
-						return
-					case "protected":
-						m.Echo("protected")
-					case "public":
-					}
-				}
-				return
-			}
-
-			bench := m.Confv("bench").(map[string]interface{})
-			if len(arg) > 0 && arg[0] == "delete" { // 删除工作流
-				delete(bench, arg[1])
-				arg = arg[2:]
-			}
-
-			if len(arg) == 0 { // 查看工作流
-				view := "base"
-				if m.Has("view") {
-					view = m.Option("view")
-				}
-				for _, v := range bench {
-					val := v.(map[string]interface{})
-					for _, k := range m.Confv("bench_view", view).([]interface{}) {
-						switch v := val[k.(string)].(type) {
-						case map[string]interface{}:
-							b, _ := json.Marshal(v)
-							m.Add("append", "commands", string(b))
-						case nil:
-							m.Add("append", k.(string), "")
-						default:
-							m.Add("append", k.(string), v)
-						}
-					}
-				}
-				m.Table()
-				return
-			}
-
-			if len(arg) > 1 { // 编辑工作流
-				m.Confv("bench", strings.Split(arg[0], "."), arg[1])
-			}
-
-			// 查看工作流
-			msg := m.Spawn().Put("option", "_cache", bench).Cmd("trans", "_cache", arg[0])
-			m.Copy(msg, "append").Copy(msg, "result")
+		"/proxy/": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			fields := strings.Split(key, "/")
+			m.Cmdy("web.get", "which", fields[2], "method", fields[3], strings.Join(fields, "/"))
 			return
 		}},
-
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Options("toolkit") {
 				if kit, ok := m.Confv("toolkit", m.Option("toolkit")).(map[string]interface{}); ok {
@@ -1012,14 +847,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				// 响应数据
 				list := []interface{}{}
 				tmpl := web.Template
-				if m.Confs("template_debug") {
+				if m.Confs("route", "template_debug") {
 					tmpl = template.New("render").Funcs(ctx.CGI)
-					tmpl.ParseGlob(path.Join(m.Conf("template_dir"), "/*.tmpl"))
-					tmpl.ParseGlob(path.Join(m.Conf("template_dir"), m.Conf("template_sub"), "/*.tmpl"))
+					tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl"))
+					tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
 				}
 
 				// 权限检查
-				if m.Confs("login_check") {
+				if m.Confs("login", "check") {
 					if m.Option("username", m.Cmdx("web.session", "login")) == "" { // 没有登录
 						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
 
@@ -1037,11 +872,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 
 				// 响应模板
-				group, order := m.Option("componet_group", m.Confx("componet_group")), m.Option("componet_name")
+				group, order := m.Option("componet_group", kit.Select(m.Conf("route", "componet_index"), m.Option("componet_group"))), m.Option("componet_name")
 
 				for _, v := range m.Confv("componet", group).([]interface{}) {
 					val := v.(map[string]interface{})
-					if order != "" && val["componet_name"].(string) != order {
+					if order != "" && val["name"].(string) != order {
 						continue
 					}
 
@@ -1070,7 +905,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 						// 添加固定值
-						msg.Option("componet_name", val["componet_name"].(string))
+						msg.Option("componet_name", val["name"].(string))
 						for k, v := range val {
 							if msg.Option(k) != "" {
 								continue
@@ -1140,7 +975,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Assert(e)
 			defer f.Close()
 
-			p := path.Join(m.Conf("directory"), m.Option("current_dir"), h.Filename)
+			p := path.Join(m.Cmdx("nfs.path", m.Option("current_dir")), h.Filename)
 			o, e := os.Create(p)
 			m.Assert(e)
 			defer o.Close()
@@ -1153,111 +988,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/download/": &ctx.Command{Name: "/download/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
-			p := m.Sess("nfs").Cmd("path", strings.TrimPrefix(m.Option("path"), "/download/")).Result(0)
-			m.Log("info", "download %s %s", p, m.Sess("aaa").Cmd("hash", "file", p).Result(0))
+			p := m.Cmdx("nfs.path", strings.TrimPrefix(key, "/download/"))
+			m.Log("info", "download %s %s", p, m.Cmdx("aaa.hash", "file", p))
 			http.ServeFile(w, r, p)
-			return
-		}},
-		"/proxy/": &ctx.Command{Name: "/proxy/", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			msg := m.Spawn().Cmd("get", strings.TrimPrefix(key, "/proxy/"), arg)
-			m.Copy(msg, "append").Copy(msg, "result")
-			return
-		}},
-
-		"spide": &ctx.Command{Name: "spide", Help: "spide", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				for k, v := range m.Confv("spide").(map[string]interface{}) {
-					val := v.(map[string]interface{})
-					m.Add("append", "key", k)
-					m.Add("append", "limit", val["limit"])
-					m.Add("append", "site", val["site"])
-				}
-				m.Sort("key", "str").Table()
-				return
-			}
-
-			if len(arg) > 0 && arg[0] == "add" {
-				m.Confv("spide", arg[1], map[string]interface{}{
-					"site":      arg[2],
-					"narg":      strings.Count(arg[2], "%s"),
-					"parse":     arg[3],
-					"sub_parse": arg[4:],
-					"fields":    m.Option("fields"),
-					"offset":    m.Option("offset"),
-					"limit":     m.Option("limit"),
-				})
-				return
-			}
-
-			spide := m.Confv("spide", arg[0]).(map[string]interface{})
-			arg = arg[1:]
-
-			sub_parse := spide["sub_parse"].([]string)
-
-			args := []interface{}{}
-			for i := 0; i < spide["narg"].(int); i++ {
-				args = append(args, url.QueryEscape(arg[i]))
-			}
-
-			msg := m.Spawn().Cmd("get", fmt.Sprintf(spide["site"].(string), args...),
-				"parse", spide["parse"], sub_parse)
-			arg = arg[spide["narg"].(int):]
-
-			offset := spide["offset"].(string)
-			if m.Has("offset") {
-				offset = m.Option("offset")
-			}
-			if len(arg) > 0 {
-				offset, arg = arg[0], arg[1:]
-			}
-
-			limit := spide["limit"].(string)
-			if m.Has("limit") {
-				limit = m.Option("limit")
-			}
-			if len(arg) > 0 {
-				limit, arg = arg[0], arg[1:]
-			}
-
-			fields := spide["fields"].(string)
-			if m.Has("fields") {
-				fields = m.Option("fields")
-			}
-			if len(arg) > 0 {
-				fields, arg = arg[0], arg[1:]
-			}
-
-			m.Copy(msg, "append").Copy(msg, "result")
-			m.Cmd("select", "limit", limit, "offset", offset, "fields", fields)
-
-			return
-		}},
-		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			date := time.Now().Add(time.Hour * 24).Format("2006-01-02")
-			if len(arg) > 0 {
-				date, arg = arg[0], arg[1:]
-			}
-			to := "QFK"
-			if len(arg) > 0 {
-				to, arg = arg[0], arg[1:]
-			}
-			from := "BJP"
-			if len(arg) > 0 {
-				from, arg = arg[0], arg[1:]
-			}
-			m.Echo("%s->%s %s\n", from, to, date)
-
-			msg := m.Spawn().Cmd("get", fmt.Sprintf("https://kyfw.12306.cn/otn/leftTicket/queryX?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT", date, from, to), "parse", "data.result")
-			for _, v := range msg.Meta["value"] {
-				fields := strings.Split(v, "|")
-				m.Add("append", "车次--", fields[3])
-				m.Add("append", "出发----", fields[8])
-				m.Add("append", "到站----", fields[9])
-				m.Add("append", "时长----", fields[10])
-				m.Add("append", "二等座", fields[30])
-				m.Add("append", "一等座", fields[31])
-			}
-			m.Table()
 			return
 		}},
 	},

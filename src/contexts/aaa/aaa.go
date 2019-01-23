@@ -357,7 +357,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						has := "false"
 						m.Confm("auth", []string{p, "ship"}, func(k string, ship map[string]interface{}) {
 							if ship["meta"] == arg[i+1] {
-								if ship["expire_time"] == nil || ship["expire_time"].(int64) > time.Now().Unix() {
+								if ship["expire_time"] == nil || int64(kit.Int(ship["expire_time"])) > time.Now().Unix() {
 									has = k
 								}
 							}

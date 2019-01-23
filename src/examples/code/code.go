@@ -4,6 +4,7 @@ import (
 	"contexts/ctx"
 	"contexts/web"
 	"fmt"
+	"net/http"
 	"strconv"
 )
 
@@ -22,8 +23,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"componet_group":   &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"login": []interface{}{
-				map[string]interface{}{"componet_name": "head", "template": "head"},
-				map[string]interface{}{"componet_name": "login", "componet_help": "login", "template": "componet",
+				map[string]interface{}{"name": "head", "template": "head"},
+				map[string]interface{}{"name": "login", "help": "login", "template": "componet",
 					"componet_ctx": "aaa", "componet_cmd": "auth", "arguments": []interface{}{"@sessid", "ship", "username", "@username", "password", "@password"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "username", "label": "username"},
@@ -32,12 +33,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					},
 					"display_append": "", "display_result": "",
 				},
-				map[string]interface{}{"componet_name": "tail", "template": "tail"},
+				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
 			"index": []interface{}{
-				map[string]interface{}{"componet_name": "head", "template": "head"},
-				map[string]interface{}{"componet_name": "docker", "componet_help": "docker", "template": "docker"},
-				// map[string]interface{}{"componet_name": "login", "componet_help": "login", "template": "componet",
+				map[string]interface{}{"name": "head", "template": "head"},
+				map[string]interface{}{"name": "toolkit", "help": "toolkit", "template": "toolkit"},
+				// map[string]interface{}{"name": "login", "help": "login", "template": "componet",
 				// 	"componet_ctx": "aaa", "componet_cmd": "login", "arguments": []interface{}{"@username", "@password"},
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "text", "name": "username", "label": "username"},
@@ -46,12 +47,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 	},
 				// 	"display_append": "", "display_result": "",
 				// },
-				// map[string]interface{}{"componet_name": "userinfo", "componet_help": "userinfo", "template": "componet",
+				// map[string]interface{}{"name": "userinfo", "help": "userinfo", "template": "componet",
 				// 	"componet_ctx": "aaa", "componet_cmd": "login", "arguments": []interface{}{"@sessid"},
 				// 	"pre_run": true,
 				// },
-				map[string]interface{}{"componet_name": "clipboard", "componet_help": "clipboard", "template": "clipboard"},
-				map[string]interface{}{"componet_name": "buffer", "componet_help": "buffer", "template": "componet",
+				map[string]interface{}{"name": "clipboard", "help": "clipboard", "template": "clipboard"},
+				map[string]interface{}{"name": "buffer", "help": "buffer", "template": "componet",
 					"componet_ctx": "cli", "componet_cmd": "tmux", "arguments": []interface{}{"buffer"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "limit", "label": "limit", "value": "3"},
 						map[string]interface{}{"type": "text", "name": "index", "label": "index"},
@@ -59,7 +60,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					},
 					"pre_run": true,
 				},
-				// map[string]interface{}{"componet_name": "time", "componet_help": "time", "template": "componet",
+				// map[string]interface{}{"name": "time", "help": "time", "template": "componet",
 				// 	"componet_ctx": "cli", "componet_cmd": "time", "arguments": []interface{}{"@string"},
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "text", "name": "time_format",
@@ -69,14 +70,14 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
 				// 	},
 				// },
-				// map[string]interface{}{"componet_name": "json", "componet_help": "json", "template": "componet",
+				// map[string]interface{}{"name": "json", "help": "json", "template": "componet",
 				// 	"componet_ctx": "nfs", "componet_cmd": "json", "arguments": []interface{}{"@string"},
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "text", "name": "string", "label": "string"},
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
 				// 	},
 				// },
-				map[string]interface{}{"componet_name": "dir", "componet_help": "dir", "template": "componet",
+				map[string]interface{}{"name": "dir", "help": "dir", "template": "componet",
 					"componet_ctx": "nfs", "componet_cmd": "dir", "arguments": []interface{}{"@dir", "dir_sort", "@sort_order", "@sort_field"},
 					"pre_run": true, "display_result": "",
 					"inputs": []interface{}{
@@ -109,7 +110,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						map[string]interface{}{"type": "text", "name": "dir", "label": "dir"},
 					},
 				},
-				map[string]interface{}{"componet_name": "upload", "componet_help": "upload", "template": "componet",
+				map[string]interface{}{"name": "upload", "help": "upload", "template": "componet",
 					"componet_ctx": "web", "componet_cmd": "upload", "form_type": "upload",
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "file", "name": "upload"},
@@ -117,7 +118,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					},
 					"display_result": "",
 				},
-				// map[string]interface{}{"componet_name": "download", "componet_help": "download", "template": "componet",
+				// map[string]interface{}{"name": "download", "help": "download", "template": "componet",
 				// 	"componet_ctx": "cli.shy", "componet_cmd": "source", "arguments": []interface{}{"@cmds"},,
 				// 	"display_result": "", "download_file": "",
 				// 	"inputs": []interface{}{
@@ -127,7 +128,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 		},
 				// 	},
 				// },
-				map[string]interface{}{"componet_name": "cmd", "componet_help": "cmd", "template": "componet",
+				map[string]interface{}{"name": "cmd", "help": "cmd", "template": "componet",
 					"componet_ctx": "cli.shy", "componet_cmd": "source", "arguments": []interface{}{"@cmd"},
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "cmd", "value": "",
@@ -135,7 +136,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						},
 					},
 				},
-				map[string]interface{}{"componet_name": "ctx", "componet_help": "ctx", "template": "componet",
+				map[string]interface{}{"name": "ctx", "help": "ctx", "template": "componet",
 					"componet_ctx": "cli.shy", "componet_cmd": "context", "arguments": []interface{}{"@ctx", "list"},
 					"display_result": "",
 					"inputs": []interface{}{
@@ -143,7 +144,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						map[string]interface{}{"type": "button", "value": "refresh"},
 					},
 				},
-				// map[string]interface{}{"componet_name": "ccc", "componet_help": "ccc", "template": "componet",
+				// map[string]interface{}{"name": "ccc", "help": "ccc", "template": "componet",
 				// 	"componet_ctx": "cli.shy", "componet_cmd": "context", "arguments": []interface{}{"@current_ctx", "@ccc"},
 				// 	"display_result": "",
 				// 	"inputs": []interface{}{
@@ -157,21 +158,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
 				// 	},
 				// },
-				// map[string]interface{}{"componet_name": "cmd", "componet_help": "cmd", "template": "componet",
+				// map[string]interface{}{"name": "cmd", "help": "cmd", "template": "componet",
 				// 	"componet_ctx": "cli.shy", "componet_cmd": "context", "arguments": []interface{}{"@current_ctx", "cmd", "list"},
 				// 	"pre_run": true, "display_result": "",
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
 				// 	},
 				// },
-				// map[string]interface{}{"componet_name": "history", "componet_help": "history", "template": "componet",
+				// map[string]interface{}{"name": "history", "help": "history", "template": "componet",
 				// 	"componet_ctx": "cli", "componet_cmd": "config", "arguments": []interface{}{"source_list"},
 				// 	"pre_run": true, "display_result": "",
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
 				// 	},
 				// },
-				// map[string]interface{}{"componet_name": "develop", "componet_help": "develop", "template": "componet",
+				// map[string]interface{}{"name": "develop", "help": "develop", "template": "componet",
 				// 	"componet_ctx": "web.code", "componet_cmd": "config", "arguments": []interface{}{"counter"},
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
@@ -179,7 +180,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 	"pre_run":        true,
 				// 	"display_result": "",
 				// },
-				// map[string]interface{}{"componet_name": "windows", "componet_help": "windows", "template": "componet",
+				// map[string]interface{}{"name": "windows", "help": "windows", "template": "componet",
 				// 	"componet_ctx": "cli", "componet_cmd": "windows",
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
@@ -187,7 +188,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 	"pre_run":        true,
 				// 	"display_result": "",
 				// },
-				map[string]interface{}{"componet_name": "runtime", "componet_help": "runtime", "template": "componet",
+				map[string]interface{}{"name": "runtime", "help": "runtime", "template": "componet",
 					"componet_ctx": "cli", "componet_cmd": "runtime",
 					"inputs": []interface{}{
 						map[string]interface{}{"type": "button", "value": "refresh"},
@@ -195,7 +196,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"pre_run":        true,
 					"display_result": "",
 				},
-				// map[string]interface{}{"componet_name": "sysinfo", "componet_help": "sysinfo", "template": "componet",
+				// map[string]interface{}{"name": "sysinfo", "help": "sysinfo", "template": "componet",
 				// 	"componet_ctx": "cli", "componet_cmd": "sysinfo",
 				// 	"inputs": []interface{}{
 				// 		map[string]interface{}{"type": "button", "value": "refresh"},
@@ -203,9 +204,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 	"pre_run":        true,
 				// 	"display_result": "",
 				// },
-				map[string]interface{}{"componet_name": "tail", "template": "tail"},
+				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
 		}, Help: "组件列表"},
+		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
+			"file": map[string]interface{}{
+				"init_shy": "etc/init0.shy",
+				"exit_shy": "etc/exit.shy",
+				"bench":    "bin/bench",
+			},
+		}, Help: "日志地址"},
 	},
 	Commands: map[string]*ctx.Command{
 		"/counter": &ctx.Command{Name: "/counter", Help: "/counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -231,6 +239,30 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			if len(arg) > 1 {
 				m.Copy(m.Spawn().Cmd("get", m.Conf("counter_service"), "name", arg[0], "count", arg[1]), "result")
 			}
+			return
+		}},
+		"/upgrade/": &ctx.Command{Name: "/upgrade/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
+			p := m.Cmdx("nfs.path", key)
+			m.Log("info", "upgrade %s %s", p, m.Cmdx("aaa.hash", "file", p))
+			http.ServeFile(w, r, p)
+			return
+		}},
+		"upgrade": &ctx.Command{Name: "upgrade system|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 && arg[0] == "system" {
+				m.Cmd("cli.source", m.Conf("exit.shy"))
+
+				m.Confm("upgrade", "file", func(key string, value string) {
+					m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", key), "save", value)
+				})
+
+				m.Cmd("cli.system", "chmod", "u+x", "bin/bench")
+				// os.Exit(1)
+				return
+			}
+
+			m.Cmdy("web.get", "dev", fmt.Sprintf("code/upgrade/script/%s", arg[0]), "save", fmt.Sprintf("usr/script/%s", arg[0]), arg[1:])
 			return
 		}},
 	},

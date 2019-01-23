@@ -35,7 +35,7 @@ function save_clipboard(item) {
         alert("保存成功")
     })
 }
-function copy_to_clipboard(text, skip_blur, skip_docker) {
+function copy_to_clipboard(text, skip_blur, skip_toolkit) {
     var clipboard = modify_node(".clipboard", {"value": text})
     if (skip_blur) {
         document.execCommand("copy")
@@ -49,7 +49,7 @@ function copy_to_clipboard(text, skip_blur, skip_docker) {
     insert_child(clipstack, "option").value = text
     clipstack.childElementCount > 3 && clipstack.removeChild(clipstack.lastElementChild)
 
-    if (skip_docker) {
+    if (skip_toolkit) {
         return
     }
 
@@ -766,7 +766,7 @@ function init_command() {
         }
     }
 }
-function init_docker() {
+function init_toolkit() {
     text = JSON.parse(bench_data.clipstack || "[]")
     for (var i = 0; i < text.length; i++) {
         copy_to_clipboard(text[i])
@@ -775,8 +775,8 @@ function init_docker() {
 
     document.querySelectorAll("div.workflow").forEach(function(workflow) {
         // 移动面板
-        workflow.style.left = context.Cookie("docker_left")
-        workflow.style.top = context.Cookie("docker_top")
+        workflow.style.left = context.Cookie("toolkit_left")
+        workflow.style.top = context.Cookie("toolkit_top")
         var moving = false, left0 = 0, top0 = 0, x0 = 0, y0 = 0
         workflow.onclick = function(event) {
             if (event.target != workflow) {
@@ -794,25 +794,25 @@ function init_docker() {
             if (moving) {
                 workflow.style.left = (left0+(event.clientX-x0))+"px"
                 workflow.style.top = (top0+(event.clientY-y0))+"px"
-                context.Cookie("docker_left", workflow.style.left)
-                context.Cookie("docker_top", workflow.style.top)
+                context.Cookie("toolkit_left", workflow.style.left)
+                context.Cookie("toolkit_top", workflow.style.top)
             }
         }
 
         // 固定面板
-        if (context.Cookie("docker_class")) {
-            workflow.className = context.Cookie("docker_class")
+        if (context.Cookie("toolkit_class")) {
+            workflow.className = context.Cookie("toolkit_class")
         }
         var head = workflow.querySelector("div")
         head.onclick = function(event) {
             head.dataset["show"] = !right(head.dataset["show"])
             workflow.className = right(head.dataset["show"])? "workflow max": "workflow"
-            context.Cookie("docker_class", workflow.className)
+            context.Cookie("toolkit_class", workflow.className)
         }
 
         // 折叠目录
-        var docker = workflow.querySelector("ul.docker")
-        docker.querySelectorAll("li>div").forEach(function(menu) {
+        var toolkit = workflow.querySelector("ul.toolkit")
+        toolkit.querySelectorAll("li>div").forEach(function(menu) {
             menu.onclick = function(event) {
                 menu.dataset["hide"] = !right(menu.dataset["hide"])
                 menu.nextElementSibling.style.display = right(menu.dataset["hide"])? "none": ""
@@ -820,7 +820,7 @@ function init_docker() {
         })
 
         // 事件
-        docker.querySelectorAll("li>ul>li").forEach(function(item) {
+        toolkit.querySelectorAll("li>ul>li").forEach(function(item) {
             // if (bench_data.board["key"] == item.dataset["key"]) {
             //     // item.className = "stick"
             // }
@@ -881,7 +881,7 @@ function init_docker() {
                             "cmd": "aaa.work "+context.Search("bench")+" delete",
                         })
                         var b = ""
-                        document.querySelectorAll("div.workflow>ul.docker>li>ul.fly>li[data-key]").forEach(function(item){
+                        document.querySelectorAll("div.workflow>ul.toolkit>li>ul.fly>li[data-key]").forEach(function(item){
                             if (!b && item.dataset["key"] != context.Search("bench")) {
                                 b = item.dataset["key"]
                             }
@@ -914,6 +914,6 @@ window.onload = function() {
 
     init_context()
     init_command()
-    init_docker()
+    init_toolkit()
 }
 

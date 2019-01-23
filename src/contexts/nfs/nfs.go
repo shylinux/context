@@ -177,6 +177,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 	m.TryCatch(m, true, func(m *ctx.Message) {
 		scroll_count := 0
+		scroll_lines := m.Confi("term", "scroll_lines")
 		which := m.Capi("ninput")
 		what := make([]rune, 0, 1024)
 		rest := make([]rune, 0, 1024)
@@ -315,11 +316,11 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 				case termbox.KeyCtrlT:
 					m.Option("scroll", true)
-					nfs.Term(m, "scroll", 1).Term(m, "flush")
+					nfs.Term(m, "scroll", scroll_lines).Term(m, "flush")
 					m.Option("scroll", false)
 				case termbox.KeyCtrlO:
 					m.Option("scroll", true)
-					nfs.Term(m, "scroll", -1).Term(m, "flush")
+					nfs.Term(m, "scroll", -scroll_lines).Term(m, "flush")
 					m.Option("scroll", false)
 
 				case termbox.KeyCtrlJ, termbox.KeyEnter:
@@ -1010,6 +1011,9 @@ func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
 		}
 	case m.Source():
 	}
+	if nfs.Name == "stdio" {
+		return false
+	}
 	return true
 }
 
@@ -1025,6 +1029,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"cursor_x": 0, "cursor_y": 0, "fgcolor": -1, "bgcolor": -1,
 			"prompt": "", "wrap": "false",
 			"scroll_count": "5",
+			"scroll_lines": "5",
 			"begin_row":    0, "begin_col": 0,
 
 			"shadow":      "hello",
@@ -1400,6 +1405,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 			m.Set("append").Add("append", "directory", p)
 			m.Set("result").Echo(p)
+			return
+		}},
+		"json": &ctx.Command{Name: "json str", Help: "导入数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			var data interface{}
+			m.Assert(json.Unmarshal([]byte(arg[0]), &data))
+			b, e := json.MarshalIndent(data, "", "  ")
+			m.Assert(e)
+			m.Echo(string(b))
 			return
 		}},
 

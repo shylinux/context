@@ -125,6 +125,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				names := strings.SplitN(arg[0], ".", 2)
 				if names[0] == "" { // 本地执行
 					host := m.Confm("host", m.Option("hostname"))
+					m.Option("current_ctx", kit.Format(host["cm_target"]))
 
 					msg := m.Find(kit.Format(host["cm_target"])).Cmd(arg[1:])
 					m.Copy(msg, "append").Copy(msg, "result")
@@ -148,19 +149,19 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				if names[0] == "*" {
 					m.Confm("host", func(name string, host map[string]interface{}) {
 						m.Find(kit.Format(host["module"]), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
-							return m.Copy(sub)
+							return m.Copy(sub, "append").Copy(sub, "result")
 						}, "send", "", arg)
 					})
 
 				} else if m.Confm("host", names[0], func(host map[string]interface{}) {
 					m.Find(kit.Format(host["module"]), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
-						return m.Copy(sub)
+						return m.Copy(sub, "append").Copy(sub, "result")
 					}, "send", rest, arg)
 					m.Log("fuck", "m %v", m.Meta)
 
 				}) == nil {
 					m.Find(m.Cap("stream"), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
-						return m.Copy(sub)
+						return m.Copy(sub, "append").Copy(sub, "result")
 					}, "send", strings.Join(names, "."), arg)
 				}
 			}
@@ -181,6 +182,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 
 			msg := m.Cmd("ssh.remote", m.Conf("current"), arg)
+			m.Copy(msg, "append")
 			m.Copy(msg, "result")
 			return
 		}},

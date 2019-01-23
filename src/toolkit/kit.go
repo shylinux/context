@@ -434,6 +434,9 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 
 	return root
 }
+func Link(name string, url string) string {
+	return fmt.Sprintf("<a href=\"%s\" target=\"_blank\">%s</a>", url, name)
+}
 
 func Duration(arg ...string) time.Duration {
 	d, _ := time.ParseDuration(arg[0])

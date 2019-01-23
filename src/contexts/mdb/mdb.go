@@ -70,7 +70,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
 	},
 	Commands: map[string]*ctx.Command{
-		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1, "limit": 1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 2 { // 添加数据
 				if temp := m.Confm("temp", arg[0]); temp == nil {
 					h := m.Cmdx("aaa.hash", arg[0], arg[1])
@@ -124,6 +124,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 								m.Confv("temp", []string{h, "data"}, msg.Meta)
 							}
 							temp = view
+						} else if arg[0] == "hash" { //  添加缓存
+							m.Echo(hash)
 						} else if arg[0] == "" { //  添加缓存
 							b, _ := json.MarshalIndent(temp["data"], "", "  ")
 							m.Echo(string(b))
@@ -148,7 +150,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						chain := strings.Join(m.Optionv("select").([]string), " ")
 						hh := m.Cmdx("aaa.hash", "select", chain, h)
 
-						if view := m.Confm("temp", hh); view != nil { // 加载缓存
+						if view := m.Confm("temp", hh); view != nil && false { // 加载缓存
 							msg = msg.Spawn()
 							switch data := view["data"].(type) {
 							case map[string][]string:

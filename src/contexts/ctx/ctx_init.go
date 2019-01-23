@@ -595,16 +595,16 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 						for _, v := range cs {
 							if msg.target = v; v == nil {
-								m.Add("append", "name", "")
+								m.Add("append", "names", "")
 								m.Add("append", "ctx", "")
 								m.Add("append", "msg", "")
 								m.Add("append", "status", "")
 								m.Add("append", "stream", "")
-								m.Add("append", "help", "")
+								m.Add("append", "helps", "")
 								continue
 							}
 
-							m.Add("append", "name", msg.target.Name)
+							m.Add("append", "names", msg.target.Name)
 							if msg.target.context != nil {
 								m.Add("append", "ctx", msg.target.context.Name)
 							} else {
@@ -613,7 +613,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							m.Add("append", "msg", msg.target.message.code)
 							m.Add("append", "status", msg.Cap("status"))
 							m.Add("append", "stream", msg.Cap("stream"))
-							m.Add("append", "help", msg.target.Help)
+							m.Add("append", "helps", msg.target.Help)
 						}
 
 					case "spawn":
@@ -944,6 +944,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 		"trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			value, arg := m.Optionv(arg[0]), arg[1:]
+			if v, ok := value.(string); ok {
+				json.Unmarshal([]byte(v), &value)
+			}
 
 			view := "data"
 			if len(arg) > 0 {
@@ -953,10 +956,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				}
 			}
 
-			limit := m.Confi("page_limit")
+			limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
 			if len(arg) > 0 && arg[0] == "limit" {
 				limit, arg = kit.Int(arg[1]), arg[2:]
 			}
+			m.Log("fuck", "trans limt %v", limit)
 
 			chain := strings.Join(arg, ".")
 			if chain != "" {
@@ -1090,7 +1094,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			return
 		}},
 		"select": &Command{Name: "select key value field",
-			Form: map[string]int{"parse": 2, "hide": 1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
+			Form: map[string]int{"eq": 2, "parse": 2, "hide": -1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 				msg := m.Set("result").Spawn()
 
@@ -1160,24 +1164,28 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				for _, k := range m.Meta["hide"] {
 					hides[k] = true
 				}
+				if len(arg) == 0 {
+					arg = append(arg, m.Meta["append"]...)
+				}
 				for i := 0; i < nrow; i++ {
-					if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
-						for _, k := range m.Meta["append"] {
-							if hides[k] {
-								continue
-							}
-							msg.Add("append", k, m.Meta[k][i])
+					// if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
+					if m.Has("eq") {
+						if m.Meta[m.Meta["eq"][0]][i] != m.Meta["eq"][1] {
+							continue
 						}
 					}
+					for _, k := range arg {
+						if hides[k] {
+							continue
+						}
+						msg.Add("append", k, m.Meta[k][i])
+					}
 				}
-
-				// 选择列
-				if m.Option("fields") != "" {
-					msg = m.Spawn()
-					m.Hand = true
-					msg.Copy(m, strings.Split(strings.Join(m.Meta["fields"], " "), " ")...)
-					m.Hand = false
-					m.Set("append").Copy(msg, "append")
+				if len(msg.Meta["append"]) == 0 {
+					return
+				}
+				if len(msg.Meta[msg.Meta["append"][0]]) == 0 {
+					return
 				}
 
 				// 聚合
@@ -1235,18 +1243,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 				// 排序
 				if m.Has("order") {
-					m.Sort(m.Meta["order"][1], m.Option("order"))
+					m.Sort(m.Option("order"), kit.Select("str", m.Meta["order"], 1))
 				}
 
 				// 分页
-				offset := 0
-				limit := m.Confi("page_limit")
-				if m.Has("limit") {
-					limit = m.Optioni("limit")
-				}
-				if m.Has("offset") {
-					offset = m.Optioni("offset")
-				}
+				offset := kit.Int(kit.Select("0", m.Option("offset")))
+				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
+
 				nrow = len(m.Meta[m.Meta["append"][0]])
 				if offset > nrow {
 					offset = nrow
@@ -1295,12 +1298,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				}
 
 				// 取单值
-				if len(arg) > 2 {
-					if len(m.Meta[arg[2]]) > 0 {
-						m.Echo(m.Meta[arg[2]][0])
-					}
-					return
-				}
+				// if len(arg) > 2 {
+				// 	if len(m.Meta[arg[2]]) > 0 {
+				// 		m.Echo(m.Meta[arg[2]][0])
+				// 	}
+				// 	return
+				// }
 
 				m.Set("result").Table()
 				return
