@@ -174,6 +174,6 @@ function! BenchCode(cmd, arg)
     exe "silent !bench " l:line
 endfunction
 
-autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
-autocmd BufWritePost * call BenchCode("counter", ["nsave", 1])
+" autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
+" autocmd BufWritePost * call BenchCode("counter", ["nsave", 1])
 "}}}
