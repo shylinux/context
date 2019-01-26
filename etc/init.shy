@@ -2,8 +2,10 @@
     remote listen :9090
 ~aaa
     role tech componet index command source
+    role tech componet index command context
+
+    role tech componet source command nfs.pwd ls
+
     user tech shy shy
 ~web
     serve
-
-~aaa

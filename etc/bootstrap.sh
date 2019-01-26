@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 
-bench=bin/bench.win64.exe
-[ `uname` = "Darwin" ] && bench=bin/bench.darwin
-[ `uname` = "Linux" ] && bench=bin/bench.linux64
-[ -e "$bench" ] || bench=bench
+bench=bench
+[ -e bin/bench ] && bench=bin/bench
 
 echo "bench: $bench"> var/boot.log
 
 while true; do
-    $bench stdio 2>var/error.log && break
+    $bench 2>var/error.log && break
     echo "bench run error"
     echo "restarting..."
     sleep 3
