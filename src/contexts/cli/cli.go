@@ -139,7 +139,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			// 解析脚本文件
-			if p := m.Cmdx("nfs.path", arg[0]); p != "" {
+			if p := m.Cmdx("nfs.path", arg[0]); p != "" && strings.Contains(p, ".") {
 				arg[0] = p
 				switch path.Ext(p) {
 				case "":

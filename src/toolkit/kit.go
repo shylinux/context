@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -37,17 +38,46 @@ func Int(arg ...interface{}) int {
 		switch val := v.(type) {
 		case int:
 			result += val
-		case bool:
-			if val {
-				result += 1
-			}
+		case int8:
+			result += int(val)
+		case int16:
+			result += int(val)
+		// case int32:
+		// 	result += int(val)
+		case int64:
+			result += int(val)
+		// case uint8:
+		// 	result += int(val)
+		case uint16:
+			result += int(val)
+		case uint32:
+			result += int(val)
+		case uint64:
+			result += int(val)
+		case float64:
+			result += int(val)
+		case byte: // uint8
+			result += int(val)
+		case rune: // int32
+			result += int(val)
 		case string:
 			if i, e := strconv.Atoi(val); e == nil {
 				result += i
 			}
+		case bool:
+			if val {
+				result += 1
+			}
 		case time.Time:
 			result += int(val.Unix())
-		default:
+		case []string:
+			result += len(val)
+		case map[string]string:
+			result += len(val)
+		case []interface{}:
+			result += len(val)
+		case map[string]interface{}:
+			result += len(val)
 		}
 	}
 	return result
@@ -64,12 +94,19 @@ func Right(arg ...interface{}) bool {
 			switch val {
 			case "", "0", "false", "off", "no", "error: ":
 				result = result || false
-				break
 			default:
 				result = result || true
 			}
 		case error:
 			result = result || false
+		case []string:
+			result = result || len(val) > 0
+		case map[string]string:
+			result = result || len(val) > 0
+		case []interface{}:
+			result = result || len(val) > 0
+		case map[string]interface{}:
+			result = result || len(val) > 0
 		default:
 			result = result || val != nil
 		}
@@ -82,28 +119,28 @@ func Format(arg ...interface{}) string {
 		switch val := v.(type) {
 		case nil:
 			result = result[:0]
-		case uint, uint8, uint16, uint32, uint64:
-			result = append(result, fmt.Sprintf("%d", val))
 		case int, int8, int16, int32, int64:
 			result = append(result, fmt.Sprintf("%d", val))
+		case uint, uint8, uint16, uint32, uint64:
+			result = append(result, fmt.Sprintf("%d", val))
+		case float64:
+			result = append(result, fmt.Sprintf("%d", int(val)))
 		case bool:
 			result = append(result, fmt.Sprintf("%t", val))
 		case string:
 			result = append(result, val)
-		case []string:
-			result = append(result, val...)
 		case []rune:
 			result = append(result, string(val))
-		case float64:
-			result = append(result, fmt.Sprintf("%d", int(val)))
+		case []string:
+			result = append(result, val...)
+		case time.Time:
+			result = append(result, fmt.Sprintf("%s", val.Format("2006-01-02 15:03:04")))
 		case *os.File:
 			if s, e := val.Stat(); e == nil {
 				result = append(result, fmt.Sprintf("%T [name: %s]", v, s.Name()))
 			} else {
 				result = append(result, fmt.Sprintf("%T", v))
 			}
-		case time.Time:
-			result = append(result, fmt.Sprintf("%d", val.Format("2006-01-02 15:03:04")))
 		// case error:
 		// 	result = append(result, fmt.Sprintf("%v", val))
 		default:
@@ -138,14 +175,14 @@ func Formats(arg ...interface{}) string {
 		// 		result = append(result, Format(v))
 		// 	}
 		default:
-			if b, e := json.MarshalIndent(val, "  ", "  "); e == nil {
-				Log("fuck", "what %v", b)
+			if b, e := json.MarshalIndent(val, "", "  "); e == nil {
 				result = append(result, string(b))
 			}
 		}
 	}
 	return strings.Join(result, " ")
 }
+
 func Trans(arg ...interface{}) []string {
 	ls := []string{}
 	for _, v := range arg {
@@ -393,6 +430,9 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 						return value[key] // 读取数据
 					}
 					value[key] = args[i+1] // 修改数据
+					if !Right(args[i+1]) {
+						delete(value, key)
+					}
 				}
 				next = value[key]
 			case []interface{}:
@@ -434,29 +474,9 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 
 	return root
 }
+
 func Link(name string, url string) string {
 	return fmt.Sprintf("<a href=\"%s\" target=\"_blank\">%s</a>", url, name)
-}
-
-func Duration(arg ...string) time.Duration {
-	d, _ := time.ParseDuration(arg[0])
-	return d
-}
-
-func Action(cmd string, arg ...interface{}) string {
-	switch cmd {
-	case "time":
-		return Format(time.Now())
-	case "rand":
-		return Format(rand.Int())
-	case "uniq":
-		return Format(time.Now(), rand.Int())
-	default:
-		if len(arg) > 0 {
-			return Format(arg...)
-		}
-	}
-	return cmd
 }
 func Time(arg ...string) int {
 	if len(arg) == 0 {
@@ -480,14 +500,9 @@ func Time(arg ...string) int {
 	}
 	return 0
 }
-func Hash(arg ...interface{}) (string, []string) {
-	meta := Trans(arg...)
-	for i, v := range meta {
-		meta[i] = Action(v)
-	}
-
-	h := md5.Sum([]byte(strings.Join(meta, "")))
-	return hex.EncodeToString(h[:]), meta
+func Duration(arg ...string) time.Duration {
+	d, _ := time.ParseDuration(arg[0])
+	return d
 }
 func FileName(name string, meta ...string) string {
 	result, app := strings.Split(name, "."), ""
@@ -503,19 +518,18 @@ func FileName(name string, meta ...string) string {
 			result = append(result, "_", time.Now().Format("0102"))
 		case "time":
 			result = append(result, "_", time.Now().Format("2006_0102_1504"))
+		case "rand":
+			result = append(result, "_", Format(rand.Int()))
+		case "uniq":
+			result = append(result, "_", Format(Time()))
+			result = append(result, "_", Format(rand.Int()))
 		}
 	}
+
 	if app != "" {
 		result = append(result, ".", app)
 	}
 	return strings.Join(result, "")
-}
-
-func Check(e error) bool {
-	if e != nil {
-		panic(e)
-	}
-	return true
 }
 func FmtSize(size uint64) string {
 	if size > 1<<30 {
@@ -546,6 +560,48 @@ func FmtNano(nano int64) string {
 	}
 
 	return fmt.Sprintf("%dns", nano)
+}
+
+func Hash(arg ...interface{}) (string, []string) {
+	args := []string{}
+	for _, v := range Trans(arg...) {
+		switch v {
+		case "time":
+			args = append(args, Format(time.Now()))
+		case "rand":
+			args = append(args, Format(rand.Int()))
+		case "uniq":
+			args = append(args, Format(time.Now()))
+			args = append(args, Format(rand.Int()))
+		default:
+			if s, e := os.Stat(v); e == nil && !s.IsDir() {
+				if f, e := os.Open(v); e == nil {
+					defer f.Close()
+					m := md5.New()
+					io.Copy(m, f)
+					h := m.Sum(nil)
+					args = append(args, hex.EncodeToString(h[:]))
+					break
+				}
+			}
+			args = append(args, v)
+		}
+	}
+
+	h := md5.Sum([]byte(strings.Join(args, "")))
+	return hex.EncodeToString(h[:]), args
+}
+
+func Block(root interface{}, args ...interface{}) interface{} {
+
+	return root
+}
+
+func Check(e error) bool {
+	if e != nil {
+		panic(e)
+	}
+	return true
 }
 func DirWalk(file string, hand func(file string)) {
 	s, e := os.Stat(file)

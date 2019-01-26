@@ -55,6 +55,18 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return tcp
 }
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
+	if arg[1] == "consul" {
+		arg[1] = m.Cmdx("web.get", "", arg[2], "temp", "hostport.0")
+		if arg[1] == "" {
+			return true
+		}
+		for i := 2; i < len(arg)-1; i++ {
+			arg[i] = arg[i+1]
+		}
+		if len(arg) > 2 {
+			arg = arg[:len(arg)-1]
+		}
+	}
 	m.Cap("address", m.Confx("address", arg, 1))
 	m.Cap("security", m.Confx("security", arg, 2))
 	m.Cap("protocol", m.Confx("protocol", arg, 3))
@@ -115,6 +127,10 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 
 		m.Log("info", "%d listen %v", m.Capi("nlisten"),
 			m.Cap("stream", fmt.Sprintf("%s", tcp.Addr())))
+
+		addr := strings.Split(tcp.Addr().String(), ":")
+		m.Log("fuck", "what %v", addr)
+		m.Back(m.Spawn(m.Source()).Add("option", "hostport", fmt.Sprintf("%s:%s", m.Cmd("tcp.ifconfig", "eth0").Append("ip"), addr[len(addr)-1])))
 	}
 
 	for {
@@ -151,6 +167,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 		"nclient": &ctx.Cache{Name: "nclient", Value: "0", Help: "连接数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"":         &ctx.Config{Name: "address", Value: ":9090", Help: "网络地址"},
 		"address":  &ctx.Config{Name: "address", Value: ":9090", Help: "网络地址"},
 		"security": &ctx.Config{Name: "security(true/false)", Value: "false", Help: "加密通信"},
 		"protocol": &ctx.Config{Name: "protocol(tcp/tcp4/tcp6)", Value: "tcp4", Help: "网络协议"},
@@ -185,19 +202,22 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 			}
 			return
 		}},
-		"ifconfig": &ctx.Command{Name: "ifconfig", Help: "网络配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"ifconfig": &ctx.Command{Name: "ifconfig [name]", Help: "网络配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if ifs, e := net.Interfaces(); m.Assert(e) {
 				for _, v := range ifs {
 
 					if ips, e := v.Addrs(); m.Assert(e) {
 						for _, x := range ips {
-							ip := x.String()
+							ip := strings.Split(x.String(), "/")
 
-							if !strings.Contains(ip, ":") && len(ip) > 0 && len(v.HardwareAddr) > 0 {
+							if !strings.Contains(ip[0], ":") && len(ip) > 0 && len(v.HardwareAddr) > 0 {
+								if len(arg) > 0 && !strings.Contains(v.Name, arg[0]) {
+									continue
+								}
 								m.Add("append", "index", v.Index)
 								m.Add("append", "name", v.Name)
 								m.Add("append", "hard", v.HardwareAddr)
-								m.Add("append", "ip", ip)
+								m.Add("append", "ip", ip[0])
 							}
 						}
 					}

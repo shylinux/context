@@ -89,6 +89,9 @@ func Merge(m *ctx.Message, client map[string]interface{}, uri string, arg ...str
 }
 
 func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) bool {
+	if msg.Confs("skip_login", msg.Option("path")) {
+		return true
+	}
 	if msg.Confs("login", "cas_url") && !msg.Confs("login", "skip_cas") {
 		if !cas.IsAuthenticated(r) {
 			r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
@@ -103,11 +106,13 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		}
 
 		if msg.Options("ticket") {
+			msg.Log("fuck", "what %v", msg.Meta)
 			msg.Option("uuid", msg.Option(msg.Conf("login", "cas_uuid")))
 			msg.Option("username", cas.Username(r))
 			if lark := msg.Find("web.chat.lark"); lark != nil {
 				msg.Option("username", lark.Cmdx("user", msg.Option("email"), "id"))
 			}
+			msg.Log("fuck", "what %v", msg.Meta)
 
 			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("web.session", "login", "uuid"), Path: "/"})
 			http.Redirect(w, r, merge(msg, r.Header.Get("index_url"), "ticket", ""), http.StatusTemporaryRedirect)
@@ -120,6 +125,9 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 			w.WriteHeader(http.StatusUnauthorized)
 		}
 		return false
+	}
+	if !msg.Options("current_ctx") {
+		http.SetCookie(w, &http.Cookie{Name: "current_ctx", Value: msg.Option("current_ctx", "mdb"), Path: "/"})
 	}
 	return true
 }
@@ -499,7 +507,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 					}
 
-					m.Log("info", "%s %s", method, uri)
 					req, e := http.NewRequest(method, uri, body)
 					m.Assert(e)
 					m.Log("info", "%s %s", req.Method, req.URL)
@@ -789,7 +796,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			switch arg[0] {
 			case "login":
-				if len(arg) == 1 {
+				if len(arg) == 1 { // 查询用户
 					m.Echo(m.Cmd("aaa.sess", sessid, "username").Append("meta"))
 					break
 				}
@@ -797,25 +804,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if username == "" || !m.Options(arg[1]) {
 					break
 				}
-				if sessid == "" || !m.Cmds("aaa.sess", sessid) {
+				if sessid == "" || !m.Cmds("aaa.sess", sessid) { // 创建会话
 					sessid = m.Cmdx("aaa.sess", "web", "ip", m.Option("remote_ip"))
 				}
-				if m.Cmds("aaa.sess", sessid, m.Option("username"), arg[1], m.Option(arg[1])) {
+				if m.Cmds("aaa.sess", sessid, m.Option("username"), arg[1], m.Option(arg[1])) { // 用户登录
 					m.Echo(sessid)
 				}
 
 			case "bench":
-				if len(arg) == 1 {
+				if len(arg) == 1 { // 创建空间
 					bench := m.Option("bench")
-					if bench == "" || !m.Cmds("aaa.work", bench) { // 创建空间
-						bench = m.Cmdx("aaa.work", sessid, "create", "web")
+					if bench == "" || !m.Cmds("aaa.work", bench) {
+						bench = m.Cmdx("aaa.work", sessid, "web")
 					}
 					m.Echo(bench)
 					break
 				}
+				// 添加数据
 				m.Cmd("aaa.work", arg[1:])
 
-			case "check":
+			case "check": // 检查权限
 				m.Echo(m.Cmdx("aaa.work", arg[1], "right", arg[2:]))
 			}
 			return
@@ -928,6 +936,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 									msg.Add("option", value["name"].(string), value["value"])
 								}
 							}
+						}
+
+						if m.Options("sessid") {
+							m.Magic("session", "what", 1)
+							m.Log("fuck", "what %v", m.Magic("bench", "what"))
+							m.Magic("bench", "what", 2)
+							m.Log("fuck", "what %v", m.Magic("bench", "what"))
 						}
 
 						// 执行命令

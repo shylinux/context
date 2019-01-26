@@ -13,11 +13,9 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 	"toolkit"
@@ -129,6 +127,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			"userrole": map[string]interface{}{"public": true},
 			"password": map[string]interface{}{"secrete": true, "single": true},
 			"uuid":     map[string]interface{}{"secrete": true, "single": true},
+			"ppid":     map[string]interface{}{"secrete": true, "single": true},
 		}, Help: "散列"},
 
 		"secrete_key": &ctx.Config{Name: "secrete_key", Value: map[string]interface{}{"password": 1, "uuid": 1}, Help: "私钥文件"},
@@ -138,37 +137,13 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"key":         &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
-		"hash": &ctx.Command{Name: "hash type data... time rand", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"hash": &ctx.Command{Name: "hash [meta...]", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "hash")
 				return
 			}
 
-			if arg[0] == "file" {
-				if f, e := os.Open(arg[1]); e == nil {
-					hash := md5.New()
-					io.Copy(hash, f)
-					h := hash.Sum(nil)
-					arg[1] = hex.EncodeToString(h[:])
-				}
-			}
-
-			meta := []string{}
-			for _, v := range arg {
-				switch v {
-				case "time":
-					v = time.Now().Format(m.Conf("time_format"))
-				case "rand":
-					v = fmt.Sprintf("%d", rand.Int())
-				case "":
-					continue
-				}
-				meta = append(meta, v)
-			}
-
-			h := md5.Sum(Input(strings.Join(meta, "")))
-			hs := hex.EncodeToString(h[:])
-
+			hs, meta := kit.Hash(arg)
 			m.Log("info", "%s: %v", hs, meta)
 			m.Confv("hash", hs, meta)
 			m.Echo(hs)
@@ -322,7 +297,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								m.Add("append", "create_time", node["create_time"])
 							}
 						})
-						m.Table()
+						m.Set("result").Table()
 						break
 					} else if i == len(arg)-1 { // 读取链接
 						if p == "" {
@@ -349,8 +324,22 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								}
 							})
 						}
-						m.Table()
+						m.Set("result").Table()
 						return
+					} else if i == len(arg)-2 {
+						if p != "" && arg[i] == "session" {
+							m.Confm("auth", []string{p, "ship"}, func(k string, ship map[string]interface{}) {
+								if node := m.Confm("auth", k); ship["type"].(string) == arg[i] && (ship["meta"] == arg[i+1] || strings.HasSuffix(k, arg[i+1]) || strings.HasPrefix(k, arg[i+1])) {
+									m.Add("append", "key", k)
+									m.Add("append", "ship", ship["ship"])
+									m.Add("append", "type", node["type"])
+									m.Add("append", "meta", node["meta"])
+									m.Add("append", "create_time", node["create_time"])
+								}
+							})
+							m.Set("result").Table()
+							return
+						}
 					}
 
 					if arg[i] == "check" {
@@ -382,6 +371,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					h := m.Cmdx("aaa.hash", meta)
 					if !m.Confs("auth", h) {
 						if m.Confs("auth_type", []string{arg[i], "single"}) && m.Cmds("aaa.auth", p, arg[i]) {
+							m.Set("result")
 							return // 单点认证失败
 						}
 
@@ -396,12 +386,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					if p != "" { // 创建父链接
 						chain = append(chain, map[string]string{"node": p, "ship": "1", "hash": h, "type": arg[i], "meta": meta[1]})
 						chain = append(chain, map[string]string{"node": h, "ship": "0", "hash": p, "type": t, "meta": ""})
-					} else if t == "" && arg[i] == "session" {
-						defer func() { m.Set("result").Echo(h) }()
 					}
 
 					p, t, a = h, arg[i], meta[1]
-					m.Set("result").Echo(h)
+					m.Echo(h)
 				case "node": // 节点操作
 					if i > len(arg)-1 { // 查看节点
 						m.Cmdy("aaa.config", "auth", p)
@@ -462,30 +450,29 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}
 			return
 		}},
-		"role": &ctx.Command{Name: "role [name [[componet] componet [[command] command]]]", Help: "用户角色",
+		"role": &ctx.Command{Name: "role [name [[componet] name [[command] name]]]", Help: "用户角色",
 			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
 				switch len(arg) {
-				case 0:
+				case 0: // 查看角色
 					Auto(m, "ship", "userrole")
+				case 1: // 查看组件
+					Auto(m, "ship", "userrole", arg[0], "componet")
+				case 2: // 查看功能
+					Auto(m, "ship", "userrole", arg[0], "componet", arg[1], "command")
 				}
 				return true
 			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				switch len(arg) {
-				case 0:
+				case 0: // 查看角色
 					m.Cmdy("aaa.auth", "ship", "userrole")
-				case 1:
+				case 1: // 查看组件
 					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet")
-				case 2:
-					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "commond")
-				case 3:
-					if arg[1] == "componet" {
-						m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2])
-					} else {
-						m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "commond", arg[2])
-					}
-				case 4:
-				default:
+				case 2: // 查看功能
+					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "command")
+				case 3: // 查看接口
+					m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[1], "command", arg[2], "componet")
+				default: // 添加接口
 					if arg[1] == "componet" && arg[3] == "command" {
 						for _, v := range arg[4:] {
 							m.Cmdy("aaa.auth", "ship", "userrole", arg[0], "componet", arg[2], "command", v)
@@ -497,82 +484,62 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"user": &ctx.Command{Name: "user [role username password] [username]", Help: "用户认证",
 			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
 				switch len(arg) {
-				case 0:
+				case 0: // 查看用户
 					Auto(m, "ship", "username")
+				case 1: // 查看会话
+					Auto(m, "ship", "username", arg[0], "session")
 				}
 				return true
 			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				switch len(arg) {
-				case 0:
+				case 0: // 查看用户
 					m.Cmdy("aaa.auth", "ship", "username")
-				case 1:
-					m.Cmd("aaa.auth", "ship", "username", arg[0], "userrole").CopyTo(m, "append")
-				case 3:
+				case 1: // 查看角色
+					m.Cmdy("aaa.auth", "ship", "username", arg[0], "userrole")
+				case 2: // 查看会话
+					m.Cmdy("aaa.auth", "ship", "username", arg[0], "session", arg[1])
+				case 3: // 用户认证
 					if m.Cmds("aaa.auth", "ship", "username", arg[0]) && (arg[1] == "password" || arg[1] == "uuid") {
 						m.Cmdy("aaa.auth", "username", arg[0], arg[1], arg[2])
 						break
 					}
 					fallthrough
-				default:
+				default: // 添加用户
 					for i := 1; i < len(arg); i += 2 {
-						if m.Cmd("aaa.auth", "ship", "username", arg[i], "userrole", arg[0]); i < len(arg)-1 {
+						if m.Cmdy("aaa.auth", "ship", "username", arg[i], "userrole", arg[0]); i < len(arg)-1 {
 							m.Cmd("aaa.auth", "ship", "username", arg[i], "password", arg[i+1])
 						}
 					}
 				}
 				return
 			}},
-		"sess": &ctx.Command{Name: "sess [sessid [username]]", Help: "会话管理",
+		"sess": &ctx.Command{Name: "sess [sessid [meta]|[username password password]]|[type ip ip]", Help: "会话管理",
 			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
 				switch len(arg) {
-				case 0:
+				case 0: // 查看会话
 					Auto(m, "ship", "session")
-				case 1:
-					m.Auto("username", "username", "查看用户")
-					m.Auto("userrole", "userrole", "查看角色")
-					m.Auto("bench", "bench", "查看空间")
-					m.Auto("ip", "ip", "查看设备")
-					m.Cmd("aaa.auth", arg[0], "ship", "username").Table(func(node map[string]string) {
-						m.Auto(node["meta"], node["type"], node["create_time"])
-					})
+				case 1: // 查看会话
+					Auto(m, "ship", "session", arg[0])
 				}
 				return true
 			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				switch len(arg) {
-				case 0:
+				case 0: // 查看会话
 					m.Cmdy("aaa.auth", "ship", "session")
-				case 1:
+				case 1: // 查看会话
 					m.Cmdy("aaa.auth", arg[0])
-
-				case 2:
-					switch arg[1] {
-					case "username", "ip", "bench":
-						m.Cmd("aaa.auth", arg[0], "ship", arg[1]).CopyTo(m, "append").Table()
-
-					case "userrole":
-						m.Cmd("aaa.auth", arg[0], "ship", "username").Table(func(user map[string]string) {
-							m.Cmd("aaa.user", user).Table(func(role map[string]string) {
-								m.Add("append", "username", user["meta"])
-								m.Add("append", "userrole", role["meta"])
-							})
-						})
-						m.Table()
-
-					default:
-						m.Cmd("aaa.auth", arg[0], "ship", "username", arg[1], "userrole").CopyTo(m, "append").Table()
-					}
-
-				case 3:
+				case 2: // 查询会话
+					m.Cmdy("aaa.auth", arg[0], "ship", arg[1])
+				case 3: // 创建会话
 					m.Cmdy("aaa.auth", "ship", "session", arg[0], arg[1], arg[2])
-
-				case 4:
+				case 4: // 用户登录
 					m.Cmdy("aaa.auth", arg[0], "ship", "username", arg[1], arg[2], arg[3])
 				}
 				return
 			}},
-		"work": &ctx.Command{Name: "work [sessid create|select]|[benchid] [right [userrole [componet name [command name [argument name]]]]]", Help: "工作任务",
+		"work": &ctx.Command{Name: "work [sessid create|select]|[benchid] [right [username [componet name [command name [argument name]]]]]", Help: "工作任务",
 			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (goon bool) {
 				switch len(arg) {
 				case 0:
@@ -601,65 +568,45 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return true
 			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if len(arg) == 0 {
+				if len(arg) == 0 { // 查看空间
 					m.Cmdy("aaa.auth", "ship", "bench")
 					return
 				}
 
 				bid := ""
 				switch m.Conf("auth", []string{arg[0], "type"}) {
-				case "session":
-					if len(arg) == 1 {
-						m.Confm("auth", []string{arg[0], "ship"}, func(key string, ship map[string]interface{}) {
-							m.Add("append", "key", key)
-							m.Add("append", "type", ship["type"])
-							m.Add("append", "meta", ship["meta"])
-							m.Add("append", "create_time", ship["create_time"])
-						})
-						m.Table()
-						return
-					}
-					switch arg[1] {
-					case "create":
-						bid, arg = m.Cmdx("aaa.auth", arg[0], "ship", "bench", arg[2]), arg[3:]
-						m.Cmd("aaa.auth", bid, "data", "name", "web")
-						defer func() { m.Set("result").Echo(bid) }()
-					case "select":
-						m.Cmd("aaa.auth", arg[0], "ship", "bench").Table(func(node map[string]string) {
-							if strings.Contains(node["meta"], arg[2]) || strings.HasPrefix(node["key"], arg[2]) || strings.HasSuffix(node["key"], arg[2]) {
-								bid = node["key"]
-							}
-						})
-						arg = arg[3:]
-					}
-				case "bench":
+				case "session": // 创建空间
+					bid, arg = m.Cmdx("aaa.auth", arg[0], "ship", "bench", arg[1]), arg[2:]
+					m.Cmd("aaa.auth", bid, "data", "name", "web")
+					defer func() { m.Set("result").Echo(bid) }()
+				case "bench": // 查询空间
 					bid, arg = arg[0], arg[1:]
 				default:
 					return
 				}
-
 				if len(arg) == 0 {
 					m.Echo(bid)
 					return
 				}
 
 				switch arg[0] {
-				case "delete":
+				case "delete": // 删除空间
 					m.Cmd("aaa.auth", bid, "delete", "node")
-				case "rename":
+				case "rename": // 命名空间
 					m.Cmd("aaa.auth", bid, "data", "name", arg[1])
-				case "right":
+				case "right": // 权限检查
 					m.Cmd("aaa.auth", "ship", "username", arg[1], "userrole").Table(func(node map[string]string) {
-						if node["meta"] == "root" {
+						if node["meta"] == "root" { // 超级用户
+							m.Log("info", "root %s", arg[1])
 							m.Echo("true")
-						} else if len(arg) >= 4 {
+						} else if len(arg) >= 4 { // 功能权限
 							if m.Cmds("aaa.auth", bid, "ship", "check", arg[3]) {
 								m.Echo("true")
 							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "componet", arg[2], "check", arg[3]); kit.Right(cid) {
 								m.Cmd("aaa.auth", bid, cid)
 								m.Echo("true")
 							}
-						} else if len(arg) >= 3 {
+						} else if len(arg) >= 3 { // 组件权限
 							if m.Cmds("aaa.auth", bid, "ship", "check", arg[2]) {
 								m.Echo("true")
 							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "check", arg[2]); kit.Right(cid) {
@@ -668,223 +615,14 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							}
 						}
 					})
-				default:
+
+					m.Log("right", "bench: %s sessid: %s user: %s com: %v result: %v",
+						m.Option("bench"), m.Option("sessid"), m.Option("username"), arg[2:], m.Result(0))
+				default: // 读写数据
 					m.Cmdx("aaa.auth", bid, arg)
 				}
 				return
 			}},
-
-		"login": &ctx.Command{Name: "login [sessid]|[username password]",
-			Form: map[string]int{"ip": 1, "openid": 1, "cert": 1, "pub": 1, "key": 1},
-			Help: []string{"会话管理", "sessid: 令牌", "username: 账号", "password: 密码",
-				"ip: 主机地址", "openid: 微信登录", "cert: 证书", "pub: 公钥", "key: 私钥"},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if _, ok := c.Server.(*AAA); m.Assert(ok) {
-					method := ""
-					for _, v := range []string{"ip", "openid", "cert", "pub", "key"} {
-						if m.Has(v) {
-							method = v
-						}
-					}
-					if method != "" {
-						c.Travel(m, func(m *ctx.Message, n int) bool {
-							if n > 0 && m.Cap("method") == method {
-								switch method {
-								case "ip", "openid":
-									if m.Cap("stream") == m.Option(method) {
-										m.Cap("expire_time", fmt.Sprintf("%d", time.Now().Unix()+int64(m.Confi("expire"))))
-										m.Echo(m.Cap("sessid"))
-										return false
-									}
-								case "cert", "pub", "key":
-									if m.Cap("stream") == Password(m.Option(method)) {
-										m.Cap("expire_time", fmt.Sprintf("%d", time.Now().Unix()+int64(m.Confi("expire"))))
-										m.Echo(m.Cap("sessid"))
-										return false
-									}
-								}
-							}
-							return false
-						})
-
-						if m.Results(0) {
-							return
-						}
-
-						m.Start(fmt.Sprintf("user%d", m.Capi("nuser", 1)), "用户登录", method, m.Option(method))
-						m.Echo(m.Cap("sessid"))
-						return
-					}
-
-					switch len(arg) {
-					case 2:
-						c.Travel(m, func(m *ctx.Message, n int) bool {
-							if n > 0 && m.Cap("method") == "password" && m.Cap("stream") == arg[0] {
-								m.Assert(m.Cap("password") == Password(arg[1]))
-								m.Cap("expire_time", fmt.Sprintf("%d", time.Now().Unix()+int64(m.Confi("expire"))))
-								m.Echo(m.Cap("sessid"))
-								return false
-							}
-							return false
-						})
-
-						if m.Results(0) {
-							m.Append("sessid", m.Result(0))
-							return
-						}
-						if arg[0] == "" {
-							return
-						}
-
-						name := ""
-						switch arg[0] {
-						case "root", "void":
-							name = arg[0]
-						default:
-							name = fmt.Sprintf("user%d", m.Capi("nuser", 1))
-						}
-
-						m.Start(name, "密码登录", "password", arg[0])
-						m.Cap("password", "password", Password(arg[1]), "密码登录")
-						m.Append("sessid", m.Cap("sessid"))
-						m.Echo(m.Cap("sessid"))
-						return
-					case 1:
-						m.Sess("login", nil)
-						c.Travel(m, func(m *ctx.Message, n int) bool {
-							if n > 0 && m.Cap("sessid") == arg[0] {
-								if int64(m.Capi("expire_time")) > time.Now().Unix() {
-									m.Sess("login", m.Target().Message())
-									m.Append("login_time", time.Unix(int64(m.Capi("login_time")), 0).Format(m.Conf("time_format")))
-									m.Append("expire_time", time.Unix(int64(m.Capi("expire_time")), 0).Format(m.Conf("time_format")))
-									m.Echo(m.Cap("stream"))
-								} else {
-									m.Target().Close(m)
-								}
-								return false
-							}
-							return true
-						})
-					case 0:
-						c.Travel(m, func(m *ctx.Message, n int) bool {
-							if n > 0 {
-								m.Add("append", "method", m.Cap("method"))
-								m.Add("append", "stream", m.Cap("stream"))
-							}
-							return false
-						})
-						m.Table()
-					}
-				}
-				return
-			}},
-		"userinfo": &ctx.Command{Name: "userinfo sessid", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			c.Travel(m, func(m *ctx.Message, n int) bool {
-				if m.Cap("sessid") == arg[0] {
-					m.Append("method", m.Cap("method"))
-					m.Append("stream", m.Cap("stream"))
-					m.Append("sessid", m.Cap("sessid"))
-					m.Append("login_time", m.Cap("login_time"))
-					m.Append("expire_time", m.Cap("expire_time"))
-				}
-				return false
-			})
-			m.Table()
-			return
-		}},
-		"right": &ctx.Command{Name: "right [user [check|owner|share group [order] [add|del]]]", Form: map[string]int{"from": 1}, Help: "权限管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			c.Travel(m, func(m *ctx.Message, n int) bool {
-				if n == 0 {
-					return true
-				}
-				if len(arg) == 0 {
-					m.Add("append", "user", m.Cap("stream"))
-					m.Add("append", "right", m.Confv("right"))
-					return true
-				}
-				if m.Cap("stream") == arg[0] {
-					if len(arg) == 1 { //查看所有权
-						for k, v := range m.Confv("right").(map[string]interface{}) {
-							for order, right := range v.(map[string]interface{}) {
-								m.Add("append", "group", k)
-								m.Add("append", "order", order)
-								m.Add("append", "right", right)
-							}
-						}
-						return true
-					}
-					if arg[1] == "check" { //权限检查
-						if from := m.Confv("right", []interface{}{"right", "role"}); from != nil && from.(string) == "root" {
-							m.Echo("root")
-						}
-						if len(arg) == 2 {
-							return false
-						}
-						if from := m.Confv("right", []interface{}{arg[2], "right", "role"}); from != nil && from.(string) == "owner" {
-							m.Echo("owner")
-						}
-						if len(arg) == 3 {
-							return false
-						}
-						if from := m.Confv("right", []interface{}{arg[2], arg[3], "right", "role"}); from != nil && from.(string) == "share" {
-							m.Echo("share")
-						}
-						return false
-					}
-					if len(arg) == 2 { //分配人事权
-						if m.Option("from") != "root" {
-							return false
-						}
-						switch arg[1] {
-						case "add":
-							m.Confv("right", []interface{}{"right", "role"}, "root")
-							m.Confv("right", []interface{}{"right", "from"}, m.Option("from"))
-						case "del":
-							m.Confv("right", []interface{}{"right", "role"}, "")
-						}
-						return true
-					}
-					if len(arg) == 3 { //查看使用权
-						for k, v := range m.Confv("right", arg[2]).(map[string]interface{}) {
-							for order, right := range v.(map[string]interface{}) {
-								m.Add("append", "order", k)
-								m.Add("append", "right", order)
-								m.Add("append", "detail", right)
-							}
-						}
-						return true
-					}
-					switch arg[1] {
-					case "owner": //分配所有权
-						if m.Cmd("right", m.Option("from"), "check").Result(0) == "" {
-							return false
-						}
-						switch arg[3] {
-						case "add":
-							m.Confv("right", []interface{}{arg[2], "right", "role"}, "owner")
-							m.Confv("right", []interface{}{arg[2], "right", "from"}, m.Option("from"))
-						case "del":
-							m.Confv("right", []interface{}{arg[2], "right", "role"}, "")
-						}
-					case "share": //分配使用权
-						if m.Cmd("right", m.Option("from"), "check", arg[2]).Result(0) == "" {
-							return false
-						}
-						switch arg[4] {
-						case "add":
-							m.Confv("right", []interface{}{arg[2], arg[3], "right", "role"}, "share")
-							m.Confv("right", []interface{}{arg[2], arg[3], "right", "from"}, m.Option("from"))
-						case "del":
-							m.Confv("right", []interface{}{arg[2], arg[3], "right", "role"}, "")
-						}
-					}
-					return false
-				}
-				return false
-			})
-			m.Table()
-			return
-		}},
 
 		"rsa": &ctx.Command{Name: "rsa gen|sign|verify|encrypt|decrypt|cert",
 			Help: []string{"gen: 生成密钥, sgin: 私钥签名, verify: 公钥验签, encrypt: 公钥加密, decrypt: 私钥解密",

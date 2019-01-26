@@ -598,6 +598,9 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 				m.Add(meta, msg.Meta[meta][0], msg.Meta[meta][1:])
 			}
 		case "option", "append":
+			if msg.Meta == nil {
+				msg.Meta = map[string][]string{}
+			}
 			if msg.Meta[meta] == nil {
 				break
 			}
@@ -761,6 +764,35 @@ func (m *Message) Optionx(key string, arg ...string) interface{} {
 		value = fmt.Sprintf(arg[0], value)
 	}
 	return value
+}
+func (m *Message) Magic(begin string, chain interface{}, args ...interface{}) interface{} {
+	auth := []string{"bench", "session", "username", "role", "componet", "command"}
+	key := []string{"bench", "sessid", "username", "role", "componet", "command"}
+	aaa := m.Sess("aaa", false)
+	for i, v := range auth {
+		if v == begin {
+			data := aaa.Confv("auth", []string{m.Option(key[i]), "data"})
+			if kit.Format(chain) == "" {
+				return data
+			}
+
+			if len(args) > 0 {
+				value := kit.Chain(data, chain, args[0])
+				aaa.Conf("auth", []string{m.Option(key[i]), "data"}, value)
+				return value
+			}
+
+			value := kit.Chain(data, chain)
+			if value != nil {
+				return value
+			}
+
+			if i < len(auth)-1 {
+				begin = auth[i+1]
+			}
+		}
+	}
+	return nil
 }
 func (m *Message) Append(key string, arg ...interface{}) string {
 	if len(arg) > 0 {

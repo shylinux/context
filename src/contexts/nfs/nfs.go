@@ -878,9 +878,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		nfs.Configs["prompt"] = &ctx.Config{Value: ""}
 
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
-			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" {
+			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" && m.Confs("term", "enable") {
 				nfs.Term(m, "init")
 				defer nfs.Term(m, "exit")
+			}
+			what := make(chan bool)
+			if m.Confs("term", "loop") {
+				<-what
 			}
 		}
 
@@ -922,7 +926,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 	}
 
 	m.Cap("stream", m.Option("ms_source"))
-	nfs.io = m.Optionv("io").(io.ReadWriter)
+	nfs.io, _ = m.Optionv("io").(io.ReadWriter)
 	nfs.send = make(chan *ctx.Message, 10)
 	nfs.echo = make(chan *ctx.Message, 10)
 	nfs.hand = map[int]*ctx.Message{}
@@ -1023,6 +1027,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"term": &ctx.Config{Name: "term", Value: map[string]interface{}{
+			"enable": 1, "loop": 0,
 			"width": 80, "height": "24",
 
 			"left": 0, "top": 0, "right": 80, "bottom": 24,
@@ -1510,6 +1515,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"remote": &ctx.Command{Name: "remote listen|dial args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
+					if sub.Options("hostport") {
+						return sub
+					}
 					sub.Sess("ms_source", sub)
 					sub.Sess("ms_target", m.Source())
 					sub.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), "远程文件")

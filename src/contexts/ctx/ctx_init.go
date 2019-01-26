@@ -72,7 +72,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"debug":       &Config{Name: "debug(on/off)", Value: "on", Help: "调试模式，on:打印，off:不打印)"},
 
 		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
-		"search_choice": &Config{Name: "search_choice(first/last/rand/magic)", Value: "magic", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magic: 加权选择"},
+		"search_choice": &Config{Name: "search_choice(first/last/rand/magics)", Value: "magics", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magics: 加权选择"},
 		"search_action": &Config{Name: "search_action(list/switch)", Value: "switch", Help: "搜索操作, list: 输出模块列表, switch: 模块切换"},
 		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索起点, true: 根模块, false: 当前模块"},
 
@@ -360,6 +360,20 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			m.Sort("key", "string").Table()
 			return
 		}},
+		"magic": &Command{Name: "magic", Help: "随机组员", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			switch len(arg) {
+			case 0:
+				m.Optionv("magic", m.Magic("bench", ""))
+			case 1:
+				m.Optionv("magic", m.Magic(arg[0], ""))
+			case 2:
+				m.Optionv("magic", m.Magic(arg[0], arg[1]))
+			case 3:
+				m.Optionv("magic", m.Magic(arg[0], arg[1], arg[2]))
+			}
+			m.Cmdy("ctx.trans", "magic")
+			return
+		}},
 		"result": &Command{Name: "result [index] [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			msg := m.message
 			if len(arg) == 0 {
@@ -481,7 +495,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		}},
 
 		"context": &Command{Name: "context [find|search] [root|back|home] [first|last|rand|magic] [module] [cmd|switch|list|spawn|start|close]",
-			Help: "查找并操作模块;\n查找方法, find: 精确查找, search: 模糊搜索;\n查找起点, root: 根模块, back: 父模块, home: 本模块;\n过滤结果, first: 取第一个, last: 取最后一个, rand: 随机选择, magic: 智能选择;\n操作方法, cmd: 执行命令, switch: 切换为当前, list: 查看所有子模块, spwan: 创建子模块并初始化, start: 启动模块, close: 结束模块",
+			Help: "查找并操作模块;\n查找方法, find: 精确查找, search: 模糊搜索;\n查找起点, root: 根模块, back: 父模块, home: 本模块;\n过滤结果, first: 取第一个, last: 取最后一个, rand: 随机选择, magics: 智能选择;\n操作方法, cmd: 执行命令, switch: 切换为当前, list: 查看所有子模块, spwan: 创建子模块并初始化, start: 启动模块, close: 结束模块",
 			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 				if len(arg) == 1 && arg[0] == "~" && m.target.context != nil {
 					m.target = m.target.context
@@ -534,7 +548,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 									ms, arg = append(ms, msg[len(msg)-1]), arg[2:]
 								case "rand":
 									ms, arg = append(ms, msg[rand.Intn(len(msg))]), arg[2:]
-								case "magic":
+								case "magics":
 									ms, arg = append(ms, msg...), arg[2:]
 								default:
 									ms, arg = append(ms, msg[0]), arg[1:]
@@ -780,6 +794,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}},
 		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [list|map arg...] [create map|list|string key name help] [delete key]",
 			Help: "配置管理, export: 导出配置, save: 保存配置到文件, load: 从文件加载配置, create: 创建配置, delete: 删除配置",
+			Form: map[string]int{"format": 1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 				if len(arg) > 2 && arg[2] == "list" {
 					chain := strings.Split(arg[1], ".")
@@ -942,157 +957,164 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				return
 			}},
 
-		"trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			value, arg := m.Optionv(arg[0]), arg[1:]
-			if v, ok := value.(string); ok {
-				json.Unmarshal([]byte(v), &value)
-			}
-
-			view := "data"
-			if len(arg) > 0 {
-				switch arg[0] {
-				case "type", "data", "json":
-					view, arg = arg[0], arg[1:]
+		"trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换",
+			Form: map[string]int{"format": 1},
+			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				value, arg := m.Optionv(arg[0]), arg[1:]
+				if v, ok := value.(string); ok {
+					json.Unmarshal([]byte(v), &value)
 				}
-			}
 
-			limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
-			if len(arg) > 0 && arg[0] == "limit" {
-				limit, arg = kit.Int(arg[1]), arg[2:]
-			}
-			m.Log("fuck", "trans limt %v", limit)
+				view := "data"
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "type", "data", "json":
+						view, arg = arg[0], arg[1:]
+					}
+				}
 
-			chain := strings.Join(arg, ".")
-			if chain != "" {
-				value = kit.Chain(value, chain)
-			}
+				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
+				if len(arg) > 0 && arg[0] == "limit" {
+					limit, arg = kit.Int(arg[1]), arg[2:]
+				}
 
-			switch view {
-			case "type": // 查看数据类型
-				switch value := value.(type) {
+				chain := strings.Join(arg, ".")
+				if chain != "" {
+					value = kit.Chain(value, chain)
+				}
+
+				switch view {
+				case "type": // 查看数据类型
+					switch value := value.(type) {
+					case map[string]interface{}:
+						for k, v := range value {
+							m.Add("append", "key", k)
+							m.Add("append", "type", fmt.Sprintf("%T", v))
+						}
+						m.Sort("key", "str").Table()
+					case []interface{}:
+						for k, v := range value {
+							m.Add("append", "key", k)
+							m.Add("append", "type", fmt.Sprintf("%T", v))
+						}
+						m.Sort("key", "int").Table()
+					case nil:
+					default:
+						m.Add("append", "key", chain)
+						m.Add("append", "type", fmt.Sprintf("%T", value))
+						m.Sort("key", "str").Table()
+					}
+					return
+				case "data":
+				case "json": // 查看文本数据
+					b, e := json.MarshalIndent(value, "", " ")
+					m.Assert(e)
+					m.Echo(string(b))
+					return nil
+				}
+
+				switch val := value.(type) {
 				case map[string]interface{}:
-					for k, v := range value {
+					for k, v := range val {
+						if m.Option("format") == "object" {
+							m.Add("append", k, v)
+							continue
+						}
+
 						m.Add("append", "key", k)
-						m.Add("append", "type", fmt.Sprintf("%T", v))
+						switch val := v.(type) {
+						case nil:
+							m.Add("append", "value", "")
+						case string:
+							m.Add("append", "value", val)
+						case float64:
+							m.Add("append", "value", fmt.Sprintf("%d", int(val)))
+						default:
+							b, _ := json.Marshal(val)
+							m.Add("append", "value", fmt.Sprintf("%s", string(b)))
+						}
+					}
+					m.Table()
+					// m.Sort("key", "str").Table()
+				case map[string]string:
+					for k, v := range val {
+						m.Add("append", "key", k)
+						m.Add("append", "value", v)
 					}
 					m.Sort("key", "str").Table()
 				case []interface{}:
-					for k, v := range value {
-						m.Add("append", "key", k)
-						m.Add("append", "type", fmt.Sprintf("%T", v))
-					}
-					m.Sort("key", "int").Table()
-				case nil:
-				default:
-					m.Add("append", "key", chain)
-					m.Add("append", "type", fmt.Sprintf("%T", value))
-					m.Sort("key", "str").Table()
-				}
-				return
-			case "data":
-			case "json": // 查看文本数据
-				b, e := json.MarshalIndent(value, "", " ")
-				m.Assert(e)
-				m.Echo(string(b))
-				return nil
-			}
-
-			switch val := value.(type) {
-			case map[string]interface{}:
-				for k, v := range val {
-					m.Add("append", "key", k)
-					switch val := v.(type) {
-					case nil:
-						m.Add("append", "value", "")
-					case string:
-						m.Add("append", "value", val)
-					case float64:
-						m.Add("append", "value", fmt.Sprintf("%d", int(val)))
-					default:
-						b, _ := json.Marshal(val)
-						m.Add("append", "value", fmt.Sprintf("%s", string(b)))
-					}
-				}
-				m.Sort("key", "str").Table()
-			case map[string]string:
-				for k, v := range val {
-					m.Add("append", "key", k)
-					m.Add("append", "value", v)
-				}
-				m.Sort("key", "str").Table()
-			case []interface{}:
-				fields := map[string]int{}
-				for i, v := range val {
-					if i >= limit {
-						break
-					}
-					switch val := v.(type) {
-					case map[string]interface{}:
-						for k, _ := range val {
-							fields[k]++
-						}
-					}
-				}
-
-				if len(fields) > 0 {
+					fields := map[string]int{}
 					for i, v := range val {
 						if i >= limit {
 							break
 						}
 						switch val := v.(type) {
 						case map[string]interface{}:
-							for k, _ := range fields {
-								switch value := val[k].(type) {
-								case nil:
-									m.Add("append", k, "")
-								case string:
-									m.Add("append", k, value)
-								case float64:
-									m.Add("append", k, fmt.Sprintf("%d", int(value)))
-								default:
-									b, _ := json.Marshal(value)
-									m.Add("append", k, fmt.Sprintf("%v", string(b)))
-								}
+							for k, _ := range val {
+								fields[k]++
 							}
 						}
 					}
-				} else {
-					for i, v := range val {
-						switch val := v.(type) {
-						case nil:
-							m.Add("append", "index", i)
-							m.Add("append", "value", "")
-						case string:
-							m.Add("append", "index", i)
-							m.Add("append", "value", val)
-						case float64:
-							m.Add("append", "index", i)
-							m.Add("append", "value", fmt.Sprintf("%v", int(val)))
-						default:
-							m.Add("append", "index", i)
-							b, _ := json.Marshal(val)
-							m.Add("append", "value", fmt.Sprintf("%v", string(b)))
+
+					if len(fields) > 0 {
+						for i, v := range val {
+							if i >= limit {
+								break
+							}
+							switch val := v.(type) {
+							case map[string]interface{}:
+								for k, _ := range fields {
+									switch value := val[k].(type) {
+									case nil:
+										m.Add("append", k, "")
+									case string:
+										m.Add("append", k, value)
+									case float64:
+										m.Add("append", k, fmt.Sprintf("%d", int(value)))
+									default:
+										b, _ := json.Marshal(value)
+										m.Add("append", k, fmt.Sprintf("%v", string(b)))
+									}
+								}
+							}
+						}
+					} else {
+						for i, v := range val {
+							switch val := v.(type) {
+							case nil:
+								m.Add("append", "index", i)
+								m.Add("append", "value", "")
+							case string:
+								m.Add("append", "index", i)
+								m.Add("append", "value", val)
+							case float64:
+								m.Add("append", "index", i)
+								m.Add("append", "value", fmt.Sprintf("%v", int(val)))
+							default:
+								m.Add("append", "index", i)
+								b, _ := json.Marshal(val)
+								m.Add("append", "value", fmt.Sprintf("%v", string(b)))
+							}
 						}
 					}
+					m.Table()
+				case []string:
+					for i, v := range val {
+						m.Add("append", "index", i)
+						m.Add("append", "value", v)
+					}
+					m.Table()
+				case string:
+					m.Echo("%s", val)
+				case float64:
+					m.Echo("%d", int(val))
+				case nil:
+				default:
+					b, _ := json.Marshal(val)
+					m.Echo("%s", string(b))
 				}
-				m.Table()
-			case []string:
-				for i, v := range val {
-					m.Add("append", "index", i)
-					m.Add("append", "value", v)
-				}
-				m.Table()
-			case string:
-				m.Echo("%s", val)
-			case float64:
-				m.Echo("%d", int(val))
-			case nil:
-			default:
-				b, _ := json.Marshal(val)
-				m.Echo("%s", string(b))
-			}
-			return
-		}},
+				return
+			}},
 		"select": &Command{Name: "select key value field",
 			Form: map[string]int{"eq": 2, "parse": 2, "hide": -1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
