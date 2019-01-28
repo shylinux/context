@@ -18,11 +18,11 @@ import (
 	_ "contexts/web" //应用中心
 
 	// 应用层
+	_ "examples/chat" //会议中心
 	_ "examples/code" //代码中心
-	// _ "examples/jira" //任务中心
-	// _ "examples/lark" //会议中心
-	// _ "examples/mall" //交易中心
 	_ "examples/wiki" //文档中心
+	// _ "examples/jira" //任务中心
+	// _ "examples/mall" //交易中心
 )
 
 func main() {

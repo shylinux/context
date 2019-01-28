@@ -656,23 +656,19 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 						break
 					}
 					if n%bottom > 0 {
-						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
 
 						nfs.Term(m, "scroll", n%bottom+1)
 						n -= n % bottom
 						x = m.Confi("term", "cursor_x")
 						y = m.Confi("term", "cursor_y")
 
-						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
 					} else if n > 0 {
-						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
 
 						nfs.Term(m, "scroll", bottom)
 						n -= bottom
 						x = m.Confi("term", "cursor_x")
 						y = m.Confi("term", "cursor_y")
 
-						m.Log("fuck", "-----scroll %v %v %v %v", m.Conf("term", "begin_row"), m.Conf("term", "begin_col"), y, n)
 					}
 				}
 			}

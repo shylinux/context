@@ -59,6 +59,16 @@ context = {
 		document.cookie = key+"="+value+";path=/";
 		return this.Cookie(key);
 	},
+    Command: function(cmd, option, cb) {
+        option = option || {}
+        option["componet_index"] = "index"
+        option["componet_name"] = "source"
+        option["cmd"] = cmd
+
+        this.GET("", option, function(msg) {
+            typeof cb == "function" && (msg && msg[0]? cb(msg[0]): cb())
+        })
+    },
     Cache: function(key, cb, sync) {
         if (key == undefined) {
             return this.cache

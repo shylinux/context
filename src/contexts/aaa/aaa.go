@@ -180,7 +180,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 			s, t, a := "", "", ""
 			if v := m.Confm("auth", arg[0]); v != nil {
-				s, t, arg = arg[0], v["type"].(string), arg[1:]
+				s, t, a, arg = arg[0], kit.Format(v["type"]), kit.Format(v["meta"]), arg[1:]
 			}
 
 			if len(arg) > 0 && arg[0] == "delete" {
@@ -370,7 +370,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					h := m.Cmdx("aaa.hash", meta)
 					if !m.Confs("auth", h) {
-						if m.Confs("auth_type", []string{arg[i], "single"}) && m.Cmds("aaa.auth", p, arg[i]) {
+						if m.Confs("auth_type", []string{arg[i], "single"}) && m.Confs("auth", p) && m.Cmds("aaa.auth", p, arg[i]) {
 							m.Set("result")
 							return // 单点认证失败
 						}
@@ -385,7 +385,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					}
 					if p != "" { // 创建父链接
 						chain = append(chain, map[string]string{"node": p, "ship": "1", "hash": h, "type": arg[i], "meta": meta[1]})
-						chain = append(chain, map[string]string{"node": h, "ship": "0", "hash": p, "type": t, "meta": ""})
+						chain = append(chain, map[string]string{"node": h, "ship": "0", "hash": p, "type": t, "meta": a})
 					}
 
 					p, t, a = h, arg[i], meta[1]
@@ -441,7 +441,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 			}
 
-			m.Log("info", "block: %v chain: %v", len(block), len(chain))
+			m.Log("debug", "block: %v chain: %v", len(block), len(chain))
 			for _, b := range block { // 添加节点
 				m.Confv("auth", b["hash"], map[string]interface{}{"create_time": m.Time(), "type": b["type"], "meta": b["meta"]})
 			}

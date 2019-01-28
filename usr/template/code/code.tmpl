@@ -300,6 +300,78 @@
 </fieldset>
 {{end}}
 
+{{define "mp"}}
+<script src="https://res.wx.qq.com/open/js/jweixin-1.4.0.js"></script>
+<script>
+{{$token := cmd . "context chat js_token"}}
+wx.config({
+    debug: true,
+    appId: {{append $token "appid"|meta}},
+    timestamp: {{append $token "timestamp"|meta}},
+    nonceStr: {{append $token "nonce"|meta}},
+    signature: {{append $token "signature"|meta}},
+    jsApiList: [
+        "scanQRCode",
+        "chooseImage",
+        "closeWindow",
+        "openAddress",
+    ],
+})
+wx.ready(function(){
+})
+wx.error(function(res){
+})
+
+function scan(event) {
+    alert("begin scan")
+    wx.scanQRCode({
+        needResult: 0,
+        scanType: ["qrCode", "barCode"],
+        desc: "what",
+        success: function(res) {
+            alert(res.resultStr)
+        },
+        fail: function(res) {
+            alert(res.errMsg)
+        },
+    })
+}
+function close() {
+    wx.closeWindow({
+        success: function(res) {
+            alert(res.resultStr)
+        },
+        fail: function(res) {
+            alert(res.errMsg)
+        },
+    })
+}
+
+function choose() {
+    wx.chooseImage({
+        count: 1, // 默认9
+        sizeType: ['original', 'compressed'], // 可以指定是原图还是压缩图，默认二者都有
+        sourceType: ['album', 'camera'], // 可以指定来源是相册还是相机，默认二者都有
+        success: function (res) {
+            var localIds = res.localIds; // 返回选定照片的本地ID列表，localId可以作为img标签的src属性显示图片
+        },
+        fail: function(res) {
+            alert(res.errMsg)
+        },
+    });
+}
+function open(event) {
+    wx.openAddress({success: function(res) {
+        context.Command("show", res)
+    }})
+}
+</script>
+<button onclick="scan(this)">scan</button>
+<button onclick="choose(this)">choose</button>
+<button onclick="close(this)">close</button>
+<button onclick="open(this)">openaddress</button>
+{{end}}
+
 {{define "tail"}}
 <script src="/static/librarys/context.js"></script>
 <script src="/static/librarys/code.js"></script>

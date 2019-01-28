@@ -129,7 +129,6 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 			m.Cap("stream", fmt.Sprintf("%s", tcp.Addr())))
 
 		addr := strings.Split(tcp.Addr().String(), ":")
-		m.Log("fuck", "what %v", addr)
 		m.Back(m.Spawn(m.Source()).Add("option", "hostport", fmt.Sprintf("%s:%s", m.Cmd("tcp.ifconfig", "eth0").Append("ip"), addr[len(addr)-1])))
 	}
 
