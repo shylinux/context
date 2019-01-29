@@ -1,0 +1,35 @@
+.container {
+    color:cyan;
+    font-size:16px;
+    font-family:Courier;
+    background-color:black;
+    min-height:800px;
+}
+.command {
+    border:solid 2px green;
+    width:calc(100% - 4px);
+}
+.table {
+    border:solid 1px green;
+    display:table;
+    overflow:auto;
+    max-width:100%;
+}
+.table-row {
+    display:table-row;
+}
+.table-th {
+    background-color:red;
+    padding:4px;
+    border:solid 1px green;
+    display:table-cell;
+}
+.table-td {
+    padding:4px;
+    border:solid 1px green;
+    display:table-cell;
+}
+.result {
+    white-space:pre;
+    width:100%;
+}
