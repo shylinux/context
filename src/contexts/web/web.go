@@ -106,13 +106,11 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		}
 
 		if msg.Options("ticket") {
-			msg.Log("fuck", "what %v", msg.Meta)
 			msg.Option("uuid", msg.Option(msg.Conf("login", "cas_uuid")))
 			msg.Option("username", cas.Username(r))
 			if lark := msg.Find("web.chat.lark"); lark != nil {
 				msg.Option("username", lark.Cmdx("user", msg.Option("email"), "id"))
 			}
-			msg.Log("fuck", "what %v", msg.Meta)
 
 			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("web.session", "login", "uuid"), Path: "/"})
 			http.Redirect(w, r, merge(msg, r.Header.Get("index_url"), "ticket", ""), http.StatusTemporaryRedirect)
@@ -142,6 +140,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("accept", r.Header.Get("Accept"))
 			msg.Option("method", r.Method)
 			msg.Option("path", r.URL.Path)
+			msg.Optionv("debug", false)
 
 			msg.Option("dir_root", msg.Cap("directory"))
 			for _, v := range r.Cookies() {
@@ -346,15 +345,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "爬虫配置"},
 		"serve": &ctx.Config{Name: "serve", Value: map[string]interface{}{
-			"loggheaders": true,
-			"form_size":   "102400",
-			"directory":   "usr",
-			"protocol":    "http",
-			"address":     ":9094",
-			"cert":        "etc/cert.pem",
-			"key":         "etc/key.pem",
-			"site":        "",
-			"index":       "/code/",
+			"logheaders": false,
+			"form_size":  "102400",
+			"directory":  "usr",
+			"protocol":   "http",
+			"address":    ":9094",
+			"cert":       "etc/cert.pem",
+			"key":        "etc/key.pem",
+			"site":       "",
+			"index":      "/code/",
 		}, Help: "服务配置"},
 		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
 			"check":     true,
@@ -512,8 +511,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Log("info", "%s %s", req.Method, req.URL)
 
 					m.Confm("spide", []string{which, "header"}, func(key string, value string) {
-						req.Header.Set(key, value)
-						m.Log("info", "header %v %v", key, value)
+						if key != "" {
+							req.Header.Set(key, value)
+							m.Log("info", "header %v %v", key, value)
+						}
 					})
 					for i := 0; i < len(m.Meta["headers"]); i += 2 {
 						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
@@ -522,8 +523,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						req.Header.Set("Content-Type", m.Option("content_type"))
 					}
 					m.Confm("spide", []string{which, "cookie"}, func(key string, value string) {
-						req.AddCookie(&http.Cookie{Name: key, Value: value})
-						m.Log("info", "set-cookie %s: %v", key, value)
+						if key != "" {
+							req.AddCookie(&http.Cookie{Name: key, Value: value})
+							m.Log("info", "set-cookie %s: %v", key, value)
+						}
 					})
 					if kit.Right(client["logheaders"]) {
 						for k, v := range req.Header {
@@ -537,7 +540,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					res, e := web.Client.Do(req)
-					m.Log("info", "response %v %v", res.StatusCode, res.Status)
 					if m.Assert(e); kit.Right(client["logheaders"]) {
 						for k, v := range res.Header {
 							m.Log("info", "%s: %v", k, v)
@@ -829,6 +831,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 
+		"/MP_verify_0xp0zkW3fIzIq2Bo.txt": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Echo("0xp0zkW3fIzIq2Bo")
+			return
+		}},
 		"/proxy/": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			fields := strings.Split(key, "/")
 			m.Cmdy("web.get", "which", fields[2], "method", fields[3], strings.Join(fields, "/"))
@@ -888,14 +894,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						continue
 					}
 
-					// 查找模块
-					context := m.Cap("module")
-					if val["componet_ctx"] != nil {
-						context = val["componet_ctx"].(string)
-					}
-					msg := m.Find(context)
+					msg := m
+					if val["componet_cmd"] != nil {
+						// 查找模块
+						context := m.Cap("module")
+						if val["componet_ctx"] != nil {
+							context = val["componet_ctx"].(string)
+						}
+						msg = m.Find(context)
 
-					if msg != nil && val["componet_cmd"] != nil {
 						// 添加参数值
 						args := []string{val["componet_cmd"].(string)}
 						if val["arguments"] != nil {
@@ -938,13 +945,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 
-						if m.Options("sessid") {
-							m.Magic("session", "what", 1)
-							m.Log("fuck", "what %v", m.Magic("bench", "what"))
-							m.Magic("bench", "what", 2)
-							m.Log("fuck", "what %v", m.Magic("bench", "what"))
-						}
-
 						// 执行命令
 						if order != "" || kit.Right(val["pre_run"]) {
 							if list := m.Confv("auth", []string{m.Option("bench"), "data", "action", msg.Option("componet_name"), "cmd"}); list != nil && order == "" {
@@ -961,7 +961,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 					} else {
-						msg = m
 					}
 
 					// 添加响应

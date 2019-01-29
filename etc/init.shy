@@ -1,11 +1,23 @@
+source local.shy
+
 ~ssh
-    remote listen :9090
+    remote listen :9090 right sub
 ~aaa
+    role void componet source js_token
+
+    role tech componet mp command share
+    role tech componet chat command share
+    role tech componet chat command nfs.pwd ls
+
     role tech componet index command source
     role tech componet index command context
 
+    role tech componet remote command nfs.pwd ls
+
     role tech componet source command nfs.pwd ls
 
-    user tech shy shy
+    user root shy shy
+    user tech sub sub
 ~web
+    config spide "" client "localhost:9094"
     serve

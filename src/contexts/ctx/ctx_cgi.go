@@ -223,12 +223,12 @@ var CGI = template.FuncMap{
 		}
 		return ""
 	},
-	"cmd": func(arg ...interface{}) string {
-		if len(arg) == 0 {
-			return ""
+	"cmd": func(m *Message, args ...interface{}) *Message {
+		if len(args) == 0 {
+			return m
 		}
 
-		return strings.Join(Pulse.Sess("cli").Cmd(arg).Meta["result"], "")
+		return m.Sess("cli").Put("option", "bench", "").Cmd("source", args)
 	},
 
 	"detail": func(arg ...interface{}) interface{} {
@@ -482,12 +482,10 @@ var CGI = template.FuncMap{
 		}
 		return nil
 	},
-	"parse": func(m *Message, arg ...string) interface{} {
+	"parse": func(m *Message, arg ...interface{}) interface{} {
 		switch len(arg) {
 		case 1:
-			if len(arg[0]) > 0 {
-				return m.Parse(arg[0])
-			}
+			return m.Parse(kit.Format(arg[0]))
 		}
 		return nil
 	},
