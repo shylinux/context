@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
+	"strings"
 )
 
 var Index = &ctx.Context{Name: "code", Help: "代码中心",
@@ -215,14 +215,65 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}, Help: "组件列表"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
 			"file": map[string]interface{}{
+				"boot_sh":    "bin/boot.sh",
+				"bench":      "bin/bench.new",
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
 				"exit_shy":   "etc/exit.shy",
-				"bench":      "bin/bench.new",
 			},
 		}, Help: "日志地址"},
 	},
 	Commands: map[string]*ctx.Command{
+		"update": &ctx.Command{Name: "update", Help: "更新代码", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			return
+		}},
+		"/upgrade/": &ctx.Command{Name: "/upgrade/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			p := m.Cmdx("nfs.path", key)
+			if strings.HasSuffix(key, "/bench") {
+				bench := m.Cmdx("nfs.path", key+"."+m.Option("GOOS")+"."+m.Option("GOARCH"))
+				if _, e := os.Stat(bench); e == nil {
+					p = bench
+				}
+			}
+
+			m.Log("info", "upgrade %s %s", p, m.Cmdx("aaa.hash", "file", p))
+			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
+			return
+		}},
+		"upgrade": &ctx.Command{Name: "upgrade system|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmdy("ctx.config", "upgrade", "file")
+				return
+			}
+
+			if arg[0] == "system" {
+				arg = arg[1:]
+				m.Confm("upgrade", "file", func(key string, value string) {
+					arg = append(arg, key)
+				})
+			}
+
+			restart := false
+			for _, link := range arg {
+				if file := m.Conf("upgrade", []string{"file", link}); file != "" {
+					if m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", link), "save", file); strings.HasPrefix(file, "bin/") {
+						if m.Cmd("cli.system", "chmod", "u+x", file); link == "bench" {
+							m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
+							m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
+						}
+					}
+					restart = true
+				} else {
+					m.Cmdy("web.get", "dev", fmt.Sprintf("code/upgrade/script/%s", link), "save", fmt.Sprintf("usr/script/%s", link))
+				}
+			}
+
+			if restart {
+				m.Cmd("cli.exit", 1)
+			}
+			return
+		}},
+
 		"/counter": &ctx.Command{Name: "/counter", Help: "/counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 {
 				m.Option("name", arg[0])
@@ -246,54 +297,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			if len(arg) > 1 {
 				m.Copy(m.Spawn().Cmd("get", m.Conf("counter_service"), "name", arg[0], "count", arg[1]), "result")
 			}
-			return
-		}},
-		"/upgrade/": &ctx.Command{Name: "/upgrade/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			r := m.Optionv("request").(*http.Request)
-			w := m.Optionv("response").(http.ResponseWriter)
-			p := m.Cmdx("nfs.path", key)
-			m.Log("info", "upgrade %s %s", p, m.Cmdx("aaa.hash", "file", p))
-			http.ServeFile(w, r, p)
-			return
-		}},
-		"upgrade": &ctx.Command{Name: "upgrade system|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				m.Cmdy("ctx.config", "upgrade", "file")
-				return
-			}
-
-			if arg[0] == "system" {
-				m.Cmd("cli.source", m.Conf("exit.shy"))
-
-				m.Confm("upgrade", "file", func(key string, value string) {
-					m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", key), "save", value)
-				})
-
-				m.Cmd("cli.system", "chmod", "u+x", "bin/bench.new")
-				m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
-				m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
-				go func() {
-					time.Sleep(time.Second * 3)
-					os.Exit(1)
-				}()
-				return
-			}
-
-			if file := m.Conf("upgrade", []string{"file", arg[0]}); file != "" {
-				m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", arg[0]), "save", file)
-				if arg[0] == "bench" {
-					m.Cmd("cli.system", "chmod", "u+x", "bin/bench.new")
-					m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
-					m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
-				}
-				go func() {
-					time.Sleep(time.Second * 3)
-					os.Exit(1)
-				}()
-				return
-			}
-
-			m.Cmdy("web.get", "dev", fmt.Sprintf("code/upgrade/script/%s", arg[0]), "save", fmt.Sprintf("usr/script/%s", arg[0]), arg[1:])
 			return
 		}},
 		"/consul": &ctx.Command{Name: "/consul", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

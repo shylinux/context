@@ -82,12 +82,27 @@ func (gdb *GDB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 	gdb.goon = make(chan os.Signal, 10)
 	gdb.wait = make(chan interface{}, 10)
-	signal.Notify(gdb.goon, syscall.Signal(30))
+
+	m.Confm("signal", func(sig string, action string) {
+		m.Log("signal", "add %s %s", sig, action)
+		signal.Notify(gdb.goon, syscall.Signal(kit.Int(sig)))
+	})
+
 	for {
 		select {
 		case sig := <-gdb.goon:
-			m.Log("error", "signal %v", sig)
-			gdb.Goon(nil, "cache", "read", "value")
+			action := m.Conf("signal", sig)
+			m.Log("signal", "signal %v %v", sig, action)
+			switch action {
+			case "quit":
+				m.Cmd("cli.exit", 0)
+			case "restart":
+				m.Cmd("cli.exit", 1)
+			case "upgrade":
+				m.Find("web.code").Cmd("upgrade", "system")
+			default:
+				// gdb.Goon(nil, "cache", "read", "value")
+			}
 		}
 	}
 	return true
@@ -103,6 +118,11 @@ func (gdb *GDB) Close(m *ctx.Message, arg ...string) bool {
 var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
+		"signal": &ctx.Config{Name: "signal", Value: map[string]interface{}{
+			"3":  "quit",
+			"10": "restart",
+			"12": "upgrade",
+		}, Help: "信号"},
 		"debug": &ctx.Config{Name: "debug", Value: map[string]interface{}{"value": map[string]interface{}{"enable": false},
 			"trace": map[string]interface{}{"value": map[string]interface{}{"enable": true}},
 			"context": map[string]interface{}{"value": map[string]interface{}{"enable": false},

@@ -119,7 +119,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"logdir": &ctx.Config{Name: "logdir", Value: "var/log", Help: ""},
-		"logpid": &ctx.Config{Name: "logpid", Value: "var/log/bench.pid", Help: ""},
+		"logpid": &ctx.Config{Name: "logpid", Value: "var/run/bench.pid", Help: ""},
 		"output": &ctx.Config{Name: "output", Value: map[string]interface{}{
 			"error":  map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
 			"trace":  map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},

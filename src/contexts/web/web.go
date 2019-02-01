@@ -142,6 +142,20 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("path", r.URL.Path)
 			msg.Optionv("debug", false)
 
+			agent := r.Header.Get("User-Agent")
+			switch {
+			case strings.Contains(agent, "Macintosh"):
+				msg.Option("GOOS", "darwin")
+			default:
+				msg.Option("GOOS", "linux")
+			}
+			switch {
+			case strings.Contains(agent, "Intel"):
+				msg.Option("GOARCH", "386")
+			default:
+				msg.Option("GOARCH", "386")
+			}
+
 			msg.Option("dir_root", msg.Cap("directory"))
 			for _, v := range r.Cookies() {
 				msg.Option(v.Name, v.Value)
@@ -553,7 +567,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					var result interface{}
 					ct := res.Header.Get("Content-Type")
 					parse := kit.Select(kit.Format(client["parse"]), m.Option("parse"))
-					m.Log("info", "parse: %s content: %s", parse, ct)
+					m.Log("info", "status %s parse: %s content: %s", res.Status, parse, ct)
 
 					switch {
 					case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):

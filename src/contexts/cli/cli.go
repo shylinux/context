@@ -54,6 +54,11 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return &CLI{Context: c}
 }
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
+	name, _ := os.Hostname()
+	m.Conf("runtime", "hostname", name)
+	m.Conf("runtime", "pid", os.Getpid())
+	m.Conf("runtime", "GOOS", runtime.GOOS)
+	m.Conf("runtime", "GOARCH", runtime.GOARCH)
 	return cli
 }
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
@@ -98,6 +103,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "终端数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{}, Help: "运行环境"},
+
 		"init_shy": &ctx.Config{Name: "init_shy", Value: "etc/init.shy", Help: "启动脚本"},
 		"exit_shy": &ctx.Config{Name: "exit_shy", Value: "etc/exit.shy", Help: "启动脚本"},
 		"cmd_script": &ctx.Config{Name: "cmd_script", Value: map[string]interface{}{
@@ -287,6 +294,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				return
 			}},
+		"exit": &ctx.Command{Name: "exit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("cli.source", m.Conf("exit_shy"))
+			go func() {
+				time.Sleep(time.Second * 3)
+				os.Exit(kit.Int(arg[0]))
+			}()
+			return
+		}},
 
 		"alias": &ctx.Command{Name: "alias [short [long...]]|[delete short]|[import module [command [alias]]]",
 			Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名, import导入模块所有命令",
