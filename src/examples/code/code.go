@@ -215,9 +215,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			},
 		}, Help: "组件列表"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
-			"system": []interface{}{"exit_shy", "common_shy", "init_shy", "bench", "boot.sh"},
+			"system": []interface{}{"exit_shy", "common_shy", "init_shy", "bench", "boot_sh"},
 			"portal": []interface{}{"code_tmpl", "code_js", "context_js"},
 			"file": map[string]interface{}{
+				"node_sh":    "bin/node.sh",
 				"boot_sh":    "bin/boot.sh",
 				"bench":      "bin/bench.new",
 				"init_shy":   "etc/init.shy",
@@ -242,14 +243,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					p = bench
 				}
 			}
-			m.Log("fuck", "wha t%v", p)
 
 			if _, e = os.Stat(p); e != nil {
 				list := strings.Split(key, "/")
-				m.Log("fuck", "wha t%v", list)
 				p = m.Cmdx("nfs.path", m.Conf("upgrade", []string{"file", list[len(list)-1]}))
 			}
-			m.Log("fuck", "wha t%v", e)
 
 			m.Log("info", "upgrade %s %s", p, m.Cmdx("aaa.hash", "file", p))
 			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
@@ -262,8 +260,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 
 			if m.Confs("upgrade", arg[0]) {
-				arg = arg[1:]
-				m.Confm("upgrade", arg[0], func(index int, value string) {
+				key, arg = arg[0], arg[1:]
+				m.Confm("upgrade", key, func(index int, value string) {
 					arg = append(arg, value)
 				})
 			}

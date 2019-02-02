@@ -874,12 +874,11 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		nfs.Configs["prompt"] = &ctx.Config{Value: ""}
 
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
-			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" && m.Confs("term", "enable") {
+			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" && !m.Options("daemon") {
 				nfs.Term(m, "init")
 				defer nfs.Term(m, "exit")
 			}
-			what := make(chan bool)
-			if m.Confs("term", "loop") {
+			if what := make(chan bool); m.Options("daemon") {
 				<-what
 			}
 		}
@@ -1023,7 +1022,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"term": &ctx.Config{Name: "term", Value: map[string]interface{}{
-			"enable": 1, "loop": 0,
 			"width": 80, "height": "24",
 
 			"left": 0, "top": 0, "right": 80, "bottom": 24,

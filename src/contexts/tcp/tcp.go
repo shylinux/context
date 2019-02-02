@@ -8,6 +8,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
+	"toolkit"
 )
 
 type TCP struct {
@@ -79,13 +81,25 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 			m.Assert(e)
 			conf := &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
 
-			c, e := tls.Dial(m.Cap("protocol"), m.Cap("address"), conf)
-			m.Assert(e)
-			tcp.Conn = c
+			for i := 0; i < m.Confi("retry", "counts"); i++ {
+				if c, e := tls.Dial(m.Cap("protocol"), m.Cap("address"), conf); e == nil {
+					tcp.Conn = c
+					break
+				} else {
+					m.Log("info", "dial %s:%s %s", m.Cap("protocol"), m.Cap("address"), e)
+				}
+				time.Sleep(kit.Duration(m.Conf("retry", "interval")))
+			}
 		} else {
-			c, e := net.Dial(m.Cap("protocol"), m.Cap("address"))
-			m.Assert(e)
-			tcp.Conn = c
+			for i := 0; i < m.Confi("retry", "counts"); i++ {
+				if c, e := net.Dial(m.Cap("protocol"), m.Cap("address")); e == nil {
+					tcp.Conn = c
+					break
+				} else {
+					m.Log("info", "dial %s:%s %s", m.Cap("protocol"), m.Cap("address"), e)
+				}
+				time.Sleep(kit.Duration(m.Conf("retry", "interval")))
+			}
 		}
 
 		m.Log("info", "%s dial %s", m.Cap("nclient"),
@@ -170,6 +184,9 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 		"address":  &ctx.Config{Name: "address", Value: ":9090", Help: "网络地址"},
 		"security": &ctx.Config{Name: "security(true/false)", Value: "false", Help: "加密通信"},
 		"protocol": &ctx.Config{Name: "protocol(tcp/tcp4/tcp6)", Value: "tcp4", Help: "网络协议"},
+		"retry": &ctx.Config{Name: "retry", Value: map[string]interface{}{
+			"interval": "3s", "counts": 5,
+		}, Help: "网络协议"},
 	},
 	Commands: map[string]*ctx.Command{
 		"listen": &ctx.Command{Name: "listen address [security [protocol]]", Help: "网络监听", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
