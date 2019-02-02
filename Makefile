@@ -1,5 +1,6 @@
 
 BENCH=src/examples/app/bench.go
+upgrade=usr/upgrade/
 
 install:
 	@go get github.com/nsf/termbox-go
@@ -50,17 +51,17 @@ tar_all: tar linux64 darwin win64
 	tar zcvf tar.tgz tar
 
 linux_arm:
-	GOARCH=arm GOOS=linux go build -o bench.linux.arm $(BENCH)
+	GOARCH=arm GOOS=linux go build -o $(upgrade)bench.linux.arm $(BENCH)
 linux32:
-	GOARCH=386 GOOS=linux go build -o bench.linux32 $(BENCH)
+	GOARCH=386 GOOS=linux go build -o $(upgrade)bench.linux32 $(BENCH)
 linux64:
-	GOARCH=amd64 GOOS=linux go build -o bench.linux64 $(BENCH)
+	GOARCH=amd64 GOOS=linux go build -o $(upgrade)bench.linux64 $(BENCH)
 darwin:
-	GOARCH=amd64 GOOS=darwin go build -o bench.darwin $(BENCH)
+	GOARCH=amd64 GOOS=darwin go build -o $(upgrade)bench.darwin $(BENCH)
 win32:
-	GOARCH=386 GOOS=windows go build -o bench.win32.exe $(BENCH)
+	GOARCH=386 GOOS=windows go build -o $(upgrade)bench.win32.exe $(BENCH)
 win64:
-	GOARCH=amd64 GOOS=windows go build -o bench.win64.exe $(BENCH)
+	GOARCH=amd64 GOOS=windows go build -o $(upgrade)bench.win64.exe $(BENCH)
 
 
 DOTS=etc/dotsfile

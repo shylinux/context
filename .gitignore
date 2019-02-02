@@ -1,6 +1,7 @@
 var/
 pkg/
 *.swp
+*.swo
 # Binaries for programs and plugins
 *.exe
 *.dll

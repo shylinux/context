@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -214,12 +215,18 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			},
 		}, Help: "组件列表"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
+			"system": []interface{}{"exit_shy", "common_shy", "init_shy", "bench", "boot.sh"},
+			"portal": []interface{}{"code_tmpl", "code_js", "context_js"},
 			"file": map[string]interface{}{
 				"boot_sh":    "bin/boot.sh",
 				"bench":      "bin/bench.new",
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
 				"exit_shy":   "etc/exit.shy",
+
+				"code_tmpl":  "usr/template/code/code.tmpl",
+				"code_js":    "usr/librarys/code.js",
+				"context_js": "usr/librarys/context.js",
 			},
 		}, Help: "日志地址"},
 	},
@@ -235,28 +242,43 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					p = bench
 				}
 			}
+			m.Log("fuck", "wha t%v", p)
+
+			if _, e = os.Stat(p); e != nil {
+				list := strings.Split(key, "/")
+				m.Log("fuck", "wha t%v", list)
+				p = m.Cmdx("nfs.path", m.Conf("upgrade", []string{"file", list[len(list)-1]}))
+			}
+			m.Log("fuck", "wha t%v", e)
 
 			m.Log("info", "upgrade %s %s", p, m.Cmdx("aaa.hash", "file", p))
 			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
 			return
 		}},
-		"upgrade": &ctx.Command{Name: "upgrade system|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"upgrade": &ctx.Command{Name: "upgrade system|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
-				m.Cmdy("ctx.config", "upgrade", "file")
+				m.Cmdy("ctx.config", "upgrade")
 				return
 			}
 
-			if arg[0] == "system" {
+			if m.Confs("upgrade", arg[0]) {
 				arg = arg[1:]
-				m.Confm("upgrade", "file", func(key string, value string) {
-					arg = append(arg, key)
+				m.Confm("upgrade", arg[0], func(index int, value string) {
+					arg = append(arg, value)
 				})
 			}
 
 			restart := false
 			for _, link := range arg {
 				if file := m.Conf("upgrade", []string{"file", link}); file != "" {
-					if m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", link), "save", file); strings.HasPrefix(file, "bin/") {
+					dir := path.Dir(file)
+					if _, e = os.Stat(dir); e != nil {
+						e = os.Mkdir(dir, 0777)
+						m.Assert(e)
+					}
+					if m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", link),
+						"GOOS", m.Conf("runtime", "GOOS"), "GOARCH", m.Conf("runtime", "GOARCH"),
+						"save", file); strings.HasPrefix(file, "bin/") {
 						if m.Cmd("cli.system", "chmod", "u+x", file); link == "bench" {
 							m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
 							m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
