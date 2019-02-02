@@ -39,6 +39,10 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	m.Optionv("ps_target", Index)
+	if len(arg) > 0 && arg[0] == "daemon" {
+		m.Options("daemon", true)
+		arg = arg[1:]
+	}
 
 	m.Cmd("log.init")
 	m.Cmd("gdb.init")
@@ -1336,6 +1340,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 func Start(args ...string) bool {
 	if len(args) == 0 {
 		args = append(args, os.Args[1:]...)
+	}
+	if len(args) > 0 && args[0] == "daemon" {
+		Pulse.Options("daemon", true)
+		args = args[1:]
 	}
 
 	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {

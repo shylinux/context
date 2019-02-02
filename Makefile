@@ -53,11 +53,11 @@ tar_all: tar linux64 darwin win64
 linux_arm:
 	GOARCH=arm GOOS=linux go build -o $(upgrade)bench.linux.arm $(BENCH)
 linux32:
-	GOARCH=386 GOOS=linux go build -o $(upgrade)bench.linux32 $(BENCH)
+	GOARCH=386 GOOS=linux go build -o $(upgrade)bench.linux.386 $(BENCH)
 linux64:
-	GOARCH=amd64 GOOS=linux go build -o $(upgrade)bench.linux64 $(BENCH)
+	GOARCH=amd64 GOOS=linux go build -o $(upgrade)bench.linux.amd64 $(BENCH)
 darwin:
-	GOARCH=amd64 GOOS=darwin go build -o $(upgrade)bench.darwin $(BENCH)
+	GOARCH=amd64 GOOS=darwin go build -o $(upgrade)bench.darwin.amd64 $(BENCH)
 win32:
 	GOARCH=386 GOOS=windows go build -o $(upgrade)bench.win32.exe $(BENCH)
 win64:
