@@ -102,7 +102,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"init_env": []interface{}{"ctx_dev", "ctx_box", "ctx_root", "ctx_home", "USER"},
 			"script":   map[string]interface{}{"sh": "bash", "shy": "source", "py": "python"},
 			"init_shy": "etc/init.shy", "exit_shy": "etc/exit.shy",
-			"web_port": ":9094", "ssh_port": ":9090",
+			"web_port": ":9094", "ssh_port": ":9090", "ssh_ports": []interface{}{},
 		}, Help: "运行环境"},
 
 		"alias": &ctx.Config{Name: "alias", Value: map[string]interface{}{

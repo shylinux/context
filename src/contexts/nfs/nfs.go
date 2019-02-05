@@ -1518,7 +1518,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"remote": &ctx.Command{Name: "remote listen|dial args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
-					if sub.Options("hostport") {
+					if sub.Has("hostport") {
 						return sub
 					}
 					sub.Sess("ms_source", sub)

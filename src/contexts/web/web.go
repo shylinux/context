@@ -1027,7 +1027,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 		"/shadow": &ctx.Command{Name: "/shadow", Help: "暗网", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Append("hostport", m.Conf("runtime", "ssh_port"))
+			m.Confm("runtime", "ssh_ports", func(index int, value string) {
+				m.Add("append", "hostport", value)
+			})
 			return
 		}},
 		"/login": &ctx.Command{Name: "/login", Help: "认证", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

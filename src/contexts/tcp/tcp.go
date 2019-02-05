@@ -57,18 +57,21 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return tcp
 }
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
+	address := []string{}
 	if arg[1] == "consul" {
-		if arg[1] = m.Cmdx("web.get", "dev", arg[2], "temp", "hostport.0"); arg[1] == "" {
-			return true
-		}
+		m.Cmd("web.get", "dev", arg[2], "temp", "hostport").Table(func(line map[string]string) {
+			address = append(address, line["value"])
+		})
 		for i := 2; i < len(arg)-1; i++ {
 			arg[i] = arg[i+1]
 		}
 		if len(arg) > 2 {
 			arg = arg[:len(arg)-1]
 		}
+	} else {
+		address = append(address, m.Cap("address", m.Confx("address", arg, 1)))
 	}
-	m.Cap("address", m.Confx("address", arg, 1))
+
 	m.Cap("security", m.Confx("security", arg, 2))
 	m.Cap("protocol", m.Confx("protocol", arg, 3))
 
@@ -80,14 +83,17 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 			m.Assert(e)
 			conf := &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
 
-			for i := 0; i < m.Confi("retry", "counts"); i++ {
-				if c, e := tls.Dial(m.Cap("protocol"), m.Cap("address"), conf); e == nil {
-					tcp.Conn = c
-					break
-				} else {
-					m.Log("info", "dial %s:%s %s", m.Cap("protocol"), m.Cap("address"), e)
+			for _, p := range address {
+				for i := 0; i < m.Confi("retry", "counts"); i++ {
+					if c, e := tls.Dial(m.Cap("protocol"), p, conf); e == nil {
+						m.Cap("address", p)
+						tcp.Conn = c
+						break
+					} else {
+						m.Log("info", "dial %s:%s %s", m.Cap("protocol"), m.Cap("address"), e)
+					}
+					time.Sleep(kit.Duration(m.Conf("retry", "interval")))
 				}
-				time.Sleep(kit.Duration(m.Conf("retry", "interval")))
 			}
 		} else {
 			for i := 0; i < m.Confi("retry", "counts"); i++ {
@@ -142,7 +148,12 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 			m.Cap("stream", fmt.Sprintf("%s", tcp.Addr())))
 
 		addr := strings.Split(tcp.Addr().String(), ":")
-		m.Back(m.Spawn(m.Source()).Add("option", "hostport", fmt.Sprintf("%s:%s", m.Cmd("tcp.ifconfig", "eth0").Append("ip"), addr[len(addr)-1])))
+
+		ports := []interface{}{}
+		m.Cmd("tcp.ifconfig").Table(func(line map[string]string) {
+			ports = append(ports, fmt.Sprintf("%s:%s", line["ip"], addr[len(addr)-1]))
+		})
+		m.Back(m.Spawn(m.Source()).Put("option", "hostport", ports))
 	}
 
 	for {

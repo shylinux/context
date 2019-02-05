@@ -59,9 +59,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			case "listen":
 				m.Call(func(nfs *ctx.Message) *ctx.Message {
-					if nfs.Options("hostport") { // 监听端口
-						m.Conf("runtime", "ssh_port", nfs.Option("hostport"))
+					if nfs.Has("hostport") {
+						m.Conf("runtime", "ssh_ports", nfs.Optionv("hostport"))
 					}
+
 					if !m.Confs("runtime", "node.sess") {
 						if !m.Confs("runtime", "node.cert") { // 设备注册
 							msg := m.Cmd("aaa.rsa", "gen", "common", m.Confv("runtime", "node"))
