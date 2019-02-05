@@ -142,17 +142,15 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("path", r.URL.Path)
 			msg.Optionv("debug", false)
 
+			msg.Option("GOOS", m.Conf("runtime", "GOOS"))
+			msg.Option("GOOS", m.Conf("runtime", "GOARCH"))
 			agent := r.Header.Get("User-Agent")
 			switch {
 			case strings.Contains(agent, "Macintosh"):
 				msg.Option("GOOS", "darwin")
-			default:
-				msg.Option("GOOS", "linux")
 			}
 			switch {
 			case strings.Contains(agent, "Intel"):
-				msg.Option("GOARCH", "386")
-			default:
 				msg.Option("GOARCH", "386")
 			}
 
@@ -397,6 +395,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "工具列表"},
 	},
 	Commands: map[string]*ctx.Command{
+		"init": &ctx.Command{Name: "init", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("web.spide", "dev", "client", "new", kit.Select(m.Conf("runtime", "ctx_dev"), m.Conf("runtime", "ctx_box")))
+			return
+		}},
 		"spide": &ctx.Command{Name: "spide [which [client|cookie [name [value]]]]", Help: "爬虫配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
@@ -562,6 +564,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					for _, v := range res.Cookies() {
 						m.Conf("spide", []string{which, "cookie", v.Name}, v.Value)
 						m.Log("info", "get-cookie %s: %v", v.Name, v.Value)
+					}
+					if res.StatusCode != http.StatusOK {
+						return nil
 					}
 
 					var result interface{}
@@ -1019,6 +1024,40 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			p := m.Cmdx("nfs.path", strings.TrimPrefix(key, "/download/"))
 			m.Log("info", "download %s %s", p, m.Cmdx("aaa.hash", "file", p))
 			http.ServeFile(w, r, p)
+			return
+		}},
+		"/shadow": &ctx.Command{Name: "/shadow", Help: "暗网", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Append("hostport", m.Conf("runtime", "ssh_port"))
+			return
+		}},
+		"/login": &ctx.Command{Name: "/login", Help: "认证", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch {
+			case m.Options("cert"): // 注册证书
+				msg := m.Cmd("aaa.rsa", "info", m.Option("cert"))
+				m.Cmd("aaa.auth", "nodes", msg.Append("route"), "cert", m.Option("cert"))
+				m.Append("sess", m.Cmdx("aaa.sess", "nodes", "nodes", msg.Append("route")))
+
+			case m.Options("pull"): // 下载证书
+				sess := m.Cmd("aaa.auth", "nodes", m.Option("pull"), "session").Append("key")
+				m.Add("append", "username", m.Cmd("aaa.auth", sess, "username").Append("meta"))
+				m.Add("append", "cert", (m.Cmd("aaa.auth", "nodes", m.Option("pull"), "cert").Append("meta")))
+
+			case m.Options("bind"): // 绑定设备
+				sess := m.Cmd("aaa.auth", "nodes", m.Option("bind"), "session").Append("key")
+				if m.Cmd("aaa.auth", sess, "username").Appends("meta") {
+					return // 已经绑定
+				}
+
+				if m.Cmds("aaa.rsa", "verify", m.Cmd("aaa.auth", "username", m.Option("username"), "cert").Append("meta"), m.Option("code"), m.Option("bind")) {
+					m.Cmd("aaa.login", sess, "username", m.Option("username"))
+					m.Append("userrole", "root")
+				}
+			case m.Options("user.cert"): // 用户注册
+				if !m.Cmds("aaa.auth", "username", m.Option("username"), "cert") {
+					m.Cmd("aaa.auth", "username", m.Option("username"), "cert", m.Option("user.cert"))
+				}
+				m.Append("username", m.Option("username"))
+			}
 			return
 		}},
 	},

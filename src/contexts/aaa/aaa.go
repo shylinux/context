@@ -9,13 +9,16 @@ import (
 	crand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 	"toolkit"
@@ -137,6 +140,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"key":         &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
 	},
 	Commands: map[string]*ctx.Command{
+		"init": &ctx.Command{Name: "init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("runtime", "user.cert", m.Cmdx("nfs.load", os.Getenv("user_cert")))
+			m.Conf("runtime", "user.key", m.Cmdx("nfs.load", os.Getenv("user_key")))
+			return
+		}},
 		"hash": &ctx.Command{Name: "hash [meta...]", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "hash")
@@ -624,7 +632,37 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}},
 
+		"login": &ctx.Command{Name: "login nodesess", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmd("aaa.auth", "username", m.Option("username"), "session", "nodes").Table(func(sess map[string]string) {
+					m.Cmd("aaa.auth", sess["key"], "nodes").Table(func(node map[string]string) {
+						m.Add("append", "key", node["key"])
+						m.Add("append", "meta", node["meta"])
+					})
+				})
+				m.Table()
+				return
+			}
+			m.Cmd("aaa.auth", arg[0], "username", m.Option("username"))
+			return
+		}},
+		"share": &ctx.Command{Name: "share nodesess", Help: "共享", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmd("aaa.auth", "username", m.Option("username"), "session", "nodes").Table(func(sess map[string]string) {
+					m.Cmd("aaa.auth", sess["key"], "nodes").Table(func(node map[string]string) {
+						m.Add("key", node["key"])
+						m.Add("meta", node["meta"])
+					})
+				})
+				m.Table()
+				return
+			}
+			m.Cmd("aaa.auth", arg[0], "username", m.Option("username"))
+			return
+		}},
+
 		"rsa": &ctx.Command{Name: "rsa gen|sign|verify|encrypt|decrypt|cert",
+			Form: map[string]int{"common": -1},
 			Help: []string{"gen: 生成密钥, sgin: 私钥签名, verify: 公钥验签, encrypt: 公钥加密, decrypt: 私钥解密",
 				"密钥: rsa gen [keyfile [pubfile [certfile]]]",
 				"加密: rsa encrypt pub content [enfile]",
@@ -650,11 +688,17 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						public := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: pub}))
 						m.Echo(m.Append("public", public))
 
+						common := map[string]interface{}{}
+						for i := 0; i < len(m.Meta["common"]); i += 2 {
+							kit.Chain(common, m.Meta["common"][i], m.Meta["common"][i+1])
+						}
+
 						// 生成证书
 						template := x509.Certificate{
 							SerialNumber: big.NewInt(1),
 							IsCA:         true,
 							KeyUsage:     x509.KeyUsageCertSign,
+							Subject:      pkix.Name{CommonName: kit.Format(common)},
 						}
 						cert, e := x509.CreateCertificate(crand.Reader, &template, &template, &keys.PublicKey, keys)
 						m.Assert(e)
@@ -686,7 +730,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						}
 					case "verify":
 						public, e := x509.ParsePKIXPublicKey(aaa.Decode(arg[1]))
-						m.Assert(e)
+						if e != nil {
+							cert, e := x509.ParseCertificate(aaa.Decode(arg[1]))
+							m.Assert(e)
+							public = cert.PublicKey
+						}
 
 						buf := make([]byte, 1024)
 						n, e := base64.StdEncoding.Decode(buf, Input(arg[2]))
@@ -742,6 +790,14 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						if m.Echo(certificate); len(arg) > 4 {
 							ioutil.WriteFile(arg[4], []byte(certificate), 0666)
 						}
+					case "info":
+						cert, e := x509.ParseCertificate(aaa.Decode(arg[1]))
+						m.Assert(e)
+
+						var common interface{}
+						json.Unmarshal([]byte(cert.Subject.CommonName), &common)
+						m.Put("option", "common", common).Cmdy("ctx.trans", "common", "format", "object")
+
 					case "check":
 						defer func() {
 							recover()

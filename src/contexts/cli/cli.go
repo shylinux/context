@@ -54,11 +54,6 @@ func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return &CLI{Context: c}
 }
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	name, _ := os.Hostname()
-	m.Conf("runtime", "hostname", name)
-	m.Conf("runtime", "pid", os.Getpid())
-	m.Conf("runtime", "GOOS", runtime.GOOS)
-	m.Conf("runtime", "GOARCH", runtime.GOARCH)
 	return cli
 }
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
@@ -103,13 +98,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "终端数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{}, Help: "运行环境"},
+		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
+			"init_env": []interface{}{"ctx_dev", "ctx_box", "ctx_root", "ctx_home", "USER"},
+			"script":   map[string]interface{}{"sh": "bash", "shy": "source", "py": "python"},
+			"init_shy": "etc/init.shy", "exit_shy": "etc/exit.shy",
+			"web_port": ":9094", "ssh_port": ":9090",
+		}, Help: "运行环境"},
 
-		"init_shy": &ctx.Config{Name: "init_shy", Value: "etc/init.shy", Help: "启动脚本"},
-		"exit_shy": &ctx.Config{Name: "exit_shy", Value: "etc/exit.shy", Help: "启动脚本"},
-		"cmd_script": &ctx.Config{Name: "cmd_script", Value: map[string]interface{}{
-			"sh": "bash", "shy": "source", "py": "python",
-		}, Help: "系统命令超时"},
 		"alias": &ctx.Config{Name: "alias", Value: map[string]interface{}{
 			"~":  []string{"context"},
 			"!":  []string{"message"},
@@ -139,6 +134,33 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
 	},
 	Commands: map[string]*ctx.Command{
+		"init": &ctx.Command{Name: "init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("runtime", "GOARCH", runtime.GOARCH)
+			m.Conf("runtime", "GOOS", runtime.GOOS)
+			m.Conf("runtime", "pid", os.Getpid())
+
+			if name, e := os.Hostname(); e == nil {
+				m.Conf("runtime", "hostname", name)
+			}
+			if name, e := os.Getwd(); e == nil {
+				_, file := path.Split(name)
+				m.Conf("runtime", "pathname", file)
+			}
+			m.Confm("runtime", "init_env", func(index int, key string) {
+				m.Conf("runtime", key, os.Getenv(key))
+			})
+
+			if m.Confs("runtime", "ctx_box") {
+				m.Conf("runtime", "node.type", "worker")
+				m.Conf("runtime", "node.name", m.Conf("runtime", "pathname"))
+			} else {
+				m.Conf("runtime", "node.type", "server")
+				m.Conf("runtime", "node.name", strings.Replace(m.Conf("runtime", "hostname"), ".", "_", -1))
+			}
+			m.Conf("runtime", "node.route", m.Conf("runtime", "node.name"))
+
+			return
+		}},
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("dir", "", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
@@ -155,7 +177,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
 					m.Wait()
 				default:
-					m.Cmdy("system", m.Conf("cmd_script", strings.TrimPrefix(path.Ext(p), ".")), arg)
+					m.Cmdy("system", m.Conf("runtime", []string{"script", strings.TrimPrefix(path.Ext(p), ".")}), arg)
 				}
 				return
 			}
@@ -376,7 +398,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			// 解析脚本
 			msg := m
-			for k, v := range m.Confv("cmd_script").(map[string]interface{}) {
+			for k, v := range m.Confv("runtime", "script").(map[string]interface{}) {
 				if strings.HasSuffix(detail[0], "."+k) {
 					msg = m.Spawn(m.Optionv("ps_target"))
 					detail[0] = m.Cmdx("nfs.path", detail[0])

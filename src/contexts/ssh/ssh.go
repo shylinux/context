@@ -35,64 +35,113 @@ func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
 var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Caches: map[string]*ctx.Cache{
 		"nnode":    &ctx.Cache{Name: "nnode", Value: "0", Help: "节点数量"},
-		"nodename": &ctx.Cache{Name: "nodename", Value: "shy", Help: "本机域名"},
+		"nodename": &ctx.Cache{Name: "nodename", Value: "dev", Help: "本机域名"},
 	},
 	Configs: map[string]*ctx.Config{
 		"node":     &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "主机信息"},
 		"hostport": &ctx.Config{Name: "hostport", Value: "", Help: "主机域名"},
-		"nodename": &ctx.Config{Name: "nodename", Value: "com", Help: "主机域名"},
 		"current":  &ctx.Config{Name: "current", Value: "", Help: "当前主机"},
 		"timer":    &ctx.Config{Name: "timer", Value: "", Help: "当前主机"},
 	},
 	Commands: map[string]*ctx.Command{
-		"remote": &ctx.Command{Name: "remote listen|dial args...", Help: "远程连接", Form: map[string]int{"right": 1, "nodename": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"remote": &ctx.Command{Name: "remote listen|dial args...", Help: "远程连接", Form: map[string]int{"right": 1, "nodename": 1, "nodetype": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 { // 查看主机
 				m.Cmdy("ctx.config", "node")
 				return
 			}
 
 			switch arg[0] {
+			case "auto":
+				if m.Cmd("ssh.remote", "dial", "consul", "/shadow"); !m.Confs("runtime", "ctx_box") && m.Confs("runtime", "ssh_port") {
+					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "ssh_port"))
+					m.Cmd("web.serve", "usr", m.Conf("runtime", "web_port"))
+				}
+
+			case "listen":
+				m.Call(func(nfs *ctx.Message) *ctx.Message {
+					if nfs.Options("hostport") { // 监听端口
+						m.Conf("runtime", "ssh_port", nfs.Option("hostport"))
+					}
+					if !m.Confs("runtime", "node.sess") {
+						if !m.Confs("runtime", "node.cert") { // 设备注册
+							msg := m.Cmd("aaa.rsa", "gen", "common", m.Confv("runtime", "node"))
+							m.Conf("runtime", "node.cert", msg.Append("certificate"))
+							m.Conf("runtime", "node.key", msg.Append("private"))
+							m.Cmd("aaa.auth", "nodes", m.Conf("runtime", "node.route"), "cert", msg.Append("certificate"))
+
+							sess := m.Cmdx("aaa.sess", "nodes", "username", m.Conf("runtime", "USER"))
+							m.Cmdx("aaa.auth", sess, "nodes", m.Conf("runtime", "node.route"))
+							m.Cmdx("aaa.auth", "username", m.Conf("runtime", "USER"), "userrole", "root")
+
+						}
+						m.Conf("runtime", "node.sess", m.Cmdx("web.get", "dev", "/login",
+							"cert", m.Confv("runtime", "node.cert"), "temp", "sess.0"))
+					}
+
+					return nil
+				}, "nfs.remote", arg)
+
 			case "redial": // 断线重连
 				if !m.Caps("nodename") {
 					m.Cmdx("remote", "dial", arg[1:])
 				}
-			case "listen", "dial":
+			case "dial":
 				m.Call(func(nfs *ctx.Message) *ctx.Message {
-					if arg[0] == "listen" && nfs.Options("hostport") { // 监听端口
-						m.Conf("hostport", nfs.Option("hostport"))
+					if m.Confs("timer") { // 断线重连
+						m.Conf("timer", m.Cmdx("cli.timer", "delete", m.Conf("timer")))
+					}
 
-					} else if arg[0] == "dial" {
-						if m.Confs("timer") { // 断线重连
-							m.Conf("timer", m.Cmdx("cli.timer", "delete", m.Conf("timer")))
+					m.Spawn(nfs.Target()).Call(func(node *ctx.Message) *ctx.Message {
+						m.Confv("node", node.Result(1), map[string]interface{}{ // 添加主机
+							"create_time": m.Time(),
+							"access_time": m.Time(),
+							"nodename":    node.Result(1),
+							"nodetype":    "master",
+							"module":      nfs.Format("target"),
+
+							"username":  m.Option("right"),
+							"cm_target": "ctx.web.code",
+						})
+
+						m.Conf("runtime", "node.route", node.Result(2)+"."+node.Result(0))
+						if !m.Confs("runtime", "node.sess") { // 设备注册
+							if !m.Confs("runtime", "node.cert") {
+								msg := m.Cmd("aaa.rsa", "gen", "common", m.Confv("runtime", "node"))
+								m.Conf("runtime", "node.cert", msg.Append("certificate"))
+								m.Conf("runtime", "node.key", msg.Append("private"))
+							}
+							m.Conf("runtime", "node.sess", m.Cmdx("web.get", "dev", "/login",
+								"cert", m.Confv("runtime", "node.cert"), "temp", "sess.0"))
 						}
 
-						m.Spawn(nfs.Target()).Call(func(node *ctx.Message) *ctx.Message {
-							m.Confv("node", node.Result(1), map[string]interface{}{ // 添加主机
-								"module":      nfs.Format("target"),
-								"create_time": m.Time(),
-								"access_time": m.Time(),
-								"username":    m.Option("right"),
-								"cm_target":   "ctx.web.code",
-							})
+						if !m.Confs("runtime", "user.name") && m.Confs("runtime", "user.key") { // 用户注册
+							user := m.Cmd("web.get", "dev", "/login", "username", m.Conf("runtime", "USER"),
+								"user.cert", m.Conf("runtime", "user.cert"), "temp", "data", "format", "object")
+							m.Conf("runtime", "user.name", user.Append("username"))
+						}
 
-							m.Cap("stream", nfs.Format("target"))
-							m.Cap("nodename", node.Result(0))
-							if !m.Confs("current") {
-								m.Conf("current", node.Result(1))
-							}
+						if m.Confs("runtime", "user.name") { // 绑定用户
+							msg := m.Cmd("web.get", "dev", "/login", "username", m.Conf("runtime", "user.name"),
+								"bind", m.Conf("runtime", "node.route"), "code", m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "user.key"), m.Conf("runtime", "node.route")), "temp", "data", "format", "object")
+							m.Cmd("aaa.auth", "username", m.Conf("runtime", "user.name"), "userrole", msg.Append("userrole"))
+						}
 
-							nfs.Free(func(nfs *ctx.Message) bool { // 连接中断
-								m.Conf("timer", m.Cmdx("cli.timer", "repeat", "10s", "context", "ssh", "remote", "redial", arg[1:]))
+						m.Cap("stream", nfs.Format("target"))
+						if !m.Confs("current") {
+							m.Conf("current", node.Result(1))
+						}
 
-								m.Log("info", "delete node %s", node.Result(1))
-								delete(m.Confm("node"), node.Result(1))
-								m.Cap("nodename", "")
-								m.Cap("stream", "")
-								return true
-							})
-							return nil
-						}, "send", "recv", "add", m.Confx("nodename"))
-					}
+						nfs.Free(func(nfs *ctx.Message) bool { // 连接中断
+							m.Conf("timer", m.Cmdx("cli.timer", "repeat", "10s", "context", "ssh", "remote", "redial", arg[1:]))
+
+							m.Log("info", "delete node %s", node.Result(1))
+							delete(m.Confm("node"), node.Result(1))
+							m.Cap("nodename", "")
+							m.Cap("stream", "")
+							return true
+						})
+						return nil
+					}, "send", "recv", "add", m.Conf("runtime", "node.name"), m.Conf("runtime", "node.type"))
 					return nil
 				}, "nfs.remote", arg)
 			case "recv":
@@ -100,11 +149,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				case "add":
 					if node := m.Confm("node", arg[2]); node == nil { // 添加主机
 						m.Confv("node", arg[2], map[string]interface{}{
-							"module":      m.Format("source"),
 							"create_time": m.Time(),
 							"access_time": m.Time(),
-							"username":    m.Option("right"),
-							"cm_target":   "ctx.web.code",
+							"nodename":    arg[2],
+							"nodetype":    arg[3],
+							"module":      m.Format("source"),
+
+							"username":  m.Option("right"),
+							"cm_target": "ctx.web.code",
 						})
 					} else if len(arg) > 3 && arg[3] == kit.Format(node["token"]) { // 断线重连
 						node["access_time"] = m.Time()
@@ -112,11 +164,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					} else { // 域名冲突
 						arg[2] = fmt.Sprintf("%s_%d", arg[2], m.Capi("nnode", 1))
 						m.Confv("node", arg[2], map[string]interface{}{
-							"module":      m.Format("source"),
 							"create_time": m.Time(),
 							"access_time": m.Time(),
-							"username":    m.Option("right"),
-							"cm_target":   "ctx.web.code",
+							"nodename":    arg[2],
+							"nodetype":    arg[3],
+							"module":      m.Format("source"),
+
+							"username":  m.Option("right"),
+							"cm_target": "ctx.web.code",
 						})
 					}
 
@@ -124,7 +179,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Conf("current", arg[2])
 					}
 
-					m.Echo(arg[2]).Echo(m.Cap("nodename")).Back(m)
+					m.Echo(arg[2]).Echo(m.Conf("runtime", "node.name")).Echo(m.Conf("runtime", "node.route")).Back(m)
 					m.Sess("ms_source", false).Free(func(msg *ctx.Message) bool { // 断线清理
 						m.Log("info", "delete node %s", arg[2])
 						delete(m.Confm("node"), arg[2])
@@ -133,26 +188,60 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 			default:
+				if !m.Options("sign_source") { // 数字签名
+					hash, meta := kit.Hash("rand",
+						m.Option("sign_time", m.Time("stamp")),
+						m.Option("sign_username", m.Option("username")),
+						m.Option("sign_source", m.Conf("runtime", "node.route")),
+						m.Option("sign_target", arg[0]),
+						m.Option("sign_cmd", strings.Join(arg[1:], " ")),
+					)
+					m.Option("sign_rand", meta[0])
+					m.Option("sign_code", m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "node.key"), m.Option("sign_hash", hash)))
+				}
+
 				names, arg := strings.SplitN(arg[0], ".", 2), arg[1:]
-
 				if names[0] == "" { // 本地执行
-					node := m.Confm("node", m.Option("nodename"))
-					user := kit.Format(kit.Chain(node, "username"))
+					hash, _ := kit.Hash(
+						m.Option("sign_rand"),
+						m.Option("sign_time"),
+						m.Option("sign_username"),
+						m.Option("sign_source"),
+						m.Option("sign_target"),
+						m.Option("sign_cmd"),
+					)
 
-					sessid := m.Cmd("aaa.user", user, "ssh").Append("key")
-					if sessid == "" { // 创建会话
-						sessid = m.Cmdx("aaa.sess", "ssh", "ip", "what")
-						m.Cmd("aaa.sess", sessid, user, "ppid", "what")
+					// 创建会话
+					if m.Option("sessid", m.Cmd("aaa.auth", "nodes", m.Option("sign_source"), "session").Append("key")); !m.Options("sessid") {
+						m.Option("sessid", m.Cmdx("aaa.sess", "nodes", "nodes", m.Option("sign_source")))
 					}
 
-					bench := m.Cmd("aaa.sess", sessid, "bench").Append("key")
-					if bench == "" { // 创建空间
-						bench = m.Cmdx("aaa.work", sessid, "ssh")
+					// 绑定设备
+					m.Option("username", m.Cmd("aaa.sess", m.Option("sessid"), "username").Append("meta"))
+					if !m.Options("username") || !m.Cmds("aaa.auth", "nodes", m.Option("sign_source"), "cert") {
+						msg := m.Cmd("web.get", "dev", "/login", "pull", m.Option("sign_source"), "temp", "data", "format", "object")
+						if m.Cmds("aaa.auth", "nodes", m.Option("sign_source"), "cert", msg.Append("cert")); m.Appends("username") {
+							m.Cmds("aaa.auth", m.Option("sessid"), "username", m.Option("username", msg.Append("username")))
+						} else {
+							m.Log("fuck", "no username")
+						}
 					}
 
-					if m.Cmds("aaa.work", bench, "right", user, "remote", arg[0]) { // 执行命令
-						msg := m.Find(m.Option("current_ctx", kit.Format(node["cm_target"]))).Cmd(arg).CopyTo(m)
-						node["cm_target"] = msg.Cap("module")
+					// 验证签名
+					if !m.Cmds("aaa.rsa", "verify", m.Cmd("aaa.auth", "nodes", m.Option("sign_source"), "cert").Append("meta"), m.Option("sign_code"), hash) {
+						m.Log("fuck", "sign failure")
+						return
+					}
+
+					// 创建空间
+					if m.Option("bench", m.Cmd("aaa.sess", m.Option("sessid"), "bench").Append("key")); !m.Options("bench") {
+						m.Option("bench", m.Cmdx("aaa.work", m.Option("sessid"), "nodes"))
+					}
+
+					m.Option("current_ctx", kit.Select("ssh", m.Cmdx("aaa.auth", m.Option("bench"), "data", "target")))
+					if m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "remote", arg[0]) { // 执行命令
+						msg := m.Find(m.Option("current_ctx")).Cmd(arg).CopyTo(m)
+						m.Cmd("aaa.auth", m.Option("bench"), "data", "target", msg.Cap("module"))
 					} else {
 						m.Echo("no right %s %s", "remote", arg[0])
 					}
@@ -170,7 +259,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				rest := kit.Select("", names, 1)
-				m.Option("nodename", m.Cap("nodename"))
+				m.Option("username", m.Option("username"))
+				m.Option("nodename", m.Conf("runtime", "node.name"))
 
 				if names[0] == "*" { // 广播命令
 					m.Confm("node", func(name string, node map[string]interface{}) {

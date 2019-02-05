@@ -38,21 +38,14 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	return ctx
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
-	m.Optionv("ps_target", Index)
-	if len(arg) > 0 && arg[0] == "daemon" {
-		m.Options("daemon", true)
-		arg = arg[1:]
-	}
-
-	m.Cmd("log.init")
-	m.Cmd("gdb.init")
-	if m.Cmd("yac.init", "lex"); len(arg) == 0 {
+	m.Cmd("ctx.init")
+	if m.Optionv("ps_target", Index); len(arg) == 0 {
 		m.Cap("stream", "shy")
-		m.Cmd("cli.source", "init.shy").Cmd("cli.source", "stdio").Cmd("cli.source", "exit.shy")
-		return true
+		m.Cmd("cli.source", m.Conf("runtime", "init_shy")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("runtime", "exit_shy"))
+	} else {
+		m.Cmd("cli.source", arg)
 	}
 
-	m.Cmd("cli.source", arg)
 	return true
 }
 func (ctx *CTX) Close(m *Message, arg ...string) bool {
@@ -96,6 +89,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"time_format": &Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
 	},
 	Commands: map[string]*Command{
+		"init": &Command{Name: "init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			for _, x := range []string{"cli", "yac", "nfs", "aaa", "log", "web", "gdb"} {
+				m.Cmd(x + ".init")
+			}
+			return
+		}},
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Echo("usage: help context [module [command|config|cache name]]\n")
@@ -1038,8 +1037,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							m.Add("append", "value", fmt.Sprintf("%s", string(b)))
 						}
 					}
+					if m.Option("format") != "object" {
+						m.Sort("key", "str")
+					}
 					m.Table()
-					// m.Sort("key", "str").Table()
 				case map[string]string:
 					for k, v := range val {
 						m.Add("append", "key", k)

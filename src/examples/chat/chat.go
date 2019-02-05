@@ -54,7 +54,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		}, Help: "聊天记录"},
 		"mp": &ctx.Config{Name: "chat", Value: map[string]interface{}{
 			"appid": "", "appmm": "", "token": "", "site": "https://shylinux.com",
-			"auth": "/sns/jscode2session?grant_type=authorization_code",
+			"auth":         "/sns/jscode2session?grant_type=authorization_code",
+			"tool_path":    "/Applications/wechatwebdevtools.app/Contents/MacOS/cli",
+			"project_path": "/Users/shaoying/context/usr/client/mp",
 		}, Help: "聊天记录"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -208,6 +210,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				m.Echo("no right %s %s", "chat", cmd[0])
 			} else if m.Cmdy("cli.source", m.Option("cmd")); m.Appends("redirect") {
 			}
+			return
+		}},
+		"mp": &ctx.Command{Name: "mp", Help: "talk", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy("cli.system", m.Conf("mp", "tool_path"), arg, m.Conf("mp", "project_path"), "cmd_active", "true")
 			return
 		}},
 

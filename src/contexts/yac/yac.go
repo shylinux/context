@@ -341,9 +341,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				yac.mat = make([]map[byte]*State, m.Confi("info", "nlang"))
 				yac.state = map[State]*State{}
 
-				if len(arg) > 0 {
-					yac.lex = m.Sess(arg[0])
-				}
 				m.Confm("seed", func(line int, seed map[string]interface{}) {
 					m.Spawn().Cmd("train", seed["page"], seed["hash"], seed["word"])
 				})

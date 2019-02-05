@@ -1,7 +1,12 @@
 #! /bin/bash
 
-export box="http://localhost:9094"
-bench="bench"
+export ctx_box=${ctx_box:="http://localhost:9094"}
+export ctx_root="/usr/local/context"
+export ctx_home=~/context
+export ctx_bin="bench"
+
+export user_cert=etc/user/cert.pem
+export user_key=etc/user/key.pem
 
 log() {
     echo -e $*
@@ -14,13 +19,13 @@ prepare() {
 
 main() {
     while true; do
-        $bench "$@" 2>var/log/boot.log && break
+        $ctx_bin "$@" 2>var/log/boot.log && break
         log "restarting..." && sleep 3
     done
 }
 
 case $1 in
-    create) mkdir $2 && cd $2 && shift && shift && prepare && main "$@";;
+    create) mkdir $2; cd $2 && shift && shift && prepare && main "$@";;
     init) shift; prepare && main "$@";;
     *) mkdir -p var/run var/log && main "$@";;
 esac

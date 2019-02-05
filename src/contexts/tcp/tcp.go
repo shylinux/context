@@ -58,8 +58,7 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 }
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	if arg[1] == "consul" {
-		arg[1] = m.Cmdx("web.get", "", arg[2], "temp", "hostport.0")
-		if arg[1] == "" {
+		if arg[1] = m.Cmdx("web.get", "dev", arg[2], "temp", "hostport.0"); arg[1] == "" {
 			return true
 		}
 		for i := 2; i < len(arg)-1; i++ {

@@ -244,10 +244,13 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 			}
 
+			m.Log("fuck", "what %v", p)
 			if _, e = os.Stat(p); e != nil {
 				list := strings.Split(key, "/")
+				m.Log("fuck", "what %v", list)
 				p = m.Cmdx("nfs.path", m.Conf("upgrade", []string{"file", list[len(list)-1]}))
 			}
+			m.Log("fuck", "what %v", p)
 
 			m.Log("info", "upgrade %s %s", p, m.Cmdx("aaa.hash", "file", p))
 			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
@@ -317,10 +320,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			if len(arg) > 1 {
 				m.Copy(m.Spawn().Cmd("get", m.Conf("counter_service"), "name", arg[0], "count", arg[1]), "result")
 			}
-			return
-		}},
-		"/consul": &ctx.Command{Name: "/consul", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Append("hostport", m.Cmdx("ssh.config", "hostport"))
 			return
 		}},
 	},

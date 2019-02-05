@@ -330,6 +330,9 @@ func (m *Message) Time(arg ...interface{}) string {
 	} else if len(arg) > 0 {
 		str = fmt.Sprintf("%v", arg[0])
 	}
+	if str == "stamp" {
+		return kit.Format(t.Unix())
+	}
 	return t.Format(str)
 }
 func (m *Message) Code() int {
@@ -1102,9 +1105,7 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 }
 func (m *Message) GoFunc(msg *Message, hand ...func(msg *Message)) *Message {
 	go func() {
-		m.Log("info", "%v safe go begin", m.Capi("ngo", 1))
 		m.TryCatch(msg, true, hand...)
-		m.Log("info", "%v safe go end", m.Capi("ngo", -1)+1)
 	}()
 	return m
 }

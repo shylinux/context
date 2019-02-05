@@ -905,7 +905,10 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			for i := m.Capi("ninput") - 1; i < m.Capi("ninput"); i++ {
 				line = m.Conf("input", []interface{}{i, "line"})
 
-				msg := m.Backs(m.Spawn(m.Source()).Set("detail", line).Set("option", "file_pos", i))
+				msg := m.Backs(m.Spawn(m.Source()).Set(
+					"detail", line).Set(
+					"option", "file_pos", i).Set(
+					"option", "username", m.Conf("runtime", "USER")))
 
 				nfs.printf(m.Conf("prompt"), line)
 				nfs.printf(msg.Meta["result"])
@@ -932,6 +935,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		case msg = <-nfs.send:
 			code = msg.Code()
 			nfs.hand[code] = msg
+			msg.Option("username", m.Conf("runtime", "USER"))
 		case msg = <-nfs.echo:
 			code, meta, body = msg.Optioni("remote_code"), "result", "append"
 		}
@@ -1108,9 +1112,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				"limit":  "10",
 			},
 		}, Help: "命令集合"},
-		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", ""}, Help: "文件路径"},
+		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", "bin", ""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
+		"init": &ctx.Command{Name: "init", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("paths", -2, m.Conf("runtime", "ctx_home"))
+			m.Conf("paths", -2, m.Conf("runtime", "ctx_root"))
+			return
+		}},
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 && arg[0] == "all" {
 				m.Cmdy("nfs.config", "paths")

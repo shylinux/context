@@ -324,6 +324,9 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 		"info":  &ctx.Config{Name: "info", Value: map[string]interface{}{"compact": true, "ncell": 128, "nlang": 64}, Help: "嵌套层级日志的标记"},
 	},
 	Commands: map[string]*ctx.Command{
+		"init": &ctx.Command{Name: "init", Help: "启动", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			return
+		}},
 		"spawn": &ctx.Command{Name: "spawn", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*LEX); m.Assert(ok) {
 				m.Start(fmt.Sprintf("matrix%d", m.Capi("nmat", 1)), "matrix")
