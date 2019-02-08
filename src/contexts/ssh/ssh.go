@@ -50,9 +50,21 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				return
 			}
 
+			if !m.Confs("runtime", "node.cert") { // 设备证书
+				msg := m.Cmd("aaa.rsa", "gen", "common", m.Confv("runtime", "node"))
+				m.Conf("runtime", "node.cert", msg.Append("certificate"))
+				m.Conf("runtime", "node.key", msg.Append("private"))
+			}
+
+			if !m.Confs("runtime", "user.cert") { // 用户证书
+				msg := m.Cmd("aaa.rsa", "gen", "common", m.Confv("runtime", "user"))
+				m.Conf("runtime", "user.cert", msg.Append("certificate"))
+				m.Conf("runtime", "user.key", msg.Append("private"))
+			}
+
 			switch arg[0] {
 			case "auto":
-				if m.Cmd("ssh.remote", "dial", "consul", "/shadow"); !m.Confs("runtime", "ctx_box") && m.Confs("runtime", "ssh_port") {
+				if m.Cmd("ssh.remote", "dial", "consul", "/shadow"); !m.Confs("runtime", "ctx_box") {
 					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "ssh_port"))
 					m.Cmd("web.serve", "usr", m.Conf("runtime", "web_port"))
 				}
@@ -60,24 +72,23 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			case "listen":
 				m.Call(func(nfs *ctx.Message) *ctx.Message {
 					if nfs.Has("hostport") {
+						m.Log("info", "ssh_ports %v", nfs.Optionv("hostport"))
 						m.Conf("runtime", "ssh_ports", nfs.Optionv("hostport"))
-					}
 
-					if !m.Confs("runtime", "node.sess") {
-						if !m.Confs("runtime", "node.cert") { // 设备注册
-							msg := m.Cmd("aaa.rsa", "gen", "common", m.Confv("runtime", "node"))
-							m.Conf("runtime", "node.cert", msg.Append("certificate"))
-							m.Conf("runtime", "node.key", msg.Append("private"))
-							m.Cmd("aaa.auth", "nodes", m.Conf("runtime", "node.route"), "cert", msg.Append("certificate"))
-
-							sess := m.Cmdx("aaa.sess", "nodes", "username", m.Conf("runtime", "USER"))
-							m.Cmdx("aaa.auth", sess, "nodes", m.Conf("runtime", "node.route"))
-							m.Cmdx("aaa.auth", "username", m.Conf("runtime", "USER"), "userrole", "root")
-
+						if !m.Confs("runtime", "node.sess") { // 注册设备
+							m.Conf("runtime", "node.sess", m.Cmdx("web.get", "dev", "/login", "cert", m.Confv("runtime", "node.cert"), "temp", "sess.0"))
 						}
-						m.Conf("runtime", "node.sess", m.Cmdx("web.get", "dev", "/login",
-							"cert", m.Confv("runtime", "node.cert"), "temp", "sess.0"))
 					}
+
+					// 创建会话
+					sess := m.Cmd("aaa.auth", "nodes", m.Conf("runtime", "node.route"), "session", "nodes").Append("key")
+					if sess == "" {
+						sess = m.Cmdx("aaa.sess", "nodes", "nodes", m.Conf("runtime", "node.route"))
+						m.Cmd("aaa.auth", "nodes", m.Conf("runtime", "node.route"), "cert", m.Conf("runtime", "node.cert"))
+					}
+
+					m.Cmd("aaa.auth", "username", m.Conf("runtime", "USER"), "userrole", "root")
+					m.Cmdx("aaa.sess", sess, m.Conf("runtime", "USER"), "cert", m.Conf("runtime", "user.cert"))
 
 					return nil
 				}, "nfs.remote", arg)
@@ -92,7 +103,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Conf("timer", m.Cmdx("cli.timer", "delete", m.Conf("timer")))
 					}
 
-					m.Spawn(nfs.Target()).Call(func(node *ctx.Message) *ctx.Message {
+					msg := m.Spawn(nfs.Target())
+					msg.Option("node.cert", m.Conf("runtime", "node.cert"))
+					msg.Option("user.cert", m.Conf("runtime", "user.cert"))
+
+					msg.Call(func(node *ctx.Message) *ctx.Message {
 						m.Confv("node", node.Result(1), map[string]interface{}{ // 添加主机
 							"create_time": m.Time(),
 							"access_time": m.Time(),

@@ -263,10 +263,9 @@ func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 	return s
 }
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
-	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: kit.Select(m.Conf("serve", "directory"), arg, 0), Help: "服务目录"}
-	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "模块路由"}
-	web.Caches["register"] = &ctx.Cache{Name: "register(yes/no)", Value: "no", Help: "是否已初始化"}
 	web.Caches["master"] = &ctx.Cache{Name: "master(yes/no)", Value: "no", Help: "服务入口"}
+	web.Caches["register"] = &ctx.Cache{Name: "register(yes/no)", Value: "no", Help: "是否已初始化"}
+	web.Caches["route"] = &ctx.Cache{Name: "route", Value: "/" + web.Context.Name + "/", Help: "模块路由"}
 
 	web.ServeMux = http.NewServeMux()
 	web.Template = template.New("render").Funcs(ctx.CGI)
@@ -274,7 +273,10 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
-	m.Cap("directory", kit.Select(m.Conf("serve", "directory"), arg, 0))
+	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: kit.Select(m.Conf("serve", "directory"), arg, 0), Help: "服务目录"}
+	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: kit.Select(m.Conf("serve", "protocol"), arg, 2), Help: "服务协议"}
+	web.Caches["address"] = &ctx.Cache{Name: "address", Value: kit.Select(m.Conf("serve", "address"), arg, 1), Help: "服务地址"}
+	m.Log("info", "%d %s %s://%s", m.Capi("nserve", 1), m.Cap("directory"), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
 
 	render := m.Target().Commands["/render"]
 	proxy := m.Target().Commands["/proxy/"]
@@ -283,12 +285,14 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		if h, ok := m.Target().Server.(MUX); ok && m.Cap("register") == "no" {
 			m.Cap("register", "yes")
 
+			// 路由级联
 			p := m.Target().Context()
 			if s, ok := p.Server.(MUX); ok {
 				m.Log("info", "route: /%s <- %s", p.Name, m.Cap("route"))
 				s.Handle(m.Cap("route"), http.StripPrefix(path.Dir(m.Cap("route")), h))
 			}
 
+			// 通用响应
 			if m.Target().Commands["/render"] == nil {
 				m.Target().Commands["/render"] = render
 			}
@@ -296,15 +300,16 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 				m.Target().Commands["/proxy/"] = proxy
 			}
 
+			// 路由节点
 			msg := m.Target().Message()
 			for k, x := range m.Target().Commands {
 				if k[0] == '/' {
-					m.Log("info", "route: %s", k)
+					m.Log("info", "%d route: %s", m.Capi("nroute", 1), k)
 					h.HandleCmd(msg, k, x)
-					m.Capi("nroute", 1)
 				}
 			}
 
+			// 路由文件
 			if m.Cap("directory") != "" {
 				m.Log("info", "route: %sstatic/ <- [%s]\n", m.Cap("route"), m.Cap("directory"))
 				h.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(m.Cap("directory")))))
@@ -313,10 +318,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		return false
 	})
 
-	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: kit.Select(m.Conf("serve", "protocol"), arg, 2), Help: "服务协议"}
-	web.Caches["address"] = &ctx.Cache{Name: "address", Value: kit.Select(m.Conf("serve", "address"), arg, 1), Help: "服务地址"}
-	m.Log("info", "%d %s://%s", m.Capi("nserve", 1), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
-
+	// SSO认证
 	var handler http.Handler
 	if cas_url, e := url.Parse(m.Conf("login", "cas_url")); e == nil && m.Confs("login", "cas_url") {
 		m.Log("info", "cas url: %s", m.Conf("login", "cas_url"))
@@ -326,14 +328,10 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		handler = web
 	}
 
+	// 启动服务
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: handler}
-
 	if m.Caps("master", true); m.Cap("protocol") == "https" {
-		web.Caches["cert"] = &ctx.Cache{Name: "cert", Value: kit.Select(m.Conf("serve", "cert"), arg, 3), Help: "服务证书"}
-		web.Caches["key"] = &ctx.Cache{Name: "key", Value: kit.Select(m.Conf("serve", "key"), arg, 4), Help: "服务密钥"}
-		m.Log("info", "cert [%s]", m.Cap("cert"))
-		m.Log("info", "key [%s]", m.Cap("key"))
-		web.Server.ListenAndServeTLS(m.Cap("cert"), m.Cap("key"))
+		web.Server.ListenAndServeTLS(m.Conf("runtime", "node.cert"), m.Conf("runtime", "node.key"))
 	} else {
 		web.Server.ListenAndServe()
 	}
