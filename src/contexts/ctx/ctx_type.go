@@ -1323,7 +1323,12 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 	})
 
 	m.Log("sync", m.Format("wait", "result", "append"))
-	return <-wait
+	select {
+	case <-time.After(kit.Duration("30s")):
+		m.Log("sync", m.Format("timeout", "result", "append"))
+	case <-wait:
+	}
+	return m
 }
 func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 	if len(cbs) == 0 {
@@ -1364,6 +1369,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	if strings.Contains(key, ".") {
 		arg := strings.Split(key, ".")
 		m, key = m.Sess(arg[0]), arg[1]
+		m.Option("remote_code", "")
 	}
 	if m == nil {
 		return m
@@ -1454,7 +1460,6 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 	if len(args) == 0 {
 		return value
 	}
-
 	switch fun := args[0].(type) {
 	case func(int, string):
 		for i, v := range table {
@@ -1477,6 +1482,9 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 			}
 		}
 	case func(map[string]interface{}):
+		if len(value) == 0 {
+			return nil
+		}
 		fun(value)
 	case func(string, map[string]interface{}):
 		for k, v := range value {

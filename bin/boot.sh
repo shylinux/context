@@ -5,9 +5,6 @@ export ctx_root="/usr/local/context"
 export ctx_home=~/context
 export ctx_bin="bench"
 
-export user_cert=etc/user/cert.pem
-export user_key=etc/user/key.pem
-
 log() {
     echo -e $*
 }

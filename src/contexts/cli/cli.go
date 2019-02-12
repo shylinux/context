@@ -149,16 +149,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Confm("runtime", "init_env", func(index int, key string) {
 				m.Conf("runtime", key, os.Getenv(key))
 			})
-
-			if m.Confs("runtime", "ctx_box") {
-				m.Conf("runtime", "node.type", "worker")
-				m.Conf("runtime", "node.name", m.Conf("runtime", "pathname"))
-			} else {
-				m.Conf("runtime", "node.type", "server")
-				m.Conf("runtime", "node.name", strings.Replace(m.Conf("runtime", "hostname"), ".", "_", -1))
-			}
-			m.Conf("runtime", "node.route", m.Conf("runtime", "node.name"))
-
 			return
 		}},
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

@@ -1,3 +1,5 @@
 source common.shy
+~ssh
+    remote auto
 source local.shy
 

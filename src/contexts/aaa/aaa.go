@@ -126,6 +126,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"auth_type": &ctx.Config{Name: "auth_type", Value: map[string]interface{}{
 			"session":  map[string]interface{}{"unique": true},
 			"bench":    map[string]interface{}{"unique": true},
+			"cert":     map[string]interface{}{"public": true},
 			"username": map[string]interface{}{"public": true},
 			"userrole": map[string]interface{}{"public": true},
 			"password": map[string]interface{}{"secrete": true, "single": true},
@@ -141,6 +142,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("runtime", "node.cert", m.Cmdx("nfs.load", os.Getenv("node_cert")))
+			m.Conf("runtime", "node.key", m.Cmdx("nfs.load", os.Getenv("node_key")))
 			m.Conf("runtime", "user.cert", m.Cmdx("nfs.load", os.Getenv("user_cert")))
 			m.Conf("runtime", "user.key", m.Cmdx("nfs.load", os.Getenv("user_key")))
 			return
@@ -508,7 +511,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				case 2: // 查看会话
 					m.Cmdy("aaa.auth", "ship", "username", arg[0], "session", arg[1])
 				case 3: // 用户认证
-					if m.Cmds("aaa.auth", "ship", "username", arg[0]) && (arg[1] == "password" || arg[1] == "uuid") {
+					if (arg[1] == "password" || arg[1] == "uuid") && m.Cmds("aaa.auth", "ship", "username", arg[0]) {
 						m.Cmdy("aaa.auth", "username", arg[0], arg[1], arg[2])
 						break
 					}
@@ -697,8 +700,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						template := x509.Certificate{
 							SerialNumber: big.NewInt(1),
 							IsCA:         true,
-							KeyUsage:     x509.KeyUsageCertSign,
-							Subject:      pkix.Name{CommonName: kit.Format(common)},
+							BasicConstraintsValid: true,
+							KeyUsage:              x509.KeyUsageCertSign,
+							Subject:               pkix.Name{CommonName: kit.Format(common)},
 						}
 						cert, e := x509.CreateCertificate(crand.Reader, &template, &template, &keys.PublicKey, keys)
 						m.Assert(e)
@@ -797,26 +801,36 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						var common interface{}
 						json.Unmarshal([]byte(cert.Subject.CommonName), &common)
 						m.Put("option", "common", common).Cmdy("ctx.trans", "common", "format", "object")
+					case "grant":
+						private, e := x509.ParsePKCS1PrivateKey(aaa.Decode(arg[1]))
+						m.Assert(e)
 
+						parent, e := x509.ParseCertificate(aaa.Decode(arg[2]))
+						m.Assert(e)
+
+						for _, v := range arg[3:] {
+							template, e := x509.ParseCertificate(aaa.Decode(v))
+							m.Assert(e)
+
+							cert, e := x509.CreateCertificate(crand.Reader, template, parent, template.PublicKey, private)
+							m.Assert(e)
+
+							certificate := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert}))
+							m.Echo(certificate)
+						}
 					case "check":
-						defer func() {
-							recover()
-						}()
-
-						root, e := x509.ParseCertificate(aaa.Decode(arg[1]))
+						parent, e := x509.ParseCertificate(aaa.Decode(arg[1]))
 						m.Assert(e)
 
-						cert, e := x509.ParseCertificate(aaa.Decode(arg[2]))
-						m.Assert(e)
+						for _, v := range arg[2:] {
+							template, e := x509.ParseCertificate(aaa.Decode(v))
+							m.Assert(e)
 
-						// ee := cert.CheckSignatureFrom(root)
-						// m.Echo("%v", ee)
-						//
-						pool := &x509.CertPool{}
-						m.Echo("%c", pool)
-						pool.AddCert(root)
-						c, e := cert.Verify(x509.VerifyOptions{Roots: pool})
-						m.Echo("%c", c)
+							if e = template.CheckSignatureFrom(parent); e != nil {
+								m.Echo("error: ").Echo("%v", e)
+							}
+						}
+						m.Echo("true")
 					}
 				}
 				return

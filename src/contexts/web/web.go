@@ -554,7 +554,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					res, e := web.Client.Do(req)
-					if m.Assert(e); kit.Right(client["logheaders"]) {
+					if e != nil {
+						m.Log("warn", "%v", e)
+						return e
+					}
+					if kit.Right(client["logheaders"]) {
 						for k, v := range res.Header {
 							m.Log("info", "%s: %v", k, v)
 						}
@@ -1025,8 +1029,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 		"/shadow": &ctx.Command{Name: "/shadow", Help: "暗网", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Confm("runtime", "ssh_ports", func(index int, value string) {
-				m.Add("append", "hostport", value)
+			m.Confm("runtime", "node.port", func(index int, value string) {
+				m.Add("append", "ports", value)
 			})
 			return
 		}},

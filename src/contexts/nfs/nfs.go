@@ -150,8 +150,12 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 		flag = arg[0]
 	}
 
-	m.Log("info", "open %s", name)
 	f, e := os.OpenFile(name, flag, 0660)
+	if e == nil {
+		m.Log("info", "open %s", name)
+		return name, f, e
+	}
+	m.Log("warn", "%v", e)
 	return name, f, e
 }
 func Format(args ...interface{}) string {
@@ -929,14 +933,14 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 	nfs.echo = make(chan *ctx.Message, 10)
 	nfs.hand = map[int]*ctx.Message{}
 
+	// 消息发送队列
 	m.GoLoop(m, func(m *ctx.Message) {
 		msg, code, meta, body := m, 0, "detail", "option"
 		select {
-		case msg = <-nfs.send:
+		case msg = <-nfs.send: // 发送请求
 			code = msg.Code()
 			nfs.hand[code] = msg
-			msg.Option("username", m.Conf("runtime", "USER"))
-		case msg = <-nfs.echo:
+		case msg = <-nfs.echo: // 发送响应
 			code, meta, body = msg.Optioni("remote_code"), "result", "append"
 		}
 
@@ -952,7 +956,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		nfs.Send("")
 	})
 
-	//接收消息队列
+	// 消息接收队列
 	msg, code, head, body := m, "0", "result", "append"
 	for bio := bufio.NewScanner(nfs.io); bio.Scan(); {
 
@@ -971,16 +975,20 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				msg.Add(field, value)
 
 			case "":
+				m.Log("recv", "time %v", time.Now().Format(m.Conf("time_format")))
 				if head == "detail" { // 接收请求
 					msg.Detail(-1, "remote")
 					msg.Option("remote_code", code)
-					msg.Call(func(msg *ctx.Message) *ctx.Message {
+					go msg.Call(func(msg *ctx.Message) *ctx.Message {
 						nfs.echo <- msg
 						return nil
 					})
 				} else { // 接收响应
 					h := nfs.hand[kit.Int(code)]
-					h.Copy(msg, "result").Copy(msg, "append").Back(h)
+					h.Copy(msg, "result").Copy(msg, "append")
+					go func() {
+						h.Back(h)
+					}()
 				}
 				msg, code, head, body = nil, "0", "result", "append"
 
@@ -1269,7 +1277,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return
 			}},
 		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if p, f, e := open(m, arg[0]); m.Assert(e) {
+			if p, f, e := open(m, arg[0]); e == nil {
 				defer f.Close()
 
 				pos := kit.Int(kit.Select("0", arg, 2))
@@ -1518,7 +1526,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"remote": &ctx.Command{Name: "remote listen|dial args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Sess("tcp").Call(func(sub *ctx.Message) *ctx.Message {
-					if sub.Has("hostport") {
+					if sub.Has("node.port") {
 						return sub
 					}
 					sub.Sess("ms_source", sub)

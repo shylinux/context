@@ -18,6 +18,37 @@ type TCP struct {
 	*ctx.Context
 }
 
+func (tcp *TCP) Fuck(address []string, action func(address string) (net.Conn, error)) {
+	m := tcp.Message()
+
+	fuck := make(chan bool, 3)
+	for _, p := range address {
+		m.Cap("address", p)
+		for i := 0; i < m.Confi("retry", "counts"); i++ {
+			go func() {
+				p := m.Cap("address")
+				if c, e := action(p); e == nil {
+					tcp.Conn = c
+					fuck <- true
+				} else {
+					m.Log("info", "dial %s:%s %s", m.Cap("protocol"), p, e)
+					fuck <- false
+				}
+			}()
+
+			select {
+			case ok := <-fuck:
+				if ok {
+					return
+				}
+			case <-time.After(kit.Duration(m.Conf("retry", "interval"))):
+				m.Log("info", "dial %s:%s timeout", m.Cap("protocol"), p)
+			}
+			time.Sleep(kit.Duration(m.Conf("retry", "interval")))
+		}
+	}
+}
+
 func (tcp *TCP) Read(b []byte) (n int, e error) {
 	m := tcp.Context.Message()
 	m.Assert(tcp.Conn != nil)
@@ -59,9 +90,13 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	address := []string{}
 	if arg[1] == "consul" {
-		m.Cmd("web.get", "dev", arg[2], "temp", "hostport").Table(func(line map[string]string) {
+		m.Cmd("web.get", "dev", arg[2], "temp", "ports", "format", "object").Table(func(line map[string]string) {
 			address = append(address, line["value"])
 		})
+		if len(address) == 0 {
+			m.Log("warn", "dial failure %v", arg)
+			return true
+		}
 		for i := 2; i < len(arg)-1; i++ {
 			arg[i] = arg[i+1]
 		}
@@ -78,33 +113,17 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	switch arg[0] {
 	case "dial":
 		if m.Caps("security") {
-			m.Sess("aaa", m.Sess("aaa").Cmd("login", "cert", m.Cap("certfile"), "key", m.Cap("keyfile"), "tcp"))
 			cert, e := tls.LoadX509KeyPair(m.Cap("certfile"), m.Cap("keyfile"))
 			m.Assert(e)
 			conf := &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
 
-			for _, p := range address {
-				for i := 0; i < m.Confi("retry", "counts"); i++ {
-					if c, e := tls.Dial(m.Cap("protocol"), p, conf); e == nil {
-						m.Cap("address", p)
-						tcp.Conn = c
-						break
-					} else {
-						m.Log("info", "dial %s:%s %s", m.Cap("protocol"), m.Cap("address"), e)
-					}
-					time.Sleep(kit.Duration(m.Conf("retry", "interval")))
-				}
-			}
+			tcp.Fuck(address, func(p string) (net.Conn, error) {
+				return tls.Dial(m.Cap("protocol"), p, conf)
+			})
 		} else {
-			for i := 0; i < m.Confi("retry", "counts"); i++ {
-				if c, e := net.Dial(m.Cap("protocol"), m.Cap("address")); e == nil {
-					tcp.Conn = c
-					break
-				} else {
-					m.Log("info", "dial %s:%s %s", m.Cap("protocol"), m.Cap("address"), e)
-				}
-				time.Sleep(kit.Duration(m.Conf("retry", "interval")))
-			}
+			tcp.Fuck(address, func(p string) (net.Conn, error) {
+				return net.Dial(m.Cap("protocol"), p)
+			})
 		}
 
 		m.Log("info", "%s dial %s", m.Cap("nclient"),
@@ -153,7 +172,7 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 		m.Cmd("tcp.ifconfig").Table(func(line map[string]string) {
 			ports = append(ports, fmt.Sprintf("%s:%s", line["ip"], addr[len(addr)-1]))
 		})
-		m.Back(m.Spawn(m.Source()).Put("option", "hostport", ports))
+		m.Back(m.Spawn(m.Source()).Put("option", "node.port", ports))
 	}
 
 	for {
@@ -195,7 +214,7 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 		"security": &ctx.Config{Name: "security(true/false)", Value: "false", Help: "加密通信"},
 		"protocol": &ctx.Config{Name: "protocol(tcp/tcp4/tcp6)", Value: "tcp4", Help: "网络协议"},
 		"retry": &ctx.Config{Name: "retry", Value: map[string]interface{}{
-			"interval": "3s", "counts": 5,
+			"interval": "3s", "counts": 3,
 		}, Help: "网络协议"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -231,20 +250,21 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 		"ifconfig": &ctx.Command{Name: "ifconfig [name]", Help: "网络配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if ifs, e := net.Interfaces(); m.Assert(e) {
 				for _, v := range ifs {
-
+					if len(arg) > 0 && !strings.Contains(v.Name, arg[0]) {
+						continue
+					}
 					if ips, e := v.Addrs(); m.Assert(e) {
 						for _, x := range ips {
 							ip := strings.Split(x.String(), "/")
-
-							if !strings.Contains(ip[0], ":") && len(ip) > 0 && len(v.HardwareAddr) > 0 {
-								if len(arg) > 0 && !strings.Contains(v.Name, arg[0]) {
-									continue
-								}
-								m.Add("append", "index", v.Index)
-								m.Add("append", "name", v.Name)
-								m.Add("append", "hard", v.HardwareAddr)
-								m.Add("append", "ip", ip[0])
+							if strings.Contains(ip[0], ":") || len(ip) == 0 {
+								continue
 							}
+
+							m.Add("append", "index", v.Index)
+							m.Add("append", "name", v.Name)
+							m.Add("append", "ip", ip[0])
+							m.Add("append", "mask", ip[1])
+							m.Add("append", "hard", v.HardwareAddr.String())
 						}
 					}
 				}

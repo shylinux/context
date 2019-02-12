@@ -128,12 +128,13 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 			"call":   map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
 			"back":   map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
 
-			"right": map[string]interface{}{"value": map[string]interface{}{"file": "right.log", "meta": []interface{}{"time", "ship"}}},
-
 			"bench": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}}},
 			"begin": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
 			"start": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
 			"close": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+			"warn":  map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[33m", "color_end": "\033[0m"}},
+
+			"right": map[string]interface{}{"value": map[string]interface{}{"file": "right.log", "meta": []interface{}{"time", "ship"}}},
 
 			"cmd": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"},
 				"lex": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
