@@ -1324,7 +1324,7 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 
 	m.Log("sync", m.Format("wait", "result", "append"))
 	select {
-	case <-time.After(kit.Duration("30s")):
+	case <-time.After(kit.Duration(m.Conf("call_timeout"))):
 		m.Log("sync", m.Format("timeout", "result", "append"))
 	case <-wait:
 	}
