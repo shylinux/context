@@ -27,6 +27,7 @@ shy:
 	cp -r src/examples ~/context/src/
 	cp -r usr/template ~/context/usr/
 	cp -r usr/librarys/ ~/context/usr/
+	cp -r bin ~/context
 
 tar:
 	[ -e tar ] || mkdir tar

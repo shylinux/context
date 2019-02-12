@@ -259,6 +259,9 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 							if strings.Contains(ip[0], ":") || len(ip) == 0 {
 								continue
 							}
+							if len(v.HardwareAddr.String()) == 0 {
+								continue
+							}
 
 							m.Add("append", "index", v.Index)
 							m.Add("append", "name", v.Name)

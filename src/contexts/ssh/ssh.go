@@ -279,7 +279,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							m.Append("user.name", m.Conf("runtime", "user.name"))
 							m.Append("user.route", kit.Select(m.Conf("runtime", "node.route"), m.Conf("runtime", "user.route")))
 						} else { // 代理验证
-							if arg[2] == m.Conf("runtime", "node.route") || m.Cmds("aaa.auth", "proxy", arg[2]) {
+							if arg[2] == m.Conf("runtime", "node.route") || m.Cmds("aaa.auth", "proxy", arg[2], "session") {
 								m.Echo(m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "user.key"), arg[3]))
 							}
 						}
@@ -395,6 +395,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						// 代理验签
 						if !m.Options("user.cert") || !m.Options("user.sign") || !m.Cmds("aaa.rsa", "verify", m.Option("user.cert"), m.Option("user.sign"), hash) {
 							m.Log("warn", "user error")
+							m.Echo("no right of %s", m.Option("text.route"))
 							return
 						}
 						// 创建会话
