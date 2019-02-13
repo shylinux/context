@@ -779,7 +779,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						}
 						list = append(list, args...)
 
-						msg := cmd.Sess("cli").Cmd("source", strings.Join(list, " "))
+						msg := cmd.Sess("cli").Set("option", "current_ctx", m.target.Name).Cmd("source", strings.Join(list, " "))
 						cmd.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
 						return
 					}}

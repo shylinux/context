@@ -95,6 +95,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	if msg.Confs("login", "cas_url") && !msg.Confs("login", "skip_cas") {
 		if !cas.IsAuthenticated(r) {
 			r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
+			msg.Log("info", "cas_login %v %v", r.URL, msg.Conf("login", "cas_url"))
 			cas.RedirectToLogin(w, r)
 			return false
 		}
@@ -105,6 +106,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 			}
 		}
 
+		msg.Log("info", "cas_login %v", msg.Option("ticket"))
 		if msg.Options("ticket") {
 			msg.Option("uuid", msg.Option(msg.Conf("login", "cas_uuid")))
 			msg.Option("username", cas.Username(r))
@@ -319,6 +321,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	})
 
 	// SSO认证
+	m.Log("info", "web: %s", m.Conf("login", "cas_url"))
 	var handler http.Handler
 	if cas_url, e := url.Parse(m.Conf("login", "cas_url")); e == nil && m.Confs("login", "cas_url") {
 		m.Log("info", "cas url: %s", m.Conf("login", "cas_url"))
@@ -328,6 +331,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		handler = web
 	}
 
+	m.Log("info", "web: %s", m.Cap("address"))
 	// 启动服务
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: handler}
 	if m.Caps("master", true); m.Cap("protocol") == "https" {

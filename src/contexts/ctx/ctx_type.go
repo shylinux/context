@@ -90,8 +90,8 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	}
 
 	module := c.Name
-	if c.context != nil {
-		module = c.context.Name + "." + c.Name
+	if c.context != nil && c.context.Caches != nil && c.context.Caches["module"] != nil {
+		module = c.context.Caches["module"].Value + "." + c.Name
 	}
 
 	c.Caches["module"] = &Cache{Name: "module", Value: module, Help: "模块域名"}
@@ -1490,6 +1490,14 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 		for k, v := range value {
 			if val, ok := v.(map[string]interface{}); ok {
 				fun(k, val)
+			}
+		}
+	case func(string, map[string]interface{}) bool:
+		for k, v := range value {
+			if val, ok := v.(map[string]interface{}); ok {
+				if fun(k, val) {
+					break
+				}
 			}
 		}
 	case func(int, map[string]interface{}):

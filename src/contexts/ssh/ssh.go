@@ -111,22 +111,17 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							},
 						})
 
-						m.Log("fuck", "what %v", node.Meta)
 						// 主机路由
 						m.Conf("runtime", "node.route", node.Append("node.route")+"."+node.Result(0))
 						if !m.Confs("runtime", "user.route") {
 							if m.Confs("runtime", "user.cert") && m.Confs("runtime", "user.key") {
 								m.Cmd("ssh.share", "root", m.Conf("runtime", "node.route"))
-								m.Log("fuck", "what %v", 123)
-								m.Log("fuck", "what %v", node.Meta)
-								if !node.Appends("user.route") {
-									m.Log("fuck", "what %v", 123)
-									m.Cmd("ssh.share", node.Append("node.route"), "root", m.Conf("runtime", "node.route"))
-								}
-
 							} else if node.Appends("user.route") {
 								m.Cmd("ssh.share", "root", node.Append("user.route"))
 							}
+						}
+						if !node.Appends("user.route") {
+							m.Cmd("ssh.share", node.Append("node.route"), "root", m.Conf("runtime", "node.route"))
 						}
 
 						// 默认节点
@@ -426,7 +421,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Cmd("aaa.auth", "proxy")
 				return
 			}
-			m.Cmd("aaa.auth", "proxy", arg[0])
+			if !m.Cmds("aaa.auth", "proxy", arg[0], "session") {
+				m.Cmd("aaa.sess", "proxy", "proxy", arg[0])
+			}
 			return
 		}},
 		"login": &ctx.Command{Name: "login client.route", Help: "用户节点", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -489,6 +486,15 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			} else if m.Confm("node", arg[0]) != nil {
 				m.Conf("current", arg[0])
 				arg = arg[1:]
+			} else {
+				m.Confm("node", func(name string, node map[string]interface{}) bool {
+					if strings.Contains(name, arg[0]) {
+						m.Conf("current", name)
+						arg = arg[1:]
+						return true
+					}
+					return false
+				})
 			}
 
 			msg := m.Cmd("ssh.remote", m.Conf("current"), arg)
