@@ -194,7 +194,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
 			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
-			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1},
+			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1, "cmd_temp": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				for _, v := range m.Meta["result"] {
 					if strings.TrimSpace(v) != "" {
@@ -261,27 +261,32 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						if e := cmd.Run(); e != nil {
 							m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
 						} else {
-							switch m.Option("cmd_parse") {
-							case "json":
-								var data interface{}
-								if json.Unmarshal(out.Bytes(), &data) == nil {
-									msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
-									m.Copy(msg, "append").Copy(msg, "result")
-								} else {
+							if m.Options("cmd_temp") {
+								m.Put("option", "data", out.String()).Cmdy("mdb.temp", "script", strings.Join(arg, " "), "data", "data", m.Meta["cmd_temp"])
+							} else {
+
+								switch m.Option("cmd_parse") {
+								case "json":
+									var data interface{}
+									if json.Unmarshal(out.Bytes(), &data) == nil {
+										msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
+										m.Copy(msg, "append").Copy(msg, "result")
+									} else {
+										m.Echo(out.String())
+									}
+
+								case "csv":
+									data, e := csv.NewReader(out).ReadAll()
+									m.Assert(e)
+									for i := 1; i < len(data); i++ {
+										for j := 0; j < len(data[i]); j++ {
+											m.Add("append", data[0][j], data[i][j])
+										}
+									}
+									m.Table()
+								default:
 									m.Echo(out.String())
 								}
-
-							case "csv":
-								data, e := csv.NewReader(out).ReadAll()
-								m.Assert(e)
-								for i := 1; i < len(data); i++ {
-									for j := 0; j < len(data[i]); j++ {
-										m.Add("append", data[0][j], data[i][j])
-									}
-								}
-								m.Table()
-							default:
-								m.Echo(out.String())
 							}
 						}
 						wait <- true
