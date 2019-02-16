@@ -30,7 +30,7 @@ install() {
     wget -O etc/exit.shy $ctx_dev/exit_shy
     wget -O etc/init.shy $ctx_dev/init_shy
     wget -O etc/common.shy $ctx_dev/common_shy
-    wget -O bin/bench "$ctx_dev/bench?GOOS=$GOOS&GOARCH=$GOARCH" && chmod u+x bin/bench
+    wget -O bin/bench.new "$ctx_dev/bench?GOOS=$GOOS&GOARCH=$GOARCH" && chmod u+x bin/bench.new && mv bin/bench.new bin/bench
     wget -O bin/boot.sh $ctx_dev/boot_sh && chmod u+x bin/boot.sh
     wget -O bin/node.sh $ctx_dev/node_sh && chmod u+x bin/node.sh
 }
