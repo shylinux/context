@@ -636,6 +636,59 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 
 	return m
 }
+func (m *Message) CopyFuck(msg *Message, arg ...string) *Message {
+	if m == msg {
+		return m
+	}
+
+	for i := 0; i < len(arg); i++ {
+		meta := arg[i]
+
+		switch meta {
+		case "target":
+			m.target = msg.target
+		case "callback":
+			m.callback = msg.callback
+		case "detail", "result":
+			if len(msg.Meta[meta]) > 0 {
+				m.Add(meta, msg.Meta[meta][0], msg.Meta[meta][1:])
+			}
+		case "option", "append":
+			if msg.Meta == nil {
+				msg.Meta = map[string][]string{}
+			}
+			if msg.Meta[meta] == nil {
+				break
+			}
+			if i == len(arg)-1 {
+				arg = append(arg, msg.Meta[meta]...)
+			}
+
+			for i++; i < len(arg); i++ {
+				if v, ok := msg.Data[arg[i]]; ok {
+					m.Put(meta, arg[i], v)
+				} else if v, ok := msg.Meta[arg[i]]; ok {
+					m.Add(meta, arg[i], v) // TODO fuck Add
+				}
+			}
+		default:
+			if msg.Hand {
+				meta = "append"
+			} else {
+				meta = "option"
+			}
+
+			if v, ok := msg.Data[arg[i]]; ok {
+				m.Put(meta, arg[i], v)
+			}
+			if v, ok := msg.Meta[arg[i]]; ok {
+				m.Add(meta, arg[i], v)
+			}
+		}
+	}
+
+	return m
+}
 func (m *Message) Echo(str string, arg ...interface{}) *Message {
 	if len(arg) > 0 {
 		return m.Add("result", fmt.Sprintf(str, arg...))

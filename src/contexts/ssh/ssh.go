@@ -57,7 +57,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		}},
 		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "远程连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
-				m.Cmdy("ctx.config", "node")
+				m.Cmdy("ctx.config", "node", "format", "table")
 				return
 			}
 
@@ -105,6 +105,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Confv("node", node.Append("node.name"), map[string]interface{}{
 							"module":      m.Cap("stream", nfs.Format("target")),
 							"create_time": m.Time(),
+							"type":        "master",
 							"node": map[string]interface{}{
 								"name": node.Append("node.name"),
 								"type": "master",
@@ -166,6 +167,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Confv("node", name, map[string]interface{}{
 						"module":      m.Format("source"),
 						"create_time": m.Time(),
+						"type":        arg[3],
 						"node": map[string]interface{}{
 							"name": name,
 							"type": arg[3],
@@ -479,6 +481,25 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Echo(m.Conf("current"))
 				return
 			}
+			if arg[0] == "sub" {
+				m.Confm("node", func(name string, node map[string]interface{}) {
+					if node["type"] == "master" {
+						return
+					}
+					msg := m.Cmd("ssh.remote", name, arg[1:])
+					if len(msg.Meta["append"]) > 0 && !msg.Has("node") {
+						line := len(msg.Meta[msg.Meta["append"][0]])
+						for i := 0; i < line; i++ {
+							msg.Add("append", "node", m.Conf("runtime", "node.route")+"."+name)
+						}
+						msg.Set("result").Table()
+					}
+					m.CopyFuck(msg, "append")
+					m.CopyFuck(msg, "result")
+					return
+				})
+				return
+			}
 
 			if arg[0] == "node" {
 				m.Conf("current", arg[1])
@@ -547,6 +568,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				msg.Option("filebuf", base64.StdEncoding.EncodeToString(buf))
 				msg.Cmd("remote", m.Conf("current"), "cp", "save", arg[0])
 			}
+			return
+		}},
+		"sync": &ctx.Command{Name: "sync", Help: "同步数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Confm("node", func(name string, node map[string]string) {
+
+			})
 			return
 		}},
 	},

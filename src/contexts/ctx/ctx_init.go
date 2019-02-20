@@ -798,7 +798,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}},
 		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [list|map arg...] [create map|list|string key name help] [delete key]",
 			Help: "配置管理, export: 导出配置, save: 保存配置到文件, load: 从文件加载配置, create: 创建配置, delete: 删除配置",
-			Form: map[string]int{"format": 1},
+			Form: map[string]int{"format": 1, "fields": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 				if len(arg) > 2 && arg[2] == "list" {
 					chain := strings.Split(arg[1], ".")
@@ -962,7 +962,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}},
 
 		"trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换",
-			Form: map[string]int{"format": 1},
+			Form: map[string]int{"format": 1, "fields": -1},
 			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 				value, arg := m.Optionv(arg[0]), arg[1:]
 				if v, ok := value.(string); ok {
@@ -1019,6 +1019,40 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 				switch val := value.(type) {
 				case map[string]interface{}:
+					if m.Option("format") == "table" {
+						fields := []string{}
+						has := map[string]bool{}
+						if m.Options("fields") {
+							fields = m.Optionv("fields").([]string)
+						} else {
+							for _, v := range val {
+								if line, ok := v.(map[string]interface{}); ok {
+									for k, _ := range line {
+										if h, ok := has[k]; ok && h {
+											continue
+										}
+										has[k], fields = true, append(fields, k)
+									}
+								}
+							}
+							sort.Strings(fields)
+						}
+
+						m.Log("fuck", "what %v", fields)
+						m.Log("fuck", "what %v", m.Meta)
+						for k, v := range val {
+							if line, ok := v.(map[string]interface{}); ok {
+								m.Add("append", "key", k)
+								for _, field := range fields {
+									m.Add("append", field, kit.Format(line[field]))
+								}
+							}
+						}
+						m.Log("fuck", "what %v", m.Meta)
+						m.Table()
+						break
+					}
+
 					for k, v := range val {
 						if m.Option("format") == "object" {
 							m.Add("append", k, v)

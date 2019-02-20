@@ -68,6 +68,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 		"temp":      &ctx.Config{Name: "temp", Value: map[string]interface{}{}, Help: "缓存数据"},
 		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
+
+		"note": &ctx.Config{Name: "note", Value: map[string]interface{}{}, Help: "缓存数据"},
 	},
 	Commands: map[string]*ctx.Command{
 		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1, "limit": 1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -466,6 +468,36 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Cmdy("show", arg[0], fields, "where", arg[1])
 				return
 			}},
+
+		"note": &ctx.Command{Name: "note [meta data]....", Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			sync := len(arg) > 0 && arg[0] == "sync"
+			if sync {
+				m.Cmdy("ssh.sh", "sub", "context", "mdb", "note", arg)
+				m.Set("result").Table()
+				arg = arg[1:]
+			}
+
+			if len(arg) == 0 {
+				msg := m.Cmd("mdb.config", "note", "format", "table", "fields", "create_time", "type", "title")
+				m.CopyFuck(msg, "append")
+				m.Set("result").Table()
+				return
+			}
+
+			h, _ := kit.Hash("uniq")
+			data := map[string]interface{}{
+				"create_time": m.Time(),
+				"type":        arg[0],
+				"title":       arg[1],
+				"content":     arg[2],
+			}
+			for i := 3; i < len(arg)-1; i += 2 {
+				kit.Chain(data, data[arg[i]], arg[i+1])
+			}
+			m.Conf("note", h, data)
+			m.Echo(h)
+			return
+		}},
 	},
 }
 

@@ -182,7 +182,6 @@ func Formats(arg ...interface{}) string {
 	}
 	return strings.Join(result, " ")
 }
-
 func Trans(arg ...interface{}) []string {
 	ls := []string{}
 	for _, v := range arg {

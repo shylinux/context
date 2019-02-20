@@ -206,11 +206,16 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 			case termbox.EventMouse:
 				switch ev.Key {
 				case termbox.MouseLeft:
-					nfs.Term(m, "window", ev.MouseX, ev.MouseY)
-					nfs.prompt(what).shadow(rest)
+					if m.Confs("term", "mouse.resize") {
+						nfs.Term(m, "window", ev.MouseX, ev.MouseY)
+						nfs.prompt(what).shadow(rest)
+					}
+
 				case termbox.MouseMiddle:
 				case termbox.MouseRight:
-					nfs.Term(m, "resize", ev.MouseX, ev.MouseY)
+					if m.Confs("term", "mouse.resize") {
+						nfs.Term(m, "resize", ev.MouseX, ev.MouseY)
+					}
 				case termbox.MouseRelease:
 				case termbox.MouseWheelUp:
 					if scroll_count++; scroll_count > m.Confi("term", "scroll_count") {
@@ -1034,6 +1039,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"term": &ctx.Config{Name: "term", Value: map[string]interface{}{
+			"mouse": map[string]interface{}{
+				"resize": false,
+			},
 			"width": 80, "height": "24",
 
 			"left": 0, "top": 0, "right": 80, "bottom": 24,

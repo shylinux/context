@@ -172,6 +172,9 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 		m.Cmd("tcp.ifconfig").Table(func(line map[string]string) {
 			ports = append(ports, fmt.Sprintf("%s:%s", line["ip"], addr[len(addr)-1]))
 		})
+		if len(ports) == 0 {
+			ports = append(ports, fmt.Sprintf("%s:%s", "127.0.0.1", addr[len(addr)-1]))
+		}
 		m.Back(m.Spawn(m.Source()).Put("option", "node.port", ports))
 	}
 
