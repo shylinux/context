@@ -360,7 +360,7 @@ function choose() {
         },
     });
 }
-function open(event) {
+function wopen(event) {
     wx.openAddress({success: function(res) {
         context.Command("show", res)
     }})
@@ -369,7 +369,7 @@ function open(event) {
 <button onclick="scan(this)">scan</button>
 <button onclick="choose(this)">choose</button>
 <button onclick="close(this)">close</button>
-<button onclick="open(this)">openaddress</button>
+<button onclick="wopen(this)">openaddress</button>
 {{end}}
 
 {{define "tail"}}

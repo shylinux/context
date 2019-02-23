@@ -973,7 +973,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						// 执行命令
 						if order != "" || kit.Right(val["pre_run"]) {
 							if list := m.Confv("auth", []string{m.Option("bench"), "data", "action", msg.Option("componet_name"), "cmd"}); list != nil && order == "" {
-								args = kit.Trans(list)
+								// args = kit.Trans(list)
 							}
 
 							if msg.Cmd(args); m.Options("bench") {
