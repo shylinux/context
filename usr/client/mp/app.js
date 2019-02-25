@@ -1,4 +1,3 @@
-//app.js
 App({
     request: function(data, done, fail) {
         var app = this

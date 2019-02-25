@@ -3,7 +3,7 @@
         <input class="command" type="text" bindconfirm="onCommand" confirm-hold="true" focus="true"/>
     </view>
     <scroll-view scroll-y class="table">
-        <view class="table-row" wx:if="{{append}}"><view class="table-th" wx:for="{{append}}">{{item}}</view></view>
+        <view class="table-th" wx:for="{{append}}">{{item}}</view>
         <view class="table-row" wx:for="{{table}}"><view class="table-td" wx:for="{{item}}">{{item}}</view></view>
     </scroll-view>
     <view class="result">{{result}}</view>

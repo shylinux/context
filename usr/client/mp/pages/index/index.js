@@ -20,6 +20,8 @@ Page({
                     table.push(line)
                 }
                 page.setData({append: res.append, table: table})
+            } else {
+                page.setData({append: [], table: []})
             }
             page.setData({result: res.result? res.result.join("") :res})
         })

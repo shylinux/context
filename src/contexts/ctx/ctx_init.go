@@ -1025,7 +1025,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						if m.Options("fields") {
 							fields = m.Optionv("fields").([]string)
 						} else {
+							i := 0
 							for _, v := range val {
+								if i++; i > kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))) {
+									break
+								}
 								if line, ok := v.(map[string]interface{}); ok {
 									for k, _ := range line {
 										if h, ok := has[k]; ok && h {
@@ -1038,9 +1042,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							sort.Strings(fields)
 						}
 
-						m.Log("fuck", "what %v", fields)
-						m.Log("fuck", "what %v", m.Meta)
+						i := 0
 						for k, v := range val {
+							if i++; i > kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))) {
+								break
+							}
 							if line, ok := v.(map[string]interface{}); ok {
 								m.Add("append", "key", k)
 								for _, field := range fields {
@@ -1048,7 +1054,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 								}
 							}
 						}
-						m.Log("fuck", "what %v", m.Meta)
 						m.Table()
 						break
 					}
