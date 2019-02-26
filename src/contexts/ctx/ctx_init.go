@@ -41,7 +41,7 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	m.Cmd("ctx.init")
 	if m.Optionv("ps_target", Index); len(arg) == 0 {
 		m.Cap("stream", "shy")
-		m.Cmd("cli.source", m.Conf("runtime", "init_shy")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("runtime", "exit_shy"))
+		m.Cmd("cli.source", m.Conf("runtime", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("runtime", "script.exit"))
 	} else {
 		m.Cmd("cli.source", arg)
 	}

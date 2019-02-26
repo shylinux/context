@@ -917,7 +917,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				msg := m.Backs(m.Spawn(m.Source()).Set(
 					"detail", line).Set(
 					"option", "file_pos", i).Set(
-					"option", "username", m.Conf("runtime", "USER")))
+					"option", "username", m.Conf("runtime", "boot.USER")))
 
 				nfs.printf(m.Conf("prompt"), line)
 				nfs.printf(msg.Meta["result"])
@@ -1132,8 +1132,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Conf("paths", -2, m.Conf("runtime", "ctx_home"))
-			m.Conf("paths", -2, m.Conf("runtime", "ctx_root"))
+			m.Conf("paths", -2, m.Conf("runtime", "boot.ctx_home"))
+			m.Conf("paths", -2, m.Conf("runtime", "boot.ctx_root"))
 			return
 		}},
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

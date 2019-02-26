@@ -144,8 +144,8 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("path", r.URL.Path)
 			msg.Optionv("debug", false)
 
-			msg.Option("GOOS", m.Conf("runtime", "GOOS"))
-			msg.Option("GOOS", m.Conf("runtime", "GOARCH"))
+			msg.Option("GOOS", m.Conf("runtime", "host.GOOS"))
+			msg.Option("GOOS", m.Conf("runtime", "host.GOARCH"))
 			agent := r.Header.Get("User-Agent")
 			switch {
 			case strings.Contains(agent, "Macintosh"):
@@ -398,7 +398,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("web.spide", "dev", "client", "new", kit.Select(m.Conf("runtime", "ctx_dev"), m.Conf("runtime", "ctx_box")))
+			m.Cmd("web.spide", "dev", "client", "new", kit.Select(m.Conf("runtime", "boot.ctx_dev"), m.Conf("runtime", "boot.ctx_box")))
 			return
 		}},
 		"spide": &ctx.Command{Name: "spide [which [client|cookie [name [value]]]]", Help: "爬虫配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

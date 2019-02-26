@@ -44,15 +44,15 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "启动", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Confs("runtime", "ctx_box") {
+			if m.Confs("runtime", "boot.ctx_box") {
 				m.Conf("runtime", "node.type", "worker")
-				m.Conf("runtime", "node.name", m.Conf("runtime", "pathname"))
+				m.Conf("runtime", "node.name", m.Conf("runtime", "boot.pathname"))
 			} else {
 				m.Conf("runtime", "node.type", "server")
-				m.Conf("runtime", "node.name", strings.Replace(strings.TrimSuffix(m.Conf("runtime", "hostname"), ".local"), ".", "_", -1))
+				m.Conf("runtime", "node.name", strings.Replace(strings.TrimSuffix(m.Conf("runtime", "boot.hostname"), ".local"), ".", "_", -1))
 			}
 			m.Conf("runtime", "node.route", m.Conf("runtime", "node.name"))
-			m.Conf("runtime", "user.name", m.Conf("runtime", "USER"))
+			m.Conf("runtime", "user.name", m.Conf("runtime", "boot.USER"))
 			return
 		}},
 		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "远程连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -70,9 +70,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			switch arg[0] {
 			case "auto": // 自动连接
-				if m.Cmd("ssh.remote", "dial", "consul", "/shadow"); !m.Confs("runtime", "ctx_box") {
-					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "ssh_port"))
-					m.Cmd("web.serve", "usr", m.Conf("runtime", "web_port"))
+				if m.Cmd("ssh.remote", "dial", "consul", "/shadow"); !m.Confs("runtime", "boot.ctx_box") {
+					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "boot.ssh_port"))
+					m.Cmd("web.serve", "usr", m.Conf("runtime", "boot.web_port"))
 				}
 
 			case "listen": // 监听连接

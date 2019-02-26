@@ -100,9 +100,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Configs: map[string]*ctx.Config{
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
 			"init_env": []interface{}{"ctx_dev", "ctx_box", "ctx_root", "ctx_home", "USER"},
-			"script":   map[string]interface{}{"sh": "bash", "shy": "source", "py": "python"},
-			"init_shy": "etc/init.shy", "exit_shy": "etc/exit.shy",
-			"web_port": ":9094", "ssh_port": ":9090", "ssh_ports": []interface{}{},
+			"boot":     map[string]interface{}{"web_port": ":9094", "ssh_port": ":9090"},
+			"script": map[string]interface{}{
+				"sh": "bash", "shy": "source", "py": "python",
+				"init": "etc/init.shy", "exit": "etc/exit.shy",
+			},
 		}, Help: "运行环境"},
 
 		"alias": &ctx.Config{Name: "alias", Value: map[string]interface{}{
@@ -136,19 +138,19 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Conf("runtime", "GOARCH", runtime.GOARCH)
-			m.Conf("runtime", "GOOS", runtime.GOOS)
-			m.Conf("runtime", "pid", os.Getpid())
+			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
+			m.Conf("runtime", "host.GOOS", runtime.GOOS)
+			m.Conf("runtime", "host.pid", os.Getpid())
 
 			if name, e := os.Hostname(); e == nil {
-				m.Conf("runtime", "hostname", name)
+				m.Conf("runtime", "boot.hostname", name)
 			}
 			if name, e := os.Getwd(); e == nil {
 				_, file := path.Split(name)
-				m.Conf("runtime", "pathname", file)
+				m.Conf("runtime", "boot.pathname", file)
 			}
 			m.Confm("runtime", "init_env", func(index int, key string) {
-				m.Conf("runtime", key, os.Getenv(key))
+				m.Conf("runtime", "boot."+key, os.Getenv(key))
 			})
 			return
 		}},
@@ -313,7 +315,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}},
 		"exit": &ctx.Command{Name: "exit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.source", m.Conf("exit_shy"))
+			m.Cmd("cli.source", m.Conf("runtime", "script.exit"))
 			go func() {
 				time.Sleep(time.Second * 3)
 				os.Exit(kit.Int(arg[0]))
