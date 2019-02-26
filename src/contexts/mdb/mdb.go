@@ -499,11 +499,12 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			hm, _ := kit.Hash("type", arg[0], "name", "shy")
 			if len(arg) == 2 && arg[0] == "value" {
 				hm, _ = kit.Hash("type", "index", "name", arg[1])
-				hm, arg = m.Conf("note", []string{hm, "ship", "value", "data"}), arg[1:]
+				arg = arg[1:]
 			} else if len(arg) == 2 && arg[0] == "note" {
 				hm, _ = kit.Hash("type", "model", "name", arg[1])
-				hm, arg = m.Conf("note", []string{hm, "ship", "note", "data"}), arg[1:]
+				arg = arg[1:]
 			}
+
 			if len(arg) == 1 {
 				for i := 0; hm != "" && i < kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))); hm, i = m.Conf("note", []string{hm, "ship", "prev", "data"}), i+1 {
 					model := m.Confm("note", hm)
