@@ -1,14 +1,21 @@
 {
-    "pages":[
-        "pages/index/index"
+    "pages": [
+        "pages/index/index",
+        "pages/list/list",
+        "pages/note/note"
     ],
-    "window":{
-        "backgroundColor":"#000",
-        "backgroundColorTop":"#000",
-        "backgroundColorBottom":"#000",
-        "backgroundTextStyle":"light",
+    "window": {
+        "backgroundColor": "#000",
+        "backgroundColorTop": "#000",
+        "backgroundColorBottom": "#000",
+        "backgroundTextStyle": "light",
         "navigationBarBackgroundColor": "#000",
         "navigationBarTitleText": "context",
-        "navigationBarTextStyle":"white"
+        "navigationBarTextStyle": "white"
+    },
+    "permission": {
+        "scope.userLocation": {
+            "desc": "你的位置信息将用于记录事情发生地点"
+        }
     }
 }
