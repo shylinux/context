@@ -1,4 +1,7 @@
 App({
+    toast: function(text) {
+        wx.showToast()
+    },
     request: function(data, done, fail) {
         var app = this
         data = data || {}
