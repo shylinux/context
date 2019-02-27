@@ -1000,7 +1000,7 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 	return m
 }
 func (m *Message) Sort(key string, arg ...string) *Message {
-	cmp := "string"
+	cmp := "str"
 	if len(arg) > 0 {
 		cmp = arg[0]
 	}
