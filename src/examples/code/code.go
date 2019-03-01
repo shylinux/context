@@ -289,7 +289,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 
 			if restart {
-				m.Cmd("cli.exit", 1)
+				m.Cmd("cli.quit", 1)
 			}
 			return
 		}},

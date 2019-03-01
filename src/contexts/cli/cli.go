@@ -113,10 +113,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			":":  []string{"command"},
 			"::": []string{"command", "list"},
 
-			"pwd":      []string{"nfs.pwd"},
-			"path":     []string{"nfs.path"},
-			"dir":      []string{"nfs.dir"},
-			"git":      []string{"nfs.git"},
+			// "pwd":      []string{"nfs.pwd"},
+			// "path":     []string{"nfs.path"},
+			// "dir":      []string{"nfs.dir"},
+			// "git":      []string{"nfs.git"},
 			"brow":     []string{"web.brow"},
 			"ifconfig": []string{"tcp.ifconfig"},
 		}, Help: "启动脚本"},
@@ -132,6 +132,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"top": map[string]interface{}{"active": true},
 			"ls":  map[string]interface{}{"arg": []interface{}{"-l"}},
 		}, Help: "系统命令配置, active: 交互方式, cmd: 命令映射, arg: 命令参数, args: 子命令参数, path: 命令目录, env: 环境变量, dir: 工作目录"},
+		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "系统命令超时"},
 
 		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
@@ -151,6 +152,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			m.Confm("runtime", "init_env", func(index int, key string) {
 				m.Conf("runtime", "boot."+key, os.Getenv(key))
+			})
+			return
+		}},
+		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Confm("daemon", func(key string, info map[string]interface{}) {
+				m.Cmd("cli.system", key, "stop")
 			})
 			return
 		}},
@@ -196,8 +203,40 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
 			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
-			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1, "cmd_temp": -1},
+			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1, "cmd_temp": -1, "cmd_log": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				if len(arg) == 0 {
+					m.Confm("daemon", func(key string, info map[string]interface{}) {
+						if cmd, ok := info["cmd"].(*exec.Cmd); ok {
+							m.Add("append", "key", key)
+							m.Add("append", "create_time", info["create_time"])
+							m.Add("append", "cmd", kit.Select(cmd.Args[0], cmd.Args, 1))
+							m.Add("append", "log", info["log"])
+							m.Add("append", "pid", cmd.Process.Pid)
+							m.Add("append", "finish_time", info["finish_time"])
+							if cmd.ProcessState == nil {
+								m.Add("append", "str", "")
+							} else {
+								m.Add("append", "str", cmd.ProcessState.String())
+							}
+						}
+					})
+					m.Table()
+					return
+				}
+				if m.Confm("daemon", arg[0], func(daemon map[string]interface{}) {
+					if cmd, ok := daemon["cmd"].(*exec.Cmd); ok {
+						switch arg[1] {
+						case "stop":
+							cmd.Process.Kill()
+						default:
+							m.Echo("%v", cmd)
+						}
+					}
+				}) != nil {
+					return
+				}
+
 				for _, v := range m.Meta["result"] {
 					if strings.TrimSpace(v) != "" {
 						arg = append(arg, v)
@@ -231,13 +270,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
 					}
 				}
+
 				for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
 					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
 				}
 				m.Log("info", "cmd.env %v", cmd.Env)
-				for _, v := range os.Environ() {
-					cmd.Env = append(cmd.Env, v)
-				}
+				// for _, v := range os.Environ() {
+				// 	cmd.Env = append(cmd.Env, v)
+				// }
 
 				if m.Options("cmd_dir") {
 					cmd.Dir = m.Option("cmd_dir")
@@ -253,6 +293,27 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					} else if e := cmd.Wait(); e != nil {
 						m.Echo("error: ").Echo("%s\n", e)
 					}
+				} else if m.Options("cmd_log") {
+
+					l, e := os.Create(m.Option("cmd_log"))
+					m.Assert(e)
+					cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, l, l
+
+					h, _ := kit.Hash("uniq")
+					m.Conf("daemon", h, map[string]interface{}{
+						"create_time": m.Time(), "cmd": cmd, "log": m.Option("cmd_log"),
+					})
+					m.Echo(h)
+
+					m.GoFunc(m, func(m *ctx.Message) {
+						if e := cmd.Start(); e != nil {
+							m.Echo("error: ").Echo("%s\n", e)
+						} else if e := cmd.Wait(); e != nil {
+							m.Echo("error: ").Echo("%s\n", e)
+						}
+						m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))
+					})
+
 				} else {
 					wait := make(chan bool, 1)
 					m.GoFunc(m, func(m *ctx.Message) {
@@ -314,7 +375,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				return
 			}},
-		"exit": &ctx.Command{Name: "exit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmd("cli.source", m.Conf("runtime", "script.exit"))
 			go func() {
 				time.Sleep(time.Second * 3)

@@ -228,6 +228,9 @@ func (c *Context) Sub(key string) *Context {
 	return c.contexts[key]
 }
 func (c *Context) Travel(m *Message, hand func(m *Message, n int) (stop bool)) *Context {
+	if c == nil {
+		return nil
+	}
 	target := m.target
 
 	cs := []*Context{c}
@@ -1205,6 +1208,12 @@ func (m *Message) Find(name string, root ...bool) *Message {
 			return nil
 		}
 	}
+
+	if len(root) > 1 && root[1] {
+		m.target = target
+		return m
+	}
+
 	return m.Spawn(target)
 }
 func (m *Message) Search(key string, root ...bool) []*Message {
@@ -1307,6 +1316,17 @@ func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context
 			context = append(context, msg.target)
 		}
 	}
+	// if m.target.root != nil && m.target.root.Configs != nil && m.target.root.Configs["search"] != nil && m.target.root.Configs["search"].Value != nil {
+	// 	target := m.target
+	// 	for _, v := range kit.Trans(kit.Chain(m.target.root.Configs["search"].Value, "context")) {
+	// 		if t := m.Find(v, true, true); t != nil {
+	// 			kit.Log("error", "%v", t)
+	// 			// 		// 	context = append(context, t.target)
+	// 		}
+	// 	}
+	// 	m.target = target
+	// }
+
 	context = append(context, m.source)
 
 	for _, s := range context {
