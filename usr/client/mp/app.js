@@ -7,7 +7,7 @@ App({
         data = data || {}
         data.sessid = app.sessid || ""
 
-        wx.request({url: "https://shylinux.com/chat/mp", data: data,
+        wx.request({method: "POST", url: "https://shylinux.com/chat/mp", data: data,
             success: function(res) {
                 typeof done == "function" && done(res.data)
             },
@@ -35,6 +35,10 @@ App({
     },
 
     onLaunch: function () {
-        this.login()
+        var app = this
+        this.login(function() {
+            app.request({"cmd": ["note", "model"]})
+
+        })
     },
 })

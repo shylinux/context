@@ -135,6 +135,8 @@ nnoremap <Space> :
 nnoremap j gj
 nnoremap k gk
 
+nnoremap <C-M> :make<CR>
+
 nnoremap df :FZF<CR>
 inoremap df _
 inoremap jk <Esc>
@@ -145,12 +147,32 @@ set keywordprg=man\ -a
 set splitbelow
 set splitright
 
+function! Config(type)
+    if a:type == "go"
+        set foldmethod=syntax
+    elseif a:type == "shy"
+        set filetype=shy
+        set commentstring=#%s
+    elseif a:type == "json"
+        set foldmethod=syntax
+    elseif a:type == "conf"
+        set filetype=nginx
+    elseif a:type == "xml"
+        set filetype=xml
+    elseif a:type == "css"
+        set filetype=css
+    endif
+endfunction
+
 autocmd BufReadPost * normal `"
-autocmd BufNewFile,BufReadPost *.shy set filetype=shy
-autocmd BufNewFile,BufReadPost *.shy set commentstring=#%s
-autocmd BufNewFile,BufReadPost *.conf set filetype=nginx
-autocmd BufNewFile,BufReadPost *.go set foldmethod=syntax
-autocmd BufNewFile,BufReadPost *.json set foldmethod=syntax
+
+autocmd BufNewFile,BufReadPost *.go call Config("go")
+autocmd BufNewFile,BufReadPost *.shy call Config("shy")
+autocmd BufNewFile,BufReadPost *.conf call Config("conf")
+autocmd BufNewFile,BufReadPost *.json call Config("json")
+
+autocmd BufNewFile,BufReadPost *.wxml call Config("xml")
+autocmd BufNewFile,BufReadPost *.wxss call Config("css")
 
 command! RR wa | source ~/.vimrc |e
 command! SS mksession! etc/session.vim

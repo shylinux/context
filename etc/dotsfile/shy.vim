@@ -4,8 +4,6 @@ syntax match   shyCommand   "\(^\|\t\|  \|$(\)[a-zA-Z0-9_\.]\+\>"
 syntax match   shyConfig    "\(^\|\t\|  \|$(\)config\>"
 syntax match   shyCache     "\(^\|\t\|  \|$(\)cache\>"
 
-syntax match   shyStmt	"return"
-
 syntax match   shyString	"'[^']*'"
 syntax match   shyString	"\"[^\"]*\""
 syntax match   shyNumber	"-\=\<\d\+\>#\="
@@ -28,8 +26,6 @@ highlight shyContext        ctermfg=red
 highlight shyCommand        ctermfg=green
 highlight shyConfig         ctermfg=yellow
 highlight shyCache          ctermfg=yellow
-
-highlight shyStmt           ctermfg=yellow
 
 highlight shyString         ctermfg=magenta
 highlight shyNumber         ctermfg=magenta
