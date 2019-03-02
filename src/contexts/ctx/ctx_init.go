@@ -45,7 +45,7 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	} else {
 		m.Cmd("cli.source", arg)
 	}
-
+	m.Cmd("ctx.exit")
 	return true
 }
 func (ctx *CTX) Close(m *Message, arg ...string) bool {
@@ -67,6 +67,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"compact_log": &Config{Name: "compact_log(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
 		"auto_make":   &Config{Name: "auto_make(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
 		"debug":       &Config{Name: "debug(on/off)", Value: "on", Help: "调试模式，on:打印，off:不打印)"},
+
+		"search": &Config{Name: "search", Value: map[string]interface{}{
+			"context": []interface{}{"nfs", "web.code"},
+		}, Help: "搜索引擎"},
 
 		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
 		"search_choice": &Config{Name: "search_choice(first/last/rand/magics)", Value: "magics", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magics: 加权选择"},
@@ -93,6 +97,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"init": &Command{Name: "init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			for _, x := range []string{"cli", "yac", "nfs", "aaa", "log", "ssh", "web", "gdb"} {
 				m.Cmd(x + ".init")
+			}
+			return
+		}},
+		"exit": &Command{Name: "exit", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			for _, x := range []string{"cli"} {
+				m.Cmd(x + ".exit")
 			}
 			return
 		}},

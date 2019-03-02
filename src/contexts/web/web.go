@@ -441,11 +441,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					m.Cmd("ctx.config", "spide", strings.Join(arg[:3], "."), arg[3])
 				case "cookie", "header":
-					if len(arg) == 3 {
-						m.Cmdy("ctx.config", "spide", strings.Join(arg[:3], "."))
-						break
+					if len(arg) > 3 {
+						m.Cmd("ctx.config", "spide", strings.Join(arg[:3], "."), arg[3])
 					}
-					m.Cmdy("ctx.config", "spide", strings.Join(arg[:3], "."), arg[3])
+					m.Cmdy("ctx.config", "spide", strings.Join(arg[:3], "."))
 				default:
 					m.Cmd("ctx.config", "spide", strings.Join(arg[:2], "."), arg[2])
 				}

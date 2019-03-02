@@ -36,6 +36,11 @@ function set_layout() {
     } else {
         nav.className = ""
         article.style.width = ""
+
+        var space = wiki.layout.article.width - article.style.maxWidth
+        if (space > 0) {
+            article.style.marginRight = space / 2
+        }
     }
 }
 
