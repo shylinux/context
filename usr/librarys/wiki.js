@@ -5,9 +5,11 @@ var wiki = {
         },
         nav: {
             min_width: 240,
+            border_width: 2,
         },
         article: {
             padding: 20,
+            max_width: 1000,
         },
         footer: {
             height: 40,
@@ -29,6 +31,8 @@ function set_layout() {
         nav.className = "fixed"
         wiki.layout.article.width = window.innerWidth - nav.offsetWidth- 2*wiki.layout.article.padding
         article.style.width = wiki.layout.article.width+"px"
+        var space = wiki.layout.article.width - wiki.layout.article.max_width
+        article.style["margin-right"] = (space>0 ? space/2: 0) + "px"
     } else {
         nav.className = ""
         article.style.width = ""
@@ -67,12 +71,13 @@ function init_layout() {
 
     header.style.height = wiki.layout.header.height+"px"
     footer.style.height = wiki.layout.footer.height+"px"
-    nav.style.height = wiki.layout.nav.height+"px"
+    nav.style.height = wiki.layout.nav.height-wiki.layout.nav.border_width+"px"
     nav.style.minWidth = wiki.layout.nav.min_width+"px"
     nav.style.marginTop = wiki.layout.header.height+"px"
     article.style.minHeight = wiki.layout.article.min_height+"px"
     article.style.marginTop = wiki.layout.header.height+"px"
     article.style.padding = wiki.layout.article.padding+"px"
+    article.style.maxWidth = wiki.layout.article.max_width+"px"
 
     set_layout()
 }
@@ -189,14 +194,19 @@ function init_code() {
 function init_table(event) {
     var append = document.querySelectorAll("article table").forEach(add_sort)
 }
+function adjust() {
+    window.setTimeout(function(){
+        window.scrollBy(0, -80)
+    }, 100)
+}
 
 window.onresize = function (event) {
     init_layout()
 }
 window.onload = function(event) {
-    init_layout()
     init_menu()
     init_link()
     init_code()
     init_table()
+    init_layout()
 }

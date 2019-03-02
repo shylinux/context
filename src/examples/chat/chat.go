@@ -208,7 +208,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			cmd := strings.Split(m.Option("cmd"), " ")
 			if !m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "mp", cmd[0]) {
 				m.Echo("no right %s %s", "chat", cmd[0])
-			} else if m.Cmdy("cli.source", m.Option("cmd")); m.Appends("redirect") {
+			} else if m.Cmdy(m.Option("cmd")); m.Appends("redirect") {
 			}
 			return
 		}},

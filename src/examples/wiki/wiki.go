@@ -27,7 +27,9 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			"md": true,
 		}, Help: "路由数量"},
 		"bench_disable": &ctx.Config{Name: "bench_disable", Value: "true", Help: "工作流"},
-		"login_right":   &ctx.Config{Name: "login_right", Value: "1", Help: "默认组件"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
+			"check": "false",
+		}, Help: "默认组件"},
 
 		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
@@ -35,7 +37,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				map[string]interface{}{"name": "head", "template": "head"},
 				map[string]interface{}{"name": "header", "template": "header"},
 				map[string]interface{}{"name": "list", "template": "list",
-					"componet_ctx": "web.wiki", "componet_cmd": "wiki_list", "arguments": []interface{}{"h2", "int_r"},
+					"componet_ctx": "web.wiki", "componet_cmd": "wiki_list", "arguments": []interface{}{"time", "time_r"},
 					"pre_run": true,
 				},
 				map[string]interface{}{"name": "text", "template": "text",
@@ -49,7 +51,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"wiki_list": &ctx.Command{Name: "wiki_list sort_field sort_order", Help: "wiki_list", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			sort_field, sort_order := "h2", "int_r"
+			sort_field, sort_order := "time", "time_r"
 			if len(arg) > 0 {
 				sort_field, arg = arg[0], arg[1:]
 			}

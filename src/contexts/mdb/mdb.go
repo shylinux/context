@@ -548,11 +548,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 				// 操作元素
 				for i := 2; i < len(arg)-1; i += 2 {
-					data = append(data, map[string]interface{}{"type": arg[i], "name": arg[i+1]})
+					data = append(data, map[string]interface{}{"name": arg[i], "type": arg[i+1]})
 
-					hi, _ := kit.Hash("type", "index", "name", arg[i])
+					hi, _ := kit.Hash("type", "index", "name", arg[i+1])
 					if index := m.Confm("note", hi); index == nil {
-						m.Cmd("mdb.note", "index", arg[i])
+						m.Cmd("mdb.note", "index", arg[i+1])
 					}
 				}
 				m.Confv("note", []string{hm, "data"}, data)

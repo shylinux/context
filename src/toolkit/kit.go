@@ -491,6 +491,8 @@ func Time(arg ...string) int {
 	for _, v := range []string{
 		"2006-01-02 15:04:05",
 		"2006-01-02 15:04",
+		"2006-01-02",
+		"2006/01/02",
 		"01-02 15:04",
 	} {
 		if t, e := time.ParseInLocation(v, arg[0], time.Local); e == nil {

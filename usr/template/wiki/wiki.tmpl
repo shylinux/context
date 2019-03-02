@@ -52,6 +52,8 @@ header .search input:focus {
 nav {
     overflow:auto;
     float:left;
+    max-width:400px;
+    border:solid 2px green;
 }
 nav.fixed {
     position:fixed;
@@ -82,8 +84,8 @@ nav>ul>li>ul>li .mono {
 }
 
 article {
+    clear:both;
     float:right;
-    max-width:calc(100% - 40px);
 }
 article h2 {
     cursor:alias;
@@ -195,7 +197,7 @@ footer .title {
             </ul>
         </li>
         <li><div onclick="action(event, 'toggle_list')">目录</div>
-            <ul class="menu"></ul>
+            <ul class="menu" onclick="adjust(this)"></ul>
         </li>
         <li><div onclick="action(event, 'toggle_list')">链接</div>
             <ul class="link" hidden></ul>
