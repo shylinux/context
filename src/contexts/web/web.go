@@ -145,7 +145,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Optionv("debug", false)
 
 			msg.Option("GOOS", m.Conf("runtime", "host.GOOS"))
-			msg.Option("GOOS", m.Conf("runtime", "host.GOARCH"))
+			msg.Option("GOARCH", m.Conf("runtime", "host.GOARCH"))
 			agent := r.Header.Get("User-Agent")
 			switch {
 			case strings.Contains(agent, "Macintosh"):
@@ -170,6 +170,22 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			}
 			for k, v := range r.Form {
 				msg.Option(k, v)
+			}
+
+			switch r.Header.Get("Content-Type") {
+			case "application/json":
+				var data interface{}
+				json.NewDecoder(r.Body).Decode(&data)
+				msg.Optionv("content_data", data)
+
+				switch d := data.(type) {
+				case map[string]interface{}:
+					for k, v := range d {
+						for _, v := range kit.Trans(v) {
+							msg.Add("option", k, v)
+						}
+					}
+				}
 			}
 
 			if msg.Put("option", "request", r).Put("option", "response", w).Sess("web", msg); web.Login(msg, w, r) {
