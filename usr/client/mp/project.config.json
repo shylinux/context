@@ -37,12 +37,20 @@
 			"list": []
 		},
 		"miniprogram": {
-			"current": 0,
+			"current": 1,
 			"list": [
 				{
-					"id": -1,
+					"id": 0,
 					"name": "note",
 					"pathName": "pages/note/note",
+					"query": "model=note",
+					"scene": null
+				},
+				{
+					"id": -1,
+					"name": "list",
+					"pathName": "pages/list/list",
+					"query": "",
 					"scene": null
 				}
 			]
