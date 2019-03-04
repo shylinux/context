@@ -499,9 +499,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			hm, _ := kit.Hash("type", arg[0], "name", "shy")
 			if len(arg) == 2 && arg[0] == "value" {
 				hm, _ = kit.Hash("type", "index", "name", arg[1])
+				hm = m.Conf("note", []string{hm, "ship", "value", "data"})
 				arg = arg[1:]
 			} else if len(arg) == 2 && arg[0] == "note" {
 				hm, _ = kit.Hash("type", "model", "name", arg[1])
+				hm = m.Conf("note", []string{hm, "ship", "note", "data"})
 				arg = arg[1:]
 			}
 
@@ -513,6 +515,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					m.Add("append", "access_time", model["access_time"])
 					m.Add("append", "type", model["type"])
 					m.Add("append", "name", model["name"])
+					m.Add("append", "view", kit.Format(model["view"]))
 					m.Add("append", "data", kit.Format(model["data"]))
 					m.Add("append", "ship", kit.Format(model["ship"]))
 				}
@@ -521,12 +524,48 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			}
 
 			switch arg[0] {
+			case "search":
+				hv, _ := kit.Hash("type", "value", "name", arg[1], "data", kit.Select(m.Option(arg[1]), arg, 2))
+				hn := m.Conf("note", []string{hv, "ship", "note", "data"})
+
+				for i := 0; hn != "" && i < kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))); hn, i = m.Conf("note", []string{hn, "ship", hv, "data"}), i+1 {
+					note := m.Confm("note", hn)
+					hvs := kit.Trans(note["data"])
+					hm := kit.Format(kit.Chain(note, "ship.model.data"))
+
+					value := []interface{}{}
+					m.Confm("note", []string{hm, "data"}, func(i int, model map[string]interface{}) {
+						value = append(value, map[string]interface{}{
+							"type": model["type"], "name": model["name"],
+							"value": m.Conf("note", []string{hvs[i], "data"}),
+						})
+					})
+
+					m.Add("append", "key", hn)
+					m.Add("append", "create_time", note["create_time"])
+					m.Add("append", "access_time", note["access_time"])
+					m.Add("append", "type", note["type"])
+					m.Add("append", "name", note["name"])
+					m.Add("append", "model", m.Conf("note", []string{hm, "name"}))
+					m.Add("append", "view", kit.Format(m.Conf("note", []string{hm, "view"})))
+					m.Add("append", "value", kit.Format(value))
+					m.Add("append", "data", kit.Format(note["data"]))
+					m.Add("append", "ship", kit.Format(note["ship"]))
+				}
+				m.Table()
+
 			case "model":
 				// 模板详情
 				hm, _ := kit.Hash("type", arg[0], "name", arg[1])
 				if len(arg) == 2 {
 					m.CopyFuck(m.Cmd("mdb.config", "note", hm), "append").Set("result").Table()
-					return
+					break
+				}
+				if arg[2] == "view" {
+					for i := 4; i < len(arg)-1; i += 2 {
+						m.Conf("note", []string{hm, "view", arg[3], arg[i]}, arg[i+1])
+					}
+					break
 				}
 
 				// 操作模板
@@ -610,7 +649,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 				data := []interface{}{}
 				m.Confm("note", []string{hm, "data"}, func(i int, index map[string]interface{}) {
-					hv := m.Cmdx("mdb.note", "value", index["type"], kit.Select("", arg, i+2))
+					hv := m.Cmdx("mdb.note", "value", index["type"], kit.Select(m.Option(kit.Format(index["name"])), arg, i+2))
 					data = append(data, hv)
 
 					ship[hv] = map[string]interface{}{"type": "note", "data": m.Conf("note", []string{hv, "ship", "note", "data"})}

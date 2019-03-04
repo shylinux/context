@@ -359,6 +359,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						return
 					}
 
+					if v, ok := msg.Data[k]; ok {
+						b, e := json.MarshalIndent(v, "", "  ")
+						m.Log("fuck", " %v", b)
+						m.Log("fuck", " %v", e)
+						m.Echo(kit.Formats(v))
+						return e
+					}
 					for i, v := range msg.Meta[k] {
 						m.Add("append", "index", i)
 						m.Add("append", "value", v)

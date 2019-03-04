@@ -177,6 +177,8 @@ func Formats(arg ...interface{}) string {
 		default:
 			if b, e := json.MarshalIndent(val, "", "  "); e == nil {
 				result = append(result, string(b))
+			} else {
+				result = append(result, fmt.Sprintf("%#v", val))
 			}
 		}
 	}

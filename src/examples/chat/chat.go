@@ -198,6 +198,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				return
 			}
 
+			if m.Option("username") == "o978M0XIrcmco28CU1UbPgNxIL78" {
+				m.Option("username", "shy")
+			}
+
 			// 创建空间
 			if !m.Options("bench") && m.Option("bench", m.Cmd("aaa.sess", m.Option("sessid"), "bench").Append("key")) == "" {
 				m.Option("bench", m.Cmdx("aaa.work", m.Option("sessid"), "mp"))
@@ -205,10 +209,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			m.Option("current_ctx", kit.Select("chat", m.Magic("bench", "current_ctx")))
 
 			// 执行命令
-			cmd := strings.Split(m.Option("cmd"), " ")
+			cmd := kit.Trans(m.Optionv("cmd"))
 			if !m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), "mp", cmd[0]) {
 				m.Echo("no right %s %s", "chat", cmd[0])
-			} else if m.Cmdy(m.Option("cmd")); m.Appends("redirect") {
+			} else if m.Cmdy(cmd); m.Appends("redirect") {
 			}
 			return
 		}},
