@@ -77,8 +77,13 @@ App({
 
     command: function(args, cb) {
         var app = this
+        var cmd = args["cmd"]
+        if (cmd[0] == "note") {
+            cmd = ["context", "ssh", "sh", "node", "note", "context", "mdb"].concat(args["cmd"])
+        }
+
         app.login(function(userInfo) {
-            app.request({cmd: ["context", "ssh", "sh", "node", "note", "context", "mdb"].concat(args["cmd"])}, function(res) {
+            app.request({cmd: cmd}, function(res) {
                 app.toast("ok")
                 typeof cb == "function" && cb(res)
             })
