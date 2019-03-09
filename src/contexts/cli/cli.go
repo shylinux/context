@@ -145,7 +145,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Conf("runtime", "host.pid", os.Getpid())
 
 			if name, e := os.Hostname(); e == nil {
-				m.Conf("runtime", "boot.hostname", name)
+				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))
 			}
 			if name, e := os.Getwd(); e == nil {
 				_, file := path.Split(name)
@@ -308,8 +308,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 					m.GoFunc(m, func(m *ctx.Message) {
 						if e := cmd.Start(); e != nil {
+							m.Log("fuck", "%v", e)
 							m.Echo("error: ").Echo("%s\n", e)
 						} else if e := cmd.Wait(); e != nil {
+							m.Log("fuck", "%v", e)
 							m.Echo("error: ").Echo("%s\n", e)
 						}
 						m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))

@@ -69,6 +69,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"temp":      &ctx.Config{Name: "temp", Value: map[string]interface{}{}, Help: "缓存数据"},
 		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
 
+		"note_view": &ctx.Config{Name: "note_view", Value: map[string]interface{}{
+			"default": []interface{}{"key", "create_time", "type", "name", "value"},
+			"base":    []interface{}{"key", "create_time", "type", "name", "value"},
+			"full":    []interface{}{"key", "create_time", "access_time", "type", "name", "model", "value", "view", "data", "ship"},
+		}, Help: "数据视图"},
 		"note": &ctx.Config{Name: "note", Value: map[string]interface{}{
 			"faa01a8fc2fc92dae3fbc02ac1b4ec75": map[string]interface{}{
 				"create_time": "1990-07-30 07:08:09", "access_time": "2017-11-01 02:03:04",
@@ -82,7 +87,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					"prev": map[string]interface{}{"type": "model", "data": ""},
 				},
 			},
-		}, Help: "缓存数据"},
+		}, Help: "数据结构"},
 	},
 	Commands: map[string]*ctx.Command{
 		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1, "limit": 1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -482,210 +487,242 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				return
 			}},
 
-		"note": &ctx.Command{Name: "note [model name [type name]...]|[index name data...]|[value name data...]|[name model data...]", Form: map[string]int{"limit": 1}, Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			// 节点列表
-			if len(arg) == 0 {
-				m.CopyFuck(m.Cmd("mdb.config", "note", "format", "table", "fields", "create_time", "access_time", "type", "name", "data", "ship"), "append").Set("result").Table()
-				return
-			}
+		"note": &ctx.Command{Name: "note [model [name [type name]...]]|[index [name data...]]|[value name data...]|[name model data...]",
+			Form: map[string]int{"offset": 1, "limit": 1}, Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				offset := kit.Int(kit.Select(m.Conf("page_offset"), m.Option("offset")))
+				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
 
-			// 节点详情
-			if note := m.Confm("note", arg[0]); note != nil {
-				m.CopyFuck(m.Cmd("mdb.config", "note", arg[0]), "append").Set("result").Table()
-				return
-			}
-
-			// 节点列表
-			hm, _ := kit.Hash("type", arg[0], "name", "shy")
-			if len(arg) == 2 && arg[0] == "value" {
-				hm, _ = kit.Hash("type", "index", "name", arg[1])
-				hm = m.Conf("note", []string{hm, "ship", "value", "data"})
-				arg = arg[1:]
-			} else if len(arg) == 2 && arg[0] == "note" {
-				hm, _ = kit.Hash("type", "model", "name", arg[1])
-				hm = m.Conf("note", []string{hm, "ship", "note", "data"})
-				arg = arg[1:]
-			}
-
-			if len(arg) == 1 {
-				for i := 0; hm != "" && i < kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))); hm, i = m.Conf("note", []string{hm, "ship", "prev", "data"}), i+1 {
-					model := m.Confm("note", hm)
-					m.Add("append", "key", hm)
-					m.Add("append", "create_time", model["create_time"])
-					m.Add("append", "access_time", model["access_time"])
-					m.Add("append", "type", model["type"])
-					m.Add("append", "name", model["name"])
-					m.Add("append", "view", kit.Format(model["view"]))
-					m.Add("append", "data", kit.Format(model["data"]))
-					m.Add("append", "ship", kit.Format(model["ship"]))
+				// 节点列表
+				if len(arg) == 0 {
+					m.CopyFuck(m.Cmd("mdb.config", "note", "format", "table", "fields", "create_time", "access_time", "type", "name", "data", "ship"), "append").Set("result").Table()
+					return
 				}
-				m.Table()
-				return
-			}
 
-			switch arg[0] {
-			case "search":
-				hv, _ := kit.Hash("type", "value", "name", arg[1], "data", kit.Select(m.Option(arg[1]), arg, 2))
-				hn := m.Conf("note", []string{hv, "ship", "note", "data"})
+				// 节点详情
+				if note := m.Confm("note", arg[0]); note != nil {
+					m.CopyFuck(m.Cmd("mdb.config", "note", arg[0]), "append").Set("result").Table()
+					return
+				}
 
-				for i := 0; hn != "" && i < kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))); hn, i = m.Conf("note", []string{hn, "ship", hv, "data"}), i+1 {
-					note := m.Confm("note", hn)
-					hvs := kit.Trans(note["data"])
-					hm := kit.Format(kit.Chain(note, "ship.model.data"))
+				// 节点列表
+				hm, _ := kit.Hash("type", arg[0], "name", "shy")
+				if len(arg) == 2 && arg[0] == "value" {
+					hm, _ = kit.Hash("type", "index", "name", arg[1])
+					hm = m.Conf("note", []string{hm, "ship", "value", "data"})
+					arg = arg[1:]
+				} else if len(arg) == 2 && arg[0] == "note" {
+					hm, _ = kit.Hash("type", "model", "name", arg[1])
+					hm = m.Conf("note", []string{hm, "ship", "note", "data"})
+					arg = arg[1:]
+				}
+				if len(arg) == 1 && arg[0] != "show" {
+					for i := offset; hm != "" && i < limit; hm, i = m.Conf("note", []string{hm, "ship", "prev", "data"}), i+1 {
+						model := m.Confm("note", hm)
+						m.Add("append", "key", hm)
+						m.Add("append", "create_time", model["create_time"])
+						m.Add("append", "access_time", model["access_time"])
+						m.Add("append", "type", model["type"])
+						m.Add("append", "name", model["name"])
+						m.Add("append", "view", kit.Format(model["view"]))
+						m.Add("append", "data", kit.Format(model["data"]))
+						m.Add("append", "ship", kit.Format(model["ship"]))
+					}
+					m.Table()
+					return
+				}
 
-					value := []interface{}{}
-					m.Confm("note", []string{hm, "data"}, func(i int, model map[string]interface{}) {
-						value = append(value, map[string]interface{}{
-							"type": model["type"], "name": model["name"],
-							"value": m.Conf("note", []string{hvs[i], "data"}),
+				switch arg[0] {
+				case "show":
+					if len(arg) == 1 {
+						m.Cmdy("mdb.note", "index")
+						break
+					}
+					if len(arg) == 2 {
+						if arg[1] == "model" {
+							m.Cmdy("mdb.note", "model")
+						} else {
+							m.Cmdy("mdb.note", "value", arg[1])
+						}
+						break
+					}
+
+					fields := kit.View(arg[3:], m.Confm("note_view"))
+
+					hv, _ := kit.Hash("type", "value", "name", arg[1], "data", kit.Select(m.Option(arg[1]), arg, 2))
+					hn := m.Conf("note", []string{hv, "ship", "note", "data"})
+					if arg[1] == "model" {
+						hm, _ := kit.Hash("type", "model", "name", arg[2])
+						hv, hn = "prev", m.Conf("note", []string{hm, "ship", "note", "data"})
+					}
+
+					for i := offset; hn != "" && i < limit; hn, i = m.Conf("note", []string{hn, "ship", hv, "data"}), i+1 {
+						note := m.Confm("note", hn)
+						hvs := kit.Trans(note["data"])
+						hm := kit.Format(kit.Chain(note, "ship.model.data"))
+
+						for i := 0; i < len(fields); i++ {
+							switch fields[i] {
+							case "key":
+								m.Add("append", "key", hn)
+							case "create_time", "access_time", "type", "name":
+								m.Add("append", fields[i], note[fields[i]])
+							case "model":
+								m.Add("append", "model", m.Conf("note", []string{hm, "name"}))
+							case "view":
+								m.Add("append", "view", kit.Format(m.Conf("note", []string{hm, "view"})))
+							case "value":
+								value := []interface{}{}
+								m.Confm("note", []string{hm, "data"}, func(i int, model map[string]interface{}) {
+									value = append(value, map[string]interface{}{
+										"type": model["type"], "name": model["name"],
+										"value": m.Conf("note", []string{hvs[i], "data"}),
+									})
+								})
+								m.Add("append", "value", kit.Format(value))
+							case "data", "ship":
+								m.Add("append", fields[i], kit.Format(note[fields[i]]))
+							}
+						}
+					}
+					m.Table()
+
+				case "model":
+					// 模板详情
+					hm, _ := kit.Hash("type", arg[0], "name", arg[1])
+					if len(arg) == 2 {
+						m.CopyFuck(m.Cmd("mdb.config", "note", hm), "append").Set("result").Table()
+						break
+					}
+					if arg[2] == "view" {
+						for i := 4; i < len(arg)-1; i += 2 {
+							m.Conf("note", []string{hm, "view", arg[3], arg[i]}, arg[i+1])
+						}
+						break
+					}
+
+					// 操作模板
+					data := []interface{}{}
+					if model := m.Confm("note", hm); model == nil { // 添加模板
+						prev := m.Conf("note", []string{"81c5709d091eb04bd31ee751c3f81023", "ship", "prev", "data"})
+						m.Confv("note", hm, map[string]interface{}{
+							"create_time": m.Time(), "access_time": m.Time(),
+							"type": "model", "name": arg[1], "data": data, "ship": map[string]interface{}{
+								"prev": map[string]interface{}{"type": "model", "data": prev},
+								"note": map[string]interface{}{"type": "note", "data": ""},
+							},
 						})
-					})
-
-					m.Add("append", "key", hn)
-					m.Add("append", "create_time", note["create_time"])
-					m.Add("append", "access_time", note["access_time"])
-					m.Add("append", "type", note["type"])
-					m.Add("append", "name", note["name"])
-					m.Add("append", "model", m.Conf("note", []string{hm, "name"}))
-					m.Add("append", "view", kit.Format(m.Conf("note", []string{hm, "view"})))
-					m.Add("append", "value", kit.Format(value))
-					m.Add("append", "data", kit.Format(note["data"]))
-					m.Add("append", "ship", kit.Format(note["ship"]))
-				}
-				m.Table()
-
-			case "model":
-				// 模板详情
-				hm, _ := kit.Hash("type", arg[0], "name", arg[1])
-				if len(arg) == 2 {
-					m.CopyFuck(m.Cmd("mdb.config", "note", hm), "append").Set("result").Table()
-					break
-				}
-				if arg[2] == "view" {
-					for i := 4; i < len(arg)-1; i += 2 {
-						m.Conf("note", []string{hm, "view", arg[3], arg[i]}, arg[i+1])
+						m.Conf("note", []string{"81c5709d091eb04bd31ee751c3f81023", "ship", "prev", "data"}, hm)
+					} else { // 修改模板
+						data = m.Confv("note", []string{hm, "data"}).([]interface{})
+						m.Confv("note", []string{hm, "access_time"}, m.Time())
 					}
-					break
-				}
 
-				// 操作模板
-				data := []interface{}{}
-				if model := m.Confm("note", hm); model == nil { // 添加模板
-					prev := m.Conf("note", []string{"81c5709d091eb04bd31ee751c3f81023", "ship", "prev", "data"})
-					m.Confv("note", hm, map[string]interface{}{
-						"create_time": m.Time(), "access_time": m.Time(),
-						"type": "model", "name": arg[1], "data": data, "ship": map[string]interface{}{
-							"prev": map[string]interface{}{"type": "model", "data": prev},
-							"note": map[string]interface{}{"type": "note", "data": ""},
-						},
-					})
-					m.Conf("note", []string{"81c5709d091eb04bd31ee751c3f81023", "ship", "prev", "data"}, hm)
-				} else { // 修改模板
-					data = m.Confv("note", []string{hm, "data"}).([]interface{})
-					m.Confv("note", []string{hm, "access_time"}, m.Time())
-				}
+					if len(data) == 0 { // 操作元素
+						for i := 2; i < len(arg)-1; i += 2 {
+							data = append(data, map[string]interface{}{"name": arg[i], "type": arg[i+1]})
 
-				// 操作元素
-				for i := 2; i < len(arg)-1; i += 2 {
-					data = append(data, map[string]interface{}{"name": arg[i], "type": arg[i+1]})
-
-					hi, _ := kit.Hash("type", "index", "name", arg[i+1])
-					if index := m.Confm("note", hi); index == nil {
-						m.Cmd("mdb.note", "index", arg[i+1])
+							hi, _ := kit.Hash("type", "index", "name", arg[i+1])
+							if index := m.Confm("note", hi); index == nil {
+								m.Cmd("mdb.note", "index", arg[i+1])
+							}
+						}
 					}
-				}
-				m.Confv("note", []string{hm, "data"}, data)
-				m.Echo(hm)
 
-			case "index":
-				// 操作索引
-				data := arg[2:]
-				hi, _ := kit.Hash("type", arg[0], "name", arg[1])
-				if index := m.Confm("note", hi); index == nil { // 添加索引
-					prev := m.Conf("note", []string{"faa01a8fc2fc92dae3fbc02ac1b4ec75", "ship", "prev", "data"})
-					m.Confv("note", hi, map[string]interface{}{
-						"create_time": m.Time(), "access_time": m.Time(),
-						"type": "index", "name": arg[1], "data": data, "ship": map[string]interface{}{
-							"prev":  map[string]interface{}{"type": "index", "data": prev},
-							"value": map[string]interface{}{"type": "value", "data": ""},
-						},
+					m.Confv("note", []string{hm, "data"}, data)
+					m.Echo(hm)
+
+				case "index":
+					// 操作索引
+					data := arg[2:]
+					hi, _ := kit.Hash("type", arg[0], "name", arg[1])
+					if index := m.Confm("note", hi); index == nil { // 添加索引
+						prev := m.Conf("note", []string{"faa01a8fc2fc92dae3fbc02ac1b4ec75", "ship", "prev", "data"})
+						m.Confv("note", hi, map[string]interface{}{
+							"create_time": m.Time(), "access_time": m.Time(),
+							"type": "index", "name": arg[1], "data": data, "ship": map[string]interface{}{
+								"prev":  map[string]interface{}{"type": "index", "data": prev},
+								"value": map[string]interface{}{"type": "value", "data": ""},
+							},
+						})
+						m.Confv("note", []string{"faa01a8fc2fc92dae3fbc02ac1b4ec75", "ship", "prev", "data"}, hi)
+					} else { // 修改索引
+						m.Confv("note", []string{hi, "access_time"}, m.Time())
+						data, _ = m.Confv("note", []string{hi, "data"}).([]string)
+					}
+
+					// 操作元素
+					m.Confv("note", []string{hi, "data"}, data)
+					m.Echo(hi)
+
+				case "value":
+					hi := m.Cmdx("mdb.note", "index", arg[1])
+					hv, _ := kit.Hash("type", arg[0], "name", arg[1], "data", arg[2:])
+					if value := m.Confm("note", hv); value == nil {
+						prev := m.Conf("note", []string{hi, "ship", "value", "data"})
+						m.Confv("note", hv, map[string]interface{}{
+							"create_time": m.Time(), "access_time": m.Time(),
+							"type": arg[0], "name": arg[1], "data": arg[2:], "ship": map[string]interface{}{
+								"prev":  map[string]interface{}{"type": "value", "data": prev},
+								"index": map[string]interface{}{"type": "index", "data": hi},
+								"note":  map[string]interface{}{"type": "note", "data": ""},
+							},
+						})
+						m.Conf("note", []string{hi, "ship", "value", "data"}, hv)
+					} else {
+						m.Confv("note", []string{hv, "access_time"}, m.Time())
+					}
+					m.Echo(hv)
+
+				default:
+					if len(arg) == 2 {
+					}
+
+					hm, _ := kit.Hash("type", "model", "name", arg[1])
+					hn, _ := kit.Hash("type", "note", "name", arg[0], "uniq")
+					ship := map[string]interface{}{
+						"prev":  map[string]interface{}{"type": "note", "data": m.Conf("note", []string{hm, "ship", "note", "data"})},
+						"model": map[string]interface{}{"type": "model", "data": hm},
+					}
+
+					data := []interface{}{}
+					m.Confm("note", []string{hm, "data"}, func(i int, index map[string]interface{}) {
+						hv := m.Cmdx("mdb.note", "value", index["type"], kit.Select(m.Option(kit.Format(index["name"])), arg, i+2))
+						data = append(data, hv)
+
+						ship[hv] = map[string]interface{}{"type": "note", "data": m.Conf("note", []string{hv, "ship", "note", "data"})}
+						m.Conf("note", []string{hv, "ship", "note", "data"}, hn)
 					})
-					m.Confv("note", []string{"faa01a8fc2fc92dae3fbc02ac1b4ec75", "ship", "prev", "data"}, hi)
-				} else { // 修改索引
-					m.Confv("note", []string{hi, "access_time"}, m.Time())
-					data, _ = m.Confv("note", []string{hi, "data"}).([]string)
-				}
 
-				// 操作元素
-				m.Confv("note", []string{hi, "data"}, data)
-				m.Echo(hi)
-
-			case "value":
-				hi := m.Cmdx("mdb.note", "index", arg[1])
-				hv, _ := kit.Hash("type", arg[0], "name", arg[1], "data", arg[2:])
-				if value := m.Confm("note", hv); value == nil {
-					prev := m.Conf("note", []string{hi, "ship", "value", "data"})
-					m.Confv("note", hv, map[string]interface{}{
+					m.Confv("note", hn, map[string]interface{}{
 						"create_time": m.Time(), "access_time": m.Time(),
-						"type": arg[0], "name": arg[1], "data": arg[2:], "ship": map[string]interface{}{
-							"prev":  map[string]interface{}{"type": "value", "data": prev},
-							"index": map[string]interface{}{"type": "index", "data": hi},
-							"note":  map[string]interface{}{"type": "note", "data": ""},
-						},
+						"type": "note", "name": arg[0], "data": data, "ship": ship,
 					})
-					m.Conf("note", []string{hi, "ship", "value", "data"}, hv)
-				} else {
-					m.Confv("note", []string{hv, "access_time"}, m.Time())
+					m.Conf("note", []string{hm, "ship", "note", "data"}, hn)
+					m.Echo(hn)
 				}
-				m.Echo(hv)
+				return
 
-			default:
-				hm, _ := kit.Hash("type", "model", "name", arg[1])
-				hn, _ := kit.Hash("type", "note", "name", arg[0], "uniq")
-				ship := map[string]interface{}{
-					"prev":  map[string]interface{}{"type": "note", "data": m.Conf("note", []string{hm, "ship", "note", "data"})},
-					"model": map[string]interface{}{"type": "model", "data": hm},
+				sync := len(arg) > 0 && arg[0] == "sync"
+				if sync {
+					m.Cmdy("ssh.sh", "sub", "context", "mdb", "note", arg)
+					m.Set("result").Table()
+					arg = arg[1:]
 				}
 
-				data := []interface{}{}
-				m.Confm("note", []string{hm, "data"}, func(i int, index map[string]interface{}) {
-					hv := m.Cmdx("mdb.note", "value", index["type"], kit.Select(m.Option(kit.Format(index["name"])), arg, i+2))
-					data = append(data, hv)
-
-					ship[hv] = map[string]interface{}{"type": "note", "data": m.Conf("note", []string{hv, "ship", "note", "data"})}
-					m.Conf("note", []string{hv, "ship", "note", "data"}, hn)
-				})
-
-				m.Confv("note", hn, map[string]interface{}{
-					"create_time": m.Time(), "access_time": m.Time(),
-					"type": "note", "name": arg[0], "data": data, "ship": ship,
-				})
-				m.Conf("note", []string{hm, "ship", "note", "data"}, hn)
-				m.Echo(hn)
-			}
-			return
-
-			sync := len(arg) > 0 && arg[0] == "sync"
-			if sync {
-				m.Cmdy("ssh.sh", "sub", "context", "mdb", "note", arg)
-				m.Set("result").Table()
-				arg = arg[1:]
-			}
-
-			h, _ := kit.Hash("uniq")
-			data := map[string]interface{}{
-				"create_time": m.Time(),
-				"type":        arg[0],
-				"title":       arg[1],
-				"content":     arg[2],
-			}
-			for i := 3; i < len(arg)-1; i += 2 {
-				kit.Chain(data, data[arg[i]], arg[i+1])
-			}
-			m.Conf("note", h, data)
-			m.Echo(h)
-			return
-		}},
+				h, _ := kit.Hash("uniq")
+				data := map[string]interface{}{
+					"create_time": m.Time(),
+					"type":        arg[0],
+					"title":       arg[1],
+					"content":     arg[2],
+				}
+				for i := 3; i < len(arg)-1; i += 2 {
+					kit.Chain(data, data[arg[i]], arg[i+1])
+				}
+				m.Conf("note", h, data)
+				m.Echo(h)
+				return
+			}},
 	},
 }
 

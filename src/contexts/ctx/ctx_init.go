@@ -1178,7 +1178,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				return
 			}},
 		"select": &Command{Name: "select key value field",
-			Form: map[string]int{"eq": 2, "parse": 2, "hide": -1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
+			Form: map[string]int{"eq": 2, "expand": 2, "hide": -1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 				msg := m.Set("result").Spawn()
 
@@ -1189,11 +1189,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				nrow := len(m.Meta[m.Meta["append"][0]])
 				keys := []string{}
 				for i := 0; i < nrow; i++ {
-					for j := 0; j < len(m.Meta["parse"]); j += 2 {
+					for j := 0; j < len(m.Meta["expand"]); j += 2 {
 						var value interface{}
-						json.Unmarshal([]byte(m.Meta[m.Meta["parse"][j]][i]), &value)
-						if m.Meta["parse"][j+1] != "" {
-							value = kit.Chain(value, m.Meta["parse"][j+1])
+						json.Unmarshal([]byte(m.Meta[m.Meta["expand"][j]][i]), &value)
+						if m.Meta["expand"][j+1] != "" {
+							value = kit.Chain(value, m.Meta["expand"][j+1])
 						}
 
 						switch val := value.(type) {
@@ -1202,7 +1202,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 								keys = append(keys, k)
 							}
 						default:
-							keys = append(keys, m.Meta["parse"][j+1])
+							keys = append(keys, m.Meta["expand"][j+1])
 						}
 					}
 				}
@@ -1212,11 +1212,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					}
 				}
 				for i := 0; i < nrow; i++ {
-					for j := 0; j < len(m.Meta["parse"]); j += 2 {
+					for j := 0; j < len(m.Meta["expand"]); j += 2 {
 						var value interface{}
-						json.Unmarshal([]byte(m.Meta[m.Meta["parse"][j]][i]), &value)
-						if m.Meta["parse"][j+1] != "" {
-							value = kit.Chain(value, m.Meta["parse"][j+1])
+						json.Unmarshal([]byte(m.Meta[m.Meta["expand"][j]][i]), &value)
+						if m.Meta["expand"][j+1] != "" {
+							value = kit.Chain(value, m.Meta["expand"][j+1])
 						}
 
 						switch val := value.(type) {
@@ -1233,12 +1233,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 								}
 							}
 						case string:
-							m.Meta[m.Meta["parse"][j+1]][i] = val
+							m.Meta[m.Meta["expand"][j+1]][i] = val
 						case float64:
-							m.Meta[m.Meta["parse"][j+1]][i] = fmt.Sprintf("%d", int(val))
+							m.Meta[m.Meta["expand"][j+1]][i] = fmt.Sprintf("%d", int(val))
 						default:
 							b, _ := json.Marshal(val)
-							m.Meta[m.Meta["parse"][j+1]][i] = string(b)
+							m.Meta[m.Meta["expand"][j+1]][i] = string(b)
 						}
 					}
 				}

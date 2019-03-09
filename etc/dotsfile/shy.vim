@@ -7,6 +7,8 @@ syntax match   shyCache     "\(^\|\t\|  \|$(\)cache\>"
 syntax match   shyString	"'[^']*'"
 syntax match   shyString	"\"[^\"]*\""
 syntax match   shyNumber	"-\=\<\d\+\>#\="
+syntax match   shyNumber	"false"
+syntax match   shyNumber	"true"
 syntax match   shVariable	"\$[_a-zA-Z0-9]\+\>"
 syntax match   shVariable	"@[_a-zA-Z0-9]\+\>"
 
