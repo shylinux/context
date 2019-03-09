@@ -11,7 +11,7 @@ Page({
     onCommand: function(e) {
         var page = this
         var cmd = e.detail.value
-        app.command({"cmd": cmd}, function(res) {
+        app.command({"cmd": ["source", cmd]}, function(res) {
             if (res.append) {
                 var table = []
                 for (var i = 0; i < res[res.append[0]].length; i++) {
