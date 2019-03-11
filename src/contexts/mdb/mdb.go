@@ -70,8 +70,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
 
 		"note_view": &ctx.Config{Name: "note_view", Value: map[string]interface{}{
-			"default": []interface{}{"key", "create_time", "type", "name", "value"},
-			"base":    []interface{}{"key", "create_time", "type", "name", "value"},
+			"default": []interface{}{"key", "create_time", "type", "name", "model", "value"},
+			"base":    []interface{}{"key", "create_time", "type", "name", "model", "value"},
 			"full":    []interface{}{"key", "create_time", "access_time", "type", "name", "model", "value", "view", "data", "ship"},
 		}, Help: "数据视图"},
 		"note": &ctx.Config{Name: "note", Value: map[string]interface{}{
@@ -83,6 +83,12 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			},
 			"81c5709d091eb04bd31ee751c3f81023": map[string]interface{}{
 				"create_time": "1990-07-30 07:08:09", "access_time": "2017-11-01 02:03:04",
+				"meta": []interface{}{"text", "text", "place", "place", "label", "label", "friend", "friend", "username", "username"},
+				"view": map[string]interface{}{
+					"list": map[string]interface{}{"name": "left", "create_date": "right"},
+					"edit": map[string]interface{}{"model": "hidden", "username": "hidden"},
+				},
+				"bind": map[string]interface{}{},
 				"type": "model", "name": "shy", "data": "", "ship": map[string]interface{}{
 					"prev": map[string]interface{}{"type": "model", "data": ""},
 				},
@@ -548,7 +554,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 					fields := kit.View(arg[3:], m.Confm("note_view"))
 
-					hv, _ := kit.Hash("type", "value", "name", arg[1], "data", kit.Select(m.Option(arg[1]), arg, 2))
+					hv, _ := kit.Hash("type", "value", "name", arg[1], "data", kit.Select(arg[2], m.Option(arg[2])))
 					hn := m.Conf("note", []string{hv, "ship", "note", "data"})
 					if arg[1] == "model" {
 						hm, _ := kit.Hash("type", "model", "name", arg[2])
@@ -559,6 +565,14 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						note := m.Confm("note", hn)
 						hvs := kit.Trans(note["data"])
 						hm := kit.Format(kit.Chain(note, "ship.model.data"))
+
+						value := []interface{}{}
+						values := map[string]interface{}{}
+						m.Confm("note", []string{hm, "data"}, func(i int, model map[string]interface{}) {
+							v := m.Conf("note", []string{hvs[i], "data"})
+							value = append(value, map[string]interface{}{"type": model["type"], "name": model["name"], "value": v})
+							values[kit.Format(model["name"])] = v
+						})
 
 						for i := 0; i < len(fields); i++ {
 							switch fields[i] {
@@ -571,16 +585,11 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 							case "view":
 								m.Add("append", "view", kit.Format(m.Conf("note", []string{hm, "view"})))
 							case "value":
-								value := []interface{}{}
-								m.Confm("note", []string{hm, "data"}, func(i int, model map[string]interface{}) {
-									value = append(value, map[string]interface{}{
-										"type": model["type"], "name": model["name"],
-										"value": m.Conf("note", []string{hvs[i], "data"}),
-									})
-								})
 								m.Add("append", "value", kit.Format(value))
 							case "data", "ship":
 								m.Add("append", fields[i], kit.Format(note[fields[i]]))
+							default:
+								m.Add("append", fields[i], kit.Format(values[fields[i]]))
 							}
 						}
 					}
@@ -593,6 +602,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						m.CopyFuck(m.Cmd("mdb.config", "note", hm), "append").Set("result").Table()
 						break
 					}
+
+					// 模板视图
 					if arg[2] == "view" {
 						for i := 4; i < len(arg)-1; i += 2 {
 							m.Conf("note", []string{hm, "view", arg[3], arg[i]}, arg[i+1])
@@ -603,10 +614,20 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					// 操作模板
 					data := []interface{}{}
 					if model := m.Confm("note", hm); model == nil { // 添加模板
+						view := map[string]interface{}{}
+						m.Confm("note", "81c5709d091eb04bd31ee751c3f81023.view", func(key string, fields map[string]interface{}) {
+							vs := map[string]interface{}{}
+							for k, v := range fields {
+								vs[k] = v
+							}
+							view[key] = vs
+						})
+
 						prev := m.Conf("note", []string{"81c5709d091eb04bd31ee751c3f81023", "ship", "prev", "data"})
 						m.Confv("note", hm, map[string]interface{}{
+							"type": "model", "name": arg[1], "data": data, "view": view,
 							"create_time": m.Time(), "access_time": m.Time(),
-							"type": "model", "name": arg[1], "data": data, "ship": map[string]interface{}{
+							"ship": map[string]interface{}{
 								"prev": map[string]interface{}{"type": "model", "data": prev},
 								"note": map[string]interface{}{"type": "note", "data": ""},
 							},
@@ -617,7 +638,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						m.Confv("note", []string{hm, "access_time"}, m.Time())
 					}
 
-					if len(data) == 0 { // 操作元素
+					// 操作元素
+					if len(data) == 0 {
+						arg = append(arg, kit.Trans(m.Confv("note", "81c5709d091eb04bd31ee751c3f81023.meta"))...)
 						for i := 2; i < len(arg)-1; i += 2 {
 							data = append(data, map[string]interface{}{"name": arg[i], "type": arg[i+1]})
 

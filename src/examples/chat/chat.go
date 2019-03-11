@@ -201,6 +201,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			if m.Option("username") == "o978M0XIrcmco28CU1UbPgNxIL78" {
 				m.Option("username", "shy")
 			}
+			if m.Option("username") == "o978M0ff_Y76hFu1FPLif6hFfmsM" {
+				m.Option("username", "shy")
+			}
 
 			// 创建空间
 			if !m.Options("bench") && m.Option("bench", m.Cmd("aaa.sess", m.Option("sessid"), "bench").Append("key")) == "" {

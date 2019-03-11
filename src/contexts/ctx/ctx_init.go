@@ -705,7 +705,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 						return !all
 					})
-					m.Table()
+					m.Sort("key").Table()
 				case "list":
 					if m.Cap("list_count") == "" {
 						break
