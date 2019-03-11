@@ -1274,6 +1274,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return true
 			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				if len(arg) == 0 {
+					return
+				}
+
 				m.Confm("paths", func(index int, value string) bool {
 					p := path.Join(value, arg[0])
 					if _, e := os.Stat(p); e == nil {

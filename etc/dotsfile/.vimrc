@@ -78,8 +78,9 @@ let g:syntastic_quiet_messages = { "regex": [
          \ ] }
 
 Plug 'Valloric/YouCompleteMe'
-let g:syntastic_enable_signs = 1
-let g:ycm_confirm_extra_conf=0
+let g:ycm_confirm_extra_conf=1
+let g:syntastic_enable_signs=1
+let g:ycm_python_binary_path='/usr/bin/python'
 nnoremap gd :YcmCompleter GoToDeclaration<CR>
 nnoremap gD :YcmCompleter GoToReferences<CR>
 
@@ -136,6 +137,7 @@ nnoremap j gj
 nnoremap k gk
 
 nnoremap <C-M> :make<CR>
+inoremap <C-M> <ESC>:make<CR>i
 
 nnoremap df :FZF<CR>
 inoremap df _
@@ -161,6 +163,8 @@ function! Config(type)
         set filetype=xml
     elseif a:type == "css"
         set filetype=css
+    elseif a:type == "txt"
+        set noexpandtab
     endif
 endfunction
 
@@ -173,6 +177,7 @@ autocmd BufNewFile,BufReadPost *.json call Config("json")
 
 autocmd BufNewFile,BufReadPost *.wxml call Config("xml")
 autocmd BufNewFile,BufReadPost *.wxss call Config("css")
+autocmd BufNewFile,BufReadPost *.txt call Config("txt")
 
 command! RR wa | source ~/.vimrc |e
 command! SS mksession! etc/session.vim

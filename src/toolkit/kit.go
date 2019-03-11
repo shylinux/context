@@ -475,6 +475,21 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 
 	return root
 }
+func View(args []string, conf map[string]interface{}) []string {
+	if len(args) == 0 {
+		args = append(args, "default")
+	}
+
+	keys := []string{}
+	for _, k := range args {
+		if v, ok := conf[k]; ok {
+			keys = append(keys, Trans(v)...)
+		} else {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
 
 func Link(name string, url string) string {
 	return fmt.Sprintf("<a href=\"%s\" target=\"_blank\">%s</a>", url, name)

@@ -385,12 +385,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			"site":       "",
 			"index":      "/code/",
 		}, Help: "服务配置"},
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
-			"check":     true,
-			"sess_void": false,
-			"cas_url":   "",
-			"cas_uuid":  "email",
-		}, Help: "认证配置"},
 		"route": &ctx.Config{Name: "route", Value: map[string]interface{}{
 			"index":          "/render",
 			"template_dir":   "usr/template",
@@ -400,6 +394,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				"top": 96, "left": 472, "width": 600, "height": 300,
 			},
 		}, Help: "功能配置"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
+			"check":     true,
+			"sess_void": false,
+			"cas_url":   "",
+			"cas_uuid":  "email",
+		}, Help: "认证配置"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"login": []interface{}{},
 			"index": []interface{}{
@@ -577,23 +577,26 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						m.Log("warn", "%v", e)
 						return e
 					}
-					if kit.Right(client["logheaders"]) {
-						for k, v := range res.Header {
-							m.Log("info", "%s: %v", k, v)
-						}
-					}
-					for _, v := range res.Cookies() {
-						m.Conf("spide", []string{which, "cookie", v.Name}, v.Value)
-						m.Log("info", "get-cookie %s: %v", v.Name, v.Value)
-					}
-					if res.StatusCode != http.StatusOK {
-						return nil
-					}
 
 					var result interface{}
 					ct := res.Header.Get("Content-Type")
 					parse := kit.Select(kit.Format(client["parse"]), m.Option("parse"))
 					m.Log("info", "status %s parse: %s content: %s", res.Status, parse, ct)
+
+					if kit.Right(client["logheaders"]) {
+						for k, v := range res.Header {
+							m.Log("info", "%s: %v", k, v)
+						}
+					}
+
+					for _, v := range res.Cookies() {
+						m.Conf("spide", []string{which, "cookie", v.Name}, v.Value)
+						m.Log("info", "get-cookie %s: %v", v.Name, v.Value)
+					}
+
+					if res.StatusCode != http.StatusOK {
+						return nil
+					}
 
 					switch {
 					case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
@@ -871,10 +874,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 
-		"/MP_verify_0xp0zkW3fIzIq2Bo.txt": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo("0xp0zkW3fIzIq2Bo")
-			return
-		}},
 		"/proxy/": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			fields := strings.Split(key, "/")
 			m.Cmdy("web.get", "which", fields[2], "method", fields[3], strings.Join(fields, "/"))
