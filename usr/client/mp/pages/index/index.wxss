@@ -1,9 +1,10 @@
-.container {
+.page {
     color:cyan;
     font-size:16px;
     font-family:Courier;
     background-color:black;
     min-height:800px;
+    overflow:auto;
 }
 .command {
     border:solid 2px green;
@@ -13,7 +14,6 @@
     border:solid 1px green;
     display:table;
     overflow:auto;
-    max-width:100%;
 }
 .table-row {
     display:table-row;

@@ -2,53 +2,120 @@ const app = getApp()
 
 Page({
     data: {
-        focus: false,
-        cmd: "",
-        table: [],
-        append: [],
-        result: "",
+        nodes: [
+            ["note", "shy"],
+            ["ctx", "cmd"],
+            ["note", "show"],
+        ],
+        shows: [0, 0, 0],
+        ctx: "", cmd: "", focus: false,
+        append: [], table: [], result: "",
+    },
+    getPod(cb) {
+        var page = this
+        app.command({"cmd": ["context", "ssh", "remote"]}, function(res) {
+            var pod = [""]
+            app.table(res, function(i, obj, line) {
+                pod.push(obj.key)
+            })
+            page.data.nodes[0] = pod
+            page.data.shows[0] = 0
+            page.setData({nodes: page.data.nodes, shows: page.data.shows})
+            typeof cb == "function" && cb(pod)
+        })
+    },
+    getCtx(pod, cb) {
+        var page = this
+        app.command({"cmd": ["context", "ssh", "sh", pod, "context", "ctx", "context"]}, function(res) {
+            var ctx = []
+            app.table(res, function(i, obj, line) {
+                ctx.push(obj.names)
+            })
+            page.data.nodes[1] = ctx
+            page.data.shows[1] = 0
+            page.setData({nodes: page.data.nodes, shows: page.data.shows})
+            typeof cb == "function" && cb(ctx)
+        })
+    },
+    getCmd(pod, ctx, cb) {
+        var page = this
+        app.command({"cmd": ["context", "ssh", "sh", pod, "context", ctx, "command", "all"]}, function(res) {
+            var cmd = [""]
+            app.table(res, function(i, obj, line) {
+                cmd.push(obj.key)
+            })
+            page.data.nodes[2] = cmd
+            page.data.shows[2] = 0
+            page.setData({nodes: page.data.nodes, shows: page.data.shows})
+            page.setData({ctx: "context ssh sh node '"+pod+"' context "+ctx+" "+cmd[0]})
+            typeof cb == "function" && cb(cmd)
+        })
+    },
+    onChange: function(e) {
+        var column = e.detail.column
+        var value = e.detail.value
+        var page = this
+        page.data.shows[column] = value
+
+        var pod = page.data.nodes[0][page.data.shows[0]]
+        var ctx = page.data.nodes[1][page.data.shows[1]]
+        var cmd = page.data.nodes[2][page.data.shows[2]]
+        switch (column) {
+            case 0:
+                page.getCtx(pod, function(ctx) {
+                    page.getCmd(pod, ctx[0], function(cmd) {
+                        this.onCommand({detail:{value: ""}})
+                    })
+                })
+                break
+            case 1:
+                page.getCmd(pod, ctx, function(cmd) {
+                    this.onCommand({detail:{value: ""}})
+                })
+                break
+            case 2:
+                page.setData({ctx: "context ssh sh node '"+pod+"' context "+ctx+" "+cmd})
+                this.onCommand({detail:{value: ""}})
+                break
+        }
     },
     onCommand: function(e) {
-        var page = this
         var cmd = e.detail.value
-        app.command({"cmd": ["source", cmd]}, function(res) {
-            if (res.append) {
-                var table = []
-                for (var i = 0; i < res[res.append[0]].length; i++) {
-                    var line = []
-                    for (var j = 0; j < res.append.length; j++) {
-                        line.push(res[res.append[j]][i])
-                    }
-                    table.push(line)
-                }
-                page.setData({append: res.append, table: table})
-            } else {
-                page.setData({append: [], table: []})
-            }
-            page.setData({result: res.result? res.result.join("") :res})
+        var page = this
+        app.command({"cmd": ["source", page.data.ctx, cmd]}, function(res) {
+            var table = []
+            app.table(res, function(i, obj, line) {
+                table.push(line)
+            })
+
+            page.setData({append: res.append || [], table: table, result: res.result? res.result.join("") :res})
             if (page.data.cmd) {
                 return
             }
-            app.command({"cmd": ["note", cmd, "flow", cmd]}, function(res) {})
+            app.command({"cmd": ["note", cmd, "proxy", page.data.ctx, cmd]})
         })
     },
     onLoad: function (options) {
-        app.log("info", {page: "pages/index/index", options: options})
-
+        app.log({page: this.route, options: options})
+        var data = app.data.list[options.index]
+        var cmd = ""
         var page = this
-        app.load("model", function(model) {
-            app.log("info", app.data.list[options.index])
-            var cmd = app.data.list[options.index]? app.data.list[options.index].args["cmd"]: ""
-            page.setData({
-                model: model[options.model],
-                value: app.data.list[options.index],
-                view: model[options.model].view,
-                cmd: cmd,
-                focus: cmd? false: true,
+        page.getPod(function(pod) {
+            page.getCtx(pod[0], function(ctx) {
+                page.getCmd(pod[0], ctx[0], function(cmd) {
+                })
             })
-            if (cmd) {
-                page.onCommand({detail:{value:cmd}})
-            }
         })
+
+        if (data) {
+            for (var i = 0; i < data.value.length; i++) {
+                if (data.value[i].name == "cmd") {
+                    cmd = data.value[i].value
+                    this.onCommand({detail:{value: cmd}})
+                }
+            }
+        }
+
+        this.setData({cmd: cmd, focus: cmd? false: true})
     },
 })

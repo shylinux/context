@@ -1,10 +1,16 @@
-<view class="container">
+<view class="page">
+    <picker
+        mode="multiSelector" range="{{nodes}}" value="{{shows}}"
+        bindchange="onChange" bindcolumnchange="onChange">
+        <view class="input">{{ctx}}</view>
+    </picker>
+
     <view class="input">
         <input class="command" type="text" value="{{cmd}}" bindconfirm="onCommand" confirm-hold="true" focus="{{focus}}"/>
     </view>
-    <scroll-view scroll-y class="table">
-        <view class="table-th" wx:for="{{append}}">{{item}}</view>
-        <view class="table-row" wx:for="{{table}}"><view class="table-td" wx:for="{{item}}">{{item}}</view></view>
+    <scroll-view class="table" scroll-y>
+        <view wx:for="{{append}}" class="table-th">{{item}}</view>
+        <view wx:for="{{table}}" class="table-row"><view wx:for="{{item}}" class="table-td">{{item}}</view></view>
     </scroll-view>
     <view class="result">{{result}}</view>
 </view>
