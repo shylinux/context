@@ -1,18 +1,40 @@
 App({
     log: function(type, args) {
-        console[type](args)
+        switch (type) {
+            case "info":
+                console.log(args)
+                break
+            default:
+                console.log(type, args)
+        }
     },
     toast: function(text) {
-        wx.showToast()
+        wx.showToast(text)
+    },
+    sheet: function(list, cb) {
+        wx.showActionSheet({itemList: list, success(res) {
+            typeof cb == "function" && cb(list[res.tapIndex])
+        }})
+    },
+    confirm: function(content, confirm, cancel) {
+        wx.showModal({
+            title: "context", content: content, success: function(res) {
+                res.confirm && typeof confirm == "function" && confirm()
+                res.cancel && typeof cancel == "function" && cancel()
+            }
+        })
     },
     place: function(cb) {
         var app = this
         wx.authorize({scope: "scope.userLocation"})
 
         wx.chooseLocation({success: function(res) {
-            app.log("info", res)
+            app.log(res)
             typeof cb == "function" && cb(res)
         }})
+    },
+    stoprefresh: function(cb) {
+        wx.stopPullDownRefresh()
     },
     navigate: function(page, args) {
         if (!page) {
@@ -35,12 +57,12 @@ App({
         var what = {method: "POST", url: "https://shylinux.com/chat/mp", data: data,
             success: function(res) {
                 what.res = res
-                app.log("info", what)
+                app.log(what)
                 typeof done == "function" && done(res.data)
             },
             fail: function(res) {
                 what.res = res
-                app.log("info", what)
+                app.log(what)
                 typeof done == "function" && done(res.data)
             },
         }
@@ -89,6 +111,19 @@ App({
             })
         })
     },
+    table: function(res, cb) {
+        if (res.append) {
+            for (var i = 0; i < res[res.append[0]].length; i++) {
+                var obj = {}
+                var line = []
+                for (var j = 0; j < res.append.length; j++) {
+                    line.push(res[res.append[j]][i])
+                    obj[res.append[j]] = res[res.append[j]][i]
+                }
+                typeof cb == "function" && cb(i, obj, line)
+            }
+        }
+    },
 
     model: {},
     data: {model: {}, list: []},
@@ -110,11 +145,17 @@ App({
                     var ncol = res.append.length
                     var nrow = res[res.append[0]].length
                     for (var i = 0; i < nrow; i++) {
-                        app.data.model[res["name"][i]] = {
-                            name: res["name"][i],
-                            data: JSON.parse(res["data"][i] || "[]"),
-                            view: JSON.parse(res["view"][i] || "{}"),
+                        var view = JSON.parse(res["view"][i] || "{}")
+                        var data = JSON.parse(res["data"][i] || "[]")
+                        data.unshift({"name": "model", "type": "text", "value": res["name"][i]})
+                        data.unshift({"name": "name", "type": "text"})
+                        if (view.edit) {
+                            for (var j = 0; j < data.length; j++) {
+                                data[j].view = view.edit[data[j].name]
+                            }
                         }
+
+                        app.data.model[res["name"][i]] = {name: res["name"][i], data: data, view: view}
                     }
                     typeof cb == "function" && cb(app.data.model)
                 })
@@ -125,37 +166,53 @@ App({
                     return
                 }
 
-                var cmd = {"cmd": ["note", "search", "username"]}
+                var cmd = {"cmd": ["note", "show", "username", "username", "full"]}
 
                 app.command(cmd, function(res) {
                     if (!res || !res.append) {
                         return
                     }
 
+                    var list = []
                     var ncol = res.append.length
                     var nrow = res[res.append[0]].length
                     for (var i = 0; i < nrow; i++) {
-                        var args = {}
                         var value = JSON.parse(res["value"][i] || "[]")
-                        for (var j = 0; j < value.length; j++) {
-                            args[value[j].name] = value[j].value
+                        value.unshift({"type": "text", "name": "model", "value": res["model"][i]})
+                        value.unshift({"type": "text", "name": "name", "value": res["name"][i]})
+                        value.unshift({"type": "text", "name": "create_date", "value": res["create_time"][i].split(" ")[0].replace("-", "/").replace("-", "/")})
+
+                        var line = {
+                            create_time: res["create_time"][i],
+                            model: res["model"][i], value: value,
+                            view: JSON.parse(res["view"][i] || "{}"), data: {},
                         }
 
-                        app.data.list.push({
-                            create_date:  res["create_time"][i].split(" ")[0].replace("-", "/").replace("-", "/"),
-                            create_time: res["create_time"][i],
-                            model: res["model"][i],
-                            name: res["name"][i],
-                            value: value,
-                            args: args,
-                            view: JSON.parse(res["view"][i] || "{}"),
-                        })
+                        for (var v in line.view) {
+                            var view = line.view[v]
+
+                            var data = []
+                            for (var k in view) {
+                                if (k in line) {
+                                    data.push({name: k, view: view[k], value: line[k]})
+                                }
+                            }
+                            for (var j = 0; j < value.length; j++) {
+                                var k = value[j]["name"]
+                                if (((v == "edit") || (k in view)) && !(k in line)) {
+                                    data.push({name: k, view: view[k] || "", value: value[j]["value"]})
+                                }
+                            }
+                            line.data[v] = data
+                        }
+
+                        list.push(line)
                     }
-                    typeof cb == "function" && cb(app.data.list)
+
+                    app.data.list = list
+                    typeof cb == "function" && cb(list)
                 })
                 break
         }
     },
-
-    onLaunch: function () {},
 })

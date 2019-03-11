@@ -11,7 +11,8 @@
         "backgroundTextStyle": "light",
         "navigationBarBackgroundColor": "#000",
         "navigationBarTitleText": "context",
-        "navigationBarTextStyle": "white"
+        "navigationBarTextStyle": "white",
+        "enablePullDownRefresh": true
     },
     "permission": {
         "scope.userLocation": {
