@@ -110,9 +110,6 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		if msg.Options("ticket") {
 			msg.Option("uuid", msg.Option(msg.Conf("login", "cas_uuid")))
 			msg.Option("username", cas.Username(r))
-			if lark := msg.Find("web.chat.lark"); lark != nil {
-				msg.Option("username", lark.Cmdx("user", msg.Option("email"), "id"))
-			}
 
 			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("web.session", "login", "uuid"), Path: "/"})
 			http.Redirect(w, r, merge(msg, r.Header.Get("index_url"), "ticket", ""), http.StatusTemporaryRedirect)
@@ -470,7 +467,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 		"get": &ctx.Command{Name: "get [which] name [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"which": 1, "method": 1, "headers": 2, "content_type": 1, "file": 2, "body": 1, "parse": 1, "temp": -1, "save": 1},
+			Form: map[string]int{"which": 1, "method": 1, "headers": 2, "content_type": 1, "file": 2, "body": 1, "parse": 1, "temp": -1, "save": 1, "temp_expire": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if len(arg) == 0 {
 					m.Cmdy("web.spide")
@@ -538,6 +535,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								m.Option("content_type", "application/x-www-form-urlencoded")
 							}
 							uri, uri_arg = uri[:index], "?"+uuu.RawQuery
+						}
+					}
+
+					if m.Options("temp_expire") {
+						if h := m.Cmdx("mdb.temp", "check", "url", uri+uri_arg); h != "" {
+							m.Cmdy("mdb.temp", h, "data", "data", m.Meta["temp"])
+							return
 						}
 					}
 
@@ -1000,7 +1004,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								// args = kit.Trans(list)
 							}
 
-							m.Log("fuck", "what %v", args)
 							if msg.Cmd(args); m.Options("bench") {
 								name_alias := "action." + kit.Select(msg.Option("componet_name"), msg.Option("componet_name_alias"))
 

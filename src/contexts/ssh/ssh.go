@@ -353,35 +353,25 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				if m.Options("remote_code") {
-					m.Option("username", m.Option("user.name"))
+					if m.Option("username", m.Option("user.name")); !m.Confs("trust", m.Option("node.route")) {
+						// 用户签名
+						hash, _ := kit.Hash("rand", m.Option("text.time", m.Time("stamp")), m.Option("node.route"))
+						m.Option("user.cert", m.Cmd("aaa.auth", "username", m.Option("user.name"), "cert").Append("meta"))
+						m.Option("user.sign", m.Spawn().Cmdx("ssh.remote", m.Option("user.route"), "sync", "check", "user", m.Option("node.route"), hash))
 
-					// 检查会话
-					m.Option("sessid", "")
-					m.Cmd("aaa.auth", "nodes", m.Option("node.route"), "session").Table(func(line map[string]string) {
-						if m.Cmds("aaa.auth", line["key"], "username", m.Option("user.name")) {
-							m.Option("sessid", line["key"])
+						// 代理验签
+						if !m.Options("user.cert") || !m.Options("user.sign") || !m.Cmds("aaa.rsa", "verify", m.Option("user.cert"), m.Option("user.sign"), hash) {
+							m.Log("warn", "user error")
+							m.Echo("no right of %s", m.Option("text.route"))
+							return
 						}
-					})
+					} else {
+						m.Log("info", "skip verify user of node %s", m.Option("node.route"))
+					}
 
-					if !m.Options("sessid") {
-						if !m.Confs("trust", m.Option("node.route")) {
-							// 用户签名
-							hash, _ := kit.Hash("rand", m.Option("text.time", m.Time("stamp")), m.Option("node.route"))
-							m.Option("user.cert", m.Cmd("aaa.auth", "username", m.Option("user.name"), "cert").Append("meta"))
-							m.Option("user.sign", m.Spawn().Cmdx("ssh.remote", m.Option("user.route"), "sync", "check", "user", m.Option("node.route"), hash))
-
-							// 代理验签
-							if !m.Options("user.cert") || !m.Options("user.sign") || !m.Cmds("aaa.rsa", "verify", m.Option("user.cert"), m.Option("user.sign"), hash) {
-								m.Log("warn", "user error")
-								m.Echo("no right of %s", m.Option("text.route"))
-								return
-							}
-						} else {
-							m.Log("info", "skip verify user %s", m.Option("user.name"))
-						}
-
-						// 创建会话
-						m.Option("sessid", m.Cmdx("aaa.sess", "nodes", "username", m.Option("user.name")))
+					// 创建会话
+					if m.Option("sessid", m.Cmd("aaa.auth", "username", m.Option("user.name"), "session").Append("key")); !m.Options("sessid") {
+						m.Option("sessid", m.Cmdx("aaa.sess", "web", "username", m.Option("user.name")))
 						m.Cmd("aaa.auth", m.Option("sessid"), "nodes", m.Option("node.route"))
 					}
 

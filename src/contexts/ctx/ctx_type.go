@@ -1454,13 +1454,20 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 }
 
 func (m *Message) Cmdm(args ...interface{}) *Message {
-	// 执行命令
-	msg := m.Search(kit.Format(m.Magic("session", "current.ctx")), true)[0]
-	if msg == nil {
-		msg = m.Spawn()
+	m.Log("info", "current: %v", m.Magic("session", "current"))
+
+	arg := []string{}
+	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
+		arg = append(arg, "context", "ssh", "sh", "node", pod)
 	}
-	msg.Cmd(args...).CopyTo(m)
-	m.Magic("session", "current.ctx", msg.target.Name)
+	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
+		arg = append(arg, "context", ctx)
+	}
+	arg = append(arg, kit.Trans(args...)...)
+
+	// 执行命令
+	m.Spawn().Cmd(arg).CopyTo(m)
+	// m.Magic("session", "current.ctx", msg.target.Name)
 	return m
 }
 func (m *Message) Cmdy(args ...interface{}) *Message {

@@ -63,8 +63,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"address":  &ctx.Config{Name: "address", Value: "", Help: "默认地址"},
 		"driver":   &ctx.Config{Name: "driver(mysql)", Value: "mysql", Help: "默认驱动"},
 
-		"temp":      &ctx.Config{Name: "temp", Value: map[string]interface{}{}, Help: "缓存数据"},
-		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
+		"temp":        &ctx.Config{Name: "temp", Value: map[string]interface{}{}, Help: "缓存数据"},
+		"temp_view":   &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
+		"temp_expire": &ctx.Config{Name: "temp_expire(s)", Value: "3000", Help: "缓存数据"},
 
 		"note": &ctx.Config{Name: "note", Value: map[string]interface{}{
 			"faa01a8fc2fc92dae3fbc02ac1b4ec75": map[string]interface{}{
@@ -343,6 +344,26 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			}},
 
 		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1, "limit": 1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 && arg[0] == "check" {
+				h := ""
+				for i := 1; i < len(arg)-1; i += 2 {
+					switch arg[i] {
+					case "url", "trans":
+						h = ""
+					}
+					if h = m.Cmdx("aaa.hash", arg[i], arg[i+1], h); !m.Confs("temp", h) {
+						return
+					}
+					expire := kit.Time(m.Conf("temp", []string{h, "create_time"})) + kit.Int(m.Confx("temp_expire")) - kit.Time(m.Time())
+					m.Log("info", "expire: %ds", expire)
+					if expire < 0 {
+						return
+					}
+				}
+				m.Echo(h)
+				return
+			}
+
 			if len(arg) > 2 { // 添加数据
 				if temp := m.Confm("temp", arg[0]); temp == nil {
 					h := m.Cmdx("aaa.hash", arg[0], arg[1])
