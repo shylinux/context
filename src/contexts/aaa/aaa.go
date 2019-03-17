@@ -536,6 +536,19 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return true
 			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				if len(arg) > 0 && arg[0] == "current" {
+					switch len(arg) {
+					case 1:
+						m.Cmdy("aaa.auth", m.Option("sessid"), "data", "current")
+					case 2:
+						m.Cmdy("aaa.auth", m.Option("sessid"), "data", "current."+arg[1])
+					default:
+						m.Cmd("aaa.auth", m.Option("sessid"), "data", "current."+arg[1], arg[2])
+						m.Cmdy("aaa.auth", m.Option("sessid"), "data", "current."+arg[1])
+					}
+					return
+				}
+
 				switch len(arg) {
 				case 0: // 查看会话
 					m.Cmdy("aaa.auth", "ship", "session")

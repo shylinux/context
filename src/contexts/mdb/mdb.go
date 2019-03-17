@@ -48,10 +48,7 @@ func (mdb *MDB) Start(m *ctx.Message, arg ...string) bool {
 	return false
 }
 func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool {
-	if mdb.DB != nil {
-		return false
-	}
-	return true
+	return false
 }
 
 var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
@@ -69,11 +66,6 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"temp":      &ctx.Config{Name: "temp", Value: map[string]interface{}{}, Help: "缓存数据"},
 		"temp_view": &ctx.Config{Name: "temp_view", Value: map[string]interface{}{}, Help: "缓存数据"},
 
-		"note_view": &ctx.Config{Name: "note_view", Value: map[string]interface{}{
-			"default": []interface{}{"key", "create_time", "type", "name", "model", "value"},
-			"base":    []interface{}{"key", "create_time", "type", "name", "model", "value"},
-			"full":    []interface{}{"key", "create_time", "access_time", "type", "name", "model", "value", "view", "data", "ship"},
-		}, Help: "数据视图"},
 		"note": &ctx.Config{Name: "note", Value: map[string]interface{}{
 			"faa01a8fc2fc92dae3fbc02ac1b4ec75": map[string]interface{}{
 				"create_time": "1990-07-30 07:08:09", "access_time": "2017-11-01 02:03:04",
@@ -94,145 +86,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				},
 			},
 		}, Help: "数据结构"},
+		"note_view": &ctx.Config{Name: "note_view", Value: map[string]interface{}{
+			"default": []interface{}{"key", "create_time", "type", "name", "model", "value"},
+			"base":    []interface{}{"key", "create_time", "type", "name", "model", "value"},
+			"full":    []interface{}{"key", "create_time", "access_time", "type", "name", "model", "value", "view", "data", "ship"},
+		}, Help: "数据视图"},
 	},
 	Commands: map[string]*ctx.Command{
-		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1, "limit": 1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 2 { // 添加数据
-				if temp := m.Confm("temp", arg[0]); temp == nil {
-					h := m.Cmdx("aaa.hash", arg[0], arg[1])
-					m.Confv("temp", h, map[string]interface{}{
-						"create_time": m.Time(), "expire_time": m.Time("60s"),
-						"type": arg[0], "meta": arg[1], "data": m.Optionv(arg[2]),
-					})
-					arg[2], arg = h, arg[2:]
-				}
-			}
-
-			if len(arg) > 1 {
-				if temp, msg := m.Confm("temp", arg[0]), m; temp != nil {
-					hash, arg := arg[0], arg[1:]
-					switch arg[0] {
-					case "node": // 查看节点
-						m.Put("option", "temp", temp).Cmdy("ctx.trans", "temp")
-						return
-					case "ship": //查看链接
-						for k, v := range temp {
-							val := v.(map[string]interface{})
-							m.Add("append", "key", k)
-							m.Add("append", "create_time", val["create_time"])
-							m.Add("append", "type", val["type"])
-							m.Add("append", "meta", val["meta"])
-						}
-						m.Sort("create_time", "time_r").Table()
-						return
-					case "data": // 查看数据
-						arg = arg[1:]
-					}
-
-					trans := strings.Join(append([]string{hash, "data"}, arg...), ".")
-					h := m.Cmdx("aaa.hash", "trans", trans)
-
-					if len(arg) == 0 || temp["type"].(string) == "trans" {
-						h = hash
-					} else { // 转换数据
-						if view := m.Confm("temp", h); view != nil && false { // 加载缓存
-							msg = m.Spawn()
-							switch data := view["data"].(type) {
-							case map[string][]string:
-								msg.Meta = data
-							case map[string]interface{}:
-								for k, v := range data {
-									switch val := v.(type) {
-									case []interface{}:
-										msg.Add("append", k, val)
-									}
-								}
-								m.Confv("temp", []string{h, "data"}, msg.Meta)
-							}
-							temp = view
-						} else if arg[0] == "hash" { //  添加缓存
-							m.Echo(hash)
-						} else if arg[0] == "" { //  添加缓存
-							b, _ := json.MarshalIndent(temp["data"], "", "  ")
-							m.Echo(string(b))
-						} else {
-							msg = m.Put("option", "temp", temp["data"]).Cmd("ctx.trans", "temp", arg)
-
-							m.Confv("temp", h, map[string]interface{}{
-								"create_time": m.Time(), "expire_time": m.Time("60s"),
-								"type": "trans", "meta": trans, "data": msg.Meta,
-								"ship": map[string]interface{}{
-									hash: map[string]interface{}{"create_time": m.Time(), "ship": "0", "type": temp["type"], "meta": temp["meta"]},
-								},
-							})
-							m.Confv("temp", []string{hash, "ship", h}, map[string]interface{}{
-								"create_time": m.Time(), "ship": "1", "type": "trans", "meta": trans,
-							})
-							temp = m.Confm("temp", h)
-						}
-					}
-
-					if m.Options("select") { // 过滤数据
-						chain := strings.Join(m.Optionv("select").([]string), " ")
-						hh := m.Cmdx("aaa.hash", "select", chain, h)
-
-						if view := m.Confm("temp", hh); view != nil && false { // 加载缓存
-							msg = msg.Spawn()
-							switch data := view["data"].(type) {
-							case map[string][]string:
-								msg.Meta = data
-							case map[string]interface{}:
-								for k, v := range data {
-									switch val := v.(type) {
-									case []interface{}:
-										msg.Add("append", k, val)
-									}
-								}
-								m.Confv("temp", []string{h, "data"}, msg.Meta)
-							}
-						} else { // 添加缓存
-							msg = msg.Spawn().Copy(msg, "append").Cmd("select", m.Optionv("select"))
-
-							m.Confv("temp", hh, map[string]interface{}{
-								"create_time": m.Time(), "expire_time": m.Time("60s"),
-								"type": "select", "meta": chain, "data": msg.Meta,
-								"ship": map[string]interface{}{
-									h: map[string]interface{}{"create_time": m.Time(), "ship": "0", "type": temp["type"], "meta": temp["meta"]},
-								},
-							})
-
-							m.Confv("temp", []string{h, "ship", hh}, map[string]interface{}{
-								"create_time": m.Time(), "ship": "1", "type": "select", "meta": chain,
-							})
-						}
-					}
-
-					msg.CopyTo(m)
-					return
-				}
-			}
-
-			arg, h := kit.Slice(arg)
-			if h != "" {
-				if temp := m.Confm("temp", h); temp != nil {
-					m.Echo(h)
-					return
-				}
-			}
-
-			// 缓存列表
-			m.Confm("temp", func(key string, temp map[string]interface{}) {
-				if len(arg) == 0 || strings.HasPrefix(key, arg[0]) || strings.HasSuffix(key, arg[0]) || (temp["type"].(string) == arg[0] && (len(arg) == 1 || strings.Contains(temp["meta"].(string), arg[1]))) {
-					m.Add("append", "key", key)
-					m.Add("append", "create_time", temp["create_time"])
-					m.Add("append", "type", temp["type"])
-					m.Add("append", "meta", temp["meta"])
-				}
-			})
-			m.Sort("create_time", "time_r").Table().Cmd("select", m.Optionv("select"))
-			return
-		}},
-
 		"open": &ctx.Command{Name: "open [database [username [password [address [protocol [driver]]]]]]",
 			Help: "打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 服务地址, protocol: 服务协议, driver: 数据库类型",
 			Form: map[string]int{"dbname": 1, "dbhelp": 1},
@@ -452,49 +312,174 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				m.Cmdy(".query", strings.Join(stmt, " "))
 				return
 			}},
-		"update": &ctx.Command{Name: "update table condition [set field value]", Help: "修改数据, table: 关系表, condition: 条件语句, set: 修改数据",
-			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
-				if len(arg) == 0 {
-					m.Put("option", "auto_cmd", "").Spawn().Cmd("query", "show tables").Table(func(line map[string]string) {
-						for _, v := range line {
-							m.Auto(v, "", "")
-						}
-					})
-					return true
-				}
-				if len(arg) == 2 {
-					// m.Put("option", "auto_cmd", "").Spawn().Cmd("show", arg[0], "where", arg[1]).Table(func(line map[string]string) {
-					// 	for _, v := range line {
-					// 		m.Auto(v, "", "")
-					// 	}
-					// })
-					return true
-				}
-				return true
-			},
+		"update": &ctx.Command{Name: "update [table [condition [field [value]]...]]",
+			Help: "修改数据, table: 关系表, condition: 条件语句, field: 字段名, value: 字段值",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if len(arg) == 2 {
-					m.Cmd(".show", arg[0], "where", arg[1]).CopyTo(m, "append")
+				switch len(arg) {
+				case 0:
+					m.Cmdy(".show")
+				case 1:
+					m.Cmdy(".show", arg[0])
+				case 2:
+					m.Cmdy(".show", arg[0], "where", arg[1])
+				case 3:
+					m.Cmdy(".show", arg[0], arg[2], "where", arg[1])
+				default:
+					fields := []string{}
+					values := []string{}
+					for i := 2; i < len(arg)-1; i += 2 {
+						fields = append(fields, arg[i])
+						values = append(values, fmt.Sprintf("%s='%s'", arg[i], arg[i+1]))
+					}
+
+					stmt := []string{fmt.Sprintf("update %s", arg[0])}
+					stmt = append(stmt, "set", strings.Join(values, ","))
+					stmt = append(stmt, fmt.Sprintf("where %s", arg[1]))
+
+					m.Cmd(".exec", strings.Join(stmt, " "))
+					m.Cmdy("show", arg[0], fields, "where", arg[1])
 				}
-
-				fields := []string{}
-				values := []string{}
-				for i := 3; i < len(arg)-1; i += 2 {
-					fields = append(fields, arg[i])
-					values = append(values, fmt.Sprintf("%s='%s'", arg[i], arg[i+1]))
-				}
-
-				stmt := []string{fmt.Sprintf("update %s", arg[0])}
-				stmt = append(stmt, "set", strings.Join(values, ","))
-				stmt = append(stmt, fmt.Sprintf("where %s", arg[1]))
-
-				m.Cmd(".exec", strings.Join(stmt, " "))
-				m.Cmdy("show", arg[0], fields, "where", arg[1])
 				return
 			}},
 
+		"temp": &ctx.Command{Name: "temp [type [meta [data]]] [tid [node|ship|data] [chain... [select ...]]]", Form: map[string]int{"select": -1, "limit": 1}, Help: "缓存数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 2 { // 添加数据
+				if temp := m.Confm("temp", arg[0]); temp == nil {
+					h := m.Cmdx("aaa.hash", arg[0], arg[1])
+					m.Confv("temp", h, map[string]interface{}{
+						"create_time": m.Time(), "expire_time": m.Time("60s"),
+						"type": arg[0], "meta": arg[1], "data": m.Optionv(arg[2]),
+					})
+					arg[2], arg = h, arg[2:]
+				}
+			}
+
+			if len(arg) > 1 {
+				if temp, msg := m.Confm("temp", arg[0]), m; temp != nil {
+					hash, arg := arg[0], arg[1:]
+					switch arg[0] {
+					case "node": // 查看节点
+						m.Put("option", "temp", temp).Cmdy("ctx.trans", "temp")
+						return
+					case "ship": //查看链接
+						for k, v := range temp {
+							val := v.(map[string]interface{})
+							m.Add("append", "key", k)
+							m.Add("append", "create_time", val["create_time"])
+							m.Add("append", "type", val["type"])
+							m.Add("append", "meta", val["meta"])
+						}
+						m.Sort("create_time", "time_r").Table()
+						return
+					case "data": // 查看数据
+						arg = arg[1:]
+					}
+
+					trans := strings.Join(append([]string{hash, "data"}, arg...), ".")
+					h := m.Cmdx("aaa.hash", "trans", trans)
+
+					if len(arg) == 0 || temp["type"].(string) == "trans" {
+						h = hash
+					} else { // 转换数据
+						if view := m.Confm("temp", h); view != nil && false { // 加载缓存
+							msg = m.Spawn()
+							switch data := view["data"].(type) {
+							case map[string][]string:
+								msg.Meta = data
+							case map[string]interface{}:
+								for k, v := range data {
+									switch val := v.(type) {
+									case []interface{}:
+										msg.Add("append", k, val)
+									}
+								}
+								m.Confv("temp", []string{h, "data"}, msg.Meta)
+							}
+							temp = view
+						} else if arg[0] == "hash" { //  添加缓存
+							m.Echo(hash)
+						} else if arg[0] == "" { //  添加缓存
+							b, _ := json.MarshalIndent(temp["data"], "", "  ")
+							m.Echo(string(b))
+						} else {
+							msg = m.Put("option", "temp", temp["data"]).Cmd("ctx.trans", "temp", arg)
+
+							m.Confv("temp", h, map[string]interface{}{
+								"create_time": m.Time(), "expire_time": m.Time("60s"),
+								"type": "trans", "meta": trans, "data": msg.Meta,
+								"ship": map[string]interface{}{
+									hash: map[string]interface{}{"create_time": m.Time(), "ship": "0", "type": temp["type"], "meta": temp["meta"]},
+								},
+							})
+							m.Confv("temp", []string{hash, "ship", h}, map[string]interface{}{
+								"create_time": m.Time(), "ship": "1", "type": "trans", "meta": trans,
+							})
+							temp = m.Confm("temp", h)
+						}
+					}
+
+					if m.Options("select") { // 过滤数据
+						chain := strings.Join(m.Optionv("select").([]string), " ")
+						hh := m.Cmdx("aaa.hash", "select", chain, h)
+
+						if view := m.Confm("temp", hh); view != nil && false { // 加载缓存
+							msg = msg.Spawn()
+							switch data := view["data"].(type) {
+							case map[string][]string:
+								msg.Meta = data
+							case map[string]interface{}:
+								for k, v := range data {
+									switch val := v.(type) {
+									case []interface{}:
+										msg.Add("append", k, val)
+									}
+								}
+								m.Confv("temp", []string{h, "data"}, msg.Meta)
+							}
+						} else { // 添加缓存
+							msg = msg.Spawn().Copy(msg, "append").Cmd("select", m.Optionv("select"))
+
+							m.Confv("temp", hh, map[string]interface{}{
+								"create_time": m.Time(), "expire_time": m.Time("60s"),
+								"type": "select", "meta": chain, "data": msg.Meta,
+								"ship": map[string]interface{}{
+									h: map[string]interface{}{"create_time": m.Time(), "ship": "0", "type": temp["type"], "meta": temp["meta"]},
+								},
+							})
+
+							m.Confv("temp", []string{h, "ship", hh}, map[string]interface{}{
+								"create_time": m.Time(), "ship": "1", "type": "select", "meta": chain,
+							})
+						}
+					}
+
+					msg.CopyTo(m)
+					return
+				}
+			}
+
+			arg, h := kit.Slice(arg)
+			if h != "" {
+				if temp := m.Confm("temp", h); temp != nil {
+					m.Echo(h)
+					return
+				}
+			}
+
+			// 缓存列表
+			m.Confm("temp", func(key string, temp map[string]interface{}) {
+				if len(arg) == 0 || strings.HasPrefix(key, arg[0]) || strings.HasSuffix(key, arg[0]) || (temp["type"].(string) == arg[0] && (len(arg) == 1 || strings.Contains(temp["meta"].(string), arg[1]))) {
+					m.Add("append", "key", key)
+					m.Add("append", "create_time", temp["create_time"])
+					m.Add("append", "type", temp["type"])
+					m.Add("append", "meta", temp["meta"])
+				}
+			})
+			m.Sort("create_time", "time_r").Table().Cmd("select", m.Optionv("select"))
+			return
+		}},
 		"note": &ctx.Command{Name: "note [model [name [type name]...]]|[index [name data...]]|[value name data...]|[name model data...]",
-			Form: map[string]int{"offset": 1, "limit": 1}, Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			Form: map[string]int{"begin": 2, "offset": 1, "limit": 1}, Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				offset := kit.Int(kit.Select(m.Conf("page_offset"), m.Option("offset")))
 				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
 
@@ -573,6 +558,21 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 							value = append(value, map[string]interface{}{"type": model["type"], "name": model["name"], "value": v})
 							values[kit.Format(model["name"])] = v
 						})
+
+						miss := false
+						if m.Has("begin") {
+							for i := 0; i < len(m.Meta["begin"]); i += 2 {
+								if !strings.HasPrefix(kit.Select(kit.Format(note[m.Meta["begin"][i]]),
+									kit.Format(values[m.Meta["begin"][i]])), m.Meta["begin"][i+1]) {
+									miss = true
+									break
+								}
+							}
+						}
+						if miss {
+							i--
+							continue
+						}
 
 						for i := 0; i < len(fields); i++ {
 							switch fields[i] {
@@ -679,12 +679,12 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 				case "value":
 					hi := m.Cmdx("mdb.note", "index", arg[1])
-					hv, _ := kit.Hash("type", arg[0], "name", arg[1], "data", arg[2:])
+					hv, _ := kit.Hash("type", arg[0], "name", arg[1], "data", arg[2])
 					if value := m.Confm("note", hv); value == nil {
 						prev := m.Conf("note", []string{hi, "ship", "value", "data"})
 						m.Confv("note", hv, map[string]interface{}{
 							"create_time": m.Time(), "access_time": m.Time(),
-							"type": arg[0], "name": arg[1], "data": arg[2:], "ship": map[string]interface{}{
+							"type": arg[0], "name": arg[1], "data": arg[2], "ship": map[string]interface{}{
 								"prev":  map[string]interface{}{"type": "value", "data": prev},
 								"index": map[string]interface{}{"type": "index", "data": hi},
 								"note":  map[string]interface{}{"type": "note", "data": ""},

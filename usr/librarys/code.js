@@ -239,7 +239,7 @@ function send_command(form, cb) {
                 for (var i = 0; i < nrow; i ++) {
                     var tr = append_child(append, "tr")
                     for (var k in msg.append) {
-                        append_child(tr, "td", msg[msg.append[k]][i])
+                        append_child(tr, "td", format(msg[msg.append[k]][i]))
                     }
                 }
 
@@ -707,6 +707,28 @@ function init_download(event) {
     })
 }
 
+function init_contain() {
+    var option = document.querySelector("form.option.pod")
+    var append = document.querySelector("table.append.pod")
+    if (!append) {return}
+
+    function change(pod) {
+        option["pod"].value = pod
+        context.Cookie("current_pod", option["pod"].value)
+        context.GET("", {
+            "componet_group": "index",
+            "componet_name": "cmd",
+            "cmd": "sess current pod "+option["pod"].value,
+        })
+        return pod
+    }
+
+    add_sort(append, "key", function(event) {
+        change(event.target.innerText.trim())
+    })
+
+    option["pod"].value = context.Cookie("current_pod")
+}
 function init_context() {
     var option = document.querySelector("form.option.ctx")
     var append = document.querySelector("table.append.ctx")
@@ -716,6 +738,11 @@ function init_context() {
         option["ctx"].value = ctx
         send_command(option)
         context.Cookie("current_ctx", option["ctx"].value)
+        context.GET("", {
+            "componet_group": "index",
+            "componet_name": "cmd",
+            "cmd": "sess current ctx "+option["ctx"].value,
+        })
         return ctx
     }
 
@@ -912,6 +939,7 @@ window.onload = function() {
     init_userinfo()
     init_download()
 
+    init_contain()
     init_context()
     init_command()
     init_toolkit()

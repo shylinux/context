@@ -191,6 +191,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}
 
+			text := strings.Join(arg, " ")
+			if !strings.HasPrefix(text, "sess") {
+				text = m.Current(text)
+			}
+
 			// 解析代码片段
 			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
 				switch msg.Cmd().Detail(0) {
@@ -199,7 +204,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Set("result").Copy(msg, "result")
 				}
 				return nil
-			}, "parse", "line", "void", strings.Join(arg, " "))
+			}, "parse", "line", "void", text)
 			return
 		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
@@ -211,10 +216,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						if cmd, ok := info["cmd"].(*exec.Cmd); ok {
 							m.Add("append", "key", key)
 							m.Add("append", "create_time", info["create_time"])
-							m.Add("append", "cmd", kit.Select(cmd.Args[0], cmd.Args, 1))
-							m.Add("append", "log", info["log"])
-							m.Add("append", "pid", cmd.Process.Pid)
 							m.Add("append", "finish_time", info["finish_time"])
+							m.Add("append", "pid", cmd.Process.Pid)
+							m.Add("append", "log", info["log"])
+							m.Add("append", "cmd", kit.Select(cmd.Args[0], cmd.Args, 1))
 							if cmd.ProcessState == nil {
 								m.Add("append", "str", "")
 							} else {
@@ -298,7 +303,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 					l, e := os.Create(m.Option("cmd_log"))
 					m.Assert(e)
-					cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, l, l
+					l2, e := os.Create(m.Option("cmd_log") + "err")
+					m.Assert(e)
+					cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, l, l2
 
 					h, _ := kit.Hash("uniq")
 					m.Conf("daemon", h, map[string]interface{}{
@@ -308,10 +315,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 					m.GoFunc(m, func(m *ctx.Message) {
 						if e := cmd.Start(); e != nil {
-							m.Log("fuck", "%v", e)
 							m.Echo("error: ").Echo("%s\n", e)
 						} else if e := cmd.Wait(); e != nil {
-							m.Log("fuck", "%v", e)
 							m.Echo("error: ").Echo("%s\n", e)
 						}
 						m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))

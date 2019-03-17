@@ -221,6 +221,12 @@ function insert_button(which, value, callback) {
     })
 }
 
+function format(str) {
+    if (str.indexOf("http") == 0 && str.indexOf("<a href") == -1) {
+        return "<a href='"+str+"' target='_blank'>"+str+"</a>"
+    }
+    return str
+}
 function sort_table(table, index, sort_asc) {
     var list = table.querySelectorAll("tr")
     var new_list = []

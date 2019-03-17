@@ -587,7 +587,7 @@ func (m *Message) CopyTo(msg *Message, arg ...string) *Message {
 	return m
 }
 func (m *Message) Copy(msg *Message, arg ...string) *Message {
-	if m == msg {
+	if msg == nil || m == msg {
 		return m
 	}
 
@@ -853,6 +853,21 @@ func (m *Message) Magic(begin string, chain interface{}, args ...interface{}) in
 	}
 	return nil
 }
+func (m *Message) Current(text string) string {
+	cs := []string{}
+	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
+		cs = append(cs, "context", "ssh", "sh", "node", "'"+pod+"'")
+	}
+	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
+		cs = append(cs, "context", ctx)
+	}
+	if cmd := kit.Format(m.Magic("session", "current.cmd")); cmd != "" {
+		cs = append(cs, cmd)
+	}
+	m.Log("info", "%s %s current %v", m.Option("username"), m.Option("sessid"), cs)
+	cs = append(cs, text)
+	return strings.Join(cs, " ")
+}
 func (m *Message) Append(key string, arg ...interface{}) string {
 	if len(arg) > 0 {
 		m.Insert(key, 0, arg...)
@@ -909,6 +924,7 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 		return m
 	}
 
+	// 遍历函数
 	if len(cbs) > 0 {
 		switch cb := cbs[0].(type) {
 		case func(map[string]string) bool:
@@ -925,32 +941,43 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 			return m
 		case func(map[string]string):
 			nrow := len(m.Meta[m.Meta["append"][0]])
-			line := map[string]string{}
 			for i := 0; i < nrow; i++ {
+				line := map[string]string{}
 				for _, k := range m.Meta["append"] {
 					line[k] = m.Meta[k][i]
 				}
 				cb(line)
 			}
 			return m
+		case func(int, map[string]string):
+			nrow := len(m.Meta[m.Meta["append"][0]])
+			for i := 0; i < nrow; i++ {
+				line := map[string]string{}
+				for _, k := range m.Meta["append"] {
+					line[k] = m.Meta[k][i]
+				}
+				cb(i, line)
+			}
+			return m
 		}
 	}
 
 	//计算列宽
+	space := m.Confx("table_space")
 	depth, width := 0, map[string]int{}
 	for _, k := range m.Meta["append"] {
 		if len(m.Meta[k]) > depth {
 			depth = len(m.Meta[k])
 		}
-		width[k] = len(k)
+		width[k] = kit.Width(k, len(space))
 		for _, v := range m.Meta[k] {
-			if len(v) > width[k] {
-				width[k] = len(v)
+			if kit.Width(v, len(space)) > width[k] {
+				width[k] = kit.Width(v, len(space))
 			}
 		}
 	}
 
-	space := m.Confx("table_space")
+	// 回调函数
 	var cb func(maps map[string]string, list []string, line int) (goon bool)
 	if len(cbs) > 0 {
 		cb = cbs[0].(func(maps map[string]string, list []string, line int) (goon bool))
@@ -977,7 +1004,7 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 	row := map[string]string{}
 	wor := []string{}
 	for _, k := range m.Meta["append"] {
-		row[k], wor = k, append(wor, k+strings.Repeat(space, width[k]-len(k)))
+		row[k], wor = k, append(wor, k+strings.Repeat(space, width[k]-kit.Width(k, len(space))))
 	}
 	if !cb(row, wor, -1) {
 		return m
@@ -993,7 +1020,7 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 				data = m.Meta[k][i]
 			}
 
-			row[k], wor = data, append(wor, data+strings.Repeat(space, width[k]-len(data)))
+			row[k], wor = data, append(wor, data+strings.Repeat(space, width[k]-kit.Width(data, len(space))))
 		}
 		if !cb(row, wor, i) {
 			break
@@ -1419,6 +1446,16 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 	return m
 }
 
+func (m *Message) Cmdm(args ...interface{}) *Message {
+	// 执行命令
+	msg := m.Search(kit.Format(m.Magic("session", "current.ctx")), true)[0]
+	if msg == nil {
+		msg = m.Spawn()
+	}
+	msg.Cmd(args...).CopyTo(m)
+	m.Magic("session", "current.ctx", msg.target.Name)
+	return m
+}
 func (m *Message) Cmdy(args ...interface{}) *Message {
 	m.Cmd(args...).CopyTo(m)
 	return m

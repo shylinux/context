@@ -70,12 +70,14 @@ back_dotsfile:
 	cp ~/.zshrc $(DOTS)
 	cp ~/.tmux.conf $(DOTS)
 	cp ~/.vimrc $(DOTS)
+	cp ~/.vim/syntax/go.vim $(DOTS)
 	cp ~/.vim/syntax/shy.vim $(DOTS)
 
 load_dotsfile:\
    	~/.zshrc\
    	~/.tmux.conf\
    	~/.vimrc\
+   	~/.vim/syntax/go.vim\
    	~/.vim/syntax/shy.vim
 
 ~/.zshrc: $(DOTS)/.zshrc
@@ -85,6 +87,8 @@ load_dotsfile:\
 ~/context/.git/hooks/post-commit: $(DOTS)/git_hooks/post-commit
 	cp $< $@
 ~/.vimrc: $(DOTS)/.vimrc
+	cp $< $@
+~/.vim/syntax/go.vim: $(DOTS)/go.vim
 	cp $< $@
 ~/.vim/syntax/shy.vim: $(DOTS)/shy.vim
 	cp $< $@

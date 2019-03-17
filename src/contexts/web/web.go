@@ -837,7 +837,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			sessid, username := m.Option("sessid"), m.Option("username")
+			username, sessid := m.Option("username"), m.Option("sessid")
 
 			switch arg[0] {
 			case "login":
@@ -849,8 +849,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if username == "" || !m.Options(arg[1]) {
 					break
 				}
+
 				if sessid == "" || !m.Cmds("aaa.sess", sessid) { // 创建会话
-					sessid = m.Cmdx("aaa.sess", "web", "ip", m.Option("remote_ip"))
+					if sessid = m.Cmd("aaa.auth", "username", m.Option("username"), "session", "web").Append("key"); sessid == "" {
+						sessid = m.Cmdx("aaa.sess", "web", "ip", m.Option("remote_ip"))
+					}
 				}
 				if m.Cmds("aaa.sess", sessid, m.Option("username"), arg[1], m.Option(arg[1])) { // 用户登录
 					m.Echo(sessid)
@@ -886,6 +889,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 				return
 			}
+
+			m.Option("current_ctx", kit.Select(m.Option("current_ctx", kit.Format(m.Magic("session", "current.ctx")))))
 
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				// 响应类型
@@ -944,6 +949,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						// 添加参数值
 						args := []string{val["componet_cmd"].(string)}
+						if kit.Right(val["componet_pod"]) {
+							args = []string{"sh", "node", kit.Format(m.Magic("session", "current.pod")), val["componet_cmd"].(string)}
+						}
 						if val["arguments"] != nil {
 							for _, v := range val["arguments"].([]interface{}) {
 								switch value := v.(type) {
@@ -990,6 +998,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								// args = kit.Trans(list)
 							}
 
+							m.Log("fuck", "what %v", args)
 							if msg.Cmd(args); m.Options("bench") {
 								name_alias := "action." + kit.Select(msg.Option("componet_name"), msg.Option("componet_name_alias"))
 
