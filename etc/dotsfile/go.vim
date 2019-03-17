@@ -1,0 +1,2 @@
+highlight goComment        ctermfg=darkgreen
+
