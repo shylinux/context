@@ -133,7 +133,8 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 }
 func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
-		m.TryCatch(m.Spawn(), true, func(msg *ctx.Message) {
+
+		m.TryCatch(m.Spawn(m.Conf("serve", "autofree")), true, func(msg *ctx.Message) {
 			msg.Option("remote_addr", r.RemoteAddr)
 			msg.Option("remote_ip", r.Header.Get("remote_ip"))
 			msg.Option("index_url", r.Header.Get("index_url"))
@@ -375,6 +376,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "爬虫配置"},
 		"serve": &ctx.Config{Name: "serve", Value: map[string]interface{}{
+			"autofree":   false,
 			"logheaders": false,
 			"form_size":  "102400",
 			"directory":  "usr",

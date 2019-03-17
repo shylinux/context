@@ -295,6 +295,7 @@ type Message struct {
 }
 
 func (m *Message) Spawn(arg ...interface{}) *Message {
+	temp := false
 	c := m.target
 	if len(arg) > 0 {
 		switch v := arg[0].(type) {
@@ -302,6 +303,8 @@ func (m *Message) Spawn(arg ...interface{}) *Message {
 			c = v
 		case *Message:
 			c = v.target
+		case string:
+			temp = kit.Right(v)
 		}
 	}
 
@@ -312,6 +315,10 @@ func (m *Message) Spawn(arg ...interface{}) *Message {
 		target:  c,
 		message: m,
 		root:    m.root,
+	}
+
+	if temp {
+		return msg
 	}
 
 	m.messages = append(m.messages, msg)
