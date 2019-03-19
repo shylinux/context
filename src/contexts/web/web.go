@@ -533,6 +533,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								m.Log("info", "body %v", string(uri[index+1:]))
 								body = strings.NewReader(uri[index+1:])
 								m.Option("content_type", "application/x-www-form-urlencoded")
+								m.Option("content_length", len(uri[index+1:]))
 							}
 							uri, uri_arg = uri[:index], "?"+uuu.RawQuery
 						}
@@ -546,6 +547,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					req, e := http.NewRequest(method, uri, body)
+					m.Log("info", "%#v", req)
 					m.Assert(e)
 					m.Log("info", "%s %s", req.Method, req.URL)
 
@@ -561,6 +563,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if m.Options("content_type") {
 						req.Header.Set("Content-Type", m.Option("content_type"))
 					}
+					if m.Options("content_length") {
+						req.Header.Set("Content-Length", m.Option("content_length"))
+					}
+					m.Log("info", "%#v", req)
 					m.Confm("spide", []string{which, "cookie"}, func(key string, value string) {
 						if key != "" {
 							req.AddCookie(&http.Cookie{Name: key, Value: value})

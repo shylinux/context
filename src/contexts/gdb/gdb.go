@@ -94,6 +94,7 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 			action := m.Conf("signal", sig)
 			m.Log("signal", "signal %v %v", sig, action)
 			switch action {
+			case "segv":
 			case "quit":
 				m.Cmd("cli.exit", 0)
 			case "restart":
@@ -121,6 +122,7 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 		"signal": &ctx.Config{Name: "signal", Value: map[string]interface{}{
 			"3":  "quit",
 			"10": "restart",
+			"11": "segv",
 			"12": "upgrade",
 		}, Help: "信号"},
 		"debug": &ctx.Config{Name: "debug", Value: map[string]interface{}{"value": map[string]interface{}{"enable": false},

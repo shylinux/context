@@ -127,6 +127,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						// 清理主机
 						nfs.Free(func(nfs *ctx.Message) bool {
 							m.Conf("timer", m.Cmdx("cli.timer", "repeat", m.Conf("timer_interval"), "context", "ssh", "remote", "redial", arg[1:]))
+							m.Cmd("aaa.auth", m.Cmdx("aaa.auth", "nodes", node.Append("node.name")), "delete", "node")
 
 							m.Log("info", "delete node %s", node.Append("node.name"))
 							delete(m.Confm("node"), node.Append("node.name"))
