@@ -500,7 +500,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			return
 		}},
 		"note": &ctx.Command{Name: "note [model [name [type name]...]]|[index [name data...]]|[value name data...]|[name model data...]",
-			Form: map[string]int{"begin": 2, "offset": 1, "limit": 1}, Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			Form: map[string]int{"eq": 2, "begin": 2, "offset": 1, "limit": 1}, Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				offset := kit.Int(kit.Select(m.Conf("page_offset"), m.Option("offset")))
 				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
 
@@ -528,7 +528,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					arg = arg[1:]
 				}
 				if len(arg) == 1 && arg[0] != "show" {
-					for i := offset; hm != "" && i < limit; hm, i = m.Conf("note", []string{hm, "ship", "prev", "data"}), i+1 {
+					for i := offset; hm != "" && i < limit+offset; hm, i = m.Conf("note", []string{hm, "ship", "prev", "data"}), i+1 {
 						model := m.Confm("note", hm)
 						m.Add("append", "key", hm)
 						m.Add("append", "create_time", model["create_time"])
@@ -545,14 +545,14 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 				switch arg[0] {
 				case "show":
-					if len(arg) == 1 {
+					if len(arg) == 1 { // 查看索引
 						m.Cmdy("mdb.note", "index")
 						break
 					}
 					if len(arg) == 2 {
-						if arg[1] == "model" {
+						if arg[1] == "model" { // 查看模型
 							m.Cmdy("mdb.note", "model")
-						} else {
+						} else { // 查看数值
 							m.Cmdy("mdb.note", "value", arg[1])
 						}
 						break
@@ -567,11 +567,19 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						hv, hn = "prev", m.Conf("note", []string{hm, "ship", "note", "data"})
 					}
 
-					for i := offset; hn != "" && i < limit; hn, i = m.Conf("note", []string{hn, "ship", hv, "data"}), i+1 {
+					for i := 0; hn != "" && i < limit+offset; hn, i = m.Conf("note", []string{hn, "ship", hv, "data"}), i+1 {
+						m.Log("fuck", "what hn: %v %v", hn, kit.Formats(m.Confv("note", hn)))
+						// 翻页
+						if i < offset {
+							continue
+						}
+
+						// 关系表
 						note := m.Confm("note", hn)
 						hvs := kit.Trans(note["data"])
 						hm := kit.Format(kit.Chain(note, "ship.model.data"))
 
+						// 值转换
 						value := []interface{}{}
 						values := map[string]interface{}{}
 						m.Confm("note", []string{hm, "data"}, func(i int, model map[string]interface{}) {
@@ -580,11 +588,20 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 							values[kit.Format(model["name"])] = v
 						})
 
+						// 行筛选
 						miss := false
-						if m.Has("begin") {
-							for i := 0; i < len(m.Meta["begin"]); i += 2 {
-								if !strings.HasPrefix(kit.Select(kit.Format(note[m.Meta["begin"][i]]),
-									kit.Format(values[m.Meta["begin"][i]])), m.Meta["begin"][i+1]) {
+						if !miss && m.Has("eq") {
+							for j := 0; j < len(m.Meta["eq"]); j += 2 {
+								if kit.Select(kit.Format(note[m.Meta["eq"][j]]), kit.Format(values[m.Meta["eq"][j]])) != m.Meta["eq"][j+1] {
+									miss = true
+									break
+								}
+							}
+						}
+						if !miss && m.Has("begin") {
+							for j := 0; j < len(m.Meta["begin"]); j += 2 {
+								if !strings.HasPrefix(kit.Select(kit.Format(note[m.Meta["begin"][j]]),
+									kit.Format(values[m.Meta["begin"][j]])), m.Meta["begin"][j+1]) {
 									miss = true
 									break
 								}
@@ -595,12 +612,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 							continue
 						}
 
-						for i := 0; i < len(fields); i++ {
-							switch fields[i] {
+						// 列筛选
+						for j := 0; j < len(fields); j++ {
+							switch fields[j] {
 							case "key":
 								m.Add("append", "key", hn)
 							case "create_time", "access_time", "type", "name":
-								m.Add("append", fields[i], note[fields[i]])
+								m.Add("append", fields[j], note[fields[j]])
 							case "model":
 								m.Add("append", "model", m.Conf("note", []string{hm, "name"}))
 							case "view":
@@ -608,9 +626,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 							case "value":
 								m.Add("append", "value", kit.Format(value))
 							case "data", "ship":
-								m.Add("append", fields[i], kit.Format(note[fields[i]]))
+								m.Add("append", fields[j], kit.Format(note[fields[j]]))
 							default:
-								m.Add("append", fields[i], kit.Format(values[fields[i]]))
+								m.Add("append", fields[j], kit.Format(values[fields[j]]))
 							}
 						}
 					}

@@ -1,4 +1,6 @@
 context = {
+	Bench: function(key, value) {
+    },
 	Search: function(key, value) {
 		var args = {};
 		var search = location.search.split("?");
@@ -62,8 +64,13 @@ context = {
     Command: function(cmd, option, cb) {
         option = option || {}
         option["componet_index"] = "index"
-        option["componet_name"] = "source"
-        option["cmd"] = cmd
+        if (typeof cmd == "string") {
+            option["componet_name"] = "source"
+            option["cmd"] = cmd
+        } else {
+            option["componet_name"] = "head"
+            option["cmds"] = cmd
+        }
 
         this.GET("", option, function(msg) {
             typeof cb == "function" && (msg && msg[0]? cb(msg[0]): cb())

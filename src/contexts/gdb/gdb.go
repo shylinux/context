@@ -84,7 +84,7 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 	gdb.wait = make(chan interface{}, 10)
 
 	m.Confm("signal", func(sig string, action string) {
-		m.Log("signal", "add %s %s", sig, action)
+		m.Log("error", "signal add %s %s", sig, action)
 		signal.Notify(gdb.goon, syscall.Signal(kit.Int(sig)))
 	})
 

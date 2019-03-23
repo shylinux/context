@@ -371,18 +371,13 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 
 					// 创建会话
-					if m.Option("sessid", m.Cmd("aaa.auth", "username", m.Option("user.name"), "session").Append("key")); !m.Options("sessid") {
-						m.Option("sessid", m.Cmdx("aaa.sess", "web", "username", m.Option("user.name")))
-						m.Cmd("aaa.auth", m.Option("sessid"), "nodes", m.Option("node.route"))
-					}
+					m.Option("sessid", m.Cmd("aaa.user", "session", "select").Append("key"))
 
 					// 创建空间
-					if m.Option("bench", m.Cmd("aaa.sess", m.Option("sessid"), "bench").Append("key")); !m.Options("bench") {
-						m.Option("bench", m.Cmdx("aaa.work", m.Option("sessid"), "nodes"))
-					}
+					m.Option("bench", m.Cmd("aaa.sess", "bench", "select").Append("key"))
 
 					// 权限检查
-					if !m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("user.name"), "remote", arg[0]) {
+					if !m.Cmds("aaa.work", "right", "remote", arg[0]) {
 						m.Echo("no right %s %s", "remote", arg[0])
 						return
 					}

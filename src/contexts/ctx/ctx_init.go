@@ -1234,11 +1234,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							}
 						case string:
 							m.Meta[m.Meta["expand"][j+1]][i] = val
-						case float64:
-							m.Meta[m.Meta["expand"][j+1]][i] = fmt.Sprintf("%d", int(val))
 						default:
-							b, _ := json.Marshal(val)
-							m.Meta[m.Meta["expand"][j+1]][i] = string(b)
+							m.Meta[m.Meta["expand"][j+1]][i] = kit.Format(val)
 						}
 					}
 				}
@@ -1262,7 +1259,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						if hides[k] {
 							continue
 						}
-						msg.Add("append", k, m.Meta[k][i])
+						msg.Add("append", k, kit.Select("", m.Meta[k], i))
 					}
 				}
 				if len(msg.Meta["append"]) == 0 {
@@ -1359,7 +1356,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				for i := 0; i < len(m.Meta["format"])-1; i += 2 {
 					format := m.Meta["format"]
 					for j, v := range m.Meta[format[i]] {
-						m.Meta[format[i]][j] = fmt.Sprintf(format[i+1], v)
+						if v != "" {
+							m.Meta[format[i]][j] = fmt.Sprintf(format[i+1], v)
+						}
 					}
 				}
 

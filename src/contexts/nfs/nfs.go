@@ -53,7 +53,12 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 				continue
 			}
 
-			f, _ := os.Stat(f.Name())
+			f, e := os.Stat(f.Name())
+			if e != nil {
+				m.Log("info", "%s", e)
+				continue
+			}
+
 			if !(dir_type == "file" && f.IsDir() || dir_type == "dir" && !f.IsDir()) && (dir_reg == nil || dir_reg.MatchString(f.Name())) {
 				for _, field := range fields {
 					switch field {
@@ -157,20 +162,6 @@ func open(m *ctx.Message, name string, arg ...int) (string, *os.File, error) {
 	}
 	m.Log("warn", "%v", e)
 	return name, f, e
-}
-func Format(args ...interface{}) string {
-	result := []string{}
-	for _, arg := range args {
-		switch arg := arg.(type) {
-		case rune:
-			result = append(result, string(arg))
-		case termbox.Key:
-			switch arg {
-
-			}
-		}
-	}
-	return strings.Join(result, "")
 }
 
 func (nfs *NFS) Read(p []byte) (n int, err error) {
@@ -402,7 +393,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 						break
 					}
 
-					if change, f, t, i := nfs.Auto(what, Format(ev.Ch), len(what)); change {
+					if change, f, t, i := nfs.Auto(what, kit.Format(ev.Ch), len(what)); change {
 						frame, table, index, pick = f, t, i, 0
 					}
 
@@ -874,6 +865,16 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 	}
 
 	if len(arg) > 0 && arg[0] == "scan" {
+		// 终端用户
+		m.Cmd("aaa.user", "root", m.Option("username", m.Conf("runtime", "boot.USER")), "what")
+
+		// 创建会话
+		m.Option("sessid", m.Cmd("aaa.user", "session", "select").Append("key"))
+
+		// 创建空间
+		m.Option("bench", m.Cmd("aaa.sess", "bench", "select").Append("key"))
+
+		// 默认配置
 		m.Cap("stream", arg[1])
 		nfs.Caches["ninput"] = &ctx.Cache{Value: "0"}
 		nfs.Caches["noutput"] = &ctx.Cache{Value: "0"}
@@ -882,6 +883,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		nfs.Configs["output"] = &ctx.Config{Value: []interface{}{}}
 		nfs.Configs["prompt"] = &ctx.Config{Value: ""}
 
+		// 终端控制
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
 			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" && !m.Options("daemon") {
 				nfs.Term(m, "init")
@@ -1113,7 +1115,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}, Help: "读取文件的缓存区的大小"},
 
 		"buf_size":   &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
-		"dir_type":   &ctx.Config{Name: "dir_type(file/dir/all)", Value: "all", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
+		"dir_type":   &ctx.Config{Name: "dir_type(file/dir/both/all)", Value: "both", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
 		"dir_fields": &ctx.Config{Name: "dir_fields(time/type/name/size/line/hash)", Value: "time size line filename", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 
 		"git": &ctx.Config{Name: "git", Value: map[string]interface{}{

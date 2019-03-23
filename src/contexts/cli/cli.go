@@ -230,8 +230,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Table()
 					return
 				}
+
 				if m.Confm("daemon", arg[0], func(daemon map[string]interface{}) {
 					if cmd, ok := daemon["cmd"].(*exec.Cmd); ok {
+						if len(arg) == 1 {
+							m.Add("append", "key", key)
+							m.Add("append", "create_time", daemon["create_time"])
+							m.Add("append", "finish_time", daemon["finish_time"])
+							m.Add("append", "pid", cmd.Process.Pid)
+							m.Add("append", "log", daemon["log"])
+							m.Add("append", "cmd", kit.Select(cmd.Args[0], cmd.Args, 1))
+							m.Table()
+							return
+						}
+
 						switch arg[1] {
 						case "stop":
 							cmd.Process.Kill()
@@ -553,7 +565,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			// 管道命令
 			if len(rest) > 0 {
-				pipe := m.Spawn().Copy(msg, "option")
+				pipe := msg.Spawn()
 				pipe.Copy(msg, "append").Copy(msg, "result").Cmd("cmd", rest)
 				msg.Set("append").Copy(pipe, "append")
 				msg.Set("result").Copy(pipe, "result")
@@ -563,6 +575,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			for _, v := range exports {
 				if v["file"] != "" {
 					m.Sess("nfs").Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
+					msg.Set("result")
 				}
 				if v["cache"] != "" {
 					if v["index"] == "result" {

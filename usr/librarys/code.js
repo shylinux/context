@@ -894,19 +894,10 @@ function init_toolkit() {
                         location.search = ""
                         return
                     case "rename_fly":
-                        context.GET("", {
-                            "componet_group": "index",
-                            "componet_name": "cmd",
-                            "cmd": "aaa.work "+context.Search("bench")+" rename "+prompt("name"),
-                        })
+                        context.Command(["work", context.Search("bench"), "rename", prompt("name")])
                         location.reload()
                         return
                     case "remove_fly":
-                        context.GET("", {
-                            "componet_group": "index",
-                            "componet_name": "cmd",
-                            "cmd": "aaa.work "+context.Search("bench")+" delete",
-                        })
                         var b = ""
                         document.querySelectorAll("div.workflow>ul.toolkit>li>ul.fly>li[data-key]").forEach(function(item){
                             if (!b && item.dataset["key"] != context.Search("bench")) {
@@ -914,6 +905,7 @@ function init_toolkit() {
                             }
                         })
                         context.Search("bench", b)
+                        context.Command(["work", context.Search("bench"), "delete"])
                         return
                 }
 

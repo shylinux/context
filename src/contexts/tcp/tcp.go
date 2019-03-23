@@ -278,6 +278,13 @@ var Index = &ctx.Context{Name: "tcp", Help: "网络中心",
 			}
 			return
 		}},
+		"probe": &ctx.Command{Name: "probe [port]", Help: "端口检测", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if t, e := net.DialTimeout("tcp", arg[0], 10*time.Second); e == nil {
+				m.Echo("active")
+				t.Close()
+			}
+			return
+		}},
 	},
 }
 

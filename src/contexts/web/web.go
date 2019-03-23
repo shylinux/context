@@ -167,7 +167,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				msg.Log("info", "")
 			}
 			for k, v := range r.Form {
-				msg.Option(k, v)
+				msg.Add("option", k, v)
 			}
 
 			switch r.Header.Get("Content-Type") {
@@ -547,7 +547,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					req, e := http.NewRequest(method, uri, body)
-					m.Log("info", "%#v", req)
 					m.Assert(e)
 					m.Log("info", "%s %s", req.Method, req.URL)
 
@@ -566,7 +565,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if m.Options("content_length") {
 						req.Header.Set("Content-Length", m.Option("content_length"))
 					}
-					m.Log("info", "%#v", req)
 					m.Confm("spide", []string{which, "cookie"}, func(key string, value string) {
 						if key != "" {
 							req.AddCookie(&http.Cookie{Name: key, Value: value})
@@ -927,18 +925,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if m.Confs("login", "check") {
 					if m.Option("username", m.Cmdx("web.session", "login")) == "" { // 没有登录
 						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
+					} else {
+						sessid, bench := m.Option("sessid"), m.Option("bench")
 
-					} else if bench := m.Cmdx("web.session", "bench"); bench == "" { // 没有空间
-						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
+						// 创建会话
+						if m.Option("sessid", m.Cmd("aaa.user", "session", "select").Append("key")) != sessid {
+							http.SetCookie(w, &http.Cookie{Name: "sessid", Value: m.Option("sessid"), Path: "/"})
+						}
 
-					} else if !m.Cmds("web.session", "check", bench, m.Option("username"), m.Confx("componet_group")) { // 没有权限
-						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
+						// 创建空间
+						if m.Option("bench", m.Cmd("aaa.sess", "bench", "select").Append("key")) != bench {
+							m.Append("redirect", merge(m, m.Option("index_url"), "bench", m.Option("bench")))
+							return
+						}
+						m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
 
-					} else if bench != m.Option("bench") { // 没有匹配
-						m.Append("redirect", merge(m, m.Option("index_url"), "bench", bench))
-						return
+						if !m.Cmds("aaa.work", "right", m.Confx("componet_group")) { // 没有权限
+							m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
+						}
 					}
-					m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
 				}
 
 				// 响应模板
@@ -950,32 +955,31 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						continue
 					}
 
-					msg := m
-					if val["componet_cmd"] != nil {
-						// 查找模块
-						context := m.Cap("module")
-						if val["componet_ctx"] != nil {
-							context = val["componet_ctx"].(string)
-						}
-						msg = m.Find(context)
+					if kit.Right(val["componet_pod"]) {
+						arg = append(arg, "sh", "node", kit.Format(m.Magic("session", "current.pod")))
+					}
+					if kit.Right(val["componet_cmd"]) {
+						arg = append(arg, kit.Format(val["componet_cmd"]))
+					}
+					if m.Has("cmds") {
+						arg = append(arg, kit.Trans(m.Optionv("cmds"))...)
+					}
 
-						// 添加参数值
-						args := []string{val["componet_cmd"].(string)}
-						if kit.Right(val["componet_pod"]) {
-							args = []string{"sh", "node", kit.Format(m.Magic("session", "current.pod")), val["componet_cmd"].(string)}
-						}
-						if val["arguments"] != nil {
-							for _, v := range val["arguments"].([]interface{}) {
-								switch value := v.(type) {
-								case string:
-									args = append(args, msg.Parse(value))
-								}
-							}
-						}
+					msg := m
+					if len(arg) > 0 {
+						// 查找模块
+						msg = m.Find(kit.Select(m.Cap("module"), val["componet_ctx"]))
 
 						// 权限检查
-						if m.Options("bench") && !m.Cmds("web.session", "check", m.Option("bench"), m.Option("username"), m.Option("componet_group"), args[0]) {
+						if m.Options("bench") && !m.Cmds("aaa.work", "right", m.Option("componet_group"), arg[0]) {
 							continue
+						}
+
+						// 添加参数值
+						if value, ok := val["arguments"].([]interface{}); ok {
+							for _, v := range value {
+								arg = append(arg, msg.Parse(kit.Format(v)))
+							}
 						}
 
 						// 添加固定值
@@ -1006,20 +1010,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						// 执行命令
 						if order != "" || kit.Right(val["pre_run"]) {
-							if list := m.Confv("auth", []string{m.Option("bench"), "data", "action", msg.Option("componet_name"), "cmd"}); list != nil && order == "" {
-								// args = kit.Trans(list)
-							}
-
-							if msg.Cmd(args); m.Options("bench") {
+							if msg.Cmd(arg); m.Options("bench") {
 								name_alias := "action." + kit.Select(msg.Option("componet_name"), msg.Option("componet_name_alias"))
 
+								// 命令历史
 								msg.Put("option", name_alias, map[string]interface{}{
-									"cmd": args, "order": m.Option("componet_name_order"), "action_time": msg.Time(),
+									"cmd": arg, "order": m.Option("componet_name_order"), "action_time": msg.Time(),
 								}).Cmd("web.session", "bench", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
-
 							}
 						}
-					} else {
 					}
 
 					// 添加响应
