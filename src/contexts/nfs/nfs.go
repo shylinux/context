@@ -866,13 +866,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 	if len(arg) > 0 && arg[0] == "scan" {
 		// 终端用户
-		m.Cmd("aaa.user", "root", m.Option("username", m.Conf("runtime", "boot.USER")), "what")
+		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.USER")))
 
 		// 创建会话
-		m.Option("sessid", m.Cmd("aaa.user", "session", "select").Append("key"))
+		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
 
 		// 创建空间
-		m.Option("bench", m.Cmd("aaa.sess", "bench", "select").Append("key"))
+		m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
 
 		// 默认配置
 		m.Cap("stream", arg[1])
@@ -1167,6 +1167,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				if len(arg) == 0 {
 					arg = append(arg, "")
 				}
+				m.Magic("session", "current.dir", arg[0])
 
 				wd, e := os.Getwd()
 				m.Assert(e)
@@ -1175,7 +1176,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				rg, e := regexp.Compile(m.Option("dir_reg"))
 
 				m.Confm("paths", func(index int, value string) bool {
-					p := path.Join(value, m.Option("dir_root"), kit.Select("", arg))
+					p := path.Join(value, m.Option("dir_root"), arg[0])
 					if s, e := os.Stat(p); e == nil {
 						if s.IsDir() {
 							dir(m, p, 0, kit.Right(m.Has("dir_deep")), m.Confx("dir_type"), trip, rg,

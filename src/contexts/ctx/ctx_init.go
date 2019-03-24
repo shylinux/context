@@ -360,9 +360,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					}
 
 					if v, ok := msg.Data[k]; ok {
-						b, e := json.MarshalIndent(v, "", "  ")
-						m.Log("fuck", " %v", b)
-						m.Log("fuck", " %v", e)
+						json.MarshalIndent(v, "", "  ")
 						m.Echo(kit.Formats(v))
 						return e
 					}
@@ -378,7 +376,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					break
 				}
 			}
-			m.Sort("key", "string").Table()
+			m.Sort("key", "str").Table()
 			return
 		}},
 		"magic": &Command{Name: "magic", Help: "随机组员", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {

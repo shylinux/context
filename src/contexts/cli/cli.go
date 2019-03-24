@@ -464,11 +464,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			detail = append(detail, arg...)
 
-			if m.Options("current_ctx") && detail[0] != "context" {
-				detail = append([]string{"context", m.Option("current_ctx")}, detail...)
-				m.Option("current_ctx", "")
-			}
-
 			// 目标切换
 			target := m.Optionv("ps_target")
 			if detail[0] != "context" {

@@ -471,12 +471,8 @@ var CGI = template.FuncMap{
 		switch len(arg) {
 		case 0:
 			list := map[string]map[string]interface{}{}
-			m.Confm("auth", []string{m.Option("sessid"), "ship"}, func(key string, ship map[string]interface{}) {
-				if ship["type"] == "bench" {
-					if work := m.Confm("auth", key); work != nil {
-						list[key] = work
-					}
-				}
+			m.Cmd("aaa.sess", "bench").Table(func(node map[string]string) {
+				list[node["key"]] = m.Confm("auth", node["key"])
 			})
 			return list
 		}
@@ -485,7 +481,8 @@ var CGI = template.FuncMap{
 	"parse": func(m *Message, arg ...interface{}) interface{} {
 		switch len(arg) {
 		case 1:
-			return m.Parse(kit.Format(arg[0]))
+			v := m.Parse(kit.Format(arg[0]))
+			return v
 		}
 		return nil
 	},

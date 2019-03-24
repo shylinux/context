@@ -62,7 +62,13 @@ context = {
 		return this.Cookie(key);
 	},
     Command: function(cmd, option, cb) {
-        option = option || {}
+        if (typeof option == "function") {
+            cb = option
+            option = {}
+        } else {
+            option = option || {}
+        }
+
         option["componet_index"] = "index"
         if (typeof cmd == "string") {
             option["componet_name"] = "source"

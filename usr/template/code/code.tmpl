@@ -216,14 +216,13 @@
     {{$form_type := option . "form_type"|meta}}
     {{$msg := .}}
 
-    {{if eq $form_type "upload"}}
-    {{end}}
     <form class="option {{option .Meta "componet_name"}}"
           data-componet_group="{{option . "componet_group"|meta}}"
           data-componet_name="{{option . "componet_name"|meta}}"
           {{if eq $form_type "upload"}}
               method="POST" action="/upload" enctype="multipart/form-data"
-              onsubmit="onaction(event,'upload')"
+              onsubmit="onaction(event, 'upload')"
+              target="_blank"
           {{end}}
           >
           <input style="display:none"></input>

@@ -650,19 +650,14 @@ function init_download(event) {
             return
         }
 
-        option["dir"].value = dir
-        if (dir == "" || dir.endsWith("/")) {
-            context.Cookie("current_dir", option["dir"].value)
-        }
+        option["current.dir"].value = dir
         send_command(option)
-        option["dir"].value = context.Cookie("current_dir")
-
     }
     insert_button(append, "root", function(event) {
         change("")
     })
     insert_button(append, "back", function(event) {
-        var path = option["dir"].value.split("/")
+        var path = option["current.dir"].value.split("/")
         while (path.pop() == "") {}
         change(path.join("/")+(path.length? "/": ""))
     })
@@ -695,14 +690,12 @@ function init_download(event) {
         })
     }
 
-    (option["dir"].value = context.Search("current_dir")) && send_command(option)
-
     add_sort(append, "filename", function(event) {
         var dir = event.target.innerText
-        if (option["dir"].value && !option["dir"].value.endsWith("/")) {
-            change(option["dir"].value+"/"+dir, event.altKey, event.shiftKey)
+        if (option["current.dir"].value && !option["current.dir"].value.endsWith("/")) {
+            change(option["current.dir"].value+"/"+dir, event.altKey, event.shiftKey)
         } else {
-            change(option["dir"].value+dir, event.altKey, event.shiftKey)
+            change(option["current.dir"].value+dir, event.altKey, event.shiftKey)
         }
     })
 }
@@ -714,7 +707,6 @@ function init_contain() {
 
     function change(pod) {
         option["pod"].value = pod
-        context.Cookie("current_pod", option["pod"].value)
         context.GET("", {
             "componet_group": "index",
             "componet_name": "cmd",
@@ -726,8 +718,6 @@ function init_contain() {
     add_sort(append, "key", function(event) {
         change(event.target.innerText.trim())
     })
-
-    option["pod"].value = context.Cookie("current_pod")
 }
 function init_context() {
     var option = document.querySelector("form.option.ctx")
@@ -737,7 +727,6 @@ function init_context() {
     function change(ctx) {
         option["ctx"].value = ctx
         send_command(option)
-        context.Cookie("current_ctx", option["ctx"].value)
         context.GET("", {
             "componet_group": "index",
             "componet_name": "cmd",
@@ -756,7 +745,6 @@ function init_context() {
         change(event.target.innerText.trim())
     })
 
-    option["ctx"].value = context.Cookie("current_ctx")
     send_command(option)
 }
 function init_command() {
@@ -891,11 +879,14 @@ function init_toolkit() {
                         location.reload()
                         return
                     case "create_fly":
-                        location.search = ""
+                        context.Command(["sess", "bench", "create"], function(msg) {
+                            context.Search("bench", msg.result[0])
+                        })
                         return
                     case "rename_fly":
-                        context.Command(["work", context.Search("bench"), "rename", prompt("name")])
-                        location.reload()
+                        context.Command(["work", context.Search("bench"), "rename", prompt("name")], function() {
+                            location.reload()
+                        })
                         return
                     case "remove_fly":
                         var b = ""

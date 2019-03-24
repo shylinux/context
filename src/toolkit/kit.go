@@ -230,6 +230,33 @@ func Trans(arg ...interface{}) []string {
 	}
 	return ls
 }
+func Struct(arg ...interface{}) map[string]interface{} {
+	value := map[string]interface{}{}
+	if len(arg) == 0 {
+		return value
+	}
+	switch val := arg[0].(type) {
+	case map[string]interface{}:
+		return val
+	}
+
+	return value
+}
+func Structm(args ...interface{}) map[string]interface{} {
+	Log("error", "what %v", Format(args))
+	value := Struct(args...)
+	for _, arg := range args {
+		Log("error", "what %v", Format(arg))
+		switch val := arg.(type) {
+		case func(k string, v string):
+			Log("error", "what %v", Format(val))
+			for k, v := range value {
+				val(k, Format(v))
+			}
+		}
+	}
+	return value
+}
 func Array(list []string, index int, arg ...interface{}) []string {
 	if len(arg) == 0 {
 		if -1 < index && index < len(list) {

@@ -832,12 +832,18 @@ func (m *Message) Optionx(key string, arg ...string) interface{} {
 	return value
 }
 func (m *Message) Magic(begin string, chain interface{}, args ...interface{}) interface{} {
-	auth := []string{"bench", "session", "username", "role", "componet", "command"}
+	auth := []string{"bench", "session", "user", "role", "componet", "command"}
 	key := []string{"bench", "sessid", "username", "role", "componet", "command"}
 	aaa := m.Sess("aaa", false)
 	for i, v := range auth {
 		if v == begin {
-			data := aaa.Confv("auth", []string{m.Option(key[i]), "data"})
+			h := m.Option(key[i])
+			if v == "user" {
+				h, _ = kit.Hash("username", m.Option("username"))
+			}
+
+			data := aaa.Confv("auth", []string{h, "data"})
+
 			if kit.Format(chain) == "" {
 				return data
 			}
@@ -1104,7 +1110,14 @@ func (m *Message) Parse(arg interface{}) string {
 			return m.Cap(str[1:])
 		}
 		if len(str) > 1 && str[0] == '@' {
-			return m.Confx(str[1:])
+			if v := m.Option(str[1:]); v != "" {
+				return v
+			}
+			if v := kit.Format(m.Magic("bench", str[1:])); v != "" {
+				return v
+			}
+			v := m.Conf(str[1:])
+			return v
 		}
 		return str
 	}
