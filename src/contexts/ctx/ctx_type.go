@@ -1597,6 +1597,7 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 	if len(args) == 0 {
 		return value
 	}
+
 	switch fun := args[0].(type) {
 	case func(int, string):
 		for i, v := range table {

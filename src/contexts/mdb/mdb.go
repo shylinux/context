@@ -568,7 +568,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					}
 
 					for i := 0; hn != "" && i < limit+offset; hn, i = m.Conf("note", []string{hn, "ship", hv, "data"}), i+1 {
-						m.Log("fuck", "what hn: %v %v", hn, kit.Formats(m.Confv("note", hn)))
+						m.Log("fuck", "what %d %d %d %s", offset, limit, i, hn)
+						// m.Log("fuck", "what hn: %v %v", hn, kit.Formats(m.Confv("note", hn)))
 						// 翻页
 						if i < offset {
 							continue
@@ -741,8 +742,12 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 
 					hm, _ := kit.Hash("type", "model", "name", arg[1])
 					hn, _ := kit.Hash("type", "note", "name", arg[0], "uniq")
+					hp := m.Conf("note", []string{hm, "ship", "note", "data"})
+					if hp == hn {
+						hp = ""
+					}
 					ship := map[string]interface{}{
-						"prev":  map[string]interface{}{"type": "note", "data": m.Conf("note", []string{hm, "ship", "note", "data"})},
+						"prev":  map[string]interface{}{"type": "note", "data": hp},
 						"model": map[string]interface{}{"type": "model", "data": hm},
 					}
 

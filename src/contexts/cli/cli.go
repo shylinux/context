@@ -101,11 +101,29 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
 			"init_env": []interface{}{"ctx_dev", "ctx_box", "ctx_root", "ctx_home", "USER"},
 			"boot":     map[string]interface{}{"web_port": ":9094", "ssh_port": ":9090"},
+		}, Help: "运行环境"},
+
+		"system": &ctx.Config{Name: "system", Value: map[string]interface{}{
+			"timeout": "60s",
+			"env":     map[string]interface{}{},
+			"shell": map[string]interface{}{
+				"sh":  map[string]interface{}{"cmd": "bash"},
+				"py":  map[string]interface{}{"cmd": "python"},
+				"vi":  map[string]interface{}{"active": true},
+				"top": map[string]interface{}{"active": true},
+				"ls":  map[string]interface{}{"arg": []interface{}{"-l"}},
+			},
 			"script": map[string]interface{}{
 				"sh": "bash", "shy": "source", "py": "python",
 				"init": "etc/init.shy", "exit": "etc/exit.shy",
 			},
-		}, Help: "运行环境"},
+		}, Help: "系统环境, shell: path, cmd, arg, dir, env, active, daemon; "},
+		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "系统命令超时"},
+
+		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
+		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
+		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
+		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
 
 		"alias": &ctx.Config{Name: "alias", Value: map[string]interface{}{
 			"~":  []string{"context"},
@@ -121,45 +139,247 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"brow":     []string{"web.brow"},
 			"ifconfig": []string{"tcp.ifconfig"},
 		}, Help: "启动脚本"},
-
-		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
-		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
-
-		"source_list": &ctx.Config{Name: "source_list", Value: []interface{}{}, Help: "系统命令超时"},
-		"system_env":  &ctx.Config{Name: "system_env", Value: map[string]interface{}{}, Help: "系统命令超时"},
-		"cmd_timeout": &ctx.Config{Name: "cmd_timeout", Value: "60s", Help: "系统命令超时"},
-		"cmd_combine": &ctx.Config{Name: "cmd_combine", Value: map[string]interface{}{
-			"vi":  map[string]interface{}{"active": true},
-			"top": map[string]interface{}{"active": true},
-			"ls":  map[string]interface{}{"arg": []interface{}{"-l"}},
-		}, Help: "系统命令配置, active: 交互方式, cmd: 命令映射, arg: 命令参数, args: 子命令参数, path: 命令目录, env: 环境变量, dir: 工作目录"},
-		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "系统命令超时"},
-
-		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
-		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
-			m.Conf("runtime", "host.GOOS", runtime.GOOS)
-			m.Conf("runtime", "host.pid", os.Getpid())
-
-			if name, e := os.Hostname(); e == nil {
-				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))
-			}
-			if name, e := os.Getwd(); e == nil {
-				_, file := path.Split(name)
-				m.Conf("runtime", "boot.pathname", file)
-			}
-			m.Confm("runtime", "init_env", func(index int, key string) {
-				m.Conf("runtime", "boot."+key, os.Getenv(key))
-			})
+		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			mem := &runtime.MemStats{}
+			runtime.ReadMemStats(mem)
+			m.Append("NumGo", runtime.NumGoroutine())
+			m.Append("NumGC", mem.NumGC)
+			m.Append("other", kit.FmtSize(mem.OtherSys))
+			m.Append("stack", kit.FmtSize(mem.StackSys))
+			m.Append("heapsys", kit.FmtSize(mem.HeapSys))
+			m.Append("heapidle", kit.FmtSize(mem.HeapIdle))
+			m.Append("heapinuse", kit.FmtSize(mem.HeapInuse))
+			m.Append("heapalloc", kit.FmtSize(mem.HeapAlloc))
+			m.Append("objects", mem.HeapObjects)
+			m.Append("lookups", mem.Lookups)
+			m.Table()
 			return
 		}},
-		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Confm("daemon", func(key string, info map[string]interface{}) {
-				m.Cmd("cli.system", key, "stop")
+		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
+			"cmd_timeout: 命令超时",
+			"cmd_active(true/false): 是否交互",
+			"cmd_daemon(true/false): 是否守护",
+			"cmd_dir: 工作目录",
+			"cmd_env: 环境变量",
+			"cmd_log: 输出日志",
+			"cmd_temp: 缓存结果",
+			"cmd_parse: 解析结果",
+			"cmd_error: 输出错误",
+		}, Form: map[string]int{
+			"cmd_timeout": 1,
+			"cmd_daemon":  1,
+			"cmd_active":  1,
+			"cmd_dir":     1,
+			"cmd_env":     2,
+			"cmd_log":     1,
+			"cmd_temp":    -1,
+			"cmd_parse":   1,
+			"cmd_error":   0,
+		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			pid := ""
+			if len(arg) > 0 && m.Confs("daemon", arg[0]) {
+				pid, arg = arg[0], arg[1:]
+			}
+
+			// 守护列表
+			if len(arg) == 0 {
+				m.Confm("daemon", func(key string, info map[string]interface{}) {
+					if pid != "" && key != pid {
+						return
+					}
+
+					m.Add("append", "key", key)
+					m.Add("append", "log", info["log"])
+					m.Add("append", "create_time", info["create_time"])
+					m.Add("append", "finish_time", info["finish_time"])
+
+					if cmd, ok := info["sub"].(*exec.Cmd); ok {
+						info["pid"] = cmd.Process.Pid
+						info["cmd"] = kit.Select(cmd.Args[0], cmd.Args, 1)
+						if cmd.ProcessState != nil {
+							info["str"] = cmd.ProcessState.String()
+						}
+					}
+					m.Add("append", "pid", kit.Format(info["pid"]))
+					m.Add("append", "cmd", kit.Format(info["cmd"]))
+					m.Add("append", "str", kit.Format(info["str"]))
+				})
+				m.Table()
+				return
+			}
+
+			// 守护操作
+			if pid != "" {
+				if cmd, ok := m.Confm("daemon", pid)["sub"].(*exec.Cmd); ok {
+					switch arg[0] {
+					case "stop":
+						cmd.Process.Kill()
+					default:
+						m.Echo("%v", cmd)
+					}
+				}
+				return
+			}
+
+			// 管道参数
+			for _, v := range m.Meta["result"] {
+				if strings.TrimSpace(v) != "" {
+					arg = append(arg, v)
+				}
+			}
+
+			// 命令配置
+			conf := m.Confm("system", []string{"shell", arg[0]})
+			if as := strings.Split(arg[0], "."); conf == nil && len(as) > 0 {
+				if conf = m.Confm("system", []string{"shell", as[len(as)-1]}); conf != nil {
+					arg = append([]string{kit.Format(kit.Chain(conf, "cmd"))}, arg...)
+				}
+			}
+
+			// 命令替换
+			args := []string{kit.Select(arg[0], kit.Format(kit.Chain(conf, "cmd")))}
+			if list, ok := kit.Chain(conf, "arg").([]interface{}); ok {
+				for _, v := range list {
+					args = append(args, m.Parse(v))
+				}
+			}
+
+			// 命令解析
+			args = append(args, arg[1:]...)
+			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Path = kit.Select(cmd.Path, kit.Format(kit.Chain(conf, "path")))
+			m.Log("info", "cmd %v %v", cmd.Path, cmd.Args)
+
+			// 工作目录
+			cmd.Dir = kit.Select(kit.Chains(conf, "dir"), m.Option("cmd_dir"))
+			m.Log("info", "dir %v", cmd.Dir)
+
+			// 环境变量
+			m.Confm("system", "env", func(key string, value string) {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, m.Parse(value)))
 			})
+			kit.Structm(kit.Chain(conf, "env"), func(key string, value string) {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, m.Parse(value)))
+			})
+			for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
+			}
+			m.Log("info", "env %v", cmd.Env)
+
+			// 交互命令
+			if m.Options("cmd_active") || kit.Right(conf["active"]) {
+				cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+				if e := cmd.Start(); e != nil {
+					m.Echo("error: ").Echo("%s\n", e)
+				} else if e := cmd.Wait(); e != nil {
+					m.Echo("error: ").Echo("%s\n", e)
+				}
+				return
+			}
+
+			// 守护命令
+			if m.Options("cmd_daemon") || kit.Right(conf["daemon"]) {
+				// 创建日志
+				if m.Options("cmd_log") {
+					log := fmt.Sprintf("var/log/%s.log", m.Option("cmd_log"))
+					if e := os.Rename(log, fmt.Sprintf("var/log/%s_%s.log", m.Option("cmd_log"), m.Time("2006_0102_1504"))); e != nil {
+						m.Log("info", "mv %s error %s", log, e)
+					}
+					if l, e := os.Create(log); m.Assert(e) {
+						cmd.Stdout = l
+					}
+
+					err := fmt.Sprintf("var/log/%s.err", m.Option("cmd_log"))
+					if e := os.Rename(err, fmt.Sprintf("var/log/%s_%s.err", m.Option("cmd_log"), m.Time("2006_0102_1504"))); e != nil {
+						m.Log("info", "mv %s error %s", err, e)
+					}
+					if l, e := os.Create(err); m.Assert(e) {
+						cmd.Stderr = l
+					}
+				}
+
+				// 守护列表
+				h, _ := kit.Hash("uniq")
+				m.Conf("daemon", h, map[string]interface{}{
+					"create_time": m.Time(), "log": m.Option("cmd_log"), "sub": cmd,
+				})
+				m.Echo(h)
+
+				// 执行命令
+				m.GoFunc(m, func(m *ctx.Message) {
+					if e := cmd.Start(); e != nil {
+						m.Echo("error: ").Echo("%s\n", e)
+					} else if e := cmd.Wait(); e != nil {
+						m.Echo("error: ").Echo("%s\n", e)
+					}
+					m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))
+				})
+				return e
+			}
+
+			// 管道命令
+			wait := make(chan bool, 1)
+			m.GoFunc(m, func(m *ctx.Message) {
+				defer func() { wait <- true }()
+
+				out := bytes.NewBuffer(make([]byte, 0, 1024))
+				err := bytes.NewBuffer(make([]byte, 0, 1024))
+				cmd.Stdout = out
+				cmd.Stderr = err
+
+				// 运行命令
+				if e := cmd.Run(); e != nil {
+					m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
+					return
+				}
+
+				// 输出错误
+				if m.Has("cmd_error") {
+					m.Echo(err.String())
+				}
+
+				// 缓存结果
+				if m.Options("cmd_temp") {
+					m.Put("option", "data", out.String()).Cmdy("mdb.temp", "script", strings.Join(arg, " "), "data", "data", m.Meta["cmd_temp"])
+					return
+				}
+
+				// 解析结果
+				switch m.Option("cmd_parse") {
+				case "json":
+					var data interface{}
+					if json.Unmarshal(out.Bytes(), &data) == nil {
+						msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
+						m.Copy(msg, "append").Copy(msg, "result")
+					} else {
+						m.Echo(out.String())
+					}
+
+				case "csv":
+					data, e := csv.NewReader(out).ReadAll()
+					m.Assert(e)
+					for i := 1; i < len(data); i++ {
+						for j := 0; j < len(data[i]); j++ {
+							m.Add("append", data[0][j], data[i][j])
+						}
+					}
+					m.Table()
+				default:
+					m.Echo(out.String())
+				}
+			})
+
+			// 命令超时
+			timeout := kit.Duration(kit.Select(m.Conf("system", "timeout"), kit.Select(kit.Chains(conf, "timeout"), m.Option("cmd_timeout"))))
+			select {
+			case <-time.After(timeout):
+				m.Log("warn", "%s: %v timeout", arg[0], timeout)
+				m.Echo("%s: %v timeout", arg[0], timeout)
+				cmd.Process.Kill()
+			case <-wait:
+			}
 			return
 		}},
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -178,7 +398,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
 					m.Wait()
 				default:
-					m.Cmdy("system", m.Conf("runtime", []string{"script", strings.TrimPrefix(path.Ext(p), ".")}), arg)
+					m.Cmdy("system", m.Conf("system", []string{"script", strings.TrimPrefix(path.Ext(p), ".")}), arg)
 				}
 				return
 			}
@@ -207,196 +427,232 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}, "parse", "line", "void", text)
 			return
 		}},
-		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
-			"cmd_active(true/false): 是否交互", "cmd_timeout: 命令超时", "cmd_env: 环境变量", "cmd_dir: 工作目录"},
-			Form: map[string]int{"cmd_active": 1, "cmd_timeout": 1, "cmd_env": 2, "cmd_dir": 1, "cmd_error": 0, "cmd_parse": 1, "cmd_temp": -1, "cmd_log": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"timer": &ctx.Command{Name: "timer [begin time] [repeat] [order time] time cmd", Help: "定时任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if cli, ok := c.Server.(*CLI); m.Assert(ok) {
+				// 定时列表
 				if len(arg) == 0 {
-					m.Confm("daemon", func(key string, info map[string]interface{}) {
-						if cmd, ok := info["cmd"].(*exec.Cmd); ok {
-							m.Add("append", "key", key)
-							m.Add("append", "create_time", info["create_time"])
-							m.Add("append", "finish_time", info["finish_time"])
-							m.Add("append", "pid", cmd.Process.Pid)
-							m.Add("append", "log", info["log"])
-							m.Add("append", "cmd", kit.Select(cmd.Args[0], cmd.Args, 1))
-							if cmd.ProcessState == nil {
-								m.Add("append", "str", "")
-							} else {
-								m.Add("append", "str", cmd.ProcessState.String())
-							}
-						}
+					m.Confm("timer", func(key string, timer map[string]interface{}) {
+						m.Add("append", "key", key)
+						m.Add("append", "action_time", time.Unix(0, timer["action_time"].(int64)/int64(m.Confi("time_unit"))*1000000000).Format(m.Conf("time_format")))
+						m.Add("append", "order", timer["order"])
+						m.Add("append", "time", timer["time"])
+						m.Add("append", "cmd", timer["cmd"])
+						m.Add("append", "msg", timer["msg"])
+						m.Add("append", "results", kit.Format(timer["result"]))
 					})
 					m.Table()
 					return
 				}
 
-				if m.Confm("daemon", arg[0], func(daemon map[string]interface{}) {
-					if cmd, ok := daemon["cmd"].(*exec.Cmd); ok {
-						if len(arg) == 1 {
-							m.Add("append", "key", key)
-							m.Add("append", "create_time", daemon["create_time"])
-							m.Add("append", "finish_time", daemon["finish_time"])
-							m.Add("append", "pid", cmd.Process.Pid)
-							m.Add("append", "log", daemon["log"])
-							m.Add("append", "cmd", kit.Select(cmd.Args[0], cmd.Args, 1))
-							m.Table()
-							return
-						}
-
-						switch arg[1] {
-						case "stop":
-							cmd.Process.Kill()
-						default:
-							m.Echo("%v", cmd)
-						}
+				switch arg[0] {
+				case "stop":
+					if timer := m.Confm("timer", arg[1]); timer != nil {
+						timer["stop"] = true
 					}
-				}) != nil {
+					cli.schedule(m)
+					return
+				case "start":
+					if timer := m.Confm("timer", arg[1]); timer != nil {
+						timer["stop"] = false
+					}
+					cli.schedule(m)
+					return
+				case "delete":
+					delete(m.Confm("timer"), arg[1])
+					cli.schedule(m)
 					return
 				}
 
-				for _, v := range m.Meta["result"] {
-					if strings.TrimSpace(v) != "" {
-						arg = append(arg, v)
-					}
+				now := int64(m.Sess("cli").Cmd("time").Appendi("timestamp"))
+				begin := now
+				if len(arg) > 0 && arg[0] == "begin" {
+					begin, arg = int64(m.Sess("cli").Cmd("time", arg[1]).Appendi("timestamp")), arg[2:]
 				}
 
-				conf := m.Confm("cmd_combine", arg[0])
-				if v, ok := kit.Chain(conf, "cmd").(string); ok {
-					arg[0] = m.Parse(v)
+				repeat := false
+				if len(arg) > 0 && arg[0] == "repeat" {
+					repeat, arg = true, arg[1:]
 				}
 
-				args := []string{arg[0]}
-				if list, ok := kit.Chain(conf, "arg").([]interface{}); ok {
-					for _, v := range list {
-						args = append(args, m.Parse(v))
-					}
-				}
-				args = append(args, arg[1:]...)
-				cmd := exec.Command(args[0], args[1:]...)
-
-				if v, ok := kit.Chain(conf, "path").(string); ok {
-					cmd.Path = m.Parse(v)
-				}
-				m.Log("info", "cmd %v %v", cmd.Path, cmd.Args)
-
-				for k, v := range m.Confm("system_env") {
-					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
-				}
-				if list, ok := kit.Chain(conf, "env").([]interface{}); ok {
-					for k, v := range list {
-						cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, m.Parse(v)))
-					}
+				order := ""
+				if len(arg) > 0 && arg[0] == "order" {
+					order, arg = arg[1], arg[2:]
 				}
 
-				for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
-					cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
-				}
-				m.Log("info", "cmd.env %v", cmd.Env)
-				// for _, v := range os.Environ() {
-				// 	cmd.Env = append(cmd.Env, v)
-				// }
+				action := int64(m.Sess("cli").Cmd("time", begin, order, arg[0]).Appendi("timestamp"))
 
-				if m.Options("cmd_dir") {
-					cmd.Dir = m.Option("cmd_dir")
-				} else if v, ok := kit.Chain(conf, "dir").(string); ok {
-					cmd.Dir = m.Parse(v)
-				}
-				m.Log("info", "cmd.dir %v", cmd.Dir)
+				// 创建任务
+				hash := m.Sess("aaa").Cmd("hash", "timer", arg, "time", "rand").Result(0)
+				m.Confv("timer", hash, map[string]interface{}{
+					"create_time": now,
+					"begin_time":  begin,
+					"action_time": action,
+					"repeat":      repeat,
+					"order":       order,
+					"done":        false,
+					"stop":        false,
+					"time":        arg[0],
+					"cmd":         arg[1:],
+					"msg":         0,
+					"result":      "",
+				})
 
-				if m.Options("cmd_active") || kit.Right(conf["active"]) {
-					cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-					if e := cmd.Start(); e != nil {
-						m.Echo("error: ").Echo("%s\n", e)
-					} else if e := cmd.Wait(); e != nil {
-						m.Echo("error: ").Echo("%s\n", e)
-					}
-				} else if m.Options("cmd_log") {
+				if cli.Timer == nil { // 创建时间队列
+					cli.Timer = time.NewTimer((time.Duration)((action - now) / int64(m.Confi("time_unit")) * 1000000000))
+					m.GoLoop(m, func(m *ctx.Message) {
+						select {
+						case <-cli.Timer.C:
+							m.Log("info", "timer %s", m.Conf("timer_next"))
+							if m.Conf("timer_next") == "" {
+								break
+							}
 
-					l, e := os.Create(m.Option("cmd_log"))
-					m.Assert(e)
-					l2, e := os.Create(m.Option("cmd_log") + "err")
-					m.Assert(e)
-					cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, l, l2
+							if timer := m.Confm("timer", m.Conf("timer_next")); timer != nil && !kit.Right(timer["stop"]) {
+								m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
 
-					h, _ := kit.Hash("uniq")
-					m.Conf("daemon", h, map[string]interface{}{
-						"create_time": m.Time(), "cmd": cmd, "log": m.Option("cmd_log"),
-					})
-					m.Echo(h)
+								msg := m.Sess("cli").Cmd("source", timer["cmd"])
+								timer["result"] = msg.Meta["result"]
+								timer["msg"] = msg.Code()
 
-					m.GoFunc(m, func(m *ctx.Message) {
-						if e := cmd.Start(); e != nil {
-							m.Echo("error: ").Echo("%s\n", e)
-						} else if e := cmd.Wait(); e != nil {
-							m.Echo("error: ").Echo("%s\n", e)
-						}
-						m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))
-					})
-
-				} else {
-					wait := make(chan bool, 1)
-					m.GoFunc(m, func(m *ctx.Message) {
-						out := bytes.NewBuffer(make([]byte, 0, 1024))
-						err := bytes.NewBuffer(make([]byte, 0, 1024))
-						cmd.Stdout = out
-						cmd.Stderr = err
-						if e := cmd.Run(); e != nil {
-							m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
-						} else {
-							if m.Options("cmd_temp") {
-								m.Put("option", "data", out.String()).Cmdy("mdb.temp", "script", strings.Join(arg, " "), "data", "data", m.Meta["cmd_temp"])
-							} else {
-
-								switch m.Option("cmd_parse") {
-								case "json":
-									var data interface{}
-									if json.Unmarshal(out.Bytes(), &data) == nil {
-										msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
-										m.Copy(msg, "append").Copy(msg, "result")
-									} else {
-										m.Echo(out.String())
-									}
-
-								case "csv":
-									data, e := csv.NewReader(out).ReadAll()
-									m.Assert(e)
-									for i := 1; i < len(data); i++ {
-										for j := 0; j < len(data[i]); j++ {
-											m.Add("append", data[0][j], data[i][j])
-										}
-									}
-									m.Table()
-								default:
-									m.Echo(out.String())
+								if timer["repeat"].(bool) {
+									timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
+								} else {
+									timer["done"] = true
 								}
 							}
+
+							cli.schedule(m)
 						}
-						wait <- true
 					})
+				}
 
-					timeout := m.Conf("cmd_timeout")
-					if conf["timeout"] != nil {
-						timeout = conf["timeout"].(string)
+				// 调度任务
+				cli.schedule(m)
+				m.Echo(hash)
+			}
+			return
+		}},
+		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if d, e := time.ParseDuration(arg[0]); m.Assert(e) {
+				m.Log("info", "sleep %v", d)
+				time.Sleep(d)
+				m.Log("info", "sleep %v done", d)
+			}
+			return
+		}},
+		"time": &ctx.Command{Name: "time when [begin|end|yestoday|tommorow|monday|sunday|first|last|new|eve] [offset]",
+			Help: "查看时间, when: 输入的时间戳, 剩余参数是时间偏移",
+			Form: map[string]int{"time_format": 1, "time_close": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				t, stamp := time.Now(), true
+				if len(arg) > 0 {
+					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
+						t, stamp, arg = time.Unix(int64(i/int64(m.Confi("time_unit"))), 0), false, arg[1:]
+					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
+						t, arg = n, arg[1:]
+					} else {
+						for _, v := range []string{"01-02", "2006-01-02", "15:04:05", "15:04"} {
+							if n, e := time.ParseInLocation(v, arg[0], time.Local); e == nil {
+								t, arg = n, arg[1:]
+								break
+							}
+						}
 					}
-					if m.Option("timeout") != "" {
-						timeout = m.Option("timeout")
-					}
+				}
 
-					d, e := time.ParseDuration(timeout)
-					m.Assert(e)
-
-					select {
-					case <-time.After(d):
-						cmd.Process.Kill()
-						m.Echo("%s: %s timeout", arg[0], m.Conf("cmd_timeout"))
-					case <-wait:
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "begin":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t, arg = t.Add(-d), arg[1:]
+					case "end":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds%dns", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()))
+						m.Assert(e)
+						t, arg = t.Add(time.Duration(24*time.Hour)-d), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "yestoday":
+						t, arg = t.Add(-time.Duration(24*time.Hour)), arg[1:]
+					case "tomorrow":
+						t, arg = t.Add(time.Duration(24*time.Hour)), arg[1:]
+					case "monday":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t, arg = t.Add(-d), arg[1:]
+					case "sunday":
+						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
+						m.Assert(e)
+						t, arg = t.Add(time.Duration(7*24*time.Hour)-d), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "first":
+						t, arg = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.Local), arg[1:]
+					case "last":
+						month, year := t.Month()+1, t.Year()
+						if month >= 13 {
+							month, year = 1, year+1
+						}
+						t, arg = time.Date(year, month, 1, 0, 0, 0, 0, time.Local), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "new":
+						t, arg = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
+					case "eve":
+						t, arg = time.Date(t.Year()+1, 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
+						if m.Confx("time_close") == "close" {
+							t = t.Add(-time.Second)
+						}
+					case "":
+						arg = arg[1:]
 					}
+				}
+
+				if len(arg) > 0 {
+					if d, e := time.ParseDuration(arg[0]); e == nil {
+						t, arg = t.Add(d), arg[1:]
+					}
+				}
+
+				m.Append("datetime", t.Format(m.Confx("time_format")))
+				m.Append("timestamp", t.Unix()*int64(m.Confi("time_unit")))
+
+				if stamp {
+					m.Echo("%d", t.Unix()*int64(m.Confi("time_unit")))
+				} else {
+					m.Echo(t.Format(m.Confx("time_format")))
 				}
 				return
 			}},
+
+		"init": &ctx.Command{Name: "init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
+			m.Conf("runtime", "host.GOOS", runtime.GOOS)
+			m.Conf("runtime", "host.pid", os.Getpid())
+
+			if name, e := os.Hostname(); e == nil {
+				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))
+			}
+			if name, e := os.Getwd(); e == nil {
+				_, file := path.Split(name)
+				m.Conf("runtime", "boot.pathname", file)
+			}
+			m.Confm("runtime", "init_env", func(index int, key string) {
+				m.Conf("runtime", "boot."+key, os.Getenv(key))
+			})
+			return
+		}},
+		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Confm("daemon", func(key string, info map[string]interface{}) {
+				m.Cmd("cli.system", key, "stop")
+			})
+			return
+		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.source", m.Conf("runtime", "script.exit"))
+			m.Cmd("cli.source", m.Conf("system", "script.exit"))
 			go func() {
 				time.Sleep(time.Second * 3)
 				os.Exit(kit.Int(arg[0]))
@@ -472,7 +728,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			// 解析脚本
 			msg := m
-			for k, v := range m.Confv("runtime", "script").(map[string]interface{}) {
+			for k, v := range m.Confv("system", "script").(map[string]interface{}) {
 				if strings.HasSuffix(detail[0], "."+k) {
 					msg = m.Spawn(m.Optionv("ps_target"))
 					detail[0] = m.Cmdx("nfs.path", detail[0])
@@ -866,32 +1122,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"sysinfo": &ctx.Command{Name: "sysinfo", Help: "sysinfo", Hand: sysinfo},
-		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			mem := &runtime.MemStats{}
-			runtime.ReadMemStats(mem)
-			m.Append("NumGo", runtime.NumGoroutine())
-			m.Append("NumGC", mem.NumGC)
-			m.Append("other", kit.FmtSize(mem.OtherSys))
-			m.Append("stack", kit.FmtSize(mem.StackSys))
-
-			m.Append("heapsys", kit.FmtSize(mem.HeapSys))
-			m.Append("heapinuse", kit.FmtSize(mem.HeapInuse))
-			m.Append("heapidle", kit.FmtSize(mem.HeapIdle))
-			m.Append("heapalloc", kit.FmtSize(mem.HeapAlloc))
-
-			m.Append("lookups", mem.Lookups)
-			m.Append("objects", mem.HeapObjects)
-
-			// sys := &syscall.Sysinfo_t{}
-			// syscall.Sysinfo(sys)
-			//
-			// m.Append("total", kit.FmtSize(uint64(sys.Totalram)))
-			// m.Append("free", kit.FmtSize(uint64(sys.Freeram)))
-			// m.Append("mper", fmt.Sprintf("%d%%", sys.Freeram*100/sys.Totalram))
-			//
-			m.Table()
-			return
-		}},
 		"windows": &ctx.Command{Name: "windows", Help: "windows", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Append("nclient", strings.Count(m.Spawn().Cmd("system", "tmux", "list-clients").Result(0), "\n"))
 			m.Append("nsession", strings.Count(m.Spawn().Cmd("system", "tmux", "list-sessions").Result(0), "\n"))
@@ -1023,206 +1253,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				return
 			}},
-
-		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if d, e := time.ParseDuration(arg[0]); m.Assert(e) {
-				m.Log("info", "sleep %v", d)
-				time.Sleep(d)
-				m.Log("info", "sleep %v done", d)
-			}
-			return
-		}},
-		"time": &ctx.Command{Name: "time when [begin|end|yestoday|tommorow|monday|sunday|first|last|new|eve] [offset]",
-			Help: "查看时间, when: 输入的时间戳, 剩余参数是时间偏移",
-			Form: map[string]int{"time_format": 1, "time_close": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				t, stamp := time.Now(), true
-				if len(arg) > 0 {
-					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
-						t, stamp, arg = time.Unix(int64(i/int64(m.Confi("time_unit"))), 0), false, arg[1:]
-					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
-						t, arg = n, arg[1:]
-					} else {
-						for _, v := range []string{"01-02", "2006-01-02", "15:04:05", "15:04"} {
-							if n, e := time.ParseInLocation(v, arg[0], time.Local); e == nil {
-								t, arg = n, arg[1:]
-								break
-							}
-						}
-					}
-				}
-
-				if len(arg) > 0 {
-					switch arg[0] {
-					case "begin":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", t.Hour(), t.Minute(), t.Second()))
-						m.Assert(e)
-						t, arg = t.Add(-d), arg[1:]
-					case "end":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds%dns", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()))
-						m.Assert(e)
-						t, arg = t.Add(time.Duration(24*time.Hour)-d), arg[1:]
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					case "yestoday":
-						t, arg = t.Add(-time.Duration(24*time.Hour)), arg[1:]
-					case "tomorrow":
-						t, arg = t.Add(time.Duration(24*time.Hour)), arg[1:]
-					case "monday":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
-						m.Assert(e)
-						t, arg = t.Add(-d), arg[1:]
-					case "sunday":
-						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
-						m.Assert(e)
-						t, arg = t.Add(time.Duration(7*24*time.Hour)-d), arg[1:]
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					case "first":
-						t, arg = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.Local), arg[1:]
-					case "last":
-						month, year := t.Month()+1, t.Year()
-						if month >= 13 {
-							month, year = 1, year+1
-						}
-						t, arg = time.Date(year, month, 1, 0, 0, 0, 0, time.Local), arg[1:]
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					case "new":
-						t, arg = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
-					case "eve":
-						t, arg = time.Date(t.Year()+1, 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
-						if m.Confx("time_close") == "close" {
-							t = t.Add(-time.Second)
-						}
-					case "":
-						arg = arg[1:]
-					}
-				}
-
-				if len(arg) > 0 {
-					if d, e := time.ParseDuration(arg[0]); e == nil {
-						t, arg = t.Add(d), arg[1:]
-					}
-				}
-
-				m.Append("datetime", t.Format(m.Confx("time_format")))
-				m.Append("timestamp", t.Unix()*int64(m.Confi("time_unit")))
-
-				if stamp {
-					m.Echo("%d", t.Unix()*int64(m.Confi("time_unit")))
-				} else {
-					m.Echo(t.Format(m.Confx("time_format")))
-				}
-				return
-			}},
-		"timer": &ctx.Command{Name: "timer [begin time] [repeat] [order time] time cmd", Help: "定时任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := c.Server.(*CLI); m.Assert(ok) {
-				if len(arg) == 0 { // 查看任务列表
-					for k, v := range m.Confv("timer").(map[string]interface{}) {
-						val := v.(map[string]interface{})
-						m.Add("append", "key", k)
-						m.Add("append", "action_time", time.Unix(0, val["action_time"].(int64)/int64(m.Confi("time_unit"))*1000000000).Format(m.Conf("time_format")))
-						m.Add("append", "order", val["order"])
-						m.Add("append", "time", val["time"])
-						m.Add("append", "cmd", val["cmd"])
-						m.Add("append", "msg", val["msg"])
-						m.Add("append", "results", fmt.Sprintf("%v", val["result"]))
-					}
-					m.Table()
-					return
-				}
-				switch arg[0] {
-				case "stop":
-					if timer := m.Confm("timer", arg[1]); timer != nil {
-						timer["stop"] = true
-					}
-					cli.schedule(m)
-					return
-				case "start":
-					if timer := m.Confm("timer", arg[1]); timer != nil {
-						timer["stop"] = false
-					}
-					cli.schedule(m)
-					return
-				case "delete":
-					delete(m.Confm("timer"), arg[1])
-					cli.schedule(m)
-					return
-				}
-
-				now := int64(m.Sess("cli").Cmd("time").Appendi("timestamp"))
-				begin := now
-				if len(arg) > 0 && arg[0] == "begin" {
-					begin, arg = int64(m.Sess("cli").Cmd("time", arg[1]).Appendi("timestamp")), arg[2:]
-				}
-
-				repeat := false
-				if len(arg) > 0 && arg[0] == "repeat" {
-					repeat, arg = true, arg[1:]
-				}
-
-				order := ""
-				if len(arg) > 0 && arg[0] == "order" {
-					order, arg = arg[1], arg[2:]
-				}
-
-				action := int64(m.Sess("cli").Cmd("time", begin, order, arg[0]).Appendi("timestamp"))
-
-				// 创建任务
-				hash := m.Sess("aaa").Cmd("hash", "timer", arg, "time", "rand").Result(0)
-				m.Confv("timer", hash, map[string]interface{}{
-					"create_time": now,
-					"begin_time":  begin,
-					"action_time": action,
-					"repeat":      repeat,
-					"order":       order,
-					"done":        false,
-					"stop":        false,
-					"time":        arg[0],
-					"cmd":         arg[1:],
-					"msg":         0,
-					"result":      "",
-				})
-
-				if cli.Timer == nil { // 创建时间队列
-					cli.Timer = time.NewTimer((time.Duration)((action - now) / int64(m.Confi("time_unit")) * 1000000000))
-					m.GoLoop(m, func(m *ctx.Message) {
-						select {
-						case <-cli.Timer.C:
-							m.Log("info", "timer %s", m.Conf("timer_next"))
-							if m.Conf("timer_next") == "" {
-								break
-							}
-
-							if timer := m.Confm("timer", m.Conf("timer_next")); timer != nil && !kit.Right(timer["stop"]) {
-								m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
-
-								msg := m.Sess("cli").Cmd("source", timer["cmd"])
-								timer["result"] = msg.Meta["result"]
-								timer["msg"] = msg.Code()
-
-								if timer["repeat"].(bool) {
-									timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
-								} else {
-									timer["done"] = true
-								}
-							}
-
-							cli.schedule(m)
-						}
-					})
-				}
-
-				// 调度任务
-				cli.schedule(m)
-				m.Echo(hash)
-			}
-			return
-		}},
 	},
 }
 

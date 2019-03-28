@@ -243,13 +243,10 @@ func Struct(arg ...interface{}) map[string]interface{} {
 	return value
 }
 func Structm(args ...interface{}) map[string]interface{} {
-	Log("error", "what %v", Format(args))
 	value := Struct(args...)
 	for _, arg := range args {
-		Log("error", "what %v", Format(arg))
 		switch val := arg.(type) {
 		case func(k string, v string):
-			Log("error", "what %v", Format(val))
 			for k, v := range value {
 				val(k, Format(v))
 			}
@@ -505,6 +502,10 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 
 	return root
 }
+func Chains(root interface{}, args ...interface{}) string {
+	return Format(Chain(root, args...))
+}
+
 func View(args []string, conf map[string]interface{}) []string {
 	if len(args) == 0 {
 		args = append(args, "default")
