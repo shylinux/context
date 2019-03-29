@@ -567,10 +567,15 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						hv, hn = "prev", m.Conf("note", []string{hm, "ship", "note", "data"})
 					}
 
+					fuck := 0
 					for i := 0; hn != "" && i < limit+offset; hn, i = m.Conf("note", []string{hn, "ship", hv, "data"}), i+1 {
 						m.Log("fuck", "what %d %d %d %s", offset, limit, i, hn)
 						// m.Log("fuck", "what hn: %v %v", hn, kit.Formats(m.Confv("note", hn)))
 						// 翻页
+						if fuck++; fuck > 1000 {
+							break
+						}
+
 						if i < offset {
 							continue
 						}

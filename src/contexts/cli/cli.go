@@ -141,6 +141,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}, Help: "启动脚本"},
 	},
 	Commands: map[string]*ctx.Command{
+		"ps": &ctx.Command{Name: "ps", Help: "ps", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy("cli.system", "ps", "-ef", "cmd_parse", "cli")
+			return
+		}},
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			mem := &runtime.MemStats{}
 			runtime.ReadMemStats(mem)
@@ -177,6 +181,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_temp":    -1,
 			"cmd_parse":   1,
 			"cmd_error":   0,
+			"app_log":     1,
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			pid := ""
 			if len(arg) > 0 && m.Confs("daemon", arg[0]) {
@@ -215,7 +220,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if cmd, ok := m.Confm("daemon", pid)["sub"].(*exec.Cmd); ok {
 					switch arg[0] {
 					case "stop":
-						cmd.Process.Kill()
+						kit.Log("error", "kill: %s", cmd.Process.Pid)
+						m.Log("kill", "kill: %d", cmd.Process.Pid)
+						m.Echo("%s", cmd.Process.Signal(os.Interrupt))
 					default:
 						m.Echo("%v", cmd)
 					}
@@ -303,7 +310,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 守护列表
 				h, _ := kit.Hash("uniq")
 				m.Conf("daemon", h, map[string]interface{}{
-					"create_time": m.Time(), "log": m.Option("cmd_log"), "sub": cmd,
+					"create_time": m.Time(), "log": kit.Select(m.Option("cmd_log"), m.Option("app_log")), "sub": cmd,
 				})
 				m.Echo(h)
 
@@ -366,6 +373,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						}
 					}
 					m.Table()
+
+				case "cli":
+					read := csv.NewReader(out)
+					read.Comma = ' '
+					read.TrimLeadingSpace = true
+					read.FieldsPerRecord = 3
+					data, e := read.ReadAll()
+					m.Assert(e)
+					for i := 1; i < len(data); i++ {
+						for j := 0; j < len(data[i]); j++ {
+							m.Add("append", data[0][j], data[i][j])
+						}
+					}
+					m.Table()
+
 				default:
 					m.Echo(out.String())
 				}

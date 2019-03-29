@@ -470,6 +470,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"get": &ctx.Command{Name: "get [which] name [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
 			Form: map[string]int{"which": 1, "method": 1, "headers": 2, "content_type": 1, "file": 2, "body": 1, "parse": 1, "temp": -1, "save": 1, "temp_expire": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				// 查看配置
 				if len(arg) == 0 {
 					m.Cmdy("web.spide")
 					return
@@ -479,208 +480,217 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					return
 				}
 
+				web, ok := m.Target().Server.(*WEB)
+				m.Assert(ok)
+
+				// 查找配置
+				which, client := m.Option("which"), m.Confm("spide", []string{m.Option("which"), "client"})
+				if c := m.Confm("spide", []string{arg[0], "client"}); c != nil {
+					which, client, arg = arg[0], c, arg[1:]
+				}
+
+				method := kit.Select(kit.Format(client["method"]), m.Option("method"))
+				uri := Merge(m, client, arg[0], arg[1:]...)
+
 				uri_arg := ""
-				if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-					which, client := m.Option("which"), m.Confm("spide", []string{m.Option("which"), "client"})
-					if c := m.Confm("spide", []string{arg[0], "client"}); c != nil {
-						which, client, arg = arg[0], c, arg[1:]
-					}
+				body, ok := m.Optionv("body").(io.Reader)
+				if method == "POST" && !ok {
+					uuu, e := url.Parse(uri)
+					m.Assert(e)
 
-					method := kit.Select(kit.Format(client["method"]), m.Option("method"))
-					uri := Merge(m, client, arg[0], arg[1:]...)
+					if m.Has("file") { // POST file
+						writer := multipart.NewWriter(&bytes.Buffer{})
+						defer writer.Close()
 
-					body, ok := m.Optionv("body").(io.Reader)
-					if method == "POST" && !ok {
-						uuu, e := url.Parse(uri)
-						m.Assert(e)
-
-						if m.Has("file") {
-							writer := multipart.NewWriter(&bytes.Buffer{})
-							defer writer.Close()
-
-							for k, v := range uuu.Query() {
-								for _, v := range v {
-									writer.WriteField(k, v)
-								}
+						for k, v := range uuu.Query() {
+							for _, v := range v {
+								writer.WriteField(k, v)
 							}
-
-							file, e := os.Open(m.Cmdx("nfs.path", m.Meta["file"][1]))
-							m.Assert(e)
-							defer file.Close()
-
-							part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
-							m.Assert(e)
-							io.Copy(part, file)
-
-							m.Option("content_type", writer.FormDataContentType())
-						} else if index := strings.Index(uri, "?"); index > 0 {
-							switch m.Option("content_type") {
-							case "application/json":
-								var data interface{}
-								for k, v := range uuu.Query() {
-									if len(v) == 1 {
-										data = kit.Chain(data, k, v[0])
-									} else {
-										data = kit.Chain(data, k, v)
-									}
-								}
-
-								b, e := json.Marshal(data)
-								m.Assert(e)
-								m.Log("info", "json %v", string(b))
-								body = bytes.NewReader(b)
-
-							default:
-								m.Log("info", "body %v", string(uri[index+1:]))
-								body = strings.NewReader(uri[index+1:])
-								m.Option("content_type", "application/x-www-form-urlencoded")
-								m.Option("content_length", len(uri[index+1:]))
-							}
-							uri, uri_arg = uri[:index], "?"+uuu.RawQuery
 						}
-					}
 
-					if m.Options("temp_expire") {
-						if h := m.Cmdx("mdb.temp", "check", "url", uri+uri_arg); h != "" {
-							m.Cmdy("mdb.temp", h, "data", "data", m.Meta["temp"])
+						file, e := os.Open(m.Cmdx("nfs.path", m.Meta["file"][1]))
+						m.Assert(e)
+						defer file.Close()
+
+						part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
+						m.Assert(e)
+						io.Copy(part, file)
+
+						m.Option("content_type", writer.FormDataContentType())
+					} else if index := strings.Index(uri, "?"); index > 0 {
+						switch m.Option("content_type") {
+						case "application/json": // POST json
+							var data interface{}
+							for k, v := range uuu.Query() {
+								if len(v) == 1 {
+									data = kit.Chain(data, k, v[0])
+								} else {
+									data = kit.Chain(data, k, v)
+								}
+							}
+
+							b, e := json.Marshal(data)
+							m.Assert(e)
+							m.Log("info", "json %v", string(b))
+							body = bytes.NewReader(b)
+
+						default: // POST form
+							m.Log("info", "body %v", string(uri[index+1:]))
+							body = strings.NewReader(uri[index+1:])
+							m.Option("content_type", "application/x-www-form-urlencoded")
+							m.Option("content_length", len(uri[index+1:]))
+						}
+						uri, uri_arg = uri[:index], "?"+uuu.RawQuery
+					}
+				}
+
+				// 查找缓存
+				if m.Options("temp_expire") {
+					if h := m.Cmdx("mdb.temp", "check", "url", uri+uri_arg); h != "" {
+						m.Cmdy("mdb.temp", h, "data", "data", m.Meta["temp"])
+						return
+					}
+				}
+
+				// 构造请求
+				req, e := http.NewRequest(method, uri, body)
+				m.Assert(e)
+				m.Log("info", "%s %s", req.Method, req.URL)
+
+				m.Confm("spide", []string{which, "header"}, func(key string, value string) {
+					if key != "" {
+						req.Header.Set(key, value)
+						m.Log("info", "header %v %v", key, value)
+					}
+				})
+				for i := 0; i < len(m.Meta["headers"]); i += 2 {
+					req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
+				}
+				if m.Options("content_type") {
+					req.Header.Set("Content-Type", m.Option("content_type"))
+				}
+				if m.Options("content_length") {
+					req.Header.Set("Content-Length", m.Option("content_length"))
+				}
+
+				// 请求cookie
+				kit.Structm(m.Magic("user", []string{"cookie", which}), func(key string, value string) {
+					req.AddCookie(&http.Cookie{Name: key, Value: value})
+					m.Log("info", "set-cookie %s: %v", key, value)
+
+				})
+
+				if web.Client == nil {
+					web.Client = &http.Client{Timeout: kit.Duration(kit.Format(client["timeout"]))}
+				}
+
+				// 请求日志
+				if kit.Right(client["logheaders"]) {
+					for k, v := range req.Header {
+						m.Log("info", "%s: %s", k, v)
+					}
+					m.Log("info", "")
+				}
+
+				// 发送请求
+				res, e := web.Client.Do(req)
+				if e != nil {
+					m.Log("warn", "%v", e)
+					return e
+				}
+
+				// 响应日志
+				var result interface{}
+				ct := res.Header.Get("Content-Type")
+				parse := kit.Select(kit.Format(client["parse"]), m.Option("parse"))
+				m.Log("info", "status %s parse: %s content: %s", res.Status, parse, ct)
+				if kit.Right(client["logheaders"]) {
+					for k, v := range res.Header {
+						m.Log("info", "%s: %v", k, v)
+					}
+				}
+
+				// 响应失败
+				if res.StatusCode != http.StatusOK {
+					m.Echo("%d: %s", res.StatusCode, res.Status)
+					return nil
+				}
+
+				// 响应cookie
+				for _, v := range res.Cookies() {
+					m.Magic("user", []string{"cookie", which, v.Name}, v.Value)
+					m.Log("info", "get-cookie %s: %v", v.Name, v.Value)
+				}
+
+				// 解析响应
+				switch {
+				case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
+					if json.NewDecoder(res.Body).Decode(&result); !m.Has("temp") {
+						m.Option("temp", "")
+					}
+					m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
+
+				case parse == "html":
+					page, e := goquery.NewDocumentFromReader(res.Body)
+					m.Assert(e)
+
+					page.Find(kit.Select("html", m.Option("parse_chain"))).Each(func(n int, s *goquery.Selection) {
+						if m.Options("parse_select") {
+							for i := 0; i < len(m.Meta["parse_select"])-2; i += 3 {
+								item := s.Find(m.Meta["parse_select"][i+1])
+								if m.Meta["parse_select"][i+1] == "" {
+									item = s
+								}
+								if v, ok := item.Attr(m.Meta["parse_select"][i+2]); ok {
+									m.Add("append", m.Meta["parse_select"][i], v)
+									m.Log("info", "item attr %v", v)
+								} else {
+									m.Add("append", m.Meta["parse_select"][i], strings.Replace(item.Text(), "\n", "", -1))
+									m.Log("info", "item text %v", item.Text())
+								}
+							}
 							return
 						}
-					}
 
-					req, e := http.NewRequest(method, uri, body)
-					m.Assert(e)
-					m.Log("info", "%s %s", req.Method, req.URL)
-
-					m.Confm("spide", []string{which, "header"}, func(key string, value string) {
-						if key != "" {
-							req.Header.Set(key, value)
-							m.Log("info", "header %v %v", key, value)
-						}
-					})
-					for i := 0; i < len(m.Meta["headers"]); i += 2 {
-						req.Header.Set(m.Meta["headers"][i], m.Meta["headers"][i+1])
-					}
-					if m.Options("content_type") {
-						req.Header.Set("Content-Type", m.Option("content_type"))
-					}
-					if m.Options("content_length") {
-						req.Header.Set("Content-Length", m.Option("content_length"))
-					}
-
-					// 请求cookie
-					kit.Structm(m.Magic("user", []string{"cookie", which}), func(key string, value string) {
-						req.AddCookie(&http.Cookie{Name: key, Value: value})
-						m.Log("info", "set-cookie %s: %v", key, value)
-
-					})
-
-					if kit.Right(client["logheaders"]) {
-						for k, v := range req.Header {
-							m.Log("info", "%s: %s", k, v)
-						}
-						m.Log("info", "")
-					}
-
-					if web.Client == nil {
-						web.Client = &http.Client{Timeout: kit.Duration(kit.Format(client["timeout"]))}
-					}
-
-					res, e := web.Client.Do(req)
-					if e != nil {
-						m.Log("warn", "%v", e)
-						return e
-					}
-
-					var result interface{}
-					ct := res.Header.Get("Content-Type")
-					parse := kit.Select(kit.Format(client["parse"]), m.Option("parse"))
-					m.Log("info", "status %s parse: %s content: %s", res.Status, parse, ct)
-
-					if kit.Right(client["logheaders"]) {
-						for k, v := range res.Header {
-							m.Log("info", "%s: %v", k, v)
-						}
-					}
-
-					// 响应cookie
-					for _, v := range res.Cookies() {
-						m.Magic("user", []string{"cookie", which, v.Name}, v.Value)
-						m.Log("info", "get-cookie %s: %v", v.Name, v.Value)
-					}
-
-					if res.StatusCode != http.StatusOK {
-						return nil
-					}
-
-					switch {
-					case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
-						if json.NewDecoder(res.Body).Decode(&result); !m.Has("temp") {
-							m.Option("temp", "")
-						}
-						m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
-
-					case parse == "html":
-						page, e := goquery.NewDocumentFromReader(res.Body)
-						m.Assert(e)
-
-						page.Find(kit.Select("html", m.Option("parse_chain"))).Each(func(n int, s *goquery.Selection) {
-							if m.Options("parse_select") {
-								for i := 0; i < len(m.Meta["parse_select"])-2; i += 3 {
-									item := s.Find(m.Meta["parse_select"][i+1])
-									if m.Meta["parse_select"][i+1] == "" {
-										item = s
-									}
-									if v, ok := item.Attr(m.Meta["parse_select"][i+2]); ok {
-										m.Add("append", m.Meta["parse_select"][i], v)
-										m.Log("info", "item attr %v", v)
-									} else {
-										m.Add("append", m.Meta["parse_select"][i], strings.Replace(item.Text(), "\n", "", -1))
-										m.Log("info", "item text %v", item.Text())
-									}
-								}
-								return
-							}
-
-							s.Find("a").Each(func(n int, s *goquery.Selection) {
-								if attr, ok := s.Attr("href"); ok {
-									s.SetAttr("href", proxy(m, attr))
-								}
-							})
-							s.Find("img").Each(func(n int, s *goquery.Selection) {
-								if attr, ok := s.Attr("src"); ok {
-									s.SetAttr("src", proxy(m, attr))
-								}
-								if attr, ok := s.Attr("r-lazyload"); ok {
-									s.SetAttr("src", proxy(m, attr))
-								}
-							})
-							s.Find("script").Each(func(n int, s *goquery.Selection) {
-								if attr, ok := s.Attr("src"); ok {
-									s.SetAttr("src", proxy(m, attr))
-								}
-							})
-
-							if html, e := s.Html(); e == nil {
-								m.Add("append", "html", html)
+						s.Find("a").Each(func(n int, s *goquery.Selection) {
+							if attr, ok := s.Attr("href"); ok {
+								s.SetAttr("href", proxy(m, attr))
 							}
 						})
-						m.Table()
+						s.Find("img").Each(func(n int, s *goquery.Selection) {
+							if attr, ok := s.Attr("src"); ok {
+								s.SetAttr("src", proxy(m, attr))
+							}
+							if attr, ok := s.Attr("r-lazyload"); ok {
+								s.SetAttr("src", proxy(m, attr))
+							}
+						})
+						s.Find("script").Each(func(n int, s *goquery.Selection) {
+							if attr, ok := s.Attr("src"); ok {
+								s.SetAttr("src", proxy(m, attr))
+							}
+						})
 
-					default:
-						if m.Options("save") {
-							f, e := os.Create(m.Option("save"))
-							m.Assert(e)
-							defer f.Close()
-
-							n, e := io.Copy(f, res.Body)
-							m.Assert(e)
-							m.Log("info", "save %d %s", n, m.Option("save"))
-							m.Echo(m.Option("save"))
-						} else {
-							buf, e := ioutil.ReadAll(res.Body)
-							m.Assert(e)
-							m.Echo(string(buf))
+						if html, e := s.Html(); e == nil {
+							m.Add("append", "html", html)
 						}
+					})
+					m.Table()
+
+				default:
+					if m.Options("save") {
+						f, e := os.Create(m.Option("save"))
+						m.Assert(e)
+						defer f.Close()
+
+						n, e := io.Copy(f, res.Body)
+						m.Assert(e)
+						m.Log("info", "save %d %s", n, m.Option("save"))
+						m.Echo(m.Option("save"))
+					} else {
+						buf, e := ioutil.ReadAll(res.Body)
+						m.Assert(e)
+						m.Echo(string(buf))
 					}
 				}
 				return
