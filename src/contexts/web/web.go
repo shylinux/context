@@ -92,10 +92,10 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	if msg.Confs("skip_login", msg.Option("path")) {
 		return true
 	}
-	if msg.Confs("login", "cas_url") && !msg.Confs("login", "skip_cas") {
+	if msg.Confs("login", "cas") {
 		if !cas.IsAuthenticated(r) {
 			r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
-			msg.Log("info", "cas_login %v %v", r.URL, msg.Conf("login", "cas_url"))
+			msg.Log("info", "cas_login %v %v", r.URL, msg.Conf("spide", "cas.client.url"))
 			cas.RedirectToLogin(w, r)
 			return false
 		}
@@ -336,10 +336,10 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	})
 
 	// SSO认证
-	m.Log("info", "web: %s", m.Conf("login", "cas_url"))
 	var handler http.Handler
-	if cas_url, e := url.Parse(m.Conf("login", "cas_url")); e == nil && m.Confs("login", "cas_url") {
-		m.Log("info", "cas url: %s", m.Conf("login", "cas_url"))
+	if cas_url, e := url.Parse(m.Cmdx("web.spide", "cas", "client", "url")); e == nil && cas_url.Host != "" {
+		m.Log("info", "cas url: %s", cas_url)
+		m.Conf("login", "cas", "true")
 		client := cas.NewClient(&cas.Options{URL: cas_url})
 		handler = client.Handle(web)
 	} else {
@@ -397,7 +397,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
 			"check":     true,
 			"sess_void": false,
-			"cas_url":   "",
 			"cas_uuid":  "email",
 		}, Help: "认证配置"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
@@ -414,6 +413,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("web.spide", "cas", "client", "new", m.Conf("runtime", "boot.ctx_cas"))
 			m.Cmd("web.spide", "dev", "client", "new", kit.Select(m.Conf("runtime", "boot.ctx_dev"), m.Conf("runtime", "boot.ctx_box")))
 			return
 		}},
@@ -613,13 +613,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				// 响应失败
 				if res.StatusCode != http.StatusOK {
 					m.Echo("%d: %s", res.StatusCode, res.Status)
-					return nil
 				}
 
 				// 响应cookie
 				for _, v := range res.Cookies() {
-					m.Magic("user", []string{"cookie", which, v.Name}, v.Value)
-					m.Log("info", "get-cookie %s: %v", v.Name, v.Value)
+					if m.Log("info", "get-cookie %s: %v", v.Name, v.Value); v.Value != "" {
+						m.Magic("user", []string{"cookie", which, v.Name}, v.Value)
+					}
 				}
 
 				// 解析响应
@@ -969,6 +969,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								}
 							}
 						}
+
+						m.Option("remote", "true")
 
 						// 执行命令
 						if order != "" || kit.Right(val["pre_run"]) {

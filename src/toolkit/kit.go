@@ -169,6 +169,9 @@ func Format(arg ...interface{}) string {
 	}
 	return strings.Join(result, "")
 }
+func Simple(str string) string {
+	return strings.Replace(strings.TrimSpace(str), "\n", "\\n", -1)
+}
 func Formats(arg ...interface{}) string {
 	result := []string{}
 	for _, v := range arg {

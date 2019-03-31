@@ -1,6 +1,6 @@
 #! /bin/bash
 
-export ctx_dev=${ctx_dev:="https://shylinux.com"}
+export ctx_dev=${ctx_dev:="-"}
 export ctx_root="/usr/local/context"
 export ctx_home=~/context
 export ctx_bin="bench"
@@ -48,17 +48,19 @@ action() {
 
 main() {
     while true; do
+        cp -r var/log var/log_$(date +%Y%m%d_%H%M%S)
         $ctx_bin "$@" 2>var/log/boot.log && break
         log "restarting..." && sleep 3
     done
 }
 
 dir=$ctx_root
+dir=./
 [ -d "$1" ] && dir=$1 && shift
 [ -d "$dir" ] && cd $dir
 [ -f bin/bench ] && ctx_bin=bin/bench
 pid=`cat var/run/bench.pid`
-log "dir: $dir\nbench: $ctx_bin\npid: $pid"
+log "dev:$ctx_dev\ndir: $dir\nbench: $ctx_bin\npid: $pid"
 
 case $1 in
     install) shift; prepare && install "$@";;

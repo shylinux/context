@@ -281,6 +281,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					if !m.Cmds("aaa.rsa", "verify", m.Option("node.cert"), m.Option("node.sign"), m.Option("text.hash", hash)) {
 						m.Cmd("aaa.auth", "nodes", m.Option("node.route"), "cert", m.Option("node.cert"))
 						m.Log("warning", "node error")
+						m.Cmd("aaa.auth", "nodes", m.Option("node.route"), "node", "delete")
 						return
 					}
 				} else {
@@ -348,7 +349,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				if m.Options("remote_code") {
 					m.Log("info", "username %s", m.Option("user.name"))
-					if m.Option("username", m.Option("user.name")); !m.Confs("trust", m.Option("node.route")) {
+					if m.Option("username", m.Option("user.name")); m.Confs("trust", m.Option("node.route")) {
+						m.Log("info", "skip verify user of node %s", m.Option("node.route"))
+					} else if m.Confs("trust", "up") && strings.HasPrefix(m.Conf("runtime", "node.route"), m.Option("node.route")) {
+						m.Log("info", "skip verify user of up node %s", m.Option("node.route"))
+					} else {
 						// 用户签名
 						hash, _ := kit.Hash("rand", m.Option("text.time", m.Time("stamp")), m.Option("node.route"))
 						m.Option("user.cert", m.Cmd("aaa.auth", "username", m.Option("user.name"), "cert").Append("meta"))
@@ -360,8 +365,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							m.Echo("no right of %s", m.Option("text.route"))
 							return
 						}
-					} else {
-						m.Log("info", "skip verify user of node %s", m.Option("node.route"))
 					}
 
 					// 创建会话

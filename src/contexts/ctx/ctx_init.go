@@ -832,6 +832,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					}
 					return
 				}
+				if len(arg) > 1 && arg[1] == "map" {
+					for i := 2; i < len(arg)-1; i += 2 {
+						m.Confv(arg[0], arg[i], arg[i+1])
+					}
+					return
+				}
 
 				all := false
 				if len(arg) > 0 && arg[0] == "all" {

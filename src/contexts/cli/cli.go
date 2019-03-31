@@ -99,7 +99,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
-			"init_env": []interface{}{"ctx_dev", "ctx_box", "ctx_root", "ctx_home", "USER"},
+			"init_env": []interface{}{"ctx_cas", "ctx_dev", "ctx_box", "ctx_root", "ctx_home", "USER"},
 			"boot":     map[string]interface{}{"web_port": ":9094", "ssh_port": ":9090"},
 		}, Help: "运行环境"},
 
@@ -338,7 +338,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				// 运行命令
 				if e := cmd.Run(); e != nil {
-					m.Echo("error: ").Echo("%s\n", e).Echo(err.String())
+					m.Echo("error: ").Echo(kit.Select(e.Error(), err.String()))
 					return
 				}
 
@@ -434,7 +434,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			text := strings.Join(arg, " ")
-			if !strings.HasPrefix(text, "sess") {
+			if !strings.HasPrefix(text, "sess") && m.Options("remote") {
 				text = m.Current(text)
 			}
 

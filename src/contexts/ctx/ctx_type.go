@@ -1488,7 +1488,11 @@ func (m *Message) Cmdy(args ...interface{}) *Message {
 	return m
 }
 func (m *Message) Cmdx(args ...interface{}) string {
-	return m.Cmd(args...).Result(0)
+	msg := m.Cmd(args...)
+	if msg.Result(0) == "error: " {
+		return msg.Result(1)
+	}
+	return msg.Result(0)
 }
 func (m *Message) Cmds(args ...interface{}) bool {
 	return m.Cmd(args...).Results(0)
