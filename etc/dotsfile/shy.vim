@@ -1,79 +1,52 @@
-syntax match   shyComment	"#.*$"
-syntax match   shyContext   "^\~[a-zA-Z0-9_\.]\+\>"
-syntax match   shyCommand   "\(^\|\t\|  \|$(\)[a-zA-Z0-9_\.]\+\>"
-syntax match   shyConfig    "\(^\|\t\|  \|$(\)config\>"
-syntax match   shyCache     "\(^\|\t\|  \|$(\)cache\>"
+function! Keys(which, keys)
+    for key in a:keys
+        if a:which == "Statment"
+            let key = "\"\\(^\\|\\t\\|  \\|$(\\)" . key . "\\>\""
+        else
+            let key = "\"\\<" . key . "\\>\""
+        end
+        exec  "syn match shy" . a:which. " " . l:key
+    endfor
+endfunction
 
-syntax match   shyString	"'[^']*'"
-syntax match   shyString	"\"[^\"]*\""
-syntax match   shyNumber	"-\=\<\d\+\>#\="
-syntax match   shyNumber	"false"
-syntax match   shyNumber	"true"
-syntax match   shVariable	"\$[_a-zA-Z0-9]\+\>"
-syntax match   shVariable	"@[_a-zA-Z0-9]\+\>"
+highlight shyArgument   ctermfg=cyan
+highlight shySubCommand ctermfg=yellow
 
-syn match   shySubCommand    "\<\(load\|save\)\>"
+highlight shyCache      ctermfg=yellow
+highlight shyConfig     ctermfg=yellow
+highlight shyCommand    ctermfg=green
+highlight shyContext    ctermfg=red
+highlight shyComment    ctermfg=blue
+
+highlight shyStatment   ctermfg=yellow
+highlight shyOperator   ctermfg=yellow
+highlight shyVariable   ctermfg=magenta
+highlight shyNumber     ctermfg=magenta
+highlight shyString     ctermfg=magenta
+
+syn match shyString     "'[^']*'"
+syn match shyString	    "\"[^\"]*\""
+syn match shyNumber	    "-\=\<\d\+\>#\="
+syn match shyNumber	    "false\|true"
+syn match shVariable    "\$[_a-zA-Z0-9]\+\>"
+syn match shVariable    "@[_a-zA-Z0-9]\+\>"
+
+syn match shyComment    "#.*$"
+syn match shyContext    "^\~[a-zA-Z0-9_\.]\+\>"
+syn match shyCommand    "\(^\|\t\|  \|$(\)[a-zA-Z0-9_\.]\+\>"
+
+call Keys("Operator", ["new"])
+call Keys("Statment", ["config", "cache"])
+call Keys("Statment", ["return", "source"])
 " context nfs
-syn match   shySubCommand    "\<\(import\|export\)\>"
+call Keys("SubCommand", ["import", "export", "load", "save"])
+
+" context ctx
+call Keys("Argument", ["list", "map"])
 " context mdb
-syn match   shyArgument    "\<\(dbname\|dbhelp\)\>"
+call Keys("Argument", ["dbname", "dbhelp"])
 " context aaa
-syn match   shyArgument    "\<\(componet\|command\)\>"
+call Keys("Argument", ["user", "componet", "command"])
 " context web
-syn match   shyArgument    "\<\(client\|cookie\|header\)\>"
-syn match   shyOperator    "\<\(new\)\>"
+call Keys("Argument", ["client", "cookie", "header"])
 
-highlight shyComment        ctermfg=blue
-highlight shyContext        ctermfg=red
-highlight shyCommand        ctermfg=green
-highlight shyConfig         ctermfg=yellow
-highlight shyCache          ctermfg=yellow
-
-highlight shyString         ctermfg=magenta
-highlight shyNumber         ctermfg=magenta
-highlight shyVariable       ctermfg=magenta
-highlight shyOperator       ctermfg=yellow
-highlight shyArgument       ctermfg=cyan
-highlight shySubCommand     ctermfg=yellow
-
-
-" syn match   shNumber			"-\=\<\d\+\>#\="
-"
-" syn match   shOperator			"=\|+\|-\|*\|/"
-" syn match   shOperator			"<\|<=\|>\|>=\|!=\|=="
-" syn match   shOperator			"\\"
-"
-" " syn keyword shStatement break cd chdir continue eval exec exit kill newgrp pwd read readonly shift trap ulimit umask wait
-"
-" " syn keyword shStatement if else elif end for
-"
-" " ctx command
-"
-" " ctx command
-" syn match   shCommand "\(^\|\t\|  \|$(\)command"
-" " cli command
-" syn match   shStatement "\(^\|\t\|  \|$(\)let"
-" syn match   shStatement "\(^\|\t\|  \|$(\)var"
-" syn match   shStatement "\(^\|\t\|  \|$(\)return"
-" syn match   shStatement "\(^\|\t\|  \|$(\)arguments"
-" syn match   shStatement "\(^\|\t\|  \|$(\)source"
-" syn match   shCommand "\(^\|\t\|  \|$(\)alias"
-"
-" " aaa command
-" syn match   shCommand "\(^\|\t\|  \|$(\)hash"
-" syn match   shCommand "\(^\|\t\|  \|$(\)auth"
-" syn match   shCommand "\(^\|\t\|  \|$(\)role"
-" syn match   shCommand "\(^\|\t\|  \|$(\)user"
-" syn match   shSubCommand "\<\(componet\|command\)\>"
-"
-" " web command
-" syn match   shCommand "\(^\|\t\|  \|$(\)serve"
-" syn match   shCommand "\(^\|\t\|  \|$(\)route"
-" syn match   shCommand "\(^\|\t\|  \|$(\)client"
-" syn match   shCommand "\(^\|\t\|  \|$(\)cookie"
-" syn match   shCommand "\(^\|\t\|  \|$(\)template"
-"
-" " mdb command
-" syn match   shCommand "\(^\|\t\|  \|$(\)open"
-"
-"

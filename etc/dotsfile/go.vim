@@ -1,2 +1,2 @@
-highlight goComment        ctermfg=darkgreen
+highlight goComment        cterm=reverse ctermfg=yellow
 
