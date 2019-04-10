@@ -9,11 +9,71 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
+	"toolkit"
 )
 
 var Index = &ctx.Context{Name: "code", Help: "代码中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
+		"mux": &ctx.Config{Name: "mux", Value: map[string]interface{}{
+			"cmd_timeout": "100ms",
+			"view": map[string]interface{}{
+				"session": []interface{}{
+					"session_id",
+					"session_name",
+					"session_windows",
+					"session_height",
+					"session_width",
+					"session_created_string",
+				},
+				"window": []interface{}{
+					"window_id",
+					"window_name",
+					"window_panes",
+					"window_height",
+					"window_width",
+				},
+				"pane": []interface{}{
+					"pane_id",
+					"pane_index",
+					"pane_tty",
+					"pane_height",
+					"pane_width",
+				},
+			},
+			"bind": map[string]interface{}{
+				"0": map[string]interface{}{},
+				"1": map[string]interface{}{
+					"x": []interface{}{"kill-session"},
+				},
+				"2": map[string]interface{}{
+					"x": []interface{}{"kill-window"},
+					"s": []interface{}{"swap-window", "-s"},
+					"e": []interface{}{"rename-window"},
+				},
+				"3": map[string]interface{}{
+					"x": []interface{}{"kill-pane"},
+					"b": []interface{}{"break-pane"},
+					"h": []interface{}{"split-window", "-h"},
+					"v": []interface{}{"split-window", "-v"},
+
+					"r": []interface{}{"send-keys"},
+					"p": []interface{}{"pipe-pane"},
+					"g": []interface{}{"capture-pane", "-p"},
+
+					"s":  []interface{}{"swap-pane", "-d", "-s"},
+					"mh": []interface{}{"move-pane", "-h", "-s"},
+					"mv": []interface{}{"move-pane", "-v", "-s"},
+
+					"H": []interface{}{"resize-pane", "-L"},
+					"L": []interface{}{"resize-pane", "-R"},
+					"J": []interface{}{"resize-pane", "-D"},
+					"K": []interface{}{"resize-pane", "-U"},
+					"Z": []interface{}{"resize-pane", "-Z"},
+				},
+			},
+		}, Help: "文档管理"},
 		"skip_login": &ctx.Config{Name: "skip_login", Value: map[string]interface{}{
 			"/consul": "true",
 		}, Help: "免登录"},
@@ -241,6 +301,93 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}, Help: "日志地址"},
 	},
 	Commands: map[string]*ctx.Command{
+		"mux": &ctx.Command{Name: "mux [session [window [pane]]] args...", Help: "终端管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 { // 会话列表
+				view := kit.View([]string{"session"}, m.Confm("mux", "view"))
+				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-sessions", "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
+					for j, col := range strings.Split(row, ",") {
+						m.Add("append", view[j], col)
+					}
+				}
+				m.Table()
+				return
+			}
+			if v := m.Confv("mux", []string{"bind", "0", arg[0]}); v != nil {
+				m.Cmdy("cli.system", "tmux", v, arg[1:])
+				return
+			}
+
+			if len(arg) == 1 { //窗口列表
+				view := kit.View([]string{"window"}, m.Confm("mux", "view"))
+				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-windows", "-t", arg[0], "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
+					for j, col := range strings.Split(row, ",") {
+						m.Add("append", view[j], col)
+					}
+				}
+				m.Table()
+				return
+			}
+
+			switch arg[1] {
+			case "create": // 创建会话
+				m.Cmdy("cli.system", "tmux", "new-session", "-s", arg[0], arg[2:], "-d", "cmd_env", "TMUX", "")
+				return
+			case "exist": // 创建会话
+				m.Cmdy("cli.system", "tmux", "has-session", "-t", arg[0])
+				return
+			default: // 会话操作
+				if v := m.Confv("mux", []string{"bind", "1", arg[1]}); v != nil {
+					m.Cmdy("cli.system", "tmux", v, "-t", arg[0], arg[2:])
+					return
+				}
+			}
+
+			target := fmt.Sprintf("%s:%s", arg[0], arg[1])
+			if len(arg) == 2 { // 面板列表
+				view := kit.View([]string{"pane"}, m.Confm("mux", "view"))
+				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-panes", "-t", target, "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
+					for j, col := range strings.Split(row, ",") {
+						m.Add("append", view[j], col)
+					}
+				}
+				m.Table()
+				return
+			}
+
+			switch arg[2] {
+			case "create": // 创建窗口
+				m.Cmdy("cli.system", "tmux", "new-window", "-t", arg[0], "-n", arg[1], arg[3:])
+				return
+			default: // 窗口操作
+				if v := m.Confv("mux", []string{"bind", "2", arg[2]}); v != nil {
+					m.Cmdy("cli.system", "tmux", v, arg[3:], "-t", target)
+					return
+				}
+			}
+
+			target = fmt.Sprintf("%s:%s.%s", arg[0], arg[1], arg[2])
+			if len(arg) == 3 {
+				m.Cmdy("cli.system", "tmux", "capture-pane", "-t", target, "-p")
+				return
+			}
+
+			if v := m.Confv("mux", []string{"bind", "3", arg[3]}); v != nil {
+				switch arg[3] {
+				case "r":
+					m.Cmd("cli.system", "tmux", "send-keys", "-t", target, strings.Join(arg[4:], " "), "Enter")
+					time.Sleep(kit.Duration(m.Conf("mux", "cmd_timeout")))
+					m.Cmdy("cli.system", "tmux", "capture-pane", "-t", target, "-p")
+				case "p":
+					m.Cmdy("cli.system", "tmux", "pipe-pane", "-t", target, arg[4:])
+				default:
+					m.Cmdy("cli.system", "tmux", v, arg[4:], "-t", target)
+				}
+				return
+			}
+
+			m.Cmdy("cli.system", "tmux", "send-keys", "-t", target, arg[3:])
+			return
+		}},
 		"update": &ctx.Command{Name: "update", Help: "更新代码", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			return
 		}},
