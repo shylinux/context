@@ -215,3 +215,178 @@ window.onload = function(event) {
     init_table()
     init_layout()
 }
+
+function modify_node(which, html) {
+    var node = which
+    if (typeof which == "string") {
+        node = document.querySelector(which)
+    }
+
+    html && typeof html == "string" && (node.innerHTML = html)
+    if (html && typeof html == "object") {
+        for (var k in html) {
+            if (typeof html[k] == "object") {
+                for (var d in html[k]) {
+                    node[k][d] = html[k][d]
+                }
+                continue
+            }
+            node[k] = html[k]
+        }
+    }
+    return node
+}
+function create_node(element, html) {
+    var node = document.createElement(element)
+    return modify_node(node, html)
+}
+function append_child(parent, element, html) {
+    var elm = create_node(element, html)
+    parent.append(elm)
+    return elm
+}
+function insert_before(self, element, html) {
+    var elm = create_node(element, html)
+    return self.parentElement.insertBefore(elm, self)
+}
+
+function format(str) {
+    if (str.indexOf("http") == 0 && str.indexOf("<a href") == -1) {
+        return "<a href='"+str+"' target='_blank'>"+str+"</a>"
+    }
+    return str
+}
+function sort_table(table, index, sort_asc) {
+    var list = table.querySelectorAll("tr")
+    var new_list = []
+
+    var is_time = true
+    var is_number = true
+    for (var i = 1; i < list.length; i++) {
+        var value = Date.parse(list[i].childNodes[index].innerText)
+        if (!(value > 0)) {
+            is_time = false
+        }
+
+        var value = parseInt(list[i].childNodes[index].innerText)
+        if (!(value >= 0 || value <= 0)) {
+            is_number = false
+        }
+
+        new_list.push(list[i])
+    }
+
+    var sort_order = ""
+    if (is_time) {
+        if (sort_asc) {
+            method = function(a, b) {return Date.parse(a) > Date.parse(b)}
+            sort_order = "time"
+        } else {
+            method = function(a, b) {return Date.parse(a) < Date.parse(b)}
+            sort_order = "time_r"
+        }
+    } else if (is_number) {
+        if (sort_asc) {
+            method = function(a, b) {return parseInt(a) > parseInt(b)}
+            sort_order = "int"
+        } else {
+            method = function(a, b) {return parseInt(a) < parseInt(b)}
+            sort_order = "int_r"
+        }
+    } else {
+        if (sort_asc) {
+            method = function(a, b) {return a > b}
+            sort_order = "str"
+        } else {
+            method = function(a, b) {return a < b}
+            sort_order = "str_r"
+        }
+    }
+
+    list = new_list
+    new_list = []
+    for (var i = 0; i < list.length; i++) {
+        list[i].parentElement && list[i].parentElement.removeChild(list[i])
+        for (var j = i+1; j < list.length; j++) {
+            if (typeof method == "function" && method(list[i].childNodes[index].innerText, list[j].childNodes[index].innerText)) {
+                var temp = list[i]
+                list[i] = list[j]
+                list[j] = temp
+            }
+        }
+        new_list.push(list[i])
+    }
+
+    for (var i = 0; i < new_list.length; i++) {
+        table.appendChild(new_list[i])
+    }
+    return sort_order
+}
+function add_sort(append, field, cb) {
+    append.onclick = function(event) {
+        var target = event.target
+        var dataset = target.dataset
+        var nodes = target.parentElement.childNodes
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i] == target) {
+                if (target.tagName == "TH") {
+                    dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
+                    sort_table(append, i, dataset["sort_asc"] == "1")
+                } else if (target.tagName == "TD") {
+                    var tr = target.parentElement.parentElement.querySelector("tr")
+                    if (tr.childNodes[i].innerText.startsWith(field)) {
+                        typeof cb == "function" && cb(event)
+                    }
+                }
+            }
+        }
+    }
+}
+function scroll_page(event, page) {
+    var body = document.querySelector("body")
+
+    switch (event.key) {
+        case "h":
+            if (event.ctrlKey) {
+                window.scrollBy(-page.scroll_x*10, 0)
+            } else {
+                window.scrollBy(-page.scroll_x, 0)
+            }
+            break
+        case "H":
+            window.scrollBy(-body.scrollWidth, 0)
+            break
+        case "l":
+            if (event.ctrlKey) {
+                window.scrollBy(page.scroll_x*10, 0)
+            } else {
+                window.scrollBy(page.scroll_x, 0)
+            }
+            break
+        case "L":
+            window.scrollBy(body.scrollWidth, 0)
+            break
+        case "j":
+            if (event.ctrlKey) {
+                window.scrollBy(0, page.scroll_y*10)
+            } else {
+                window.scrollBy(0, page.scroll_y)
+            }
+            break
+        case "J":
+            window.scrollBy(0, body.scrollHeight)
+            break
+        case "k":
+            if (event.ctrlKey) {
+                window.scrollBy(0, -page.scroll_y*10)
+            } else {
+                window.scrollBy(0, -page.scroll_y)
+            }
+            break
+        case "K":
+            window.scrollBy(0, -body.scrollHeight)
+            break
+    }
+    return
+}
+

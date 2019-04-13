@@ -941,58 +941,55 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						continue
 					}
 
+					// 查找模块
+					msg := m.Find(kit.Select(m.Cap("module"), val["componet_ctx"]))
+
+					// 默认变量
+					msg.Option("componet_name", val["name"].(string))
+					for k, v := range val {
+						if msg.Option(k) != "" {
+							continue
+						}
+						switch value := v.(type) {
+						case []string:
+							msg.Add("option", k, value)
+						case string:
+							msg.Add("option", k, value)
+						default:
+							msg.Put("option", k, value)
+						}
+					}
+					// 默认参数
+					if val["inputs"] != nil {
+						for _, v := range val["inputs"].([]interface{}) {
+							value := v.(map[string]interface{})
+							if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
+								msg.Add("option", value["name"].(string), m.Parse(value["value"]))
+							}
+						}
+					}
+
+					// 添加设备
 					arg = arg[:0]
 					if kit.Right(val["componet_pod"]) {
 						arg = append(arg, "sh", "node", kit.Format(m.Magic("session", "current.pod")))
 					}
+					// 添加命令
 					if kit.Right(val["componet_cmd"]) {
 						arg = append(arg, kit.Format(val["componet_cmd"]))
 					}
 					if m.Has("cmds") {
 						arg = append(arg, kit.Trans(m.Optionv("cmds"))...)
 					}
+					// 添加参数
+					for _, v := range kit.Trans(val["arguments"]) {
+						arg = append(arg, msg.Parse(v))
+					}
 
-					msg := m
 					if len(arg) > 0 {
-						// 查找模块
-						msg = m.Find(kit.Select(m.Cap("module"), val["componet_ctx"]))
-
 						// 权限检查
 						if m.Options("bench") && !m.Cmds("aaa.work", "right", m.Option("componet_group"), arg[0]) {
 							continue
-						}
-
-						// 添加参数值
-						if value, ok := val["arguments"].([]interface{}); ok {
-							for _, v := range value {
-								arg = append(arg, msg.Parse(kit.Format(v)))
-							}
-						}
-
-						// 添加固定值
-						msg.Option("componet_name", val["name"].(string))
-						for k, v := range val {
-							if msg.Option(k) != "" {
-								continue
-							}
-							switch value := v.(type) {
-							case []string:
-								msg.Add("option", k, value)
-							case string:
-								msg.Add("option", k, value)
-							default:
-								msg.Put("option", k, value)
-							}
-						}
-
-						// 添加输入值
-						if val["inputs"] != nil {
-							for _, v := range val["inputs"].([]interface{}) {
-								value := v.(map[string]interface{})
-								if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
-									msg.Add("option", value["name"].(string), m.Parse(value["value"]))
-								}
-							}
 						}
 
 						m.Option("remote", "true")

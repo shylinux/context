@@ -1,33 +1,5 @@
 ctx = context = {
     __proto__: kit,
-    Table: function(msg, cb) {
-        var rows = this.PackAppend(msg)
-        if (typeof cb == "function") {
-            for (var i = 0; i < rows.length; i++) {
-                if (cb(rows[i], i)) {
-                    break
-                }
-            }
-        }
-        return rows
-    },
-    PackAppend: function(msg) {
-        var ret = []
-        if (!msg || !msg.append || !msg.append.length || !msg[msg.append[0]]) {
-            return ret
-        }
-
-        var ncol = msg.append.length
-        var nrow = msg[msg.append[0]].length
-        for (var i = 0; i < nrow; i++) {
-            var one = {}
-            for (var j = 0; j < ncol; j++) {
-                one[msg.append[j]] = msg[msg.append[j]][i]
-            }
-            ret.push(one)
-        }
-        return ret
-    },
     Run: function(page, dataset, cmd, cb) {
         var option = {"cmds": cmd}
         for (var k in dataset) {
@@ -51,14 +23,26 @@ ctx = context = {
         }
         this.Run(page, data, [], cb || form.onactions)
     },
-    Current: function(key, value) {
-        context.GET("", {
-            "componet_group": "index",
-            "componet_name": "cmd",
-            "cmds": ["sess", "current", key, value],
-        })
-        return value
+    Table: function(msg, cb) {
+        var ret = []
+        if (!msg || !msg.append || !msg.append.length || !msg[msg.append[0]]) {
+            return ret
+        }
+
+        var ncol = msg.append.length
+        var nrow = msg[msg.append[0]].length
+        for (var i = 0; i < nrow; i++) {
+            var one = {}
+            for (var j = 0; j < ncol; j++) {
+                one[msg.append[j]] = msg[msg.append[j]][i]
+            }
+            ret.push(one)
+        }
+
+        typeof cb == "function" && ret.forEach(cb)
+        return ret
     },
+
     Share: function(objs) {
         var args = this.Search()
         for (var k in objs) {
@@ -132,45 +116,13 @@ ctx = context = {
         document.cookie = key+"="+value+";path=/";
         return this.Cookie(key);
     },
-    Command: function(cmd, option, cb) {
-        if (typeof option == "function") {
-            cb = option
-            option = {}
-        } else {
-            option = option || {}
-        }
-
-        option["componet_index"] = "index"
-        if (typeof cmd == "string") {
-            option["componet_name"] = "source"
-            option["cmd"] = cmd
-        } else {
-            option["componet_name"] = "head"
-            option["cmds"] = cmd
-        }
-
-        this.GET("", option, function(msg) {
-            typeof cb == "function" && (msg && msg[0]? cb(msg[0]): cb())
+    Current: function(key, value) {
+        context.GET("", {
+            "componet_group": "index",
+            "componet_name": "cmd",
+            "cmds": ["sess", "current", key, value],
         })
-    },
-    Cache: function(key, cb, sync) {
-        if (key == undefined) {
-            return this.cache
-        }
-        if (this.cache && !sync) {
-            typeof cb == "function" && cb(this.cache[key])
-            return this.cache[key]
-        }
-
-        var that = this
-        this.GET("", {"componet_group": "login", "componet_order": "userinfo"}, function(msg) {
-            msg = msg[0]
-            that.cache = {}
-            for (var i = 0; i < msg.append.length; i++) {
-                that.cache[msg.append[i]] = msg[msg.append[i]].join("")
-            }
-            typeof cb == "function" && cb(that.cache[key])
-        })
+        return value
     },
     GET: function(url, form, cb) {
         form = form || {}
