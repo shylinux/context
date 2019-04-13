@@ -4,23 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=0.7">
 <link rel="shortcut icon" type="image/ico" href="/favicon.ico">
-<title>code</title>
-<style>
-    html, body {
-        height:100%;
-        width:100%;
-        margin:0px;
-        background-color:#d8d8d8;
-    }
-    fieldset {
-        margin-top:8px;
-    }
-    legend {
-        font-size:16px;
-        font-weight:bold;
-        font-family:monospace;
-    }
-</style>
+<title>{{option . "componet_name"}}</title>
+<link rel="stylesheet" type="text/css" href="/static/librarys/example.css"></link>
+<link rel="stylesheet" type="text/css" href="/static/librarys/code.css"></link>
 <style>
 {{$toolkit_view := conf . "route" "toolkit_view"}}
     div.workflow {
@@ -55,97 +41,6 @@
     div.workflow li>input {
         background-color:rgba(0,0,0,0.2);
     }
-
-
-    form.option div {
-        float:left;
-    }
-    textarea.clipboard {
-        color:white;
-        background-color:#272822;
-        width:600px;
-    }
-    form.option div {
-        float:left;
-    }
-    form.option hr {
-        clear:both;
-    }
-    form.option label.keymap {
-        color:red;
-        display:none;
-    }
-    form.option label.keymap.show {
-        display:inline;
-    }
-    form.option input {
-        margin-right:10px;
-    }
-    form.option input.cmd {
-        color:white;
-        background-color:#272822;
-        padding-left:10px;
-        width:600px;
-    }
-    form.option input.file_cmd {
-        color:white;
-        background-color:#272822;
-        padding-left:10px;
-        width:400px;
-    }
-    form.option input.file_name {
-        width:200px;
-    }
-    form.option.exec input {
-        color:white;
-        background-color:#272822;
-        padding-left:10px;
-        width:600px;
-    }
-    form.option select {
-        margin-right:10px;
-    }
-    table.append {
-        font-size:14px;
-        overflow: auto;
-    }
-    table.append tr:hover {
-        background-color:lightgreen;
-    }
-    table.append th {
-        font-family:monospace;
-        background-color:lightgreen;
-        cursor:pointer;
-    }
-    table.append th.order {
-        background-color:red;
-        cursor:pointer;
-    }
-    table.append td {
-        max-width:1200px;
-        font-family:monospace;
-        padding-left: 10px;
-        padding-right: 20px;
-    }
-    table.append td.clip {
-        background-color:red;
-    }
-    table.append td:hover {
-        background-color:red;
-    }
-    code.result pre {
-        color:white;
-        font-size:14px;
-        background-color:#272822;
-        overflow:scroll;
-        padding:5px;
-        border:solid 2px green;
-        border-left:solid 4px green;
-        margin:0;
-    }
-    code.result pre.clipboard {
-        height:2em;
-    }
 </style>
 </head>
 <body onkeydown="return onaction(event, 'scroll')" onkeyup="return onaction(event, 'keymap')">
@@ -154,13 +49,6 @@
     var bench_data ={{option . "bench_data"}}
 </script>
 {{end}}
-
-{{define "void"}}{{end}}
-
-{{define "detail"}}{{detail .}}{{end}}
-{{define "option"}}{{option .}}{{end}}
-{{define "append"}}{{append .}}{{end}}
-{{define "result"}}{{result .}}{{end}}
 
 {{define "clipboard"}}
 <fieldset><legend>clipboard</legend>
@@ -212,19 +100,18 @@
 {{end}}
 
 {{define "componet"}}
-<fieldset><legend title="{{option .Meta "help"}}">{{option .Meta "name"}}({{option .Meta "help"}})</legend>
-    {{$form_type := option . "form_type"|meta}}
+<fieldset class="{{option . "componet_view"|meta}}" data-init="{{option . "componet_init"|meta}}">
+    <legend title="{{option .Meta "help"}}">{{option .Meta "name"}}({{option .Meta "help"}})</legend>
     {{$msg := .}}
+    {{$form_type := option . "form_type"|meta}}
 
     <form class="option {{option .Meta "componet_name"}}"
           data-componet_group="{{option . "componet_group"|meta}}"
           data-componet_name="{{option . "componet_name"|meta}}"
           {{if eq $form_type "upload"}}
-              method="POST" action="/upload" enctype="multipart/form-data"
-              onsubmit="onaction(event, 'upload')"
-              target="_blank"
-          {{end}}
-          >
+              method="POST" action="/upload" enctype="multipart/form-data" target="_blank"
+          {{end}}>
+
           <input style="display:none"></input>
           {{range $index, $input := option . "inputs"}}
               <div>
@@ -233,6 +120,7 @@
                   {{if index $input "label"}}
                       <label>{{index $input "label"}} : </label>
                   {{end}}
+
                   {{if eq $type "button"}}
                       <input type="button" onclick="return onaction(event, 'cmd')" value="{{$value}}">
                   {{else if eq $type "submit"}}
@@ -259,6 +147,14 @@
                           class="{{index $input "class"}}"
                           onclick="return onaction(event, 'click')"
                           onkeyup="return onaction(event, 'input')">
+                  {{else if eq $type "textarea"}}
+                      <textarea
+                          rows="{{index $input "rows"}}"
+                          cols="{{index $input "cols"}}"
+                          name="{{index $input "name"}}"
+                          class="{{index $input "class"}}"
+                          onclick="return onaction(event, 'click')"
+                          onkeyup="return onaction(event, 'input')">{{$value}}</textarea>
                   {{else}}
                       <input
                           name="{{index $input "name"}}"
@@ -276,12 +172,8 @@
           {{end}}
           <hr/>
     </form>
-    {{if eq $form_type "upload"}}
-    {{end}}
 
-    {{if index .Meta "display_append"}}
-        {{option .Meta "display_append"}}
-    {{else}}
+    {{if index .Meta "display_append"}} {{option .Meta "display_append"}} {{else}}
         <table class="append {{option .Meta "componet_name"}}">
             {{$msg := .}}
             <tr>{{range $field := append .}}<th>{{$field}}</th>{{end}}</tr>
@@ -290,17 +182,18 @@
             {{end}}
         </table>
     {{end}}
-
-    {{if index .Meta "display_result"}}
-        {{option .Meta "display_result"}}
-    {{else}}
+    {{if index .Meta "display_result"}} {{option .Meta "display_result"}} {{else}}
         <code class="result {{option .Meta "componet_name"}}"><pre>{{result .Meta}}</pre></code>
+    {{end}}
+    {{if index .Meta "display_div"}} {{option .Meta "display_div"}} {{else}}
+        <div class="result {{option .Meta "componet_name"}}"></div>
     {{end}}
 </fieldset>
 {{end}}
 
 {{define "mp"}}
 <script src="https://res.wx.qq.com/open/js/jweixin-1.4.0.js"></script>
+<script src="/static/librarys/wexin.js"></script>
 <script>
 {{$token := cmd . "context chat js_token"}}
 wx.config({
@@ -316,59 +209,15 @@ wx.config({
         "openAddress",
     ],
 })
-wx.ready(function(){
-})
-wx.error(function(res){
-})
-
-function scan(event) {
-    alert("begin scan")
-    wx.scanQRCode({
-        needResult: 0,
-        scanType: ["qrCode", "barCode"],
-        desc: "what",
-        success: function(res) {
-            alert(res.resultStr)
-        },
-        fail: function(res) {
-            alert(res.errMsg)
-        },
-    })
-}
-function close() {
-    wx.closeWindow({
-        success: function(res) {
-            alert(res.resultStr)
-        },
-        fail: function(res) {
-            alert(res.errMsg)
-        },
-    })
-}
-
-function choose() {
-    wx.chooseImage({
-        count: 1, // 默认9
-        sizeType: ['original', 'compressed'], // 可以指定是原图还是压缩图，默认二者都有
-        sourceType: ['album', 'camera'], // 可以指定来源是相册还是相机，默认二者都有
-        success: function (res) {
-            var localIds = res.localIds; // 返回选定照片的本地ID列表，localId可以作为img标签的src属性显示图片
-        },
-        fail: function(res) {
-            alert(res.errMsg)
-        },
-    });
-}
-function wopen(event) {
-    wx.openAddress({success: function(res) {
-        context.Command("show", res)
-    }})
-}
+wx.ready(function(){})
+wx.error(function(res){})
 </script>
 {{end}}
 
 {{define "tail"}}
+<script src="/static/librarys/toolkit.js"></script>
 <script src="/static/librarys/context.js"></script>
+<script src="/static/librarys/example.js"></script>
 <script src="/static/librarys/code.js"></script>
 </body>
 {{end}}

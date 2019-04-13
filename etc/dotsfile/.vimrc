@@ -149,22 +149,31 @@ set keywordprg=man\ -a
 set splitbelow
 set splitright
 
+let javaScript_fold=1
 function! Config(type)
     if a:type == "go"
         set foldmethod=syntax
+        set foldnestmax=3
     elseif a:type == "shy"
         set filetype=shy
         set commentstring=#%s
-    elseif a:type == "json"
-        set foldmethod=syntax
+    elseif a:type == "tmpl"
+        set foldmethod=indent
     elseif a:type == "conf"
         set filetype=nginx
+    elseif a:type == "json"
+        set foldmethod=syntax
     elseif a:type == "xml"
         set filetype=xml
     elseif a:type == "css"
         set filetype=css
+        set foldmethod=marker
+        set foldmarker={,}
     elseif a:type == "txt"
         set noexpandtab
+    elseif a:type == "js"
+        set foldmethod=marker
+        set foldmarker={,}
     endif
 endfunction
 
@@ -172,12 +181,14 @@ autocmd BufReadPost * normal `"
 
 autocmd BufNewFile,BufReadPost *.go call Config("go")
 autocmd BufNewFile,BufReadPost *.shy call Config("shy")
+autocmd BufNewFile,BufReadPost *.tmpl call Config("tmpl")
 autocmd BufNewFile,BufReadPost *.conf call Config("conf")
 autocmd BufNewFile,BufReadPost *.json call Config("json")
 
 autocmd BufNewFile,BufReadPost *.wxml call Config("xml")
 autocmd BufNewFile,BufReadPost *.wxss call Config("css")
 autocmd BufNewFile,BufReadPost *.txt call Config("txt")
+autocmd BufNewFile,BufReadPost *.js call Config("js")
 
 command! RR wa | source ~/.vimrc |e
 command! SS mksession! etc/session.vim

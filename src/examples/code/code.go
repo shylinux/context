@@ -101,8 +101,27 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				},
 				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
+			"flash": []interface{}{
+				map[string]interface{}{"name": "flash", "template": "head"},
+				map[string]interface{}{"name": "ask", "help": "ask", "template": "componet",
+					"componet_view": "flasktext", "componet_init": "initFlashText",
+					"componet_ctx": "web.code", "componet_cmd": "flash", "arguments": []interface{}{"text", "@text"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "textarea", "name": "text", "value": "", "cols": 50, "rows": 5},
+						map[string]interface{}{"type": "button", "value": "添加请求"},
+					},
+					"display_result": "", "display_append": "",
+				},
+				map[string]interface{}{"name": "tip", "help": "tip", "template": "componet",
+					"componet_view": "flasklist", "componet_init": "initFlashList",
+					"componet_ctx": "web.code", "componet_cmd": "flash", "arguments": []interface{}{}, "inputs": []interface{}{
+						// map[string]interface{}{"type": "button", "value": "refresh"},
+					},
+					"display_result": "", "display_append": "",
+				},
+				map[string]interface{}{"name": "tail", "template": "tail"},
+			},
 			"index": []interface{}{
-				map[string]interface{}{"name": "head", "template": "head"},
+				map[string]interface{}{"name": "code", "template": "head"},
 				map[string]interface{}{"name": "toolkit", "help": "toolkit", "template": "toolkit"},
 				// map[string]interface{}{"name": "login", "help": "login", "template": "componet",
 				// 	"componet_ctx": "aaa", "componet_cmd": "login", "arguments": []interface{}{"@username", "@password"},
@@ -126,27 +145,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					},
 					"pre_run": true,
 				},
-				// map[string]interface{}{"name": "time", "help": "time", "template": "componet",
-				// 	"componet_ctx": "cli", "componet_cmd": "time", "arguments": []interface{}{"@string"},
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "text", "name": "time_format",
-				// 			"label": "format", "value": "2006-01-02 15:04:05",
-				// 		},
-				// 		map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// },
-				// map[string]interface{}{"name": "json", "help": "json", "template": "componet",
-				// 	"componet_ctx": "nfs", "componet_cmd": "json", "arguments": []interface{}{"@string"},
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "text", "name": "string", "label": "string"},
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// },
 				map[string]interface{}{"name": "dir", "help": "dir", "template": "componet",
-					"componet_ctx": "nfs", "componet_cmd": "dir", "arguments": []interface{}{"@current.dir", "dir_sort", "@sort_field", "@sort_order"},
-					"pre_run": true, "display_result": "",
-					"inputs": []interface{}{
+					"componet_view": "DirList", "componet_init": "initDirList",
+					"pre_run": false, "componet_ctx": "nfs", "componet_cmd": "dir", "arguments": []interface{}{"@current.dir", "dir_sort", "@sort_field", "@sort_order"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "choice", "name": "dir_type",
 							"label": "dir_type", "value": "both", "choice": []interface{}{
 								map[string]interface{}{"name": "all", "value": "all"},
@@ -176,25 +177,15 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						},
 						map[string]interface{}{"type": "text", "name": "current.dir", "value": "@current.dir", "label": "dir"},
 					},
+					"display_result": "",
 				},
 				map[string]interface{}{"name": "upload", "help": "upload", "template": "componet",
-					"componet_ctx": "web", "componet_cmd": "upload", "form_type": "upload",
-					"inputs": []interface{}{
+					"componet_ctx": "web", "componet_cmd": "upload", "form_type": "upload", "inputs": []interface{}{
 						map[string]interface{}{"type": "file", "name": "upload"},
 						map[string]interface{}{"type": "submit", "value": "submit"},
 					},
 					"display_result": "",
 				},
-				// map[string]interface{}{"name": "download", "help": "download", "template": "componet",
-				// 	"componet_ctx": "cli.shy", "componet_cmd": "source", "arguments": []interface{}{"@cmds"},,
-				// 	"display_result": "", "download_file": "",
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "text", "name": "download_file", "value": "data_2006_0102_1504.txt", "class": "file_name"},
-				// 		map[string]interface{}{"type": "text", "name": "cmds", "value": "",
-				// 			"class": "file_cmd", "clipstack": "clistack",
-				// 		},
-				// 	},
-				// },
 				map[string]interface{}{"name": "cmd", "help": "cmd", "template": "componet",
 					"componet_ctx": "cli.shy", "componet_cmd": "source", "arguments": []interface{}{"@cmd"},
 					"inputs": []interface{}{
@@ -204,81 +195,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					},
 				},
 				map[string]interface{}{"name": "pod", "help": "pod", "template": "componet",
-					"componet_ctx": "ssh", "componet_cmd": "remote",
-					"inputs": []interface{}{
+					"componet_view": "PodList", "componet_init": "initPodList",
+					"pre_run": true, "componet_ctx": "ssh", "componet_cmd": "remote", "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "value": "@current.pod"},
 						map[string]interface{}{"type": "button", "value": "refresh"},
 					},
-					"pre_run": true, "display_result": "",
+					"display_result": "",
 				},
 				map[string]interface{}{"name": "ctx", "help": "ctx", "template": "componet",
-					"componet_pod": "true", "componet_ctx": "ssh", "componet_cmd": "context", "arguments": []interface{}{"@ctx", "list"},
-					"display_result": "",
-					"inputs": []interface{}{
+					"componet_view": "CtxList", "componet_init": "initCtxList",
+					"componet_pod": "true", "componet_ctx": "ssh", "componet_cmd": "context", "arguments": []interface{}{"@ctx", "list"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "ctx", "value": "@current.ctx"},
 						map[string]interface{}{"type": "button", "value": "refresh"},
 					},
+					"display_result": "",
 				},
-				// map[string]interface{}{"name": "ccc", "help": "ccc", "template": "componet",
-				// 	"componet_ctx": "cli.shy", "componet_cmd": "context", "arguments": []interface{}{"@current_ctx", "@ccc"},
-				// 	"display_result": "",
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "choice", "name": "ccc",
-				// 			"label": "ccc", "value": "cmd", "choice": []interface{}{
-				// 				map[string]interface{}{"name": "cmd", "value": "cmd"},
-				// 				map[string]interface{}{"name": "config", "value": "config"},
-				// 				map[string]interface{}{"name": "cache", "value": "cache"},
-				// 			},
-				// 		},
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// },
-				// map[string]interface{}{"name": "cmd", "help": "cmd", "template": "componet",
-				// 	"componet_ctx": "cli.shy", "componet_cmd": "context", "arguments": []interface{}{"@current_ctx", "cmd", "list"},
-				// 	"pre_run": true, "display_result": "",
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// },
-				// map[string]interface{}{"name": "history", "help": "history", "template": "componet",
-				// 	"componet_ctx": "cli", "componet_cmd": "config", "arguments": []interface{}{"source_list"},
-				// 	"pre_run": true, "display_result": "",
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// },
-				// map[string]interface{}{"name": "develop", "help": "develop", "template": "componet",
-				// 	"componet_ctx": "web.code", "componet_cmd": "config", "arguments": []interface{}{"counter"},
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// 	"pre_run":        true,
-				// 	"display_result": "",
-				// },
-				// map[string]interface{}{"name": "windows", "help": "windows", "template": "componet",
-				// 	"componet_ctx": "cli", "componet_cmd": "windows",
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// 	"pre_run":        true,
-				// 	"display_result": "",
-				// },
-				// map[string]interface{}{"name": "runtime", "help": "runtime", "template": "componet",
-				// 	"componet_ctx": "cli", "componet_cmd": "runtime",
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// 	"pre_run":        true,
-				// 	"display_result": "",
-				// },
-				// map[string]interface{}{"name": "sysinfo", "help": "sysinfo", "template": "componet",
-				// 	"componet_ctx": "cli", "componet_cmd": "sysinfo",
-				// 	"inputs": []interface{}{
-				// 		map[string]interface{}{"type": "button", "value": "refresh"},
-				// 	},
-				// 	"pre_run":        true,
-				// 	"display_result": "",
-				// },
 				// map[string]interface{}{"name": "mp", "template": "mp"},
 				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
@@ -299,6 +230,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				"context_js": "usr/librarys/context.js",
 			},
 		}, Help: "日志地址"},
+		"flash": &ctx.Config{Name: "flash", Value: map[string]interface{}{
+			"data": []interface{}{},
+			"view": map[string]interface{}{"default": []interface{}{"index", "time", "text", "code", "output"}},
+		}, Help: "闪存"},
 	},
 	Commands: map[string]*ctx.Command{
 		"mux": &ctx.Command{Name: "mux [session [window [pane]]] args...", Help: "终端管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -473,6 +408,67 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			if len(arg) > 1 {
 				m.Copy(m.Spawn().Cmd("get", m.Conf("counter_service"), "name", arg[0], "count", arg[1]), "result")
 			}
+			return
+		}},
+		"flash": &ctx.Command{Name: "flash", Help: "闪存", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			total := len(m.Confv("flash", "data").([]interface{}))
+			// 查看列表
+			if len(arg) == 0 {
+				if index := m.Option("flash_index"); index != "" {
+					arg = append(arg, index)
+				} else {
+					m.Confm("flash", "data", func(index int, item map[string]interface{}) {
+						for _, k := range kit.View([]string{}, m.Confm("flash", "view")) {
+							m.Add("append", k, kit.Format(item[k]))
+						}
+					})
+					m.Table()
+					return
+				}
+
+			}
+
+			index, item := -1, map[string]interface{}{"time": m.Time()}
+			if i, e := strconv.Atoi(arg[0]); e == nil && 0 <= i && i < total {
+				// 查看索引
+				index, arg = total-1-i, arg[1:]
+				if item = m.Confm("flash", []interface{}{"data", index}); len(arg) == 0 {
+					// 查看数据
+					for _, k := range kit.View([]string{}, m.Confm("flash", "view")) {
+						m.Add("append", k, kit.Format(item[k]))
+					}
+					m.Table()
+					return e
+				}
+			}
+
+			switch arg[0] {
+			case "vim": // 编辑数据
+				name := m.Cmdx("nfs.temp", kit.Format(item[kit.Select("code", arg, 1)]))
+				m.Cmd("cli.system", "vi", name)
+				item[kit.Select("code", arg, 1)] = m.Cmdx("nfs.load", name)
+				m.Cmd("nfs.trash", name)
+
+			case "run": // 运行代码
+				code := kit.Format(item[kit.Select("code", arg, 1)])
+				if code == "" {
+					break
+				}
+				name := m.Cmdx("nfs.temp", code)
+				m.Cmdy("cli.system", "python", name)
+				item["output"] = m.Result(0)
+				m.Cmd("nfs.trash", name)
+
+			default:
+				// 修改数据
+				for i := 0; i < len(arg)-1; i += 2 {
+					item[arg[i]] = arg[i+1]
+				}
+				m.Conf("flash", []interface{}{"data", index}, item)
+				item["index"] = total - 1 - index
+				m.Echo("%d", total-1-index)
+			}
+
 			return
 		}},
 	},

@@ -118,20 +118,38 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		if msg.Cmds("aaa.auth", "username", msg.Option("username"), "password", msg.Option("password")) {
 			msg.Log("info", "login: %s", msg.Option("username"))
 			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("aaa.user", "session", "select"), Path: "/"})
+			if msg.Options("relay") {
+				if role := msg.Cmdx("aaa.relay", "check", msg.Option("relay"), "userrole"); role != "" {
+					msg.Cmd("aaa.role", role, "user", msg.Option("username"))
+					msg.Log("info", "relay: %s", role)
+				}
+			}
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
 		}
 		return false
 	}
+
 	if msg.Options("sessid") {
 		msg.Log("info", "sessid: %s", msg.Option("sessid"))
 		msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta")))
 	}
+
+	if !msg.Options("username") && msg.Options("relay") {
+		if relay := msg.Cmd("aaa.relay", "check", msg.Option("relay")); relay.Appends("username") {
+			if role := msg.Cmdx("aaa.relay", "check", msg.Option("relay"), "userrole"); role != "" {
+				msg.Log("info", "login: %s", msg.Option("username", relay.Append("username")))
+				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("aaa.user", "session", "select"), Path: "/"})
+				msg.Cmd("aaa.role", role, "user", msg.Option("username"))
+				msg.Log("info", "relay: %s", role)
+			}
+		}
+	}
+
 	return true
 }
 func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
-
 		m.TryCatch(m.Spawn(m.Conf("serve", "autofree")), true, func(msg *ctx.Message) {
 			msg.Option("remote_addr", r.RemoteAddr)
 			msg.Option("remote_ip", r.Header.Get("remote_ip"))
@@ -143,23 +161,13 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("path", r.URL.Path)
 			msg.Optionv("debug", false)
 
-			msg.Option("GOOS", m.Conf("runtime", "host.GOOS"))
-			msg.Option("GOARCH", m.Conf("runtime", "host.GOARCH"))
-			agent := r.Header.Get("User-Agent")
-			switch {
-			case strings.Contains(agent, "Macintosh"):
-				msg.Option("GOOS", "darwin")
-			}
-			switch {
-			case strings.Contains(agent, "Intel"):
-				msg.Option("GOARCH", "386")
-			}
-
+			// 请求环境
 			msg.Option("dir_root", msg.Cap("directory"))
 			for _, v := range r.Cookies() {
 				msg.Option(v.Name, v.Value)
 			}
 
+			// 请求参数
 			r.ParseMultipartForm(int64(msg.Confi("serve", "form_size")))
 			if r.ParseForm(); len(r.PostForm) > 0 {
 				for k, v := range r.PostForm {
@@ -171,6 +179,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				msg.Add("option", k, v)
 			}
 
+			// 请求数据
 			switch r.Header.Get("Content-Type") {
 			case "application/json":
 				var data interface{}
@@ -187,11 +196,27 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				}
 			}
 
+			// 请求系统
+			// msg.Option("GOOS", m.Conf("runtime", "host.GOOS"))
+			// msg.Option("GOARCH", m.Conf("runtime", "host.GOARCH"))
+			// agent := r.Header.Get("User-Agent")
+			// switch {
+			// case strings.Contains(agent, "Macintosh"):
+			// 	msg.Option("GOOS", "darwin")
+			// }
+			// switch {
+			// case strings.Contains(agent, "Intel"):
+			// 	msg.Option("GOARCH", "386")
+			// }
+			//
+
+			// 用户登录
 			if msg.Put("option", "request", r).Put("option", "response", w).Sess("web", msg); web.Login(msg, w, r) {
 				msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
 				cmd.Hand(msg, msg.Target(), msg.Option("path"))
 			}
 
+			// 返回响应
 			switch {
 			case msg.Has("redirect"):
 				http.Redirect(w, r, msg.Append("redirect"), http.StatusTemporaryRedirect)

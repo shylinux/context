@@ -172,7 +172,7 @@ function init_link() {
     })
 }
 function init_code() {
-    var fuck = context.isMobile? 22: 16
+    var fuck = kit.isMobile? 22: 16
 
     document.querySelectorAll("article pre").forEach(function(item, i) {
         var nu = insert_before(item, "div", {"className": "number1"})
@@ -181,8 +181,8 @@ function init_code() {
         for (var j = 1; j <= line; j++) {
             append_child(nu, "div", {
                 "style": {
-                    "fontSize": context.isMobile?"20px":"14px",
-                    "lineHeight": context.isMobile?"22px":"16px",
+                    "fontSize": kit.isMobile?"20px":"14px",
+                    "lineHeight": kit.isMobile?"22px":"16px",
                 },
                 "id": "code"+i+"_"+"line"+j,
                 "onclick": function(event) {

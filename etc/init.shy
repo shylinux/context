@@ -1,8 +1,8 @@
-# ~aaa
-#     config load auth.json auth
-# ~mdb
-#     config load note.json note
-#
+~aaa
+    config load tmp/auth.json auth
+~code
+    config load tmp/flash.json flash
+
 source common.shy
 ~ssh
     remote auto

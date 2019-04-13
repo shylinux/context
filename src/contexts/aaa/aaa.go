@@ -124,7 +124,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"auth":        &ctx.Config{Name: "auth", Value: map[string]interface{}{}, Help: "散列"},
 		"auth_expire": &ctx.Config{Name: "auth_expire", Value: "10m", Help: "权限超时"},
 		"auth_type": &ctx.Config{Name: "auth_type", Value: map[string]interface{}{
-			"unique":  map[string]interface{}{"session": true, "bench": true},
+			"unique":  map[string]interface{}{"session": true, "bench": true, "relay": true},
 			"public":  map[string]interface{}{"userrole": true, "username": true, "cert": true},
 			"single":  map[string]interface{}{"password": true, "token": true, "uuid": true, "ppid": true},
 			"secrete": map[string]interface{}{"password": true, "token": true, "uuid": true, "ppid": true},
@@ -424,18 +424,20 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					componets, commands := []string{}, []string{}
 					for i := 0; i < len(arg); i++ { // 解析参数
 						if arg[i] == "command" {
-							for i := i + 1; i < len(arg); i++ {
+							for i = i + 1; i < len(arg); i++ {
 								if arg[i] == "componet" {
 									break
 								}
 								commands = append(commands, arg[i])
 							}
+							continue
 						}
 						if arg[i] == "componet" {
 							continue
 						}
 						componets = append(componets, arg[i])
 					}
+					m.Log("info", "componet: %v, command: %v", componets, commands)
 
 					if len(componets) == 0 { // 查看组件
 						m.Cmdy("aaa.auth", "ship", "userrole", role, "componet")
@@ -654,6 +656,33 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}},
 
+		"relay": &ctx.Command{Name: "relay check hash | share role", Help: "授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 { // 会话列表
+				m.Cmdy("aaa.auth", "relay")
+				return
+			}
+
+			switch arg[0] {
+			case "check":
+				if relay := m.Confm("auth", []string{arg[1], "data"}); relay != nil {
+					if kit.Select("", arg, 2) == "userrole" && kit.Int(relay["count"]) > 0 {
+						relay["count"] = kit.Int(relay["count"]) - 1
+						m.Echo("%s", relay["userrole"])
+					}
+					for k, v := range relay {
+						m.Append(k, v)
+					}
+				}
+			case "share":
+				m.Echo(m.Cmd("aaa.auth", "relay", "right").Result(0))
+				m.Conf("auth", []string{m.Result(0), "data"}, map[string]interface{}{
+					"userrole": kit.Select("tech", arg, 1),
+					"username": kit.Select("", arg, 2),
+					"count":    kit.Select("1", arg, 3),
+				})
+			}
+			return
+		}},
 		"login": &ctx.Command{Name: "login nodesess", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmd("aaa.auth", "username", m.Option("username"), "session", "nodes").Table(func(sess map[string]string) {
@@ -717,8 +746,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber: big.NewInt(1),
-							IsCA:         true,
+							SerialNumber:          big.NewInt(1),
+							IsCA:                  true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},

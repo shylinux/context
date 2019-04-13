@@ -76,18 +76,6 @@ function copy_to_clipboard(text, skip_blur, skip_toolkit) {
     })
 }
 
-function add_keymap(input) {
-    if (code.ninput < code.keymap.length && input.style.display != "none") {
-        input.title = "keymap: "+code.keymap[code.ninput]
-        input.dataset["keymap"] = code.keymap[code.ninput]
-        insert_before(input, "label", {
-            "innerText": "("+code.keymap[code.ninput]+")",
-            "className": "keymap" + (code.showmap? " show": " hide"),
-        })
-        code.inputs[code.keymap[code.ninput++]] = input
-    }
-    return input
-}
 function add_sort(append, field, cb) {
     append.onclick = function(event) {
         var target = event.target
@@ -181,11 +169,11 @@ function add_command(init) {
     })
 
     append_child(option, "input", {"style": {"display": "none"}})
-    add_keymap(append_child(option, "input", {
+    append_child(option, "input", {
         "name": "cmd", "className": "cmd",
         "onkeyup": function(event) {onaction(event, "input")},
         "onfocus": function(event) {code.current_cmd=order}
-    })).focus()
+    }).focus()
 
     add_sort(append_child(fieldset, "table", {"className": "append "+name}))
     append_child(append_child(fieldset, "code", {"className": "result "+name}), "pre")
@@ -404,13 +392,13 @@ function onaction(event, action, arg) {
                 return
             }
 
-            switch (event.key) {
-                default:
-                    if (code.inputs[event.key]) {
-                        code.inputs[event.key].focus()
-                    }
-                    break
-            }
+            // switch (event.key) {
+            //     default:
+            //         if (code.inputs[event.key]) {
+            //             code.inputs[event.key].focus()
+            //         }
+            //         break
+            // }
             break
         case "input":
             if (event.key == "Escape") {
@@ -580,6 +568,7 @@ function onaction(event, action, arg) {
                 if (target["value"] == "login") {
                     location.reload()
                 }
+                typeof target.form.onactions == "function" && target.form.onactions(msg)
             })
             break
         case "toolkit":
@@ -593,22 +582,6 @@ function onaction(event, action, arg) {
     }
 }
 
-function init_option() {
-    code.inputs = {}
-    code.ninput = 0
-    code.keymap =[]
-    for (var i = 97; i < 123; i++) {
-        switch (i) {
-            case "j".charCodeAt(0):
-            case "k".charCodeAt(0):
-            case "h".charCodeAt(0):
-            case "l".charCodeAt(0):
-                continue
-        }
-        code.keymap.push(String.fromCharCode(i))
-    }
-    document.querySelectorAll("form.option input").forEach(add_keymap)
-}
 function init_append(event) {
     var append = document.querySelectorAll("table.append").forEach(add_sort)
 }
@@ -623,130 +596,6 @@ function init_result(event) {
     })
 }
 
-function init_userinfo() {
-    var option = document.querySelector("form.option.userinfo")
-    var append = document.querySelector("table.append.userinfo")
-    if (!append) {return}
-
-    insert_button(append, "logout", function(event) {
-        context.Cookie("sessid", "")
-        location.reload()
-    })
-}
-function init_download(event) {
-    var option = document.querySelector("form.option.dir")
-    var append = document.querySelector("table.append.dir")
-    if (!append) {return}
-
-    function change(dir, show, run) {
-        if ((dir.endsWith(".sh") || dir.endsWith(".shy") || dir.endsWith(".py")) && !show) {
-            var command = document.querySelector("form.option.cmd")
-            var cmd = command["cmd"]
-            cmd.value = "run "+ dir.split("/").pop()
-            cmd.focus()
-            if (run) {
-                check_option(command)
-            }
-            return
-        }
-
-        option["current.dir"].value = dir
-        send_command(option)
-    }
-    insert_button(append, "root", function(event) {
-        change("")
-    })
-    insert_button(append, "back", function(event) {
-        var path = option["current.dir"].value.split("/")
-        while (path.pop() == "") {}
-        change(path.join("/")+(path.length? "/": ""))
-    })
-
-    var sort_order = option["sort_order"]
-    var sort_field = option["sort_field"]
-    sort_field.innerHTML = ""
-    sort_field.onchange = function(event) {
-        switch (event.target.selectedOptions[0].value) {
-            case "filename":
-            case "type":
-                sort_order.value = (sort_order.value == "str")? "str_r": "str"
-                break
-            case "line":
-            case "size":
-                sort_order.value = (sort_order.value == "int")? "int_r": "int"
-                break
-            case "time":
-                sort_order.value = (sort_order.value == "time")? "time_r": "time"
-                break
-        }
-        send_command(option)
-    }
-
-    var th = append.querySelectorAll("th")
-    for (var i = 0; i < th.length; i++) {
-        var value = th[i].innerText.trim()
-        var opt = append_child(sort_field, "option", {
-            "value": value, "innerText": value,
-        })
-    }
-
-    add_sort(append, "filename", function(event) {
-        var dir = event.target.innerText
-        if (option["current.dir"].value && !option["current.dir"].value.endsWith("/")) {
-            change(option["current.dir"].value+"/"+dir, event.altKey, event.shiftKey)
-        } else {
-            change(option["current.dir"].value+dir, event.altKey, event.shiftKey)
-        }
-    })
-}
-
-function init_contain() {
-    var option = document.querySelector("form.option.pod")
-    var append = document.querySelector("table.append.pod")
-    if (!append) {return}
-
-    function change(pod) {
-        option["pod"].value = pod
-        context.GET("", {
-            "componet_group": "index",
-            "componet_name": "cmd",
-            "cmd": "sess current pod "+option["pod"].value,
-        })
-        return pod
-    }
-
-    add_sort(append, "key", function(event) {
-        change(event.target.innerText.trim())
-    })
-}
-function init_context() {
-    var option = document.querySelector("form.option.ctx")
-    var append = document.querySelector("table.append.ctx")
-    if (!append) {return}
-
-    function change(ctx) {
-        option["ctx"].value = ctx
-        send_command(option)
-        context.GET("", {
-            "componet_group": "index",
-            "componet_name": "cmd",
-            "cmd": "sess current ctx "+option["ctx"].value,
-        })
-        return ctx
-    }
-
-    var contexts = ["ctx", "shy", "web", "mdb"]
-    for (var i = 0; i < contexts.length; i++) {
-        insert_button(append, contexts[i], function(event) {
-            change(event.target.value)
-        })
-    }
-    add_sort(append, "name", function(event) {
-        change(event.target.innerText.trim())
-    })
-
-    send_command(option)
-}
 function init_command() {
     var option = document.querySelector("form.option.cmd")
     if (!option) {
@@ -914,17 +763,94 @@ function init_toolkit() {
     })
 }
 
-window.onload = function() {
-    init_option()
-    init_append()
-    init_result()
+Page({
+    initFlashText: function(page, field, option, append, result) {
+        option.onactions = function(msg) {
+            page.reload()
+        }
+    },
+    initFlashList: function(page, field, option, append, result) {
+        option.dataset.flash_index = ctx.Search("flash_index")
+        option.onactions = function(msg) {
+            page.onFlashShow(msg, field, option, append, result)
+        }
+        ctx.Run(page, option.dataset, [], option.onactions)
+    },
+    onFlashShow: function(msg, field, option, append, result) {
+        var page = this
+        result.innerHTML = ""
+        ctx.Table(msg, function(tip) {
+            var ui = kit.AppendChild(result, [{"list": [
+                {"view": ["detail", "div", tip.text]},
+                {"code": [tip.output, "result", "result"]},
+                {"view": ["action"], "list": [
+                    {"click": ["查看详情", function(event) {
+                        ctx.Search("flash_index", tip.index)
+                    }]},
+                    {"click": ["执行代码", function(event) {
+                        tip.code && ctx.Run(page, option.dataset, [tip.index, "run"], function(msg) {
+                            ui.output.innerText = msg.result
+                        })
+                    }]},
+                    {"click": ["清空结果", function(event) {
+                        ui.output.innerText = ""
+                    }]},
+                ]},
+                {"code": [tip.output, "output", "output"]},
+            ]}])
+        })
+    },
 
-    init_userinfo()
-    init_download()
+    initDirList: function(page, field, option, append, result) {
+        var history = []
+        function change(value) {
+            option["current.dir"].value = value
+            ctx.Runs(page, option)
+            ctx.Current("dir", value)
+            return value
+        }
+        function brow(value, dir, event) {
+            option["current.dir"].value = value
+            ctx.Runs(page, option)
+            option["current.dir"].value = dir
+            ctx.Runs(page, option)
+        }
+        return {
+            "button": ["root", "back"], "action": function(value) {
+                switch (value) {
+                    case "back": history.length > -1 && change(history.pop() || "/"); break
+                    case "root": change("/"); break
+                }
+            },
+            "table": {"filename": function(value, key, row, index, event) {
+                var dir = option["current.dir"].value
+                var file = dir + ((dir && !dir.endsWith("/"))? "/": "") + value
+                file.endsWith("/")? history.push(change(file)): brow(file, dir, event)
+            }},
+        }
+    },
+    initPodList: function(page, field, option, append, result) {
+        function change(value) {
+            option.pod.value = value
+            ctx.Runs(page, option)
+            ctx.Current("pod", value)
+        }
+        return {"table": {"key": change}}
+    },
+    initCtxList: function(page, field, option, append, result) {
+        function change(value) {
+            option.ctx.value = value
+            ctx.Runs(page, option)
+            ctx.Current("ctx", value)
+        }
+        return {"button": ["ctx", "shy", "web", "mdb"], "action": change, "table": {"names": change}}
+    },
 
-    init_contain()
-    init_context()
-    init_command()
-    init_toolkit()
-}
+    init: function(exp) {
+        init_append()
+        init_result()
 
+        init_command()
+        init_toolkit()
+    },
+})

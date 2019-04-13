@@ -1,6 +1,6 @@
 #! /bin/bash
 
-export ctx_dev=${ctx_dev:="-"}
+export ctx_dev=${ctx_dev:="https://shylinux.com"}
 export ctx_root="/usr/local/context"
 export ctx_home=~/context
 export ctx_bin="bench"

@@ -1167,7 +1167,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				if len(arg) == 0 {
 					arg = append(arg, "")
 				}
-				m.Magic("session", "current.dir", arg[0])
 
 				wd, e := os.Getwd()
 				m.Assert(e)
@@ -1264,33 +1263,39 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
-		"path": &ctx.Command{Name: "path filename", Help: "查找文件路径",
-			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (ok bool) {
-				if len(arg) == 0 {
-					m.Add("append", "value", "")
-					m.Add("append", "name", "filename")
-					m.Add("append", "help", "文件名")
-					return false
-				}
-				m.Add("append", "value", "")
-				m.Add("append", "name", "no more arg")
-				return true
-			},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if len(arg) == 0 {
-					return
-				}
+		"temp": &ctx.Command{Name: "temp data", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			h, _ := kit.Hash("uniq")
+			name := fmt.Sprintf("var/tmp/file/%s", h)
 
-				m.Confm("paths", func(index int, value string) bool {
-					p := path.Join(value, arg[0])
-					if _, e := os.Stat(p); e == nil {
-						m.Echo(p)
-						return true
-					}
-					return false
-				})
+			m.Assert(os.MkdirAll("var/tmp/file/", 0777))
+			f, e := os.Create(name)
+			m.Assert(e)
+			defer f.Close()
+			f.Write([]byte(arg[0]))
+
+			m.Echo(name)
+			return
+		}},
+		"trash": &ctx.Command{Name: "trash file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			os.Remove(arg[0])
+			return
+		}},
+
+		"path": &ctx.Command{Name: "path filename", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
 				return
-			}},
+			}
+
+			m.Confm("paths", func(index int, value string) bool {
+				p := path.Join(value, arg[0])
+				if _, e := os.Stat(p); e == nil {
+					m.Echo(p)
+					return true
+				}
+				return false
+			})
+			return
+		}},
 		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if p, f, e := open(m, arg[0]); e == nil {
 				defer f.Close()

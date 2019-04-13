@@ -1,5 +1,5 @@
-~mdb
-    # config save note.json note
+~code
+    config save tmp/flash.json flash
 ~aaa
-    config save auth.json auth
+    config save tmp/auth.json auth
 
