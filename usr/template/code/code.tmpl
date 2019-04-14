@@ -1,88 +1,45 @@
 {{define "head"}}
-<!DOCTYPE html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=0.7">
-<link rel="shortcut icon" type="image/ico" href="/favicon.ico">
-<title>{{option . "componet_name"}}</title>
-<link rel="stylesheet" type="text/css" href="/static/librarys/example.css"></link>
-<link rel="stylesheet" type="text/css" href="/static/librarys/code.css"></link>
-<style>
-{{$toolkit_view := conf . "route" "toolkit_view"}}
-    fieldset.KitList {
-        color:#e6dd37;
-        font-size:14px;
-        font-family:monospace;
-        background-color:#498bb1a8;
-        border:solid 3px red;
-        width:60px;
-        height:20px;
-        overflow:scroll;
-        position:fixed;
-        top:{{index $toolkit_view "top"}}px;
-        left:{{index $toolkit_view "left"}}px;
-    }
-    fieldset.KitList:hover, fieldset.KitList.max {
-        width:{{index $toolkit_view "width"}}px;
-        height:{{index $toolkit_view "height"}}px;
-    }
-    fieldset.KitList div:hover, fieldset.KitList li li:hover {
-        background-color:red;
-    }
-    fieldset.KitList div.stick, fieldset.KitList li li.stick {
-        background-color:red;
-    }
-    fieldset.KitList li>label.result{
-        background-color:rgba(0,0,0,0.2);
-        padding:0 5px;
-        border:2px solid green;
-        margin-left: 10px;
-    }
-    fieldset.KitList li>input {
-        background-color:rgba(0,0,0,0.2);
-    }
-</style>
-</head>
-<body>
-<script>
-    var session ={{option . "session"}}
-    var bench_data ={{option . "bench_data"}}
-</script>
-{{end}}
+    <!DOCTYPE html>
+    <head>
+        <meta charset="utf-8">
+        {{range $index, $meta := option . "metas"}}
+            <meta name="{{index $meta "name"}}" content="{{index $meta "content"}}">
+        {{end}}
 
-{{define "clipboard"}}
-<fieldset><legend>clipboard</legend>
-    <datalist id="clipstack"></datalist>
-    <datalist id="clistack"></datalist>
-    <textarea class="clipboard"></textarea>
-</fieldset>
+        <title>{{option . "componet_name"|meta}}</title>
+        <link rel="shortcut icon" type="image/ico" href="/static/librarys/{{option . "favicon"|meta}}">
+        {{range $index, $lib := option . "styles"}}
+            <link rel="stylesheet" type="text/css" href="/static/librarys/{{$lib}}"></link>
+        {{end}}
+    </head>
+    <body>
+    <script>
+        var conf = {
+            toolkit_view: {{conf . "route" "toolkit_view"}},
+            bench_data: {{option . "bench_data"}},
+        }
+    </script>
 {{end}}
-
 {{define "toolkit"}}
-{{$bench_data := option . "bench_data"}}
-<fieldset class="{{option . "componet_view"|meta}}" data-init="{{option . "componet_init"|meta}}">
-    <div>{{option .Meta "name"}}({{option .Meta "help"}})</div>
-</fieldset>
+    <fieldset class="{{option . "componet_view"|meta}}" data-init="{{option . "componet_init"|meta}}">
+        <div>{{option .Meta "name"}}({{option .Meta "help"}})</div>
+    </fieldset>
 {{end}}
-
 {{define "componet"}}
-<fieldset class="{{option . "componet_view"|meta}}" data-init="{{option . "componet_init"|meta}}">
-    <legend title="{{option .Meta "help"}}">{{option .Meta "name"}}({{option .Meta "help"}})</legend>
-    {{$msg := .}}
-    {{$form_type := option . "form_type"|meta}}
+    <fieldset class="{{option . "componet_view"|meta}}" data-init="{{option . "componet_init"|meta}}">
+        <legend title="{{option .Meta "help"}}">{{option .Meta "name"}}({{option .Meta "help"}})</legend>
+        {{$msg := .}} {{$form_type := option . "form_type"|meta}}
 
-    <form class="option {{option .Meta "componet_name"}}"
-          data-componet_group="{{option . "componet_group"|meta}}"
-          data-componet_name="{{option . "componet_name"|meta}}"
-          {{if eq $form_type "upload"}}
-              method="POST" action="/upload" enctype="multipart/form-data" target="_blank"
-          {{end}}>
+        <form class="option {{option .Meta "componet_name"}}"
+              data-componet_group="{{option . "componet_group"|meta}}"
+              data-componet_name="{{option . "componet_name"|meta}}"
+              {{if eq $form_type "upload"}}
+                  method="POST" action="/upload" enctype="multipart/form-data" target="_blank"
+              {{end}}>
 
-          <input style="display:none"></input>
-          {{range $index, $input := option . "inputs"}}
-              <div>
-                  {{$type := index $input "type"}}
-                  {{$value := index $input "value" | parse $msg}}
+              <input style="display:none"></input>
+              {{range $index, $input := option . "inputs"}}
+                  <div>{{$type := index $input "type"}} {{$value := index $input "value" | parse $msg}}
                   {{if index $input "label"}}
                       <label>{{index $input "label"}} : </label>
                   {{end}}
@@ -93,11 +50,9 @@
                       <input type="submit" value="{{$value}}">
                   {{else if eq $type "file"}}
                       <input type="file" name="{{index $input "name"}}">
-                  {{else if eq $type "choice"}}
-                      {{$default_value := index $input "value"}}
+                  {{else if eq $type "choice"}} {{$default_value := index $input "value"}}
                       <select name="{{index $input "name"}}">
-                          {{range $index, $value := index $input "choice"}}
-                              {{$val := index $value "value"}}
+                          {{range $index, $value := index $input "choice"}} {{$val := index $value "value"}}
                               {{if eq $default_value $val}}
                                   <option value="{{index $value "value"}}" selected>{{index $value "name"}}</option>
                               {{else}}
@@ -112,58 +67,55 @@
                           name="{{index $input "name"}}" class="{{index $input "class"}}">{{$value}}</textarea>
                   {{else}}
                       <input name="{{index $input "name"}}" value="{{$value}}" class="{{index $input "class"}}">
-                  {{end}}
-              </div>
-          {{end}}
-          <hr/>
-    </form>
+                  {{end}}</div>
+              {{end}}
+              <hr/>
+        </form>
 
-    {{if index .Meta "display_append"}} {{option .Meta "display_append"}} {{else}}
-        <table class="append {{option .Meta "componet_name"}}">
-            {{$msg := .}}
-            <tr>{{range $field := append .}}<th>{{$field}}</th>{{end}}</tr>
-            {{range $line := table .}}
-                <tr>{{range $field := append $msg}}<td>{{index $line $field|unescape}}</td>{{end}}</tr>
-            {{end}}
-        </table>
-    {{end}}
-    {{if index .Meta "display_result"}} {{option .Meta "display_result"}} {{else}}
-        <code class="result {{option .Meta "componet_name"}}"><pre>{{result .Meta}}</pre></code>
-    {{end}}
-    {{if index .Meta "display_div"}} {{option .Meta "display_div"}} {{else}}
-        <div class="result {{option .Meta "componet_name"}}"></div>
-    {{end}}
-</fieldset>
+        {{if index .Meta "display_append"}} {{option .Meta "display_append"}} {{else}}
+            <table class="append {{option .Meta "componet_name"}}"> {{$msg := .}}
+                <tr>{{range $field := append .}}<th>{{$field}}</th>{{end}}</tr>
+                {{range $line := table .}}
+                    <tr>{{range $field := append $msg}}<td>{{index $line $field|unescape}}</td>{{end}}</tr>
+                {{end}}
+            </table>
+        {{end}}
+
+        {{if index .Meta "display_result"}} {{option .Meta "display_result"}} {{else}}
+            <code class="result {{option .Meta "componet_name"}}"><pre>{{result .Meta}}</pre></code>
+        {{end}}
+
+        {{if index .Meta "display_div"}} {{option .Meta "display_div"}} {{else}}
+            <div class="result {{option .Meta "componet_name"}}"></div>
+        {{end}}
+    </fieldset>
 {{end}}
-
 {{define "mp"}}
-<script src="https://res.wx.qq.com/open/js/jweixin-1.4.0.js"></script>
-<script src="/static/librarys/wexin.js"></script>
-<script>
-{{$token := cmd . "context chat js_token"}}
-wx.config({
-    debug: true,
-    appId: {{append $token "appid"|meta}},
-    timestamp: {{append $token "timestamp"|meta}},
-    nonceStr: {{append $token "nonce"|meta}},
-    signature: {{append $token "signature"|meta}},
-    jsApiList: [
-        "scanQRCode",
-        "chooseImage",
-        "closeWindow",
-        "openAddress",
-    ],
-})
-wx.ready(function(){})
-wx.error(function(res){})
-</script>
+    <script src="https://res.wx.qq.com/open/js/jweixin-1.4.0.js"></script>
+    <script src="/static/librarys/wexin.js"></script>
+    <script>
+    {{$token := cmd . "context chat js_token"}}
+    wx.config({
+        debug: true,
+        appId: {{append $token "appid"|meta}},
+        timestamp: {{append $token "timestamp"|meta}},
+        nonceStr: {{append $token "nonce"|meta}},
+        signature: {{append $token "signature"|meta}},
+        jsApiList: [
+            "scanQRCode",
+            "chooseImage",
+            "closeWindow",
+            "openAddress",
+        ],
+    })
+    wx.ready(function(){})
+    wx.error(function(res){})
+    </script>
 {{end}}
-
 {{define "tail"}}
-<script src="/static/librarys/toolkit.js"></script>
-<script src="/static/librarys/context.js"></script>
-<script src="/static/librarys/example.js"></script>
-<script src="/static/librarys/code.js"></script>
-</body>
+    {{range $index, $lib := option . "scripts"}}
+        <script src="/static/librarys/{{$lib}}"></script>
+    {{end}}
+    </body>
 {{end}}
 

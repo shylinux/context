@@ -968,6 +968,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 					}
+					msg.Log("fuck", "what %v", msg.Option("componet_name"))
 
 					// 添加设备
 					arg = arg[:0]

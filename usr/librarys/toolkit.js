@@ -255,6 +255,11 @@ kit = toolkit = {
                 case "button":
                     input.onclick = function(event) {
                         if (index == array.length-1) {
+                            if (input.value == "login") {
+                                form.onactions = function(msg) {
+                                    page.reload()
+                                }
+                            }
                             page.Runs(page, form)
                             return
                         }

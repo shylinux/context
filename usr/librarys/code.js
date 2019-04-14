@@ -7,11 +7,11 @@ var page = Page({
     initFlashList: function(page, field, option, append, result) {
         option.dataset.flash_index = ctx.Search("flash_index")
         option.onactions = function(msg) {
-            page.onFlashShow(msg, field, option, append, result)
+            page.showFlashList(msg, option, append, result)
         }
         ctx.Run(page, option.dataset, [], option.onactions)
     },
-    onFlashShow: function(msg, field, option, append, result) {
+    showFlashList: function(msg, option, append, result) {
         var page = this
         result.innerHTML = ""
         ctx.Table(msg, function(tip) {
@@ -81,243 +81,6 @@ var page = Page({
         return {"button": ["ctx", "shy", "web", "mdb"], "action": change, "table": {"names": change}}
     },
 
-    getCmdList: function(input, step, cmd) {
-        var history = kit.History.get("cmd")
-        var length = history.length
-        var last = (parseInt(input.dataset["history_last"]||length)+step+length)%length
-        if (0 <= last && last < length) {
-            input.dataset["history_last"] = last
-            cmd = history[last].data
-        }
-        return cmd
-    },
-    showCmdResult: function(page) {
-        page.conf.show_result = !page.conf.show_result
-        document.querySelectorAll("body>fieldset>code.result>pre").forEach(function(result) {
-            result.style.height = (page.conf.show_result || result.innerText=="")? "": page.conf.show_height
-        })
-    },
-    showCmdList: function(msg, option, append, result) {
-        append.innerHTML = ""
-        kit.AppendTable(append, ctx.Table(msg), msg.append)
-        result.innerHTML = ""
-        result.innerText = msg.result.join("")
-        return
-    },
-    initCmdList: function(page, field, option, append, result) {
-        option.dataset["componet_name_alias"] = "cmd"
-        option.dataset["componet_name_order"] = 0
-        option.onactions = function(msg) {
-            page.showCmdList(msg, option, append, result)
-        }
-
-        var cmd = option.querySelector("input[name=cmd]")
-        cmd.onkeyup = function(event) {
-            page.onCmdList("input", cmd, option, append, result, event)
-        }
-
-        var action = bench_data.action
-        if (action && action["cmd"]) {
-            cmd.value = action["cmd"].cmd[1]
-            ctx.Runs(page, option)
-            page.History.add("cmd", cmd.value)
-        }
-
-        var max = 0
-        for (var k in action) {
-            var order = parseInt(action[k].order)
-            if (order > max) {
-                max = order
-            }
-        }
-
-        for (var i = 1; i <= max; i++) {
-            var ui = page.addCmdList("cmd", i)
-            if (action["cmd"+i]) {
-                ui.cmd.value = action["cmd"+i].cmd[1]
-                ctx.Runs(page, ui.option)
-                page.History.add("cmd", ui.cmd.value)
-            }
-        }
-        page.conf.ncommand = i
-        return
-    },
-    addCmdList: function(name, order) {
-        var page = this
-        var alias = name+order
-        var ui = kit.AppendChild(document.querySelector("body"), [{"type": "fieldset", "data": {}, "list": [
-            {"text": [alias, "legend"]},
-            {"view": ["option "+alias, "form", "", "option"], "data": {"dataset": {
-                "componet_group": "index", "componet_name": name, "componet_name_alias": alias, "componet_name_order": order,
-            }, "onactions": function(msg) {
-                page.showCmdList(msg, ui.option, ui.append, ui.result)
-            }}, "list": [
-                {"type": "input", "data": {"style": {"display": "none"}}},
-                {"name": "cmd", "type": "input", "data": {"name": "cmd", "className": "cmd", "onkeyup": function(event) {
-                    page.onCmdList("input", ui.cmd, ui.option, ui.append, ui.result, event)
-                }}},
-            ]},
-            {"view": ["append "+alias, "table", "", "append"]},
-            {"code": ["", "result", "result "+alias]},
-        ]}])
-        page.OrderTable(ui.append)
-        page.OrderCode(ui.code)
-        ui.cmd.focus()
-        return ui
-    },
-    delCmdList: function(name, order) {
-        var option = document.querySelector("form.option.cmd"+order)
-        option && document.body.removeChild(option.parentElement)
-
-        for (;order < page.conf.ncommand; order++) {
-            var input = document.querySelector("form.option.cmd"+order+" input[name=cmd]")
-            if (input) {
-                input.focus()
-                return
-            }
-        }
-        for (;order >= 0; order--) {
-            var input = document.querySelector("form.option.cmd"+(order? order: "")+" input[name=cmd]")
-            page.conf.ncommand = order+1
-            if (input) {
-                input.focus()
-                return
-            }
-        }
-    },
-    onCmdList: function(action, target, option, append, result, event) {
-        var page = this
-        var order = option.dataset.componet_name_order
-        var prev_order = (parseInt(order)-1+page.conf.ncommand)%page.conf.ncommand||""
-        var next_order = (parseInt(order)+1)%page.conf.ncommand||""
-
-        switch (action) {
-            case "input":
-                if (event.key == "Escape") {
-                    target.blur()
-
-                } else if (event.key == "Enter") {
-                    target.dataset.history_last = page.History.get("cmd").length
-                    page.History.add("cmd", target.value)
-                    ctx.Runs(page, option)
-
-                } else if (event.ctrlKey) {
-                    switch (event.key) {
-                        case "0":
-                            var pre_pre = document.querySelector("code.result.cmd"+(event.shiftKey? next_order: prev_order)+" pre")
-                            pre_pre && (target.value += pre_pre.innerText)
-                            break
-                        case "1":
-                        case "2":
-                        case "3":
-                        case "4":
-                        case "5":
-                        case "6":
-                        case "7":
-                        case "8":
-                        case "9":
-                            if (code.quick_txt) {
-                                var item = document.querySelectorAll("div.workflow>ul>li>ul.txt>li[data-text]")
-                                target.value += item[parseInt(event.key)-1].dataset["text"]
-                            } else {
-                                var item = document.querySelectorAll("table.append.cmd"+(event.shiftKey? next_order: prev_order)+" td")
-                                target.value += item[parseInt(event.key)-1].innerText
-                            }
-                            break
-                        case "p":
-                            target.value = page.getCmdList(target, -1, target.value)
-                            break
-                        case "n":
-                            target.value = page.getCmdList(target, 1, target.value)
-                            break
-                        case "g":
-                            var value = target.value.substr(0, target.selectionStart)
-                            var last = parseInt(target.dataset.search_last || kit.History.get("cmd").length-1)
-                            for (var i = last; i >= 0; i--) {
-                                var cmd = kit.History.get("cmd", i).data
-                                if (cmd.startsWith(value)) {
-                                    target.value = cmd
-                                    target.dataset.search_last = i-1
-                                    target.setSelectionRange(value.length, cmd.length)
-                                    break
-                                }
-                            }
-                            target.dataset.search_last = ""
-                            break
-                        case "a":
-                        case "e":
-                        case "f":
-                        case "b":
-                        case "h":
-                        case "d":
-                            break
-                        case "k":
-                            kit.DelText(target, target.selectionStart)
-                            break
-                        case "u":
-                            kit.DelText(target, 0, target.selectionEnd)
-                            break
-                        case "w":
-                            var start = target.selectionStart-2
-                            var end = target.selectionEnd-1
-                            for (var i = start; i >= 0; i--) {
-                                if (target.value[end] == " " && target.value[i] != " ") {
-                                    break
-                                }
-                                if (target.value[end] != " " && target.value[i] == " ") {
-                                    break
-                                }
-                            }
-                            kit.DelText(target, i+1, end-i)
-                            break
-                        case "c":
-                            append.innerHTML = ""
-                            result.innerHTML = ""
-                            break
-                        case "r":
-                            append.innerHTML = ""
-                            result.innerHTML = ""
-                        case "j":
-                            target.dataset.history_last = page.History.get("cmd").length
-                            page.History.add("cmd", target.value)
-                            ctx.Runs(page, option)
-                            break
-                        case "l":
-                            window.scrollTo(0, option.parentElement.offsetTop)
-                            break
-                        case "m":
-                            page.addCmdList("cmd", page.conf.ncommand++)
-                            break
-                        case "i":
-                            var input = document.querySelector("form.option.cmd"+next_order+" input[name=cmd]")
-                            input && input.focus()
-                            break
-                        case "o":
-                            var input = document.querySelector("form.option.cmd"+prev_order+" input[name=cmd]")
-                            input && input.focus()
-                            break
-                        case "x":
-                            result.style.height = result.style.height? "": page.conf.hide_height
-                            break
-                        case "z":
-                            result.style.height = result.style.height? "": page.conf.show_height
-                            break
-                        case "q":
-                            page.delCmdList("cmd", order)
-                        default:
-                            return
-                    }
-                } else {
-                    kit.History.add("key", event.key)
-                    if (kit.HitText(target, "jk")) {
-                        kit.DelText(target, target.selectionStart-2, 2)
-                        target.blur()
-                    }
-                }
-                event.stopPropagation()
-        }
-    },
-
     initKitList: function(page, field, option, append, result) {
         var ui = kit.AppendChild(field, [{"type": "ul", "list": [
             {"fork": ["粘贴板", [
@@ -334,7 +97,7 @@ var page = Page({
             {"fork": ["命令行", [
                 {"leaf": ["+ 折叠命令行(Ctrl+Z)", function(event, target) {
                     target.className = page.conf.show_result? "": "stick"
-                    page.showCmdResult(page)
+                    page.showResult(page)
                 }]},
                 {"leaf": ["+ 添加命令行(Ctrl+M)", function(event) {
                     page.addCmdList("cmd", page.conf.ncommand++)
@@ -507,8 +270,237 @@ var page = Page({
         })
         return
     },
+    initCmdList: function(page, field, option, append, result) {
+        option.dataset["componet_name_alias"] = "cmd"
+        option.dataset["componet_name_order"] = 0
+        option.onactions = function(msg) {
+            page.showCmdList(msg, option, append, result)
+        }
 
-    onaction: function(action, target, event) {
+        var cmd = option.querySelector("input[name=cmd]")
+        cmd.onkeyup = function(event) {
+            page.onCmdList(event, cmd, "input", option, append, result)
+        }
+
+        var action = conf.bench_data.action
+        if (action && action["cmd"]) {
+            cmd.value = action["cmd"].cmd[1]
+            ctx.Runs(page, option)
+            page.History.add("cmd", cmd.value)
+        }
+
+        var max = 0
+        for (var k in action) {
+            var order = parseInt(action[k].order)
+            if (order > max) {
+                max = order
+            }
+        }
+
+        for (var i = 1; i <= max; i++) {
+            var ui = page.addCmdList("cmd", i)
+            if (action["cmd"+i]) {
+                ui.cmd.value = action["cmd"+i].cmd[1]
+                ctx.Runs(page, ui.option)
+                page.History.add("cmd", ui.cmd.value)
+            }
+        }
+        page.conf.ncommand = i
+        return
+    },
+    showCmdList: function(msg, option, append, result) {
+        append.innerHTML = ""
+        msg && msg.append && kit.AppendTable(append, ctx.Table(msg), msg.append)
+        result.innerText = (msg && msg.result)? msg.result.join(""): ""
+        return
+    },
+    getCmdList: function(input, step, cmd) {
+        var history = kit.History.get("cmd")
+        var length = history.length
+        var last = (parseInt(input.dataset["history_last"]||length)+step+length)%length
+        if (0 <= last && last < length) {
+            input.dataset["history_last"] = last
+            cmd = history[last].data
+        }
+        return cmd
+    },
+    addCmdList: function(name, order) {
+        var page = this
+        var alias = name+order
+        var ui = kit.AppendChild(document.querySelector("body"), [{"type": "fieldset", "data": {}, "list": [
+            {"text": [alias, "legend"]},
+            {"view": ["option "+alias, "form", "", "option"], "data": {"dataset": {
+                "componet_group": "index", "componet_name": name, "componet_name_alias": alias, "componet_name_order": order,
+            }, "onactions": function(msg) {
+                page.showCmdList(msg, ui.option, ui.append, ui.result)
+            }}, "list": [
+                {"type": "input", "data": {"style": {"display": "none"}}},
+                {"name": "cmd", "type": "input", "data": {"name": "cmd", "className": "cmd", "onkeyup": function(event) {
+                    page.onCmdList(event, ui.cmd, "input", ui.option, ui.append, ui.result)
+                }}},
+            ]},
+            {"view": ["append "+alias, "table", "", "append"]},
+            {"code": ["", "result", "result "+alias]},
+        ]}])
+        page.OrderTable(ui.append)
+        page.OrderCode(ui.code)
+        ui.cmd.focus()
+        return ui
+    },
+    delCmdList: function(name, order) {
+        var option = document.querySelector("form.option.cmd"+order)
+        option && document.body.removeChild(option.parentElement)
+
+        for (;order < page.conf.ncommand; order++) {
+            var input = document.querySelector("form.option.cmd"+order+" input[name=cmd]")
+            if (input) {
+                input.focus()
+                return
+            }
+        }
+        for (;order >= 0; order--) {
+            var input = document.querySelector("form.option.cmd"+(order? order: "")+" input[name=cmd]")
+            page.conf.ncommand = order+1
+            if (input) {
+                input.focus()
+                return
+            }
+        }
+    },
+    onCmdList: function(event, target, action, option, append, result) {
+        var page = this
+        var order = option.dataset.componet_name_order
+        var prev_order = (parseInt(order)-1+page.conf.ncommand)%page.conf.ncommand||""
+        var next_order = (parseInt(order)+1)%page.conf.ncommand||""
+
+        switch (action) {
+            case "input":
+                if (event.key == "Escape") {
+                    target.blur()
+
+                } else if (event.key == "Enter") {
+                    target.dataset.history_last = page.History.get("cmd").length
+                    page.History.add("cmd", target.value)
+                    ctx.Runs(page, option)
+
+                } else if (event.ctrlKey) {
+                    switch (event.key) {
+                        case "0":
+                            var pre_pre = document.querySelector("code.result.cmd"+(event.shiftKey? next_order: prev_order)+" pre")
+                            pre_pre && (target.value += pre_pre.innerText)
+                            break
+                        case "1":
+                        case "2":
+                        case "3":
+                        case "4":
+                        case "5":
+                        case "6":
+                        case "7":
+                        case "8":
+                        case "9":
+                            if (code.quick_txt) {
+                                var item = document.querySelectorAll("div.workflow>ul>li>ul.txt>li[data-text]")
+                                target.value += item[parseInt(event.key)-1].dataset["text"]
+                            } else {
+                                var item = document.querySelectorAll("table.append.cmd"+(event.shiftKey? next_order: prev_order)+" td")
+                                target.value += item[parseInt(event.key)-1].innerText
+                            }
+                            break
+                        case "p":
+                            target.value = page.getCmdList(target, -1, target.value)
+                            break
+                        case "n":
+                            target.value = page.getCmdList(target, 1, target.value)
+                            break
+                        case "g":
+                            var value = target.value.substr(0, target.selectionStart)
+                            var last = parseInt(target.dataset.search_last || kit.History.get("cmd").length-1)
+                            for (var i = last; i >= 0; i--) {
+                                var cmd = kit.History.get("cmd", i).data
+                                if (cmd.startsWith(value)) {
+                                    target.value = cmd
+                                    target.dataset.search_last = i-1
+                                    target.setSelectionRange(value.length, cmd.length)
+                                    break
+                                }
+                            }
+                            target.dataset.search_last = ""
+                            break
+                        case "a":
+                        case "e":
+                        case "f":
+                        case "b":
+                        case "h":
+                        case "d":
+                            break
+                        case "k":
+                            kit.DelText(target, target.selectionStart)
+                            break
+                        case "u":
+                            kit.DelText(target, 0, target.selectionEnd)
+                            break
+                        case "w":
+                            var start = target.selectionStart-2
+                            var end = target.selectionEnd-1
+                            for (var i = start; i >= 0; i--) {
+                                if (target.value[end] == " " && target.value[i] != " ") {
+                                    break
+                                }
+                                if (target.value[end] != " " && target.value[i] == " ") {
+                                    break
+                                }
+                            }
+                            kit.DelText(target, i+1, end-i)
+                            break
+                        case "c":
+                            append.innerHTML = ""
+                            result.innerHTML = ""
+                            break
+                        case "r":
+                            append.innerHTML = ""
+                            result.innerHTML = ""
+                        case "j":
+                            target.dataset.history_last = page.History.get("cmd").length
+                            page.History.add("cmd", target.value)
+                            ctx.Runs(page, option)
+                            break
+                        case "l":
+                            window.scrollTo(0, option.parentElement.offsetTop)
+                            break
+                        case "m":
+                            page.addCmdList("cmd", page.conf.ncommand++)
+                            break
+                        case "i":
+                            var input = document.querySelector("form.option.cmd"+next_order+" input[name=cmd]")
+                            input && input.focus()
+                            break
+                        case "o":
+                            var input = document.querySelector("form.option.cmd"+prev_order+" input[name=cmd]")
+                            input && input.focus()
+                            break
+                        case "x":
+                            result.style.height = result.style.height? "": page.conf.hide_height
+                            break
+                        case "z":
+                            result.style.height = result.style.height? "": page.conf.show_height
+                            break
+                        case "q":
+                            page.delCmdList("cmd", order)
+                        default:
+                            return
+                    }
+                } else {
+                    kit.History.add("key", event.key)
+                    if (kit.HitText(target, "jk")) {
+                        kit.DelText(target, target.selectionStart-2, 2)
+                        target.blur()
+                    }
+                }
+                event.stopPropagation()
+        }
+    },
+
+    onaction: function(event, target, action) {
         var page = this
         switch (action) {
             case "scroll":
@@ -569,7 +561,7 @@ var page = Page({
                             page.addCmdList("cmd", page.conf.ncommand++)
                             return
                         case "z":
-                            page.showCmdResult(page)
+                            page.showResult(page)
                             return
                         case "0":
                         case "1":
@@ -587,14 +579,20 @@ var page = Page({
                 }
         }
     },
+    showResult: function(page, type) {
+        page.conf.show_result = !page.conf.show_result
+        document.querySelectorAll("body>fieldset>code.result>pre").forEach(function(result) {
+            result.style.height = (page.conf.show_result || result.innerText=="")? "": page.conf.show_height
+        })
+    },
     init: function(exp) {
         var page = this
         var body = document.body
         body.onkeydown = function(event) {
-            page.onaction("scroll", body, event)
+            page.onaction(event, body, "scroll")
         }
         body.onkeyup = function(event) {
-            page.onaction("keymap", body, event)
+            page.onaction(event, body, "keymap")
         }
 
         document.querySelectorAll("body>fieldset").forEach(function(field) {

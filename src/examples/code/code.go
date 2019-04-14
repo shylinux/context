@@ -89,17 +89,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"componet_group":   &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"login": []interface{}{
-				map[string]interface{}{"name": "head", "template": "head"},
+				map[string]interface{}{"name": "code", "template": "head", "metas": []interface{}{
+					map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7"},
+					map[string]interface{}{"name": "user-scalable", "content": "no"},
+				}, "favicon": "favicon.ico", "styles": []interface{}{"example.css", "code.css"}},
 				map[string]interface{}{"name": "login", "help": "login", "template": "componet",
-					"componet_ctx": "aaa", "componet_cmd": "auth", "arguments": []interface{}{"@sessid", "ship", "username", "@username", "password", "@password"},
-					"inputs": []interface{}{
+					"componet_ctx": "aaa", "componet_cmd": "auth", "arguments": []interface{}{"@sessid", "ship", "username", "@username", "password", "@password"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "username", "label": "username", "value": ""},
 						map[string]interface{}{"type": "password", "name": "password", "label": "password", "value": ""},
 						map[string]interface{}{"type": "button", "value": "login"},
 					},
 					"display_append": "", "display_result": "",
 				},
-				map[string]interface{}{"name": "tail", "template": "tail"},
+				map[string]interface{}{"name": "tail", "template": "tail",
+					"scripts": []interface{}{"toolkit.js", "context.js", "example.js", "code.js"},
+				},
 			},
 			"flash": []interface{}{
 				map[string]interface{}{"name": "flash", "template": "head"},
@@ -121,7 +125,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
 			"index": []interface{}{
-				map[string]interface{}{"name": "code", "template": "head"},
+				map[string]interface{}{"name": "code", "template": "head", "metas": []interface{}{
+					map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7"},
+					map[string]interface{}{"name": "user-scalable", "content": "no"},
+				}, "favicon": "favicon.ico", "styles": []interface{}{"example.css", "code.css"}},
+
 				map[string]interface{}{"name": "toolkit", "help": "Ctrl+B", "template": "toolkit",
 					"componet_view": "KitList", "componet_init": "initKitList",
 				},
@@ -138,7 +146,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 	"componet_ctx": "aaa", "componet_cmd": "login", "arguments": []interface{}{"@sessid"},
 				// 	"pre_run": true,
 				// },
-				map[string]interface{}{"name": "clipboard", "help": "clipboard", "template": "clipboard"},
 				map[string]interface{}{"name": "buffer", "help": "buffer", "template": "componet",
 					"componet_ctx": "cli", "componet_cmd": "tmux", "arguments": []interface{}{"buffer"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "limit", "label": "limit", "value": "3"},
@@ -211,7 +218,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					},
 				},
 				// map[string]interface{}{"name": "mp", "template": "mp"},
-				map[string]interface{}{"name": "tail", "template": "tail"},
+				map[string]interface{}{"name": "tail", "template": "tail",
+					"scripts": []interface{}{"toolkit.js", "context.js", "example.js", "code.js"},
+				},
 			},
 		}, Help: "组件列表"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
