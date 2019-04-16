@@ -203,6 +203,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				},
 			},
 		}, Help: "文档管理"},
+		"schedule": &ctx.Config{Name: "schedule", Value: map[string]interface{}{
+			"data": []interface{}{},
+			"maps": map[string]interface{}{"baidu": "<a href='baidumap://map/direction?region=&origin=&destination=%s'>%s</a>"},
+		}, Help: "闪存"},
 
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
 			"system": []interface{}{"exit_shy", "common_shy", "init_shy", "bench", "boot_sh"},
@@ -372,6 +376,17 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 
 			m.Cmdy("cli.system", "tmux", "send-keys", "-t", target, arg[3:])
+			return
+		}},
+		"schedule": &ctx.Command{Name: "schedule", Help: "行程安排", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 { // 会话列表
+				m.Confm("schedule", "data", func(index int, value map[string]interface{}) {
+					m.Add("append", "destination", fmt.Sprintf(m.Conf("schedule", "maps.baidu"), value["destination"], value["destination"]))
+				})
+				m.Table()
+				return
+			}
+			m.Conf("schedule", []string{"data", "-1"}, map[string]interface{}{"destination": arg[0]})
 			return
 		}},
 
