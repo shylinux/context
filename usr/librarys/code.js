@@ -1,4 +1,13 @@
 var page = Page({
+    initScheduleText: function(page, field, option, append, result) {
+        option.ondaemon = function(msg) {
+            page.reload()
+        }
+    },
+    initScheduleList: function(page, field, option) {
+        ctx.Runs(page, option)
+    },
+
     initFlashText: function(page, field, option, append, result) {
         option.ondaemon = function(msg) {
             page.reload()

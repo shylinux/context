@@ -59,6 +59,30 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"scripts": []interface{}{"toolkit.js", "context.js", "example.js", "code.js"},
 				},
 			},
+			"schedule": []interface{}{
+				map[string]interface{}{"componet_name": "flash", "componet_tmpl": "head", "metas": []interface{}{
+					map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no"},
+				}, "favicon": "favicon.ico", "styles": []interface{}{"example.css", "code.css"}},
+
+				map[string]interface{}{"componet_name": "text", "componet_help": "text", "componet_tmpl": "componet",
+					"componet_view": "ScheduleText", "componet_init": "initScheduleText",
+					"componet_ctx": "web.code", "componet_cmd": "schedule", "componet_args": []interface{}{"@time", "@name", "@place"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "time", "value": "", "label": "time"},
+						map[string]interface{}{"type": "text", "name": "name", "value": "", "label": "name"},
+						map[string]interface{}{"type": "text", "name": "place", "value": "", "label": "place"},
+						map[string]interface{}{"type": "button", "value": "添加行程"},
+					},
+					"display_result": "", "display_append": "",
+				},
+				map[string]interface{}{"componet_name": "list", "componet_help": "list", "componet_tmpl": "componet",
+					"componet_view": "ScheduleList", "componet_init": "initScheduleList",
+					"componet_ctx": "web.code", "componet_cmd": "schedule",
+				},
+
+				map[string]interface{}{"componet_name": "tail", "componet_tmpl": "tail",
+					"scripts": []interface{}{"toolkit.js", "context.js", "example.js", "code.js"},
+				},
+			},
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "code", "componet_tmpl": "head", "metas": []interface{}{
 					map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no"},
@@ -378,15 +402,19 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Cmdy("cli.system", "tmux", "send-keys", "-t", target, arg[3:])
 			return
 		}},
-		"schedule": &ctx.Command{Name: "schedule", Help: "行程安排", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"schedule": &ctx.Command{Name: "schedule [time name place]", Help: "行程安排", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 { // 会话列表
 				m.Confm("schedule", "data", func(index int, value map[string]interface{}) {
-					m.Add("append", "destination", fmt.Sprintf(m.Conf("schedule", "maps.baidu"), value["destination"], value["destination"]))
+					m.Add("append", "time", kit.Format(value["time"]))
+					m.Add("append", "name", kit.Format(value["name"]))
+					m.Add("append", "place", fmt.Sprintf(m.Conf("schedule", "maps.baidu"), value["place"], value["place"]))
 				})
 				m.Table()
 				return
 			}
-			m.Conf("schedule", []string{"data", "-1"}, map[string]interface{}{"destination": arg[0]})
+			m.Conf("schedule", []string{"data", "-1"}, map[string]interface{}{
+				"time": arg[0], "name": arg[1], "place": arg[2],
+			})
 			return
 		}},
 
