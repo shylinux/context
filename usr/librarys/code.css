@@ -68,21 +68,21 @@
         height:2em;
     }
 /* ----- FlashList ----- */
-    fieldset.flasktext {
+    fieldset.FlashList {
     }
 
-    fieldset.flasklist div.detail {
+    fieldset.FlashList div.detail {
         border:ridge 2px green;
         border-bottom:0px;
         margin-top:20px;
         padding:5px;
     }
-    fieldset.flasklist div.action {
+    fieldset.FlashList div.action {
         border:ridge 2px green;
         border-top:0px;
         border-bottom:0px;
     }
-    fieldset.flasklist code.output pre {
+    fieldset.FlashList code.output pre {
         border:ridge 2px green;
         margin:0px;
         padding:5px;
@@ -100,7 +100,6 @@
         overflow:scroll;
         position:fixed;
     }
-    fieldset.KitList:hover, fieldset.KitList.max {}
     fieldset.KitList div:hover, fieldset.KitList li li:hover {
         background-color:red;
     }

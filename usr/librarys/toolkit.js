@@ -1,10 +1,10 @@
 kit = toolkit = {
-    History: {cmd: [], txt: [], key: [],
+    History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [],
         add: function(type, data) {
             var list = this[type] || []
             data && list.push({time: Date.now(), data: data})
             this[type] = list
-            return list.length
+            return list.length-1
         },
         get: function(type, index) {
             var list = this[type] || []
@@ -21,6 +21,8 @@ kit = toolkit = {
         return args
     },
     isMobile: navigator.userAgent.indexOf("Mobile") > -1,
+    CreateStyle: function(style) {
+    },
 
     ModifyNode: function(which, html) {
         var node = typeof which == "string"? document.querySelector(which): which
@@ -52,8 +54,9 @@ kit = toolkit = {
             return elm
         }
 
+        // include require styles style
         // tree, code, text, view, click
-        // type, name, data, list
+        // type, name, data, list, style
         var kit = this
 
         subs = subs || {}
@@ -61,18 +64,61 @@ kit = toolkit = {
             child.data = child.data || {}
             child.type = child.type || "div"
 
-            if (child.button) {
+            if (child.style) {
+                var str = []
+                for (var k in child.style) {
+                    str.push(k)
+                    str.push(":")
+                    str.push(child.style[k] + (typeof child.style[k] == "number"? "px": ""))
+                    str.push(";")
+                }
+                child.data["style"] = str.join("")
+            }
+
+            if (child.include) {
+                child.data["src"] = child.include[0]
+                child.data["type"] = "text/javascript"
+                child.include.length > 1 && (child.data["onload"] = child.include[1])
+                child.type = "script"
+
+            } else if (child.require) {
+                child.data["href"] = child.require[0]
+                child.data["rel"] = child.require.length > 1? child.require[1]: "stylesheet"
+                child.data["type"] = child.require.length > 2? child.require[2]: "text/css"
+                child.type = "link"
+
+            } else if (child.styles) {
+                var str = []
+                for (var key in child.styles) {
+                    str.push(key)
+                    str.push(" {")
+                    for (var k in child.styles[key]) {
+                        str.push(k)
+                        str.push(":")
+                        str.push(child.styles[key][k] + (typeof child.styles[key][k] == "number"? "px": ""))
+                        str.push(";")
+                    }
+                    str.push("}\n")
+                }
+                child.data["innerHTML"] = str.join("")
+                child.data["type"] = "text/css"
+                child.type = "style"
+
+            } else if (child.button) {
                 child.type = "button"
                 child.data["innerText"] = child.button[0]
                 child.data["onclick"] = child.button[1]
+
             } else if (child.click) {
                 child.data["onclick"] = child.click[0]
+
             } else if (child.fork) {
                 child.type = "li"
                 child.list = [
                     {"text": [child.fork[0], "div"]},
                     {"type": "ul", "list": child.fork[1]},
                 ]
+
             } else if (child.leaf) {
                 child.type = "li"
                 child.data["innerText"] = child.leaf[0]
@@ -81,15 +127,18 @@ kit = toolkit = {
                         child.leaf[1](event, node)
                     }
                 }
+
             } else if (child.view) {
                 child.data["className"] = child.view[0]
                 child.type = child.view.length > 1? child.view[1]: "div"
                 child.view.length > 2 && (child.data["innerText"] = child.view[2])
                 child.view.length > 3 && (child.name = child.view[3])
+
             } else if (child.text) {
                 child.data["innerText"] = child.text[0]
                 child.type = child.text.length > 1? child.text[1]: "pre"
                 child.text.length > 2 && (child.data["className"] = child.text[2])
+
             } else if (child.code) {
                 child.type = "code"
                 child.list = [{"type": "pre" ,"data": {"innerText": child.code[0]}, "name": child.code[1]}]
@@ -99,6 +148,7 @@ kit = toolkit = {
             var node = kit.CreateNode(child.type, child.data)
             child.list && kit.AppendChild(node, child.list, subs)
             child.name && (subs[child.name] = node)
+            subs.field || (subs.field = node)
             parent.append(node)
         })
         return subs
@@ -109,6 +159,9 @@ kit = toolkit = {
         return parent.insertBefore(elm, position || parent.firstElementChild)
     },
 
+    AppendStyle: function(parent, style) {
+        return node
+    },
     AppendTable: function(table, data, fields, cb) {
         if (!data || !fields) {
             return
@@ -227,20 +280,20 @@ kit = toolkit = {
             kit.CopyText()
         }
     },
-    OrderForm: function(page, form, append, result) {
-        if (!form) {return}
-        form.onactions = form.onactions || function(msg) {
-            if (!msg) {return}
+    OrderForm: function(page, field, option, append, result) {
+        if (!option) {return}
+        option.ondaemon = option.ondaemon || function(msg) {
             append.innerHTML = ""
-            kit.AppendTable(append, ctx.Table(msg), msg.append)
-            result.innerHTML = ""
-            result.innerText = msg.result.join("")
+            msg && msg.append && kit.AppendTable(append, ctx.Table(msg), msg.append, function(value, key, row, index, event) {
+                typeof option.daemon_action[key] == "function" && option.daemon_action[key](value, key, row, index, event)
+            })
+            result && (result.innerText = (msg && msg.result)? msg.result.join(""): "")
         }
 
-        form.querySelectorAll("select").forEach(function(select, index, array) {
-            select.onchange = function(event) {
+        option.querySelectorAll("select").forEach(function(select, index, array) {
+            select.onchange = select.onchange || function(event) {
                 if (index == array.length-1) {
-                    page.Runs(page, form)
+                    page.Runs(page, option)
                     return
                 }
                 if (array[index+1].type == "button") {
@@ -250,17 +303,17 @@ kit = toolkit = {
                 array[index+1].focus()
             }
         })
-        form.querySelectorAll("input").forEach(function(input, index, array) {
+        option.querySelectorAll("input").forEach(function(input, index, array) {
             switch (input.type) {
                 case "button":
-                    input.onclick = function(event) {
+                    input.onclick = input.onclick || function(event) {
                         if (index == array.length-1) {
                             if (input.value == "login") {
-                                form.onactions = function(msg) {
+                                option.ondaemon = function(msg) {
                                     page.reload()
                                 }
                             }
-                            page.Runs(page, form)
+                            page.Runs(page, option)
                             return
                         }
                         if (array[index+1].type == "button") {
@@ -270,12 +323,12 @@ kit = toolkit = {
                         array[index+1].focus()
                     }
                 default:
-                    input.onkeyup = function(event) {
+                    input.onkeyup = input.onkeyup || function(event) {
                         if (event.key != "Enter") {
                             return
                         }
                         if (index == array.length-1) {
-                            page.Runs(page, form)
+                            page.Runs(page, option)
                             return
                         }
                         if (array[index+1].type == "button") {
@@ -291,7 +344,6 @@ kit = toolkit = {
     CopyText: function(text) {
         text = window.getSelection().toString()
         if (text == "") {return}
-        kit.Log(text)
         kit.History.add("txt", text)
         document.execCommand("copy")
     },
@@ -306,6 +358,52 @@ kit = toolkit = {
             if (target.value[start-i] != ch && kit.History.get("key", -i).data != ch) {
                 return false
             }
+        }
+        return true
+    },
+
+    ScrollPage: function(event, conf) {
+        switch (event.key) {
+            case "h":
+                if (event.ctrlKey) {
+                    window.scrollBy(-conf.scroll_x*10, 0)
+                } else {
+                    window.scrollBy(-conf.scroll_x, 0)
+                }
+                break
+            case "H":
+                window.scrollBy(-document.body.scrollWidth, 0)
+                break
+            case "l":
+                if (event.ctrlKey) {
+                    window.scrollBy(conf.scroll_x*10, 0)
+                } else {
+                    window.scrollBy(conf.scroll_x, 0)
+                }
+                break
+            case "L":
+                window.scrollBy(document.body.scrollWidth, 0)
+                break
+            case "j":
+                if (event.ctrlKey) {
+                    window.scrollBy(0, conf.scroll_y*10)
+                } else {
+                    window.scrollBy(0, conf.scroll_y)
+                }
+                break
+            case "J":
+                window.scrollBy(0, document.body.scrollHeight)
+                break
+            case "k":
+                if (event.ctrlKey) {
+                    window.scrollBy(0, -conf.scroll_y*10)
+                } else {
+                    window.scrollBy(0, -conf.scroll_y)
+                }
+                break
+            case "K":
+                window.scrollBy(0, -document.body.scrollHeight)
+                break
         }
         return true
     },

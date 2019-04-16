@@ -309,6 +309,49 @@ var CGI = template.FuncMap{
 		}
 		return ""
 	},
+	"options": func(arg ...interface{}) string {
+		if len(arg) == 0 {
+			return ""
+		}
+
+		switch m := arg[0].(type) {
+		case *Message:
+			if len(arg) == 1 {
+				return kit.Format(m.Meta["option"])
+			}
+
+			switch value := arg[1].(type) {
+			case int:
+				if 0 <= value && value < len(m.Meta["option"]) {
+					return kit.Format(m.Meta["option"][value])
+				}
+			case string:
+				if len(arg) == 2 {
+					return kit.Format(m.Optionv(value))
+				}
+
+				switch val := arg[2].(type) {
+				case int:
+					if 0 <= val && val < len(m.Meta[value]) {
+						return kit.Format(m.Meta[value][val])
+					}
+				}
+			}
+		case map[string][]string:
+			if len(arg) == 1 {
+				return strings.Join(m["option"], "")
+			}
+			switch value := arg[1].(type) {
+			case string:
+				return strings.Join(m[value], "")
+			}
+		case []string:
+			return strings.Join(m, "")
+		default:
+			return kit.Format(m)
+		}
+		return ""
+	},
 	"result": func(arg ...interface{}) interface{} {
 		if len(arg) == 0 {
 			return ""

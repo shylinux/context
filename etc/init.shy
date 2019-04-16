@@ -3,7 +3,7 @@
 ~code
     config load tmp/flash.json flash
 
-source common.shy
+source etc/common.shy
 ~ssh
     remote auto
 source local.shy

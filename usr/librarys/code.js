@@ -1,23 +1,25 @@
 var page = Page({
     initFlashText: function(page, field, option, append, result) {
-        option.onactions = function(msg) {
+        option.ondaemon = function(msg) {
             page.reload()
         }
     },
-    initFlashList: function(page, field, option, append, result) {
+    initFlashList: function(page, field, option) {
         option.dataset.flash_index = ctx.Search("flash_index")
-        option.onactions = function(msg) {
-            page.showFlashList(msg, option, append, result)
+        option.ondaemon = function(msg) {
+            page.showFlashList(msg, field, option)
         }
-        ctx.Run(page, option.dataset, [], option.onactions)
+        ctx.Runs(page, option)
     },
-    showFlashList: function(msg, option, append, result) {
+    showFlashList: function(msg, field, option) {
         var page = this
+        var result = field.querySelector("div.result")
+
         result.innerHTML = ""
         ctx.Table(msg, function(tip) {
             var ui = kit.AppendChild(result, [{"list": [
-                {"view": ["detail", "div", tip.text]},
-                {"code": [tip.output, "result", "result"]},
+                {"text": [tip.text, "div", "detail"]},
+                {"code": [tip.code, "result", "result"]},
                 {"view": ["action"], "list": [
                     {"button": ["查看详情", function(event) {
                         ctx.Search("flash_index", tip.index)
@@ -36,88 +38,53 @@ var page = Page({
         })
     },
 
-    initDirList: function(page, field, option, append, result) {
-        var history = []
-        function change(value) {
-            option["current.dir"].value = value
-            ctx.Runs(page, option)
-            ctx.Current("dir", value)
-            return value
-        }
-        function brow(value, dir, event) {
-            option["current.dir"].value = value
-            ctx.Runs(page, option)
-            option["current.dir"].value = dir
-            ctx.Runs(page, option)
-        }
-        return {
-            "button": ["root", "back"], "action": function(value) {
-                switch (value) {
-                    case "back": history.length > -1 && change(history.pop() || "/"); break
-                    case "root": change("/"); break
-                }
-            },
-            "table": {"filename": function(value, key, row, index, event) {
-                var dir = option["current.dir"].value
-                var file = dir + ((dir && !dir.endsWith("/"))? "/": "") + value
-                file.endsWith("/")? history.push(change(file)): brow(file, dir, event)
-            }},
-        }
-    },
-    initPodList: function(page, field, option, append, result) {
-        function change(value) {
-            option.pod.value = value
-            ctx.Runs(page, option)
-            ctx.Current("pod", value)
-        }
-        return {"table": {"key": change}}
-    },
-    initCtxList: function(page, field, option, append, result) {
-        function change(value) {
-            option.ctx.value = value
-            ctx.Runs(page, option)
-            ctx.Current("ctx", value)
-        }
-        return {"button": ["ctx", "shy", "web", "mdb"], "action": change, "table": {"names": change}}
-    },
-
     initKitList: function(page, field, option, append, result) {
-        var ui = kit.AppendChild(field, [{"type": "ul", "list": [
-            {"fork": ["粘贴板", [
-                {"leaf": ["+ 保存粘贴板(Ctrl+S)", function(event) {
-                    console.log("save_txt")
-                }]},
-                {"leaf": ["+ 添加粘贴板(Ctrl+Y)", function(event) {
-                    console.log("create_txt")
-                }]},
-                {"leaf": ["+ 快捷粘贴板(Ctrl+P)", function(event) {
-                    console.log("quick_txt")
-                }]},
-            ]]},
-            {"fork": ["命令行", [
-                {"leaf": ["+ 折叠命令行(Ctrl+Z)", function(event, target) {
-                    target.className = page.conf.show_result? "": "stick"
-                    page.showResult(page)
-                }]},
-                {"leaf": ["+ 添加命令行(Ctrl+M)", function(event) {
-                    page.addCmdList("cmd", page.conf.ncommand++)
-                }]},
-            ]]},
-            {"fork": ["工作流", [
-                {"leaf": ["+ 刷新工作流(Ctrl+R)", function(event) {
-                    console.log("refresh_fly")
-                }]},
-                {"leaf": ["+ 添加工作流(Ctrl+T)", function(event) {
-                    console.log("create_fly")
-                }]},
-                {"leaf": ["+ 命名工作流", function(event) {
-                    console.log("rename_fly")
-                }]},
-                {"leaf": ["+ 删除工作流", function(event) {
-                    console.log("remove_fly")
-                }]},
-            ]]},
-        ]}])
+        var ui = kit.AppendChild(field, [
+            {"styles": {
+                "fieldset.KitList": {
+                    "top": conf.toolkit_view.top, "left": conf.toolkit_view.left,
+                },
+                "fieldset.KitList:hover, fieldset.KitList.max": {
+                    "width": conf.toolkit_view.width, "height": conf.toolkit_view.height,
+                },
+            }},
+            {"type": "ul", "list": [
+                {"fork": ["粘贴板", [
+                    {"leaf": ["+ 保存粘贴板(Ctrl+S)", function(event) {
+                        console.log("save_txt")
+                    }]},
+                    {"leaf": ["+ 添加粘贴板(Ctrl+Y)", function(event) {
+                        console.log("create_txt")
+                    }]},
+                    {"leaf": ["+ 快捷粘贴板(Ctrl+P)", function(event) {
+                        console.log("quick_txt")
+                    }]},
+                ]]},
+                {"fork": ["命令行", [
+                    {"leaf": ["+ 折叠命令行(Ctrl+Z)", function(event, target) {
+                        target.className = page.conf.show_result? "": "stick"
+                        page.showResult(page)
+                    }]},
+                    {"leaf": ["+ 添加命令行(Ctrl+M)", function(event) {
+                        page.addCmdList("cmd", page.conf.ncommand++)
+                    }]},
+                ]]},
+                {"fork": ["工作流", [
+                    {"leaf": ["+ 刷新工作流(Ctrl+R)", function(event) {
+                        console.log("refresh_fly")
+                    }]},
+                    {"leaf": ["+ 添加工作流(Ctrl+T)", function(event) {
+                        console.log("create_fly")
+                    }]},
+                    {"leaf": ["+ 命名工作流", function(event) {
+                        console.log("rename_fly")
+                    }]},
+                    {"leaf": ["+ 删除工作流", function(event) {
+                        console.log("remove_fly")
+                    }]},
+                ]]},
+            ]},
+        ])
         /*
         <li><div>命令行</div>
             <ul class="cmd">
@@ -270,49 +237,81 @@ var page = Page({
         })
         return
     },
+
+    initDirList: function(page, field, option, append, result) {
+        var history = []
+        function change(value) {
+            return page.setCurrent(page, option, "dir", value)
+        }
+        function brow(value, dir, event) {
+            page.setCurrent(page, option, "dir", value)
+            page.setCurrent(page, option, "dir", dir)
+        }
+        return {
+            "button": ["root", "back"], "action": function(value) {
+                switch (value) {
+                    case "back": history.length > -1 && change(history.pop() || "/"); break
+                    case "root": change("/"); break
+                }
+            },
+            "table": {"filename": function(value, key, row, index, event) {
+                var dir = option.dir.value
+                var file = dir + ((dir && !dir.endsWith("/"))? "/": "") + value
+                file.endsWith("/")? history.push(change(file)): brow(file, dir, event)
+            }},
+        }
+    },
+    initPodList: function(page, field, option, append, result) {
+        return {"button": ["local"], "action": function(value) {
+            value == "local" && (value = "''")
+            page.setCurrent(page, option, "pod", value)
+        }, "table": {"key": function(value) {
+            page.setCurrent(page, option, "pod", value)
+        }}}
+    },
+    initCtxList: function(page, field, option, append, result) {
+        return {"button": ["ctx", "shy", "web", "mdb"], "action": function(value) {
+            page.setCurrent(page, option, "ctx", value)
+        }, "table": {"names": function(value) {
+            page.setCurrent(page, option, "ctx", value)
+        }}}
+    },
+    setCurrent: function(page, option, type, value) {
+        option[type].value = ctx.Current(type, value)
+        page.History.add(type, value)
+        ctx.Runs(page, option)
+        return value
+    },
+
     initCmdList: function(page, field, option, append, result) {
         option.dataset["componet_name_alias"] = "cmd"
         option.dataset["componet_name_order"] = 0
-        option.onactions = function(msg) {
-            page.showCmdList(msg, option, append, result)
-        }
 
         var cmd = option.querySelector("input[name=cmd]")
         cmd.onkeyup = function(event) {
-            page.onCmdList(event, cmd, "input", option, append, result)
+            page.onCmdList(event, cmd, "input", field, option, append, result)
         }
 
         var action = conf.bench_data.action
-        if (action && action["cmd"]) {
-            cmd.value = action["cmd"].cmd[1]
-            ctx.Runs(page, option)
-            page.History.add("cmd", cmd.value)
-        }
+        action && action["cmd"] && page.runCmdList(page, option, cmd, action["cmd"].cmd[1])
 
         var max = 0
         for (var k in action) {
             var order = parseInt(action[k].order)
-            if (order > max) {
-                max = order
-            }
+            order > max && (max = order)
         }
 
         for (var i = 1; i <= max; i++) {
             var ui = page.addCmdList("cmd", i)
-            if (action["cmd"+i]) {
-                ui.cmd.value = action["cmd"+i].cmd[1]
-                ctx.Runs(page, ui.option)
-                page.History.add("cmd", ui.cmd.value)
-            }
+            action["cmd"+i] && page.runCmdList(page, ui.option, ui.cmd, action["cmd"+i].cmd[1])
         }
         page.conf.ncommand = i
         return
     },
-    showCmdList: function(msg, option, append, result) {
-        append.innerHTML = ""
-        msg && msg.append && kit.AppendTable(append, ctx.Table(msg), msg.append)
-        result.innerText = (msg && msg.result)? msg.result.join(""): ""
-        return
+    runCmdList: function(page, option, target, value) {
+        target.value = value
+        target.dataset.history_last = page.History.add("cmd", target.value)
+        ctx.Runs(page, option)
     },
     getCmdList: function(input, step, cmd) {
         var history = kit.History.get("cmd")
@@ -327,23 +326,26 @@ var page = Page({
     addCmdList: function(name, order) {
         var page = this
         var alias = name+order
-        var ui = kit.AppendChild(document.querySelector("body"), [{"type": "fieldset", "data": {}, "list": [
+        var ui = kit.AppendChild(document.body, [{"view": ["CmdList", "fieldset"], "list": [
             {"text": [alias, "legend"]},
-            {"view": ["option "+alias, "form", "", "option"], "data": {"dataset": {
-                "componet_group": "index", "componet_name": name, "componet_name_alias": alias, "componet_name_order": order,
-            }, "onactions": function(msg) {
-                page.showCmdList(msg, ui.option, ui.append, ui.result)
-            }}, "list": [
-                {"type": "input", "data": {"style": {"display": "none"}}},
-                {"name": "cmd", "type": "input", "data": {"name": "cmd", "className": "cmd", "onkeyup": function(event) {
-                    page.onCmdList(event, ui.cmd, "input", ui.option, ui.append, ui.result)
-                }}},
-            ]},
+            {"view": ["option "+alias, "form", "", "option"],
+                "data": {"dataset": {
+                    "componet_group": "index", "componet_name": name, "componet_name_alias": alias, "componet_name_order": order,
+                }},
+                "list": [
+                    {"type": "input", "data": {"style": {"display": "none"}}},
+                    {"name": "cmd", "type": "input", "data": {"name": "cmd", "className": "cmd", "onkeyup": function(event) {
+                        page.onCmdList(event, ui.cmd, "input", ui.field, ui.option, ui.append, ui.result)
+                    }}},
+                ]
+            },
             {"view": ["append "+alias, "table", "", "append"]},
             {"code": ["", "result", "result "+alias]},
         ]}])
+
+        page.OrderForm(page, ui.field, ui.option, ui.append, ui.result)
         page.OrderTable(ui.append)
-        page.OrderCode(ui.code)
+        page.OrderCode(ui.result)
         ui.cmd.focus()
         return ui
     },
@@ -367,7 +369,7 @@ var page = Page({
             }
         }
     },
-    onCmdList: function(event, target, action, option, append, result) {
+    onCmdList: function(event, target, action, field, option, append, result) {
         var page = this
         var order = option.dataset.componet_name_order
         var prev_order = (parseInt(order)-1+page.conf.ncommand)%page.conf.ncommand||""
@@ -375,13 +377,13 @@ var page = Page({
 
         switch (action) {
             case "input":
+                kit.History.add("key", (event.ctrlKey? "Control+": "")+(event.shiftKey? "Shift+": "")+event.key)
+
                 if (event.key == "Escape") {
                     target.blur()
 
                 } else if (event.key == "Enter") {
-                    target.dataset.history_last = page.History.get("cmd").length
-                    page.History.add("cmd", target.value)
-                    ctx.Runs(page, option)
+                    page.runCmdList(page, option, target, target.value)
 
                 } else if (event.ctrlKey) {
                     switch (event.key) {
@@ -426,6 +428,13 @@ var page = Page({
                             }
                             target.dataset.search_last = ""
                             break
+
+                        case "y":
+                        case "v":
+                        case "s":
+                        case "t":
+                            break
+
                         case "a":
                         case "e":
                         case "f":
@@ -452,6 +461,7 @@ var page = Page({
                             }
                             kit.DelText(target, i+1, end-i)
                             break
+
                         case "c":
                             append.innerHTML = ""
                             result.innerHTML = ""
@@ -460,9 +470,7 @@ var page = Page({
                             append.innerHTML = ""
                             result.innerHTML = ""
                         case "j":
-                            target.dataset.history_last = page.History.get("cmd").length
-                            page.History.add("cmd", target.value)
-                            ctx.Runs(page, option)
+                            page.runCmdList(page, option, target, target.value)
                             break
                         case "l":
                             window.scrollTo(0, option.parentElement.offsetTop)
@@ -486,11 +494,11 @@ var page = Page({
                             break
                         case "q":
                             page.delCmdList("cmd", order)
+                            break
                         default:
                             return
                     }
                 } else {
-                    kit.History.add("key", event.key)
                     if (kit.HitText(target, "jk")) {
                         kit.DelText(target, target.selectionStart-2, 2)
                         target.blur()
@@ -504,65 +512,23 @@ var page = Page({
         var page = this
         switch (action) {
             case "scroll":
-                if (event.target != document.body) {
-                    return
+                if (event.target == document.body) {
+                    kit.ScrollPage(event, page.conf)
                 }
-                switch (event.key) {
-                    case "h":
-                        if (event.ctrlKey) {
-                            window.scrollBy(-page.conf.scroll_x*10, 0)
-                        } else {
-                            window.scrollBy(-page.conf.scroll_x, 0)
-                        }
-                        break
-                    case "H":
-                        window.scrollBy(-body.scrollWidth, 0)
-                        break
-                    case "l":
-                        if (event.ctrlKey) {
-                            window.scrollBy(page.conf.scroll_x*10, 0)
-                        } else {
-                            window.scrollBy(page.conf.scroll_x, 0)
-                        }
-                        break
-                    case "L":
-                        window.scrollBy(body.scrollWidth, 0)
-                        break
-                    case "j":
-                        if (event.ctrlKey) {
-                            window.scrollBy(0, page.conf.scroll_y*10)
-                        } else {
-                            window.scrollBy(0, page.conf.scroll_y)
-                        }
-                        break
-                    case "J":
-                        window.scrollBy(0, body.scrollHeight)
-                        break
-                    case "k":
-                        if (event.ctrlKey) {
-                            window.scrollBy(0, -page.conf.scroll_y*10)
-                        } else {
-                            window.scrollBy(0, -page.conf.scroll_y)
-                        }
-                        break
-                    case "K":
-                        window.scrollBy(0, -body.scrollHeight)
-                        break
-                }
-                return
+                break
             case "keymap":
                 if (event.key == "Escape") {
-                }
-                if (event.key == "Enter") {
-                }
-                if (event.ctrlKey) {
+
+                } else if (event.key == "Enter") {
+
+                } else if (event.ctrlKey) {
                     switch (event.key) {
                         case "m":
                             page.addCmdList("cmd", page.conf.ncommand++)
-                            return
+                            break
                         case "z":
                             page.showResult(page)
-                            return
+                            break
                         case "0":
                         case "1":
                         case "2":
@@ -574,7 +540,7 @@ var page = Page({
                         case "8":
                         case "9":
                             document.querySelector("form.option.cmd"+(event.key||"")+" input[name=cmd]").focus()
-                            return
+                            break
                     }
                 }
         }
@@ -599,7 +565,7 @@ var page = Page({
             var option = field.querySelector("form.option")
             var append = field.querySelector("table.append")
             var result = field.querySelector("code.result pre")
-            page.OrderForm(page, option, append, result)
+            page.OrderForm(page, field, option, append, result)
             page.OrderTable(append)
             page.OrderCode(result)
 
@@ -616,12 +582,7 @@ var page = Page({
                     kit.InsertChild(field, append, "div", buttons)
                 }
                 if (conf && conf["table"]) {
-                    option.onactions = function(msg) {
-                        append.innerHTML = ""
-                        kit.AppendTable(append, ctx.Table(msg), msg.append, function(value, key, row, index, event) {
-                            typeof conf["table"][key] == "function" && conf["table"][key](value, key, row, index, event)
-                        })
-                    }
+                    option.daemon_action = conf["table"]
                     ctx.Runs(page, option)
                 }
             }

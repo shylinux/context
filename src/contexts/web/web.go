@@ -862,7 +862,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			case 0:
 				m.Cmdy("ctx.config", "componet")
 			case 1:
-				m.Cmdy("ctx.config", "componet", arg[0])
+				m.Confm("componet", arg[0], func(index int, val map[string]interface{}) {
+					m.Add("append", "ctx", val["componet_ctx"])
+					m.Add("append", "cmd", val["componet_cmd"])
+					m.Add("append", "name", val["componet_name"])
+					m.Add("append", "help", val["componet_help"])
+					m.Add("append", "tmpl", val["componet_tmpl"])
+					m.Add("append", "view", val["componet_view"])
+					m.Add("append", "init", val["componet_init"])
+				})
+				m.Table()
 			case 2:
 				m.Cmdy("ctx.config", "componet", strings.Join(arg, "."))
 			default:
@@ -875,18 +884,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				default:
 					componet := m.Confm("componet", arg[:2])
 					for i := 2; i < len(arg)-1; i += 2 {
-						componet[arg[i]] = arg[i+1]
+						kit.Chain(componet, arg[i], arg[i+1])
 					}
 				}
 			}
 			return
 		}},
 
-		"/proxy/": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			fields := strings.Split(key, "/")
-			m.Cmdy("web.get", "which", fields[2], "method", fields[3], strings.Join(fields, "/"))
-			return
-		}},
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Options("toolkit") {
 				if kit, ok := m.Confv("toolkit", m.Option("toolkit")).(map[string]interface{}); ok {
@@ -937,7 +941,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				for _, v := range m.Confv("componet", group).([]interface{}) {
 					val := v.(map[string]interface{})
-					if order != "" && val["name"].(string) != order {
+					if order != "" && val["componet_name"].(string) != order {
 						continue
 					}
 
@@ -945,7 +949,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					msg := m.Find(kit.Select(m.Cap("module"), val["componet_ctx"]))
 
 					// 默认变量
-					msg.Option("componet_name", val["name"].(string))
 					for k, v := range val {
 						if msg.Option(k) != "" {
 							continue
@@ -968,7 +971,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 					}
-					msg.Log("fuck", "what %v", msg.Option("componet_name"))
+					msg.Log("fuck", "what %v", val)
 
 					// 添加设备
 					arg = arg[:0]
@@ -983,7 +986,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						arg = append(arg, kit.Trans(m.Optionv("cmds"))...)
 					}
 					// 添加参数
-					for _, v := range kit.Trans(val["arguments"]) {
+					for _, v := range kit.Trans(val["componet_args"]) {
 						arg = append(arg, msg.Parse(v))
 					}
 
@@ -1014,8 +1017,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						return
 					} else if accept_json {
 						list = append(list, msg.Meta)
-					} else if val["template"] != nil {
-						m.Assert(tmpl.ExecuteTemplate(w, val["template"].(string), msg))
+					} else if val["componet_tmpl"] != nil {
+						m.Assert(tmpl.ExecuteTemplate(w, val["componet_tmpl"].(string), msg))
 					}
 				}
 
@@ -1053,6 +1056,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Log("info", "download %s %s", p, m.Cmdx("aaa.hash", "file", p))
 
 			http.ServeFile(w, r, p)
+			return
+		}},
+		"/proxy/": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			fields := strings.Split(key, "/")
+			m.Cmdy("web.get", "which", fields[2], "method", fields[3], strings.Join(fields, "/"))
 			return
 		}},
 		"/shadow": &ctx.Command{Name: "/shadow", Help: "暗网", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

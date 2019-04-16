@@ -21,7 +21,7 @@ ctx = context = {
                 data[form[i].name] = form[i].value
             }
         }
-        this.Run(page, data, [], cb || form.onactions)
+        this.Run(page, data, [], cb || form.ondaemon)
     },
     Table: function(msg, cb) {
         var ret = []

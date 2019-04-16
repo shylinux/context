@@ -7,8 +7,6 @@ exp = example = {
     reload: function() {
         location.reload()
     },
-    _exit: function(page) {
-    },
 }
 
 function Page(page) {
