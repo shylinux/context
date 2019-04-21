@@ -14,42 +14,77 @@ import (
 	"os"
 	"path"
 	"strings"
+	"toolkit"
 )
 
 var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"wiki_dir":   &ctx.Config{Name: "wiki_dir", Value: "usr/wiki", Help: "路由数量"},
-		"wiki_favor": &ctx.Config{Name: "wiki_favor", Value: "lamp.md", Help: "路由数量"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "默认组件"},
+		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+			"index": []interface{}{
+				map[string]interface{}{"componet_name": "wiki", "componet_tmpl": "head", "metas": []interface{}{
+					map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no"},
+				}, "favicon": "favicon.ico", "styles": []interface{}{"example.css", "wiki.css"}},
+				map[string]interface{}{"componet_name": "header", "componet_tmpl": "fieldset",
+					"componet_view": "Header", "componet_init": "initHeader",
+					"title": "shylinux 天行健，君子以自强不息",
+				},
 
+				map[string]interface{}{"componet_name": "tree", "componet_tmpl": "fieldset",
+					"componet_view": "Tree", "componet_init": "initTree",
+					"componet_ctx": "web.wiki", "componet_cmd": "wiki_tree", "arguments": []interface{}{"@wiki_class"},
+				},
+				map[string]interface{}{"componet_name": "text", "componet_tmpl": "fieldset",
+					"componet_view": "Text", "componet_init": "initText",
+					"componet_ctx": "web.wiki", "componet_cmd": "wiki_text", "arguments": []interface{}{"@wiki_favor"},
+				},
+
+				map[string]interface{}{"componet_name": "footer", "componet_tmpl": "fieldset",
+					"componet_view": "Footer", "componet_init": "initFooter",
+					"title": "shycontext 地势坤，君子以厚德载物",
+				},
+				map[string]interface{}{"componet_name": "tail", "componet_tmpl": "tail",
+					"scripts": []interface{}{"toolkit.js", "context.js", "example.js", "wiki.js"},
+				},
+			},
+		}, Help: "组件列表"},
+		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
+
+		"wiki_level": &ctx.Config{Name: "wiki_level", Value: "wiki/自然/编程", Help: "路由数量"},
+		"wiki_favor": &ctx.Config{Name: "wiki_favor", Value: "index.md", Help: "路由数量"},
+
+		"wiki_dir":  &ctx.Config{Name: "wiki_dir", Value: "wiki", Help: "路由数量"},
 		"wiki_list": &ctx.Config{Name: "wiki_list", Value: []interface{}{}, Help: "路由数量"},
 		"wiki_list_show": &ctx.Config{Name: "wiki_list_show", Value: map[string]interface{}{
 			"md": true,
 		}, Help: "路由数量"},
-		"bench_disable": &ctx.Config{Name: "bench_disable", Value: "true", Help: "工作流"},
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
-			"check": "false",
-		}, Help: "默认组件"},
-
-		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
-		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
-			"index": []interface{}{
-				map[string]interface{}{"name": "head", "template": "head"},
-				map[string]interface{}{"name": "header", "template": "header"},
-				map[string]interface{}{"name": "list", "template": "list",
-					"componet_ctx": "web.wiki", "componet_cmd": "wiki_list", "arguments": []interface{}{"time", "time_r"},
-					"pre_run": true,
-				},
-				map[string]interface{}{"name": "text", "template": "text",
-					"componet_ctx": "web.wiki", "componet_cmd": "wiki_body", "arguments": []interface{}{"@wiki_favor"},
-					"pre_run": true,
-				},
-				map[string]interface{}{"name": "footer", "template": "footer"},
-				map[string]interface{}{"name": "tail", "template": "tail"},
-			},
-		}, Help: "组件列表"},
 	},
 	Commands: map[string]*ctx.Command{
+		"wiki_tree": &ctx.Command{Name: "wiki_tree", Help: "wiki_tree", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy("nfs.dir", path.Join(m.Confx("wiki_level"), kit.Select(m.Option("wiki_class"), arg, 0)), "dir_sort", "time_r")
+			return
+		}},
+		"wiki_text": &ctx.Command{Name: "wiki_text", Help: "wiki_text", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			which := m.Cmdx("nfs.path", path.Join(m.Confx("wiki_level"), m.Option("wiki_class"), m.Confx("wiki_favor", arg, 0)))
+
+			if ls, e := ioutil.ReadFile(which); e == nil {
+				buffer := bytes.NewBuffer([]byte{})
+				temp, e := template.New("temp").Funcs(ctx.CGI).Parse(string(ls))
+				if e != nil {
+					m.Log("info", "parse %s %s", which, e)
+				}
+				temp.Execute(buffer, m)
+				ls = buffer.Bytes()
+
+				ls = markdown.ToHTML(ls, nil, nil)
+				m.Echo(string(ls))
+			} else {
+				m.Echo(m.Cmd("nfs.dir", path.Join(m.Confx("wiki_level"), m.Option("wiki_class")),
+					"dir_deep", "dir_type", "dir", "time", "path").ToHTML())
+			}
+			return
+		}},
 		"wiki_list": &ctx.Command{Name: "wiki_list sort_field sort_order", Help: "wiki_list", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			sort_field, sort_order := "time", "time_r"
 			if len(arg) > 0 {
@@ -59,12 +94,13 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				sort_order, arg = arg[0], arg[1:]
 			}
 
-			md, e := ioutil.ReadDir(m.Conf("wiki_dir"))
+			dir := path.Join(m.Conf("wiki_dir"), m.Option("wiki_class"))
+			md, e := ioutil.ReadDir(dir)
 			m.Assert(e)
 
 			for _, v := range md {
 				if strings.HasSuffix(v.Name(), ".md") {
-					f, e := os.Open(path.Join(m.Conf("wiki_dir"), v.Name()))
+					f, e := os.Open(path.Join(dir, v.Name()))
 					m.Assert(e)
 					defer f.Close()
 
@@ -110,23 +146,6 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				}
 				return true
 			})
-			return
-		}},
-		"wiki_body": &ctx.Command{Name: "wiki_body", Help: "wiki_body", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			which := path.Join(m.Conf("wiki_dir"), m.Confx("wiki_favor", arg, 0))
-			if ls, e := ioutil.ReadFile(which); e == nil {
-
-				buffer := bytes.NewBuffer([]byte{})
-				temp, e := template.New("temp").Funcs(ctx.CGI).Parse(string(ls))
-				if e != nil {
-					m.Log("info", "parse %s %s", which, e)
-				}
-				temp.Execute(buffer, m)
-				ls = buffer.Bytes()
-
-				ls = markdown.ToHTML(ls, nil, nil)
-				m.Echo(string(ls))
-			}
 			return
 		}},
 

@@ -1,4 +1,8 @@
 var page = Page({
+    initComList: function(page, field, option, append, result) {
+        return
+    },
+
     initScheduleText: function(page, field, option, append, result) {
         option.ondaemon = function(msg) {
             page.reload()
@@ -521,9 +525,6 @@ var page = Page({
         var page = this
         switch (action) {
             case "scroll":
-                if (event.target == document.body) {
-                    kit.ScrollPage(event, page.conf)
-                }
                 break
             case "keymap":
                 if (event.key == "Escape") {
@@ -563,9 +564,6 @@ var page = Page({
     init: function(exp) {
         var page = this
         var body = document.body
-        body.onkeydown = function(event) {
-            page.onaction(event, body, "scroll")
-        }
         body.onkeyup = function(event) {
             page.onaction(event, body, "keymap")
         }
@@ -575,8 +573,8 @@ var page = Page({
             var append = field.querySelector("table.append")
             var result = field.querySelector("code.result pre")
             page.OrderForm(page, field, option, append, result)
-            page.OrderTable(append)
-            page.OrderCode(result)
+            append && page.OrderTable(append)
+            result && page.OrderCode(result)
 
             var init = page[field.dataset.init]
             if (typeof init == "function") {

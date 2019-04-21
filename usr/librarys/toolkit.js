@@ -74,6 +74,9 @@ kit = toolkit = {
                 }
                 child.data["style"] = str.join("")
             }
+            if (child.click) {
+                child.data["onclick"] = child.click
+            }
 
             if (child.include) {
                 child.data["src"] = child.include[0]
@@ -109,19 +112,20 @@ kit = toolkit = {
                 child.data["innerText"] = child.button[0]
                 child.data["onclick"] = child.button[1]
 
-            } else if (child.click) {
-                child.data["onclick"] = child.click[0]
+            } else if (child.tree) {
+                child.type = "ul"
+                child.list = child.tree
 
             } else if (child.fork) {
                 child.type = "li"
                 child.list = [
-                    {"text": [child.fork[0], "div"]},
+                    {"text": [child.fork[0], "div"], "click": (child.fork.length>2? child.fork[2]: "")},
                     {"type": "ul", "list": child.fork[1]},
                 ]
 
             } else if (child.leaf) {
                 child.type = "li"
-                child.data["innerText"] = child.leaf[0]
+                child.list = [{"text": [child.leaf[0], "div"]}]
                 if (child.leaf.length > 1 && typeof child.leaf[1] == "function") {
                     child.data["onclick"] = function(event) {
                         child.leaf[1](event, node)
@@ -131,7 +135,7 @@ kit = toolkit = {
             } else if (child.view) {
                 child.data["className"] = child.view[0]
                 child.type = child.view.length > 1? child.view[1]: "div"
-                child.view.length > 2 && (child.data["innerText"] = child.view[2])
+                child.view.length > 2 && (child.data["innerHTML"] = child.view[2])
                 child.view.length > 3 && (child.name = child.view[3])
 
             } else if (child.text) {
@@ -339,6 +343,9 @@ kit = toolkit = {
                     }
             }
         })
+    },
+    OrderLink: function(link) {
+        link.target = "_blank"
     },
 
     CopyText: function(text) {

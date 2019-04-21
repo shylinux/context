@@ -40,10 +40,8 @@ type NFS struct {
 func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, trip int, dir_reg *regexp.Regexp, fields []string, format string) {
 	back, e := os.Getwd()
 	m.Assert(e)
-	os.Chdir(name)
-	defer os.Chdir(back)
 
-	if fs, e := ioutil.ReadDir("."); m.Assert(e) {
+	if fs, e := ioutil.ReadDir(name); m.Assert(e) {
 		for _, f := range fs {
 			if f.Name() == "." || f.Name() == ".." {
 				continue
@@ -53,7 +51,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 				continue
 			}
 
-			f, e := os.Stat(f.Name())
+			f, e := os.Stat(path.Join(name, f.Name()))
 			if e != nil {
 				m.Log("info", "%s", e)
 				continue
@@ -91,11 +89,11 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 					case "line":
 						nline := 0
 						if f.IsDir() {
-							d, e := ioutil.ReadDir(f.Name())
+							d, e := ioutil.ReadDir(path.Join(name, f.Name()))
 							m.Assert(e)
 							nline = len(d)
 						} else {
-							f, e := os.Open(f.Name())
+							f, e := os.Open(path.Join(name, f.Name()))
 							m.Assert(e)
 							defer f.Close()
 
@@ -108,7 +106,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 						m.Add("append", "line", nline)
 					case "hash":
 						if f.IsDir() {
-							d, e := ioutil.ReadDir(f.Name())
+							d, e := ioutil.ReadDir(path.Join(name, f.Name()))
 							m.Assert(e)
 							meta := []string{}
 							for _, v := range d {
@@ -121,7 +119,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 							break
 						}
 
-						f, e := ioutil.ReadFile(f.Name())
+						f, e := ioutil.ReadFile(path.Join(name, f.Name()))
 						m.Assert(e)
 						h := sha1.Sum(f)
 						m.Add("append", "hash", hex.EncodeToString(h[:]))
@@ -129,7 +127,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 				}
 			}
 			if f.IsDir() && deep {
-				dir(m, f.Name(), level+1, deep, dir_type, trip, dir_reg, fields, format)
+				dir(m, path.Join(name, f.Name()), level+1, deep, dir_type, trip, dir_reg, fields, format)
 			}
 		}
 	}

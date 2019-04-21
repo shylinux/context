@@ -26,44 +26,6 @@
         clear:both;
     }
 
-    fieldset table.append {
-        font-size:14px;
-        overflow: auto;
-    }
-    fieldset table.append tr:hover {
-        background-color:lightgreen;
-    }
-    fieldset table.append th {
-        font-family:monospace;
-        background-color:lightgreen;
-        cursor:pointer;
-    }
-    fieldset table.append th.order {
-        background-color:red;
-        cursor:pointer;
-    }
-    fieldset table.append td {
-        max-width:1200px;
-        font-family:monospace;
-        padding-left: 10px;
-        padding-right: 20px;
-    }
-    fieldset table.append td.clip {
-        background-color:red;
-    }
-    fieldset table.append td:hover {
-        background-color:red;
-    }
-    fieldset code.result pre {
-        color:white;
-        font-size:14px;
-        background-color:#272822;
-        overflow:scroll;
-        padding:5px;
-        border:solid 2px green;
-        border-left:solid 4px green;
-        margin:0;
-    }
     fieldset code.result pre.clipboard {
         height:2em;
     }
@@ -114,5 +76,10 @@
     }
     fieldset.KitList li>input {
         background-color:rgba(0,0,0,0.2);
+    }
+/* ----- ScheduleList ----- */
+    fieldset.ScheduleList table.append td {
+        max-width:240px;
+        min-width:100px;
     }
 

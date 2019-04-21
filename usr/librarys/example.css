@@ -4,3 +4,49 @@ html, body {
     margin:0px;
     background-color:#d8d8d8;
 }
+
+fieldset table {
+    font-size:14px;
+    overflow: auto;
+    border:solid 1px green;
+}
+fieldset table caption {
+    font-size:18px;
+    font-style:italic;
+    border:solid 1px green;
+}
+fieldset table tr:hover {
+    background-color:lightgreen;
+}
+fieldset table th {
+    font-family:monospace;
+    background-color:lightgreen;
+    cursor:pointer;
+}
+fieldset table th.order {
+    background-color:red;
+    cursor:pointer;
+}
+fieldset table td {
+    max-width:1200px;
+    font-family:monospace;
+    padding-left: 10px;
+    padding-right: 20px;
+}
+fieldset table td.clip {
+    background-color:red;
+}
+fieldset table td:hover {
+    background-color:red;
+}
+
+fieldset pre code, fieldset code pre {
+    color:white;
+    font-size:14px;
+    background-color:#272822;
+    overflow:scroll;
+    padding:5px;
+    border:solid 2px green;
+    border-left:solid 4px green;
+    display:block;
+}

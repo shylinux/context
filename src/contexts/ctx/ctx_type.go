@@ -1123,6 +1123,37 @@ func (m *Message) Parse(arg interface{}) string {
 	}
 	return ""
 }
+func (m *Message) ToHTML() string {
+	cmd := strings.Join(m.Meta["detail"], " ")
+	result := []string{}
+	if len(m.Meta["append"]) > 0 {
+		result = append(result, "<table>")
+		result = append(result, "<caption>", cmd, "</caption>")
+		m.Table(func(maps map[string]string, list []string, line int) bool {
+			if line == -1 {
+				result = append(result, "<tr>")
+				for _, v := range list {
+					result = append(result, "<th>", v, "</th>")
+				}
+				result = append(result, "</tr>")
+				return true
+			}
+			result = append(result, "<tr>")
+			for _, v := range list {
+				result = append(result, "<td>", v, "</td>")
+			}
+			result = append(result, "</tr>")
+			return true
+		})
+		result = append(result, "</table>")
+	} else {
+		result = append(result, "<pre><code>")
+		result = append(result, fmt.Sprintf("%s", m.Find("shy", false).Conf("prompt")), cmd, "\n")
+		result = append(result, m.Meta["result"]...)
+		result = append(result, "</code></pre>")
+	}
+	return strings.Join(result, "")
+}
 
 func (m *Message) Gdb(arg ...interface{}) interface{} {
 	if g := m.Sess("gdb", false); g != nil {

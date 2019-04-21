@@ -64,9 +64,19 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no"},
 				}, "favicon": "favicon.ico", "styles": []interface{}{"example.css", "code.css"}},
 
+				map[string]interface{}{"componet_name": "com", "componet_help": "com", "componet_tmpl": "componet",
+					"componet_view": "ComList", "componet_init": "initComList",
+					"componet_ctx": "web.code", "componet_cmd": "componet", "componet_args": []interface{}{"share", "@role", "@componet_group", "@tips"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "role", "value": "tech", "label": "role"},
+						map[string]interface{}{"type": "text", "name": "tips", "value": "schedule", "label": "tips"},
+						map[string]interface{}{"type": "button", "value": "共享页面"},
+					},
+				},
+
 				map[string]interface{}{"componet_name": "text", "componet_help": "text", "componet_tmpl": "componet",
 					"componet_view": "ScheduleText", "componet_init": "initScheduleText",
-					"componet_ctx": "web.code", "componet_cmd": "schedule", "componet_args": []interface{}{"@time", "@name", "@place"}, "inputs": []interface{}{
+					"componet_ctx": "web.code", "componet_cmd": "schedule",
+					"componet_args": []interface{}{"@time", "@name", "@place"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "time", "value": "", "label": "time"},
 						map[string]interface{}{"type": "text", "name": "name", "value": "", "label": "name"},
 						map[string]interface{}{"type": "text", "name": "place", "value": "", "label": "place"},
@@ -77,6 +87,15 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				map[string]interface{}{"componet_name": "list", "componet_help": "list", "componet_tmpl": "componet",
 					"componet_view": "ScheduleList", "componet_init": "initScheduleList",
 					"componet_ctx": "web.code", "componet_cmd": "schedule",
+					"inputs": []interface{}{
+						map[string]interface{}{"type": "choice", "name": "view", "value": "summary", "label": "显示字段", "choice": []interface{}{
+							map[string]interface{}{"name": "默认", "value": "default"},
+							map[string]interface{}{"name": "行程", "value": "order"},
+							map[string]interface{}{"name": "总结", "value": "summary"},
+						}},
+						map[string]interface{}{"type": "button", "value": "刷新行程"},
+					},
+					"display_result": "",
 				},
 
 				map[string]interface{}{"componet_name": "tail", "componet_tmpl": "tail",
@@ -229,6 +248,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}, Help: "文档管理"},
 		"schedule": &ctx.Config{Name: "schedule", Value: map[string]interface{}{
 			"data": []interface{}{},
+			"view": map[string]interface{}{
+				"default": []interface{}{"面试时间", "面试公司", "面试地点", "面试轮次", "题目类型", "面试题目", "面试总结"},
+				"summary": []interface{}{"面试公司", "面试轮次", "题目类型", "面试题目", "面试总结"},
+				"order":   []interface{}{"面试时间", "面试公司", "面试地点"},
+			},
 			"maps": map[string]interface{}{"baidu": "<a href='baidumap://map/direction?region=&origin=&destination=%s'>%s</a>"},
 		}, Help: "闪存"},
 
@@ -405,16 +429,39 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"schedule": &ctx.Command{Name: "schedule [time name place]", Help: "行程安排", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 { // 会话列表
 				m.Confm("schedule", "data", func(index int, value map[string]interface{}) {
-					m.Add("append", "time", kit.Format(value["time"]))
-					m.Add("append", "name", kit.Format(value["name"]))
-					m.Add("append", "place", fmt.Sprintf(m.Conf("schedule", "maps.baidu"), value["place"], value["place"]))
+					for _, v := range kit.View([]string{m.Option("view")}, m.Confm("schedule", "view")) {
+						if v == "面试地点" {
+							m.Add("append", "面试地点", fmt.Sprintf(m.Conf("schedule", "maps.baidu"), value["面试地点"], value["面试地点"]))
+							continue
+						}
+						m.Add("append", v, kit.Format(value[v]))
+					}
 				})
 				m.Table()
 				return
 			}
-			m.Conf("schedule", []string{"data", "-1"}, map[string]interface{}{
-				"time": arg[0], "name": arg[1], "place": arg[2],
-			})
+
+			view := "default"
+			if m.Confs("schedule", arg[0]) {
+				view, arg = arg[0], arg[1:]
+			}
+
+			data := map[string]interface{}{}
+			for _, k := range kit.View([]string{view}, m.Confm("schedule", "view")) {
+				if len(arg) == 0 {
+					data[k] = ""
+					continue
+				}
+				data[k], arg = arg[0], arg[1:]
+			}
+
+			extra := map[string]interface{}{}
+			for i := 0; i < len(arg)-1; i += 2 {
+				data[arg[i]] = arg[i+1]
+			}
+			data["extra"] = extra
+
+			m.Conf("schedule", []string{"data", "-1"}, data)
 			return
 		}},
 

@@ -39,7 +39,14 @@ ctx = context = {
             ret.push(one)
         }
 
-        typeof cb == "function" && ret.forEach(cb)
+        var list = []
+        typeof cb == "function" && ret.forEach(function(value, index, array) {
+            var item = cb(value, index, array)
+            item && list.push(item)
+        })
+        if (list.length > 0) {
+            return list
+        }
         return ret
     },
 

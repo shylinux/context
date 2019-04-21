@@ -1,11 +1,11 @@
 ## 简介
+
 Redis是一个使用ANSI C编写的开源、支持网络、基于内存、可持久性的键值对存储数据库。
 Redis是最流行的键值对存储数据库。
 
-- 维基百科: <https://zh.wikipedia.org/wiki/Redis>
-- 官网: <https://redis.io](https://redis.io>
-- 源码: <https://shylinux.com/wiki/redis-4.0.11>
-- github: <https://github.com/antirez/redis>
+- 官网: <https://redis.io>
+- 源码: <http://download.redis.io/releases/redis-4.0.9.tar.gz>
+- 文档: <https://redis.io/documentation>
 
 ## 源码安装
 ```

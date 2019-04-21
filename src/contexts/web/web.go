@@ -858,6 +858,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 		"componet": &ctx.Command{Name: "componet [group [order [arg...]]]", Help: "添加组件, group: 组件分组, arg...: 组件参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 && arg[0] == "share" {
+				m.Cmd("aaa.role", arg[1], "componet", arg[2], "command", arg[3:])
+				m.Echo("%s/?componet_group=%s&relay=%s", m.Conf("serve", "site"), arg[2], m.Cmdx("aaa.relay", "share", arg[1]))
+				return
+			}
+
 			switch len(arg) {
 			case 0:
 				m.Cmdy("ctx.config", "componet")
@@ -971,7 +977,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 					}
-					msg.Log("fuck", "what %v", val)
+					msg.Log("fuck", "%s", msg.Option("componet_name"))
 
 					// 添加设备
 					arg = arg[:0]
