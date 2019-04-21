@@ -45,6 +45,7 @@ nnoremap <Leader>; :VimuxPromptCommand<CR>
 " nnoremap <Leader>vx :VimuxInterruptRunner<CR>
 
 Plug 'fatih/vim-go'
+" Plug 'Blackrush/vim-gocode'
 Plug 'chr4/nginx.vim'
 Plug 'othree/html5.vim'
 Plug 'godlygeek/tabular'
