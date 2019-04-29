@@ -2,4 +2,6 @@
     config save tmp/flash.json flash
 ~aaa
     config save tmp/auth.json auth
+~cli
+    config save tmp/runtime.json runtime
 

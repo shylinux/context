@@ -313,10 +313,16 @@ kit = toolkit = {
                     input.onclick = input.onclick || function(event) {
                         if (index == array.length-1) {
                             if (input.value == "login") {
-                                option.ondaemon = function(msg) {
-                                    page.reload()
-                                }
+                                page.Runs(page, option, function(msg) {
+                                    if (document.referrer) {
+                                        location.href = document.referrer
+                                    } else {
+                                        m.Search("componet_group", "")
+                                    }
+                                })
+                                return
                             }
+
                             page.Runs(page, option)
                             return
                         }

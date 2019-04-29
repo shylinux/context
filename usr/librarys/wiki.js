@@ -3,7 +3,7 @@ var page = Page({
         ctx.Runs(page, option, function(msg) {
             output.innerHTML = ""
             var back = [{"button": ["知识", function(event) {
-                ctx.Search({"wiki_class": "", "wiki_favor": ""})
+                ctx.Search({"wiki_level": "", "wiki_class": "", "wiki_favor": ""})
             }]}]
             ctx.Search("wiki_class").split("/").forEach(function(value, index, array) {
                 if (value) {
@@ -29,7 +29,7 @@ var page = Page({
                 })}]},
                 {"view": ["list"], "list": [{"tree": ctx.Table(msg, function(value, index) {
                     if (!value.filename.endsWith("/")) {
-                        return {"leaf": [value.filename, function(event, target) {
+                        return {"leaf": [value.time.substr(5, 5)+" "+value.filename, function(event, target) {
                             ctx.Search("wiki_favor", value.filename)
                         }]}
                     }
@@ -61,7 +61,13 @@ var page = Page({
             ])
 
             ui.text.querySelectorAll("table").forEach(function(value, index, array) {
-                kit.OrderTable(value, field)
+                kit.OrderTable(value)
+            })
+            ui.text.querySelectorAll("table.wiki_list").forEach(function(value, index, array) {
+                kit.OrderTable(value, "path", function(event) {
+                    var text = event.target.innerText
+                    ctx.Search({"wiki_class": text})
+                })
             })
 
             ui.text.querySelectorAll("a").forEach(function(value, index, array) {
@@ -96,7 +102,7 @@ var page = Page({
                         location.hash = id
                     }]})
                 } else if (value.tagName == "H4") {
-                    id = i+"."+(++j)+"."+(++k)
+                    id = i+"."+j+"."+(++k)
                     text = id+" "+text
                     h3.push({"leaf": [text+" ("+ratio+"%)", function(event) {
                         console.log(text)
@@ -120,6 +126,7 @@ var page = Page({
     },
     init: function(exp) {
         var page = this
+
         document.querySelectorAll("body>fieldset").forEach(function(field) {
             var option = field.querySelector("form.option")
             var output = field.querySelector("div.output")

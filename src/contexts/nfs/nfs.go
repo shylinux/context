@@ -923,7 +923,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				nfs.printf(msg.Meta["result"])
 
 				if msg.Appends("file_pos0") {
-					i = msg.Appendi("file_pos0") - 1
+					i = int(msg.Appendi("file_pos0")) - 1
 					msg.Append("file_pos0", "")
 				}
 			}
@@ -984,16 +984,15 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				if head == "detail" { // 接收请求
 					msg.Detail(-1, "remote")
 					msg.Option("remote_code", code)
-					go msg.Call(func(msg *ctx.Message) *ctx.Message {
-						nfs.echo <- msg
-						return nil
+					m.GoFunc(msg, func(msg *ctx.Message) {
+						msg.Call(func(msg *ctx.Message) *ctx.Message {
+							nfs.echo <- msg
+							return nil
+						})
 					})
 				} else { // 接收响应
 					h := nfs.hand[kit.Int(code)]
-					h.Copy(msg, "result").Copy(msg, "append")
-					go func() {
-						h.Back(h)
-					}()
+					h.Copy(msg, "result").Copy(msg, "append").Back(h)
 				}
 				msg, code, head, body = nil, "0", "result", "append"
 

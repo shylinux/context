@@ -25,7 +25,7 @@ func (tcp *TCP) Fuck(address []string, action func(address string) (net.Conn, er
 	for _, p := range address {
 		m.Cap("address", p)
 		for i := 0; i < m.Confi("retry", "counts"); i++ {
-			go func() {
+			m.GoFunc(m, func(m *ctx.Message) {
 				p := m.Cap("address")
 				if c, e := action(p); e == nil {
 					tcp.Conn = c
@@ -34,7 +34,7 @@ func (tcp *TCP) Fuck(address []string, action func(address string) (net.Conn, er
 					m.Log("info", "dial %s:%s %s", m.Cap("protocol"), p, e)
 					fuck <- false
 				}
-			}()
+			})
 
 			select {
 			case ok := <-fuck:
@@ -176,6 +176,8 @@ func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 			ports = append(ports, fmt.Sprintf("%s:%s", "127.0.0.1", addr[len(addr)-1]))
 		}
 		m.Back(m.Spawn(m.Source()).Put("option", "node.port", ports))
+	default:
+		return true
 	}
 
 	for {

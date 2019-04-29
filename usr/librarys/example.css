@@ -50,3 +50,16 @@ fieldset pre code, fieldset code pre {
     border-left:solid 4px green;
     display:block;
 }
+
+fieldset.Banner>ul {
+    margin:0;
+    padding:0;
+}
+fieldset.Banner>ul>li {
+    display:inline;
+    padding:5px;
+    margin:0;
+}
+fieldset.Banner>ul>li:hover {
+    background-color:red;
+}

@@ -6,13 +6,12 @@ Redis是最流行的键值对存储数据库。
 - 官网: <https://redis.io>
 - 源码: <http://download.redis.io/releases/redis-4.0.9.tar.gz>
 - 文档: <https://redis.io/documentation>
+- 开源: <https://github.com/antirez/redis/tree/4.0>
 
 ## 源码安装
 ```
 $ wget http://download.redis.io/releases/redis-4.0.11.tar.gz
-$ tar xzf redis-4.0.11.tar.gz
-$ cd redis-4.0.11
-$ make
+$ tar xzf redis-4.0.11.tar.gz && cd redis-4.0.11 && make
 ```
 #### 启动服务端
 ```
@@ -32,6 +31,186 @@ OK
 127.0.0.1:6379> get employee_name
 "shy"
 ```
+## 源码解析
+### 数据结构
+#### sds
+#### dict
+#### intset
+#### adlist
+#### ziplist
+#### geohash
+#### geo
+
+### 数据类型
+#### string
+#### list
+#### hash
+#### set
+#### zset
+
+### 数据存储
+#### db
+#### expire
+#### notify
+#### script
+#### multi
+#### sort
+
+### 服务框架
+#### server
+#### config
+#### module
+#### ae
+#### aof
+#### rdb
+
+### 服务集群
+#### replication
+#### sentinel
+#### cluster
+#### pubsub
+
+### 应用场景
+#### 数据缓存
+#### 分布式锁
+#### 计数统计
+#### 消息队列
+
+基本类型
+```
+typedef struct redisObject { // server.h:585
+    unsigned type:4;
+    unsigned encoding:4;
+    unsigned lru:LRU_BITS; /* LRU time (relative to global lru_clock) or
+                            * LFU data (least significant 8 bits frequency
+                            * and most significant 16 bits access time). */
+    int refcount;
+    void *ptr;
+} robj;
+```
+```
+typedef struct redisDb { // server.h:611
+    dict *dict;                 /* The keyspace for this DB */
+    dict *expires;              /* Timeout of keys with a timeout set */
+    dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP)*/
+    dict *ready_keys;           /* Blocked keys that received a PUSH */
+    dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
+    int id;                     /* Database ID */
+    long long avg_ttl;          /* Average TTL, just for stats */
+} redisDb;
+
+struct redisServer { // server.h:874
+    ...
+    redisDb *db;
+    ...
+    int dbnum;                      /* Total number of configured DBs */
+    ...
+}
+```
+
+
+## 基本类型
+### 字符串sds
+```
+struct __attribute__ ((__packed__)) sdshdr64 { // sds.h:68
+    uint64_t len; /* used */
+    uint64_t alloc; /* excluding the header and null terminator */
+    unsigned char flags; /* 3 lsb of type, 5 unused bits */
+    char buf[];
+};
+```
+
+### 双链表adlist
+```
+typedef struct listNode { // adlist.h
+    struct listNode *prev;
+    struct listNode *next;
+    void *value;
+} listNode;
+
+typedef struct list {
+    listNode *head;
+    listNode *tail;
+    void *(*dup)(void *ptr);
+    void (*free)(void *ptr);
+    int (*match)(void *ptr, void *key);
+    unsigned long len;
+} list;
+```
+
+```
+struct redisCommand redisCommandTable[] = {
+}
+```
+
+### 哈希表dict
+```
+typedef struct dictEntry { // dict.h
+    void *key;
+    union {
+        void *val;
+        uint64_t u64;
+        int64_t s64;
+        double d;
+    } v;
+    struct dictEntry *next;
+} dictEntry;
+
+typedef struct dictType {
+    uint64_t (*hashFunction)(const void *key);
+    void *(*keyDup)(void *privdata, const void *key);
+    void *(*valDup)(void *privdata, const void *obj);
+    int (*keyCompare)(void *privdata, const void *key1, const void *key2);
+    void (*keyDestructor)(void *privdata, void *key);
+    void (*valDestructor)(void *privdata, void *obj);
+} dictType;
+
+/* This is our hash table structure. Every dictionary has two of this as we
+ * implement incremental rehashing, for the old to the new table. */
+typedef struct dictht {
+    dictEntry **table;
+    unsigned long size;
+    unsigned long sizemask;
+    unsigned long used;
+} dictht;
+
+typedef struct dict {
+    dictType *type;
+    void *privdata;
+    dictht ht[2];
+    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
+    unsigned long iterators; /* number of iterators currently running */
+} dict;
+```
+
+### 跳跃表zskiplist
+```
+zskiplistNode { // server.h
+    sds ele;
+    double score;
+    struct zskiplistNode *backward;
+    struct zskiplistLevel {
+        struct zskiplistNode *forward;
+        unsigned int span;
+    } level[];
+} zskiplistNode;
+
+typedef struct zskiplist {
+    struct zskiplistNode *header, *tail;
+    unsigned long length;
+    int level;
+} zskiplist;
+```
+
+### 整数集合intset
+```
+typedef struct intset { // intset.h
+    uint32_t encoding;
+    uint32_t length;
+    int8_t contents[];
+} intset;
+```
+
 ## 源码解析
 ### 目录解析
 

@@ -335,9 +335,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}
 
 			msg := m.message
+			keys := map[string]bool{}
 			for msg = msg; msg != nil; msg = msg.message {
 				for _, k := range msg.Meta["option"] {
 					if len(arg) == 0 {
+						if keys[k] {
+							continue
+						}
+						keys[k] = true
 						m.Add("append", "key", k)
 						m.Add("append", "len", len(msg.Meta[k]))
 						m.Add("append", "value", fmt.Sprintf("%v", msg.Meta[k]))
@@ -601,9 +606,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					switch action {
 					case "cmd":
 						componet := "source"
-						if m.Options("bench") && m.Options("username") &&
-							!m.Cmds("aaa.work", m.Option("bench"), "right", m.Option("username"), componet, arg[0]) {
-							m.Log("info", "check %v: %v failure", componet, arg[0])
+						if m.Options("bench") && m.Options("username") && !m.Cmds("aaa.work", "right", componet, arg[0]) {
+							m.Log("info", "%s no right [%v: %v]", m.Option("username"), componet, arg[0])
 							m.Echo("error: ").Echo("no right [%s: %s]", componet, arg[0])
 							break
 						}
@@ -1407,6 +1411,7 @@ func Start(args ...string) bool {
 		args = args[1:]
 	}
 
+	Pulse.Option("routine", 0)
 	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
 		return Index.Close(Pulse, args...)
 	}

@@ -37,11 +37,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"nnode": &ctx.Cache{Name: "nnode", Value: "0", Help: "节点数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"node":           &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "主机信息"},
-		"trust":          &ctx.Config{Name: "trust", Value: map[string]interface{}{}, Help: "主机信息"},
-		"current":        &ctx.Config{Name: "current", Value: "", Help: "当前主机"},
-		"timer":          &ctx.Config{Name: "timer", Value: "", Help: "断线重连"},
-		"timer_interval": &ctx.Config{Name: "timer_interval", Value: "10s", Help: "断线重连"},
+		"current": &ctx.Config{Name: "current", Value: "", Help: "当前主机"},
+		"trust":   &ctx.Config{Name: "trust", Value: map[string]interface{}{}, Help: "可信主机"},
+		"node":    &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "主机信息"},
+		"timer":   &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "启动", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -94,8 +93,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			case "dial": // 连接主机
 				m.Call(func(nfs *ctx.Message) *ctx.Message {
 					// 断线重连
-					if m.Confs("timer") {
-						m.Conf("timer", m.Cmdx("cli.timer", "delete", m.Conf("timer")))
+					if m.Confs("timer", "timer") {
+						m.Conf("timer", "timer", m.Cmdx("cli.timer", "delete", m.Conf("timer", "timer")))
 					}
 
 					m.Spawn(nfs.Target()).Call(func(node *ctx.Message) *ctx.Message {
@@ -126,7 +125,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 						// 清理主机
 						nfs.Free(func(nfs *ctx.Message) bool {
-							m.Conf("timer", m.Cmdx("cli.timer", "repeat", m.Conf("timer_interval"), "context", "ssh", "remote", "redial", arg[1:]))
+							m.Conf("timer", "timer", m.Cmdx("cli.timer", "repeat", m.Conf("timer", "interval"), "context", "ssh", "remote", "redial", arg[1:]))
 							m.Cmd("aaa.auth", m.Cmdx("aaa.auth", "nodes", node.Append("node.name")), "delete", "node")
 							m.Log("info", "delete node %s", node.Append("node.name"))
 							delete(m.Confm("node"), node.Append("node.name"))
@@ -213,11 +212,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						}
 					}
 
-					if names[0] == "*" { // 广播命令
-						m.Confm("node", func(name string, node map[string]interface{}) {
+					if names[0] == "%" || names[0] == "*" { // 广播命令
+						m.Confm("node", names[0], func(name string, node map[string]interface{}) {
 							m.Find(kit.Format(node["module"]), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
-								return m.Copy(sub, "append").Copy(sub, "result")
-							}, "send", "", arg)
+								return m.CopyFuck(sub, "append").CopyFuck(sub, "result").Echo("\n\n")
+							}, "send", rest, arg)
 						})
 
 					} else if m.Confm("node", names[0], func(node map[string]interface{}) { // 单播命令
@@ -344,7 +343,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Cmd("aaa.auth", sess, "proxy", m.Option("node.route"))
 					m.Echo(sess)
 					return
-
 				}
 
 				if m.Options("remote_code") {

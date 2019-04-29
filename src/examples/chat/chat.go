@@ -116,7 +116,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			if kit.Int(access["expire"]) < now {
 				msg := m.Cmd("web.get", "wexin", access["url"], "appid", m.Conf("chat", "appid"), "secret", m.Conf("chat", "appmm"), "temp", "data")
 				access["token"] = msg.Append("access_token")
-				access["expire"] = msg.Appendi("expires_in") + now
+				access["expire"] = int(msg.Appendi("expires_in")) + now
 			}
 			m.Echo("%v", access["token"])
 			return
@@ -129,7 +129,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			if kit.Int(ticket["expire"]) < now {
 				msg := m.Cmd("web.get", "wexin", ticket["url"], "access_token", m.Cmdx(".access"), "temp", "data")
 				ticket["value"] = msg.Append("ticket")
-				ticket["expire"] = msg.Appendi("expires_in") + now
+				ticket["expire"] = int(msg.Appendi("expires_in")) + now
 			}
 			m.Echo("%v", ticket["value"])
 			return

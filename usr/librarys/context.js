@@ -70,6 +70,9 @@ ctx = context = {
             var searchs = search[1].split("&");
             for (var i = 0; i < searchs.length; i++) {
                 var keys = searchs[i].split("=");
+                if (keys[1]=="") {
+                    continue
+                }
                 args[keys[0]] = decodeURIComponent(keys[1]);
             }
         }
@@ -93,6 +96,7 @@ ctx = context = {
             arg.push(k+"="+encodeURIComponent(args[k]));
         }
         location.search = arg.join("&");
+        return value
     },
     Cookie: function(key, value) {
         if (key == undefined) {

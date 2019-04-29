@@ -62,7 +62,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"wiki_tree": &ctx.Command{Name: "wiki_tree", Help: "wiki_tree", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmdy("nfs.dir", path.Join(m.Confx("wiki_level"), kit.Select(m.Option("wiki_class"), arg, 0)), "dir_sort", "time_r")
+			m.Cmdy("nfs.dir", path.Join(m.Confx("wiki_level"), kit.Select(m.Option("wiki_class"), arg, 0)), "dir_sort", "time", "time_r")
 			return
 		}},
 		"wiki_text": &ctx.Command{Name: "wiki_text", Help: "wiki_text", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -80,8 +80,12 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				ls = markdown.ToHTML(ls, nil, nil)
 				m.Echo(string(ls))
 			} else {
-				m.Echo(m.Cmd("nfs.dir", path.Join(m.Confx("wiki_level"), m.Option("wiki_class")),
-					"dir_deep", "dir_type", "dir", "time", "path").ToHTML())
+				msg := m.Cmd("nfs.dir", path.Join(m.Confx("wiki_level"), m.Option("wiki_class")),
+					"dir_deep", "dir_type", "dir", "time", "path")
+				msg.Table(func(index int, value map[string]string) {
+					msg.Meta["path"][index] = strings.TrimPrefix(value["path"], path.Join("usr", m.Confx("wiki_level")))
+				})
+				m.Echo(msg.ToHTML("wiki_list"))
 			}
 			return
 		}},

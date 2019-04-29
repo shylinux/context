@@ -9,13 +9,21 @@ exp = example = {
         }
         return this
     },
-    initHeader: function(field, option, output) {
+    initHeader: function(page, field, option, output) {
         return [{"text": ["shylinux", "div", "title"]}]
     },
-    initBanner: function(field, option, output) {
+    initBanner: function(page, field, option, output) {
+        field.querySelectorAll("li").forEach(function(item) {
+            item.onclick = function(event) {
+                ctx.Search("componet_group", item.innerText)
+                if (item.innerText == "login") {
+                    ctx.Cookie("sessid", "")
+                }
+            }
+        })
         return [{"text": ["shylinux", "div", "title"]}]
     },
-    initFooter: function(field, option) {
+    initFooter: function(page, field, option) {
         return [{"text": ["shycontext", "div", "title"]}]
     },
     onscroll: function(event, target, action) {

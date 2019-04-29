@@ -20,6 +20,11 @@
         }
     </script>
 {{end}}
+{{define "banner"}}
+    <fieldset class="{{options . "componet_view"}}" data-init="{{options . "componet_init"}}">
+        <ul>{{range $key, $item := conf . "componet"}}<li>{{$key}}</li>{{end}}</ul>
+    </fieldset>
+{{end}}
 {{define "fieldset"}}
     <fieldset class="{{options . "componet_view"}}" data-init="{{options . "componet_init"}}">
         <form class="option {{options . "componet_name"}}"

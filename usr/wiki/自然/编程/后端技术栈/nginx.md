@@ -1,16 +1,16 @@
 ## 简介
 Nginx 是一个异步框架的Web服务器，也可以用作反向代理，负载均衡和HTTP缓存。
 
-- 维基百科: [https://zh.wikipedia.org/wiki/Nginx](https://zh.wikipedia.org/wiki/Nginx)
-- 官网: [https://www.nginx.org/](https://www.nginx.org/)
+- 官网: <https://www.nginx.org/>
+- 文档: <https://nginx.org/en/docs/>
+- 源码: <https://nginx.org/download/nginx-1.0.15.tar.gz>
+- 开源: <https://github.com/nginx/nginx/tree/branches/stable-1.0>
 
 ## 源码安装
 ```
-$ wget http://nginx.org/download/nginx-1.15.2.tar.gz
-$ tar xzf nginx-1.15.2.tar.gz
-$ cd nginx-1.15.2
-$ ./configure
-$ make
+$ wget http://nginx.org/download/nginx-1.0.15.tar.gz
+$ tar xzf nginx-1.0.15.tar.gz && cd nginx-1.0.15
+$ ./configure && make
 $ sudo make install
 $ sudo nginx
 $ curl localhost

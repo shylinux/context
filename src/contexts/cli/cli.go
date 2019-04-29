@@ -485,7 +485,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					return
 				}
 
-				now := int64(m.Sess("cli").Cmd("time").Appendi("timestamp"))
+				now := m.Sess("cli").Cmd("time").Appendi("timestamp")
 				begin := now
 				if len(arg) > 0 && arg[0] == "begin" {
 					begin, arg = int64(m.Sess("cli").Cmd("time", arg[1]).Appendi("timestamp")), arg[2:]
@@ -524,7 +524,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.GoLoop(m, func(m *ctx.Message) {
 						select {
 						case <-cli.Timer.C:
-							m.Log("info", "timer %s", m.Conf("timer_next"))
 							if m.Conf("timer_next") == "" {
 								break
 							}
@@ -675,10 +674,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmd("cli.source", m.Conf("system", "script.exit"))
-			go func() {
+
+			m.GoFunc(m, func(m *ctx.Message) {
 				time.Sleep(time.Second * 3)
 				os.Exit(kit.Int(arg[0]))
-			}()
+			})
 			return
 		}},
 
@@ -761,7 +761,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			// 解析路由
 			if msg == m {
-				if routes := strings.Split(detail[0], "."); len(routes) > 1 {
+				if routes := strings.Split(detail[0], "."); len(routes) > 1 && !strings.Contains(detail[0], ":") {
 					route := strings.Join(routes[:len(routes)-1], ".")
 					if msg = m.Find(route, false); msg == nil {
 						msg = m.Find(route, true)
