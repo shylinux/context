@@ -513,7 +513,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					if m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", link),
 						"GOOS", m.Conf("runtime", "host.GOOS"), "GOARCH", m.Conf("runtime", "host.GOARCH"),
 						"save", file); strings.HasPrefix(file, "bin/") {
-						if m.Cmd("cli.system", "chmod", "u+x", file); link == "bench" {
+						if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
 							m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
 							m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
 						}

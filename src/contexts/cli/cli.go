@@ -148,6 +148,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			mem := &runtime.MemStats{}
 			runtime.ReadMemStats(mem)
+			m.Append("NumCPU", runtime.NumCPU())
 			m.Append("NumGo", runtime.NumGoroutine())
 			m.Append("NumGC", mem.NumGC)
 			m.Append("other", kit.FmtSize(mem.OtherSys))
@@ -653,6 +654,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
 			m.Conf("runtime", "host.GOOS", runtime.GOOS)
 			m.Conf("runtime", "host.pid", os.Getpid())
+			runtime.GOMAXPROCS(1)
 
 			if name, e := os.Hostname(); e == nil {
 				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))

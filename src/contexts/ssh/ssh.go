@@ -214,9 +214,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 					if names[0] == "%" || names[0] == "*" { // 广播命令
 						m.Confm("node", names[0], func(name string, node map[string]interface{}) {
-							m.Find(kit.Format(node["module"]), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
-								return m.CopyFuck(sub, "append").CopyFuck(sub, "result").Echo("\n\n")
-							}, "send", rest, arg)
+							if kit.Format(node["type"]) != "master" {
+								m.Find(kit.Format(node["module"]), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
+									return m.CopyFuck(sub, "append").CopyFuck(sub, "result").Echo("\n\n")
+								}, "send", rest, arg)
+							}
 						})
 
 					} else if m.Confm("node", names[0], func(node map[string]interface{}) { // 单播命令
