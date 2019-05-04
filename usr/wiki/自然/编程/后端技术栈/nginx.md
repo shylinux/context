@@ -1,4 +1,4 @@
-## 简介
+## nginx
 Nginx 是一个异步框架的Web服务器，也可以用作反向代理，负载均衡和HTTP缓存。
 
 - 官网: <https://www.nginx.org/>

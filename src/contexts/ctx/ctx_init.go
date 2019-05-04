@@ -647,7 +647,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							} else {
 								m.Add("append", "ctx", "")
 							}
-							m.Add("append", "msg", msg.target.message.code)
+							if msg.target.message != nil {
+								m.Add("append", "msg", msg.target.message.code)
+							} else {
+								m.Add("append", "msg", "")
+							}
 							m.Add("append", "status", msg.Cap("status"))
 							m.Add("append", "stream", msg.Cap("stream"))
 							m.Add("append", "helps", msg.target.Help)

@@ -2,6 +2,7 @@ package ctx
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"regexp"
 	"runtime"
@@ -60,11 +61,18 @@ type Context struct {
 	Server
 }
 
-func (c *Context) Register(s *Context, x Server) {
+func (c *Context) Register(s *Context, x Server, args ...interface{}) {
 	if c.contexts == nil {
 		c.contexts = make(map[string]*Context)
 	}
-	if x, ok := c.contexts[s.Name]; ok {
+	force := false
+	if len(args) > 0 {
+		switch arg := args[0].(type) {
+		case bool:
+			force = arg
+		}
+	}
+	if x, ok := c.contexts[s.Name]; ok && !force {
 		panic(errors.New(c.Name + "上下文中已存在模块:" + x.Name))
 	}
 
@@ -265,6 +273,24 @@ func (c *Context) BackTrace(m *Message, hand func(m *Message) (stop bool)) *Cont
 
 	m.target = target
 	return target
+}
+
+func (c *Context) Plugin(args []string) string {
+	m := &Message{code: 0, time: time.Now(), source: c, target: c, Meta: map[string][]string{}}
+	if len(args) == 0 {
+		m.Echo("%s: %s\n", c.Name, c.Help)
+		for k, v := range c.Commands {
+			m.Echo("%s: %s %v\n", k, v.Name, v.Help)
+		}
+	} else if cs, ok := c.Commands[args[0]]; ok {
+		h := cs.Hand
+		if e := h(m, c, args[0], args[1:]...); e != nil {
+			m.Echo("error: ").Echo("%v\n", e)
+		}
+	} else {
+		m.Echo("error: ").Echo("not found: %v\n", args[0])
+	}
+	return strings.Join(m.Meta["result"], "")
 }
 
 type DEBUG interface {
@@ -1178,6 +1204,8 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 			}
 			return m
 		}
+	} else {
+		log.Printf(str, arg...)
 	}
 
 	if action == "error" {

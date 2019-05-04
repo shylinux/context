@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"plugin"
 	"strconv"
 	"strings"
 	"time"
@@ -187,6 +188,17 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}, Help: "组件列表"},
 		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 
+		"make": &ctx.Config{Name: "make", Value: map[string]interface{}{
+			"go": map[string]interface{}{
+				"build":  []interface{}{"go", "build"},
+				"plugin": []interface{}{"go", "build", "-buildmode=plugin"},
+				"load":   []interface{}{"load"},
+			},
+			"so": map[string]interface{}{
+				"load": []interface{}{"load"},
+			},
+		}, Help: "免密登录"},
+
 		"flash": &ctx.Config{Name: "flash", Value: map[string]interface{}{
 			"data": []interface{}{},
 			"view": map[string]interface{}{"default": []interface{}{"index", "time", "text", "code", "output"}},
@@ -281,6 +293,43 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"counter_service": &ctx.Config{Name: "counter_service", Value: "http://localhost:9094/code/counter", Help: "counter"},
 	},
 	Commands: map[string]*ctx.Command{
+		"make": &ctx.Command{Name: "make [action] file [args...]", Help: "更新代码", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			target, action, suffix := path.Join(m.Conf("runtime", "boot.ctx_home"), "src/examples/app/bench.go"), "build", "go"
+			if len(arg) == 0 {
+				arg = append(arg, target)
+			}
+
+			if cs := strings.Split(arg[0], "."); len(cs) > 1 {
+				suffix = cs[len(cs)-1]
+			} else if cs := strings.Split(arg[1], "."); len(cs) > 1 {
+				action, suffix, arg = arg[0], cs[len(cs)-1], arg[1:]
+			}
+
+			target = m.Cmdx("nfs.path", arg[0])
+			if target == "" {
+				target = m.Cmdx("nfs.path", path.Join("src/plugin/", arg[0]))
+			}
+
+			cook := m.Confv("make", []string{suffix, action})
+			switch kit.Chains(cook, "0") {
+			case "load":
+				if suffix == "go" {
+					so := strings.Replace(target, ".go", ".so", -1)
+					m.Cmd("cli.system", m.Confv("make", "go.plugin"), "-o", so, target)
+					arg[0] = so
+				}
+
+				if p, e := plugin.Open(arg[0]); m.Assert(e) {
+					s, e := p.Lookup("Index")
+					m.Assert(e)
+					w := *(s.(**ctx.Context))
+					c.Register(w, nil, true)
+				}
+			default:
+				m.Cmdy("cli.system", cook, arg)
+			}
+			return
+		}},
 		"flash": &ctx.Command{Name: "flash", Help: "闪存", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			total := len(m.Confv("flash", "data").([]interface{}))
 			// 查看列表
