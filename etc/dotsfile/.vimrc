@@ -137,8 +137,8 @@ nnoremap <Space> :
 nnoremap j gj
 nnoremap k gk
 
-nnoremap <C-M> :make<CR>
-inoremap <C-M> <ESC>:make<CR>i
+" nnoremap <C-M> :make<CR>
+" inoremap <C-M> <ESC>:make<CR>i
 
 nnoremap df :FZF<CR>
 inoremap df _

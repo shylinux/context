@@ -89,7 +89,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"componet_view": "ScheduleList", "componet_init": "initScheduleList",
 					"componet_ctx": "web.code", "componet_cmd": "schedule",
 					"inputs": []interface{}{
-						map[string]interface{}{"type": "choice", "name": "view", "value": "order", "label": "显示字段", "choice": []interface{}{
+						map[string]interface{}{"type": "choice", "name": "view", "value": "default", "label": "显示字段", "choice": []interface{}{
 							map[string]interface{}{"name": "默认", "value": "default"},
 							map[string]interface{}{"name": "行程", "value": "order"},
 							map[string]interface{}{"name": "总结", "value": "summary"},

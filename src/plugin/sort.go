@@ -39,14 +39,12 @@ func QuickSort(m *ctx.Message, level int, data []int, left int, right int) {
 		for ; p < r && data[p] < data[r]; r-- {
 		}
 		if p < r {
-			data[p], data[r] = data[r], data[p]
-			p = r
+			p, data[p], data[r] = r, data[r], data[p]
 		}
 		for ; l < p && data[l] < data[p]; l++ {
 		}
 		if l < p {
-			data[l], data[p] = data[p], data[l]
-			p = l
+			p, data[l], data[p] = l, data[p], data[l]
 		}
 	}
 
