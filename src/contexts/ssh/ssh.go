@@ -41,6 +41,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"trust":   &ctx.Config{Name: "trust", Value: map[string]interface{}{}, Help: "可信主机"},
 		"node":    &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "主机信息"},
 		"timer":   &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
+
+		"cert": &ctx.Config{Name: "cert", Value: map[string]interface{}{}, Help: "用户证书"},
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "启动", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -53,6 +55,46 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			m.Conf("runtime", "node.route", m.Conf("runtime", "node.name"))
 			m.Conf("runtime", "user.name", m.Conf("runtime", "boot.USER"))
+			return
+		}},
+		"cert": &ctx.Command{Name: "cert [node|user|work [create [args...]]]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Add("append", "key", "node.cert")
+				m.Add("append", "value", m.Conf("runtime", "node.cert"))
+				m.Add("append", "key", "user.cert")
+				m.Add("append", "value", m.Conf("runtime", "user.cert"))
+				m.Table()
+				return
+			}
+
+			switch arg[0] {
+			case "node": // 节点证书
+				if len(arg) > 1 && arg[1] == "create" {
+					msg := m.Cmd("aaa.rsa", "gen")
+					m.Conf("runtime", "node.cert", msg.Append("certificate"))
+					m.Conf("runtime", "node.key", msg.Append("private"))
+				}
+				m.Echo(m.Conf("runtime", "node.cert"))
+
+			case "user": // 用户证书
+				if len(arg) > 1 && arg[1] == "create" {
+					msg := m.Cmd("aaa.rsa", "gen")
+					m.Conf("runtime", "user.route", m.Conf("runtime", "node.route"))
+					m.Conf("runtime", "user.cert", msg.Append("certificate"))
+					m.Conf("runtime", "user.key", msg.Append("private"))
+				}
+				m.Echo(m.Conf("runtime", "user.cert"))
+
+			case "work": // 工作证书
+				if len(arg) > 1 && arg[1] == "create" {
+					if name := m.Cmdx("ssh.sh", "node", arg[2], "check", "work", m.Conf("runtime", "user.route"), m.Conf("runtime", "user.cert"), arg[3]); name != "" {
+						m.Conf("runtime", "work.route", arg[2])
+						m.Conf("runtime", "work.name", name)
+					}
+				}
+				m.Echo(m.Conf("runtime", "work.name"))
+			}
+
 			return
 		}},
 		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "远程连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -97,6 +139,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Conf("timer", "timer", m.Cmdx("cli.timer", "delete", m.Conf("timer", "timer")))
 					}
 
+					// 注册设备
 					m.Spawn(nfs.Target()).Call(func(node *ctx.Message) *ctx.Message {
 						// 添加网关
 						m.Confv("node", node.Append("node.name"), map[string]interface{}{
@@ -176,6 +219,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					arg[0] = ""
 				}
 				arg[0] = strings.TrimPrefix(arg[0], m.Conf("runtime", "node.route")+".")
+				arg[0] = strings.TrimPrefix(arg[0], m.Conf("runtime", "node.name")+".")
 				route, names, arg := arg[0], strings.SplitN(arg[0], ".", 2), arg[1:]
 				if len(names) > 1 && names[0] == "" && names[1] != "" {
 					names[0], names[1] = names[1], names[0]
@@ -200,6 +244,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							m.Option("node.route", m.Conf("runtime", "node.route")),
 							m.Option("user.route", kit.Select(m.Conf("runtime", "node.route"), m.Conf("runtime", "user.route"))),
 							m.Option("user.name", m.Option("username")),
+							m.Option("work.name", m.Conf("runtime", "work.name")),
 						)
 						m.Option("text.rand", meta[0])
 
@@ -226,7 +271,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							return m.Copy(sub, "append").Copy(sub, "result")
 						}, "send", rest, arg)
 
-					}) == nil { // 回溯命令
+					}) == nil { // 上报命令
 						m.Find(m.Cap("stream"), true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
 							return m.Copy(sub, "append").Copy(sub, "result")
 						}, "send", strings.Join(names, "."), arg)
@@ -253,6 +298,28 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 								m.Echo(m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "user.key"), arg[3]))
 							}
 						}
+					case "work":
+						if len(arg) == 2 { // 查看
+							if cert := m.Confm("cert", arg[2]); cert != nil {
+								m.Echo("%s", cert["user"])
+								return
+							}
+
+						} else { // 申请
+							if cert := m.Confm("cert", arg[4]); cert != nil {
+								if cert["user"] != arg[2] {
+									return
+								}
+								m.Echo(arg[4])
+								return
+							}
+
+							m.Conf("cert", arg[4], map[string]interface{}{
+								"create_time": m.Time(),
+								"user":        arg[2],
+							})
+							m.Echo(arg[4])
+						}
 					}
 					return
 				}
@@ -267,6 +334,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Option("node.route"),
 						m.Option("user.route"),
 						m.Option("user.name"),
+						m.Option("work.name"),
 					)
 					if m.Option("text.hash") != hash {
 						m.Log("warning", "text error")
@@ -348,15 +416,19 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				if m.Options("remote_code") {
-					m.Log("info", "username %s", m.Option("user.name"))
-					if m.Option("username", m.Option("user.name")); m.Confs("trust", m.Option("node.route")) {
+					m.Log("info", "username %s", m.Option("work.name"))
+					if m.Option("username", m.Option("work.name")); m.Confs("trust", m.Option("node.route")) {
 						m.Log("info", "skip verify user of node %s", m.Option("node.route"))
 					} else if m.Confs("trust", "up") && strings.HasPrefix(m.Conf("runtime", "node.route"), m.Option("node.route")) {
 						m.Log("info", "skip verify user of up node %s", m.Option("node.route"))
 					} else {
 						// 用户签名
 						hash, _ := kit.Hash("rand", m.Option("text.time", m.Time("stamp")), m.Option("node.route"))
-						m.Option("user.cert", m.Cmd("aaa.auth", "username", m.Option("user.name"), "cert").Append("meta"))
+						if m.Option("user.cert", m.Cmd("aaa.auth", "username", m.Option("username"), "cert").Append("meta")); !m.Options("user.cert") {
+							m.Option("user.cert", m.Cmd("ssh.remote", m.Option("user.route"), "sync", "check", "user").Append("user.cert"))
+							m.Log("fuck", "user.eert %v", m.Option("user.cert"))
+							m.Log("fuck", "wat %v", m.Cmd("aaa.auth", "username", m.Option("username"), "cert", m.Option("user.cert")))
+						}
 						m.Option("user.sign", m.Spawn().Cmdx("ssh.remote", m.Option("user.route"), "sync", "check", "user", m.Option("node.route"), hash))
 
 						// 代理验签

@@ -7,7 +7,7 @@ fieldset.Tree>div.output>div.tree li {
 fieldset.Tree>div.output>div.tree li div {
     float:left;
     padding:5px;
-    border:solid 1px green;
+    border:solid 2px green;
 }
 fieldset.Tree>div.output>div.list {
     clear:both;

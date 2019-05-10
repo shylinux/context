@@ -991,8 +991,9 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 						})
 					})
 				} else { // 接收响应
-					h := nfs.hand[kit.Int(code)]
-					h.Copy(msg, "result").Copy(msg, "append").Back(h)
+					if h, ok := nfs.hand[kit.Int(code)]; ok {
+						h.CopyFuck(msg, "result").CopyFuck(msg, "append").Back(h)
+					}
 				}
 				msg, code, head, body = nil, "0", "result", "append"
 
