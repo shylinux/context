@@ -10,7 +10,7 @@ exp = example = {
         return this
     },
     initHeader: function(page, field, option, output) {
-        return [{"text": ["shylinux", "div", "title"]}]
+        return [{"text": ["shycontext", "div", "title"]}]
     },
     initBanner: function(page, field, option, output) {
         field.querySelectorAll("li").forEach(function(item) {
@@ -24,7 +24,7 @@ exp = example = {
         return [{"text": ["shylinux", "div", "title"]}]
     },
     initFooter: function(page, field, option) {
-        return [{"text": ["shycontext", "div", "title"]}]
+        return [{"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]}]
     },
     onscroll: function(event, target, action) {
         var page = this

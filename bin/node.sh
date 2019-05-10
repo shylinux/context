@@ -3,7 +3,9 @@
 export ctx_box=${ctx_box:="http://localhost:9094"}
 export ctx_root="/usr/local/context"
 export ctx_home=~/context
-export ctx_bin="bench"
+
+ctx_bin="bench" && [ -e bin/bench ] && ctx_bin=bin/bench
+export ctx_bin
 
 log() {
     echo -e $*
@@ -22,7 +24,7 @@ main() {
 }
 
 case $1 in
-    create) mkdir $2; cd $2 && shift && shift && prepare && main "$@";;
+    create) mkdir -p $2; cd $2 && shift && shift && prepare && main "$@";;
     init) shift; prepare && main "$@";;
     *) mkdir -p var/run var/log && main "$@";;
 esac

@@ -3,7 +3,9 @@
 export ctx_dev=${ctx_dev:="https://shylinux.com"}
 export ctx_root="/usr/local/context"
 export ctx_home=~/context
-export ctx_bin="bench"
+
+ctx_bin="bench" && [ -e bin/bench ] && ctx_bin=bin/bench
+export ctx_bin
 
 log() {
     echo -e $*
@@ -64,6 +66,7 @@ log "dev:$ctx_dev\ndir: $dir\nbench: $ctx_bin\npid: $pid"
 
 case $1 in
     install) shift; prepare && install "$@";;
+    create) mkdir -p $2; cd $2 && shift && shift && prepare && main "$@";;
     start|"") shift; prepare && main "$@";;
     state) state;;
     stop) action QUIT;;

@@ -317,7 +317,7 @@ kit = toolkit = {
                                     if (document.referrer) {
                                         location.href = document.referrer
                                     } else {
-                                        m.Search("componet_group", "")
+                                        ctx.Search("componet_group", "")
                                     }
                                 })
                                 return

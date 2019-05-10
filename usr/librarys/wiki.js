@@ -1,5 +1,9 @@
 var page = Page({
     initTree: function(field, option, output) {
+        // if (!ctx.isMobile) {
+        //     field.style.float = "left"
+        // }
+
         ctx.Runs(page, option, function(msg) {
             output.innerHTML = ""
             var back = [{"button": ["知识", function(event) {
@@ -113,6 +117,22 @@ var page = Page({
                 value.id = id
             })
             kit.AppendChild(ui.menu, [{"tree": h0}])
+
+
+            ui.text.style.width = document.body.offsetWidth-30+"px"
+            if (i > 0 && !ctx.isMobile) {
+                ui.menu.style.position = "absolute"
+                var width = ui.menu.offsetWidth
+                var height = ui.menu.offsetHeight>400?ui.menu.offsetHeight:600
+
+                field.style.marginLeft = width+10+"px"
+                ui.menu.style.marginLeft = -width-20+"px"
+                ui.text.style.height = height+"px"
+                ui.text.style.width = field.offsetWidth-30-width+"px"
+
+
+                // ui.text.style.width = field.offsetWidth-ui.menu.offsetWidth+"px"
+            }
         })
         return
     },

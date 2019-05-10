@@ -63,3 +63,6 @@ fieldset.Banner>ul>li {
 fieldset.Banner>ul>li:hover {
     background-color:red;
 }
+fieldset.Footer {
+    clear:both;
+}
