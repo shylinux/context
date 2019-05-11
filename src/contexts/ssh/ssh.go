@@ -35,7 +35,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Configs: map[string]*ctx.Config{
 		"node":  &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
 		"cert":  &ctx.Config{Name: "cert", Value: map[string]interface{}{}, Help: "用户信息"},
-		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{"fresh": true, "user": true, "up": true}, Help: "可信节点"},
+		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{"fresh": false, "user": true, "up": true}, Help: "可信节点"},
 		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -292,6 +292,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			} else {
 				m.Log("warn", "user error of %s", m.Option("user.route"))
+				m.Echo("user error")
 				return
 			}
 			m.Log("info", "username: %s", m.Option("username"))
