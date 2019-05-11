@@ -33,3 +33,9 @@ fieldset.Text>div.output>div.text {
     overflow:auto;
     padding:10px;
 }
+fieldset.Text>div.output>div.text strong {
+    background-color:yellow;
+    border-left:solid 2px green;
+    border-top:solid 2px green;
+    color:red;
+}

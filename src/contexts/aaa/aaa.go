@@ -130,11 +130,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			"secrete": map[string]interface{}{"password": true, "token": true, "uuid": true, "ppid": true},
 		}, Help: "散列"},
 
-		"secrete_key": &ctx.Config{Name: "secrete_key", Value: map[string]interface{}{"password": 1, "uuid": 1}, Help: "私钥文件"},
-		"expire":      &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
-		"cert":        &ctx.Config{Name: "cert", Value: "etc/pem/cert.pem", Help: "证书文件"},
-		"pub":         &ctx.Config{Name: "pub", Value: "etc/pem/pub.pem", Help: "公钥文件"},
-		"key":         &ctx.Config{Name: "key", Value: "etc/pem/key.pem", Help: "私钥文件"},
+		"expire": &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

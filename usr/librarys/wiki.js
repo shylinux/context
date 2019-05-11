@@ -130,8 +130,10 @@ var page = Page({
                 ui.text.style.height = height+"px"
                 ui.text.style.width = field.offsetWidth-30-width+"px"
 
-
                 // ui.text.style.width = field.offsetWidth-ui.menu.offsetWidth+"px"
+            }
+            if (location.hash) {
+                location.href = location.hash
             }
         })
         return

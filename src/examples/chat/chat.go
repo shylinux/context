@@ -36,6 +36,37 @@ func Marshal(m *ctx.Message, meta string) string {
 var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "默认组件"},
+		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+			"index": []interface{}{
+				map[string]interface{}{"componet_name": "chat", "componet_tmpl": "head", "metas": []interface{}{
+					map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no"},
+				}, "favicon": "favicon.ico", "styles": []interface{}{"example.css", "chat.css"}},
+				map[string]interface{}{"componet_name": "header", "componet_tmpl": "fieldset",
+					"componet_view": "Header", "componet_init": "initHeader",
+					"title": "shylinux 天行健，君子以自强不息",
+				},
+
+				map[string]interface{}{"componet_name": "ocean", "componet_tmpl": "fieldset",
+					"componet_view": "Ocean", "componet_init": "initOcean",
+					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"ocean"},
+				},
+				map[string]interface{}{"componet_name": "river", "componet_tmpl": "fieldset",
+					"componet_view": "River", "componet_init": "initRiver",
+					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"river"},
+				},
+
+				map[string]interface{}{"componet_name": "footer", "componet_tmpl": "fieldset",
+					"componet_view": "Footer", "componet_init": "initFooter",
+					"title": "shycontext 地势坤，君子以厚德载物",
+				},
+				map[string]interface{}{"componet_name": "tail", "componet_tmpl": "tail",
+					"scripts": []interface{}{"toolkit.js", "context.js", "example.js", "chat.js"},
+				},
+			},
+		}, Help: "组件列表"},
+		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
+
 		"chat_msg":      &ctx.Config{Name: "chat_msg", Value: []interface{}{}, Help: "聊天记录"},
 		"default":       &ctx.Config{Name: "default", Value: "", Help: "聊天记录"},
 		"weather_site":  &ctx.Config{Name: "weather_site", Value: "http://weather.sina.com.cn", Help: "聊天记录"},
@@ -60,6 +91,17 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		}, Help: "聊天记录"},
 	},
 	Commands: map[string]*ctx.Command{
+		"flow": &ctx.Command{Name: "flow", Help: "信息流", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch arg[0] {
+			case "ocean":
+				m.Confm("")
+				m.Echo("ocean")
+			case "river":
+				m.Echo("river")
+			}
+			return
+		}},
+
 		"/chat": &ctx.Command{Name: "user", Help: "应用示例", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 信息验证
 			nonce := []string{m.Option("timestamp"), m.Option("nonce"), m.Conf("chat", "token")}
@@ -224,12 +266,6 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			return
 		}},
 
-		"talk": &ctx.Command{Name: "talk", Help: "talk", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Confs("default") {
-				m.Echo(m.Conf("default"))
-			}
-			return
-		}},
 		"weather": &ctx.Command{Name: "weather where field", Help: "weather", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			where := "beijing"
 			if len(arg) > 0 {

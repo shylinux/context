@@ -12,6 +12,10 @@ exp = example = {
     initHeader: function(page, field, option, output) {
         return [{"text": ["shycontext", "div", "title"]}]
     },
+    initField: function(page, field, option, output) {
+        ctx.Runs(page, option)
+        return
+    },
     initBanner: function(page, field, option, output) {
         field.querySelectorAll("li").forEach(function(item) {
             item.onclick = function(event) {

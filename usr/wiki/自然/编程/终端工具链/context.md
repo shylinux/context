@@ -363,8 +363,183 @@ chat模块提供了信息管理。
 
 ### 应用框架
 #### 模块
+
+context内部使用模块组织功能，每个模块都可以独立编译，独立运行。
+解除了代码之间的包依赖、库依赖、引用依赖、调用依赖。
+通过map查找模块，通过map查找命令，通过map查找配置，从而实现完全自由的模块。
+
+**模块定义：**
+```
+type Context struct { // src/contexts/ctx/ctx.go
+    Name string
+    Help string
+
+    Caches   map[string]*Cache
+    Configs  map[string]*Config
+    Commands map[string]*Command
+
+    ...
+
+    contexts map[string]*Context
+    context  *Context
+    root     *Context
+
+    ...
+    Server
+}
+
+```
+Name：模块名称，Help：模块帮助。
+模糊搜索搜索时，会根据Name与Help进行匹配。
+
+每个模块会有命令集合Commands，配置集合Configs，缓存集合Caches。通过这种形式提供功能集合。
+
+contexts：所有子模块，context：指向父模块，root：指向根模块。
+从而组成一个模块树，所以可以通过路由查找模块，
+如ctx.web.code，code的父模块是web，web的父模块是ctx，ctx是根模块。
+所以可以通过命令，查看到当前程序所有模块的信息。
+
+**缓存定义：**
+```
+type Cache struct {
+	Value string
+	Name  string
+	Help  string
+	Hand  func(m *Message, x *Cache, arg ...string) string
+}
+```
+Value：存放的数据，Name：变量名称，Help：变量帮助，Hand读写函数。
+
+缓存数量是一种数据接口，用来存放一些状态量，向外部显示程序进行状态，对外部来说一般是只读的。对内部来说可读可写。
+所以可以通过命令，查看到当前程序任意模块的状态数据。
+
+如下，ncontext当前有多少个模块。nserver有多少个模块运行了守护协程。
+
+```
+"nserver":    &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
+"ncontext":   &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
+```
+
+**缓存读写：**
+```
+func (m *Message) Cap(key string, arg ...interface{}) string {}
+func (m *Message) Capi(key string, arg ...interface{}) int {}
+func (m *Message) Caps(key string, arg ...interface{}) bool {}
+```
+定义了缓存数据的三种读写接口。
+
+m.Cap()只有一个参数时，会从当前模块查询缓存变量，如果查到则返回Value，如果没有，则依次查询父模块。
+如果查找到根模块还没有查到找，变返回空字符串。
+
+m.Cap()有两个参数时，同样会从当前模块依次查询父模块，直到查到变量，然后设置其值。
+
+m.Capi()是对m.Cap()封装了一下，在int与str相互转换，从而实现用str存储int。
+所有转换失败的数据，都会返回0。
+
+m.Caps()，实现了str存储bool。返回false的值有"", "0", "false", "off", "no", "error: "，其它都返回true。
+
+**配置定义：**
+```
+type Config struct {
+	Value interface{}
+	Name  string
+	Help  string
+	Hand  func(m *Message, x *Cache, arg ...string) string
+}
+```
+Value：存放的数据，Name：变量名称，Help：变量帮助，Hand读写函数。
+与Cache相似，只是Value的类型不再是String而是interface{}，所以可以用来存放更复杂的数据。
+
+一般用来存放配置数据，是外部控制内部数据接口。
+所以可以通过命令，实时修改当前程序任意模块的配置数据。
+避免只是修改某个配置变量，就要重启整个进程，从而实现高效灵活的配置。
+把每个进程当成一个生命来对待，不要轻易杀死任何一个进程。有问题可以用微创手术解决。
+
+**配置读写：**
+```
+func (m *Message) Conf(key string, args ...interface{}) string {}
+func (m *Message) Confi(key string, arg ...interface{}) int {}
+func (m *Message) Confs(key string, arg ...interface{}) bool {}
+func (m *Message) Confx(key string, args ...interface{}) string {}
+func (m *Message) Confv(key string, args ...interface{}) interface{} {}
+func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} {}
+```
+与Cache相似，也定义了各种读写的接口。
+
+因为interface{}可以是任意复合类型，所以数据嵌套很深时，查询会涉及各种类型转换，非常麻烦。
+Conf()定义了键值链。内部去处理类型转换与嵌套的深入。 
+如m.Conf("runtime", "user.node")、m.Conf("runtime", []string{"user", "node"})、m.Conf("runtime", []interface{}{"user", "node"})
+都会查询配置runtime下的user下的node的值。
+
+m.Confx()内部进行选择，如果m.Option(key)中取到了值，则直接返回m.Option(key)，否则返回m.Conf(key)。
+把配置当成一个备用的默认值，如果命令参数设置了此参数，则用命令中的参数。
+
+m.Confv()直接读写原始数据。
+m.Confm()则定义了更丰富的接口，m就是map意思，直接返回map[string]interface{}
+m另外一个意思就是magic，可以传入各种回调函数。
+如下配置node类型是map[string]interface{}，m.Confm()会遍历此map，查到value也是map[string]interface{}的键值，调用回调函数。
+```
+    ...
+    m.Confm("node", func(name string, node map[string]interface{}) {
+        if kit.Format(node["type"]) != "master" {
+            ps = append(ps, kit.Format(node["module"]))
+        }
+    })
+    ...
+```
+
+**命令定义：**
+```
+type Command struct {
+	Form map[string]int
+	Name string
+	Help interface{}
+	Auto func(m *Message, c *Context, key string, arg ...string) (ok bool)
+	Hand func(m *Message, c *Context, key string, arg ...string) (e error)
+}
+```
+Name：命令语法，Help：命令帮助。
+
+Hand：命令处理函数，m是调用消息，c是当前模块，key是命令名，arg是命令参数。
+
+在命令解析时，会根据Form将[key value...]形式的参数，取出存放到m.Option中，方便用key直接查找参数。
+所以arg中只剩下序列参数，通过index序号查找参数。
+
+Auto：终端自动补全函数。在使用终端每输入一个单词时，就调用此函数输出提示信息。所以在命令执行前，这个函数会被调用多次。
+
+如下定义了trans命令
+```
+    ...
+    "trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换",
+        Form: map[string]int{"format": 1, "fields": -1},
+        Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+            ...
+        }}
+    ...
+```
+
+**命令调用：**
+```
+func (m *Message) Cmd(args ...interface{}) *Message {}
+func (m *Message) Cmdx(args ...interface{}) string {}
+func (m *Message) Cmds(args ...interface{}) bool {}
+func (m *Message) Cmdy(args ...interface{}) *Message {}
+func (m *Message) Cmdm(args ...interface{}) *Message {}
+```
+m.Cmd()根据第一个参数去当前查找命令，如果没有查找到，则去父模块查找。如果没有查找，则不会执行。
+剩下的参数会根据Form定义来解析，存放到m.Option中。
+
+m.Cmds()当返回值转换成bool规则同m.Caps()与m.Confs()。
+m.Cmdx()当返回值转换成str。 m.Cmdy()将结果复制到当前Message。
+
+m.Cmdm()，m同样是magic，会根据当前会话，自动定向到远程某主机某模块，远程调用其命令，当然也可能定向到本机。
+
 #### 协程
 #### 消息
+
+context内部调用都是
+
+
 ### 解析引擎
 #### 文件扫描
 #### 词法解析
