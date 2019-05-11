@@ -461,7 +461,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					for i := 1; i < len(arg); i++ { // 添加用户
 						if m.Cmd("aaa.auth", "ship", "username", arg[i], "userrole", role); i < len(arg)-2 {
 							switch arg[i+1] {
-							case "password", "uuid":
+							case "password", "uuid", "cert":
 								m.Cmd("aaa.auth", "ship", "username", arg[i], arg[i+1], arg[i+2])
 								i += 2
 							}
@@ -628,26 +628,30 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					// 检查权限
 					m.Cmd("aaa.auth", "ship", "username", m.Option("username"), "userrole").Table(func(node map[string]string) {
-						if node["meta"] == "root" { // 超级用户
-							m.Log("info", "role: root")
-							m.Echo("true")
+						if m.Options("userrole") && node["meta"] != m.Option("userrole") {
+							return // 失败
+						} else if node["meta"] == "root" { // 超级用户
+
 						} else if len(arg) > 2 { // 接口权限
 							if m.Cmds("aaa.auth", m.Option("bench"), "ship", "check", arg[2]) {
-								m.Echo("true")
+
 							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "componet", arg[1], "check", arg[2]); kit.Right(cid) {
-								m.Log("info", "role: %s", node["meta"])
 								m.Cmd("aaa.auth", m.Option("bench"), cid)
-								m.Echo("true")
+							} else {
+								return // 失败
 							}
 						} else if len(arg) > 1 { // 组件权限
 							if m.Cmds("aaa.auth", m.Option("bench"), "ship", "check", arg[1]) {
-								m.Echo("true")
+
 							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "check", arg[1]); kit.Right(cid) {
-								m.Log("info", "role: %s", node["meta"])
 								m.Cmd("aaa.auth", m.Option("bench"), cid)
-								m.Echo("true")
+							} else {
+								return // 失败
 							}
 						}
+
+						m.Log("info", "role: %s %v", node["meta"], arg[1:])
+						m.Echo(node["meta"])
 					})
 
 					m.Log("right", "bench: %s sessid: %s user: %s com: %v result: %v",
@@ -746,8 +750,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber:          big.NewInt(1),
-							IsCA:                  true,
+							SerialNumber: big.NewInt(1),
+							IsCA:         true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},

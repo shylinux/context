@@ -466,32 +466,41 @@ func (m *Message) Format(arg ...interface{}) string {
 				}
 			}
 
+			meta = append(meta, "\n")
 			for i := len(ms) - 1; i >= 0; i-- {
 				msg := ms[i]
 
-				meta = append(meta, fmt.Sprintf("\n%s\n", msg.Format("time", "ship")))
-				meta = append(meta, fmt.Sprintf("  detail: %d %v\n", len(msg.Meta["detail"]), msg.Meta["detail"]))
-				meta = append(meta, fmt.Sprintf("  option: %d %v\n", len(msg.Meta["option"]), msg.Meta["option"]))
-				for _, k := range msg.Meta["option"] {
-					if v, ok := msg.Data[k]; ok {
-						meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
-					} else if v, ok := msg.Meta[k]; ok {
-						meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
+				meta = append(meta, fmt.Sprintf("%s\n", msg.Format("time", "ship")))
+				if len(msg.Meta["detail"]) > 0 {
+					meta = append(meta, fmt.Sprintf("  detail: %d %v\n", len(msg.Meta["detail"]), msg.Meta["detail"]))
+				}
+				if len(msg.Meta["option"]) > 0 {
+					meta = append(meta, fmt.Sprintf("  option: %d %v\n", len(msg.Meta["option"]), msg.Meta["option"]))
+					for _, k := range msg.Meta["option"] {
+						if v, ok := msg.Data[k]; ok {
+							meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
+						} else if v, ok := msg.Meta[k]; ok {
+							meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
+						}
 					}
 				}
-				meta = append(meta, fmt.Sprintf("  append: %d %v\n", len(msg.Meta["append"]), msg.Meta["append"]))
-				for _, k := range msg.Meta["append"] {
-					if v, ok := msg.Data[k]; ok {
-						meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
-					} else if v, ok := msg.Meta[k]; ok {
-						meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
+				if len(msg.Meta["append"]) > 0 {
+					meta = append(meta, fmt.Sprintf("  append: %d %v\n", len(msg.Meta["append"]), msg.Meta["append"]))
+					for _, k := range msg.Meta["append"] {
+						if v, ok := msg.Data[k]; ok {
+							meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
+						} else if v, ok := msg.Meta[k]; ok {
+							meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
+						}
 					}
 				}
-				meta = append(meta, fmt.Sprintf("  result: %d %v\n", len(msg.Meta["result"]), msg.Meta["result"]))
+				if len(msg.Meta["result"]) > 0 {
+					meta = append(meta, fmt.Sprintf("  result: %d %v\n", len(msg.Meta["result"]), msg.Meta["result"]))
+				}
 			}
 		case "stack":
 			pc := make([]uintptr, 100)
-			pc = pc[:runtime.Callers(2, pc)]
+			pc = pc[:runtime.Callers(6, pc)]
 			frames := runtime.CallersFrames(pc)
 
 			for {
@@ -1570,7 +1579,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	msg := m
 	if strings.Contains(key, ":") {
 		ps := strings.Split(key, ":")
-		msg, key, arg = msg.Sess("ssh"), "sh", append([]string{"node", ps[0], "sync", ps[1]}, arg...)
+		msg, key, arg = msg.Sess("ssh"), "remote", append([]string{"sync", ps[0], ps[1]}, arg...)
 		defer func() { m.Copy(msg, "append").Copy(msg, "result") }()
 		m.Hand = true
 

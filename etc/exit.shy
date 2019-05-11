@@ -1,5 +1,5 @@
-~code
-    config save tmp/flash.json flash
+~ssh
+    config save tmp/cert.json cert trust
 ~aaa
     config save tmp/auth.json auth
 ~cli

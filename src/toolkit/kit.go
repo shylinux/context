@@ -643,6 +643,10 @@ func Hash(arg ...interface{}) (string, []string) {
 	h := md5.Sum([]byte(strings.Join(args, "")))
 	return hex.EncodeToString(h[:]), args
 }
+func Hashs(arg ...interface{}) string {
+	h, _ := Hash(arg...)
+	return h
+}
 
 func Block(root interface{}, args ...interface{}) interface{} {
 

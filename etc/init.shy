@@ -2,8 +2,8 @@
     config load tmp/runtime.json runtime
 ~aaa
     config load tmp/auth.json auth
-~code
-    config load tmp/flash.json flash
+~ssh
+    config load tmp/cert.json cert trust
 
 source etc/common.shy
 ~ssh
