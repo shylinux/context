@@ -10,12 +10,17 @@ var page = Page({
         page.panes.river = field
         page.panes.channel = output
         page.showRiver(page, option)
+		return {"button": ["添加"], "action": function(value) {
+			ctx.Run(page, option.dataset, ["river", "create", prompt("name")], function(msg) {
+				page.showRiver(page, option)
+			})
+		}}
     },
     showRiver: function(page, option) {
         page.panes.channel.innerHTML = ""
         page.getRiver(page, option, function(line, index) {
             page.conf.river = page.conf.river || page.showTarget(page, option, line.key) || line.key
-            kit.AppendChild(page.panes.channel, [{view: ["item", "div", line.name], click: function(event) {
+            kit.AppendChild(page.panes.channel, [{view: ["item", "div", line.name+"("+line.count+")"], click: function(event) {
                 if (page.conf.river == line.key) {
                     return
                 }
@@ -151,7 +156,15 @@ var page = Page({
             var init = page[field.dataset.init]
             if (typeof init == "function") {
                 var conf = page[field.dataset.init](page, field, option, output)
-                if (conf) {
+                if (conf && conf["button"]) {
+                    var buttons = []
+                    conf.button.forEach(function(value, index) {
+                        buttons.push({"button": [value, function(event) {
+                            typeof conf["action"] == "function" && conf["action"](value, event)
+                        }]})
+                    })
+                    kit.InsertChild(field, output, "div", buttons)
+                } else if (conf) {
                     kit.AppendChild(output, conf)
                 }
             }

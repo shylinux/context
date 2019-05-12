@@ -125,6 +125,12 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 						m.Add("append", "name", kit.Chains(value, "conf.name"))
 						m.Add("append", "create_user", kit.Chains(value, "conf.create_user"))
 						m.Add("append", "create_time", kit.Chains(value, "conf.create_time"))
+
+						if list, ok := kit.Chain(value, "text.list").([]interface{}); ok {
+							m.Add("append", "count", len(list))
+						} else {
+							m.Add("append", "count", 0)
+						}
 					})
 					m.Table()
 					return
