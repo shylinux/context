@@ -1788,6 +1788,14 @@ func (m *Message) Confi(key string, arg ...interface{}) int {
 	return kit.Int(m.Confv(key, arg...))
 }
 func (m *Message) Confv(key string, args ...interface{}) interface{} {
+	if strings.Contains(key, ".") {
+		target := m.target
+		defer func() { m.target = target }()
+
+		ps := strings.Split(key, ".")
+		m.target, key = m.Sess(ps[0], false).target, ps[1]
+	}
+
 	var config *Config
 	m.Match(key, false, func(m *Message, s *Context, c *Context, key string) bool {
 		if x, ok := c.Configs[key]; ok {

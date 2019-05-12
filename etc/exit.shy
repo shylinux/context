@@ -1,3 +1,5 @@
+~chat
+    config save tmp/flow.json flow
 ~ssh
     config save tmp/cert.json cert trust
 ~aaa

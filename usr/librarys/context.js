@@ -7,7 +7,7 @@ ctx = context = {
         }
         this.GET("", option, function(msg) {
             msg = msg && msg[0]
-            // msg && (msg.__proto__ = (page || {}))
+            msg && (msg.__proto__ = (page || {}))
             typeof cb == "function" && cb(msg || {})
         })
     },

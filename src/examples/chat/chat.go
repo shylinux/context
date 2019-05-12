@@ -51,9 +51,26 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					"componet_view": "Ocean", "componet_init": "initOcean",
 					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"ocean"},
 				},
+				map[string]interface{}{"componet_name": "steam", "componet_tmpl": "fieldset",
+					"componet_view": "Steam", "componet_init": "initSteam",
+					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"steam"},
+				},
 				map[string]interface{}{"componet_name": "river", "componet_tmpl": "fieldset",
 					"componet_view": "River", "componet_init": "initRiver",
 					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"river"},
+				},
+				map[string]interface{}{"componet_name": "storm", "componet_tmpl": "fieldset",
+					"componet_view": "Storm", "componet_init": "initStorm",
+					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"storm"},
+				},
+
+				map[string]interface{}{"componet_name": "target", "componet_tmpl": "fieldset",
+					"componet_view": "Target", "componet_init": "initTarget",
+					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"target"},
+				},
+				map[string]interface{}{"componet_name": "source", "componet_tmpl": "fieldset",
+					"componet_view": "Source", "componet_init": "initSource",
+					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"source"},
 				},
 
 				map[string]interface{}{"componet_name": "footer", "componet_tmpl": "fieldset",
@@ -89,15 +106,75 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			"tool_path":    "/Applications/wechatwebdevtools.app/Contents/MacOS/cli",
 			"project_path": "/Users/shaoying/context/usr/client/mp",
 		}, Help: "聊天记录"},
+
+		"flow": &ctx.Config{Name: "flow", Value: map[string]interface{}{}, Help: "聊天记录"},
 	},
 	Commands: map[string]*ctx.Command{
 		"flow": &ctx.Command{Name: "flow", Help: "信息流", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "ocean":
-				m.Confm("")
-				m.Echo("ocean")
+				m.Confm("ssh.cert", func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "user", value["user"])
+				})
+				m.Table()
 			case "river":
-				m.Echo("river")
+				if len(arg) == 1 {
+					m.Confm("flow", func(key string, value map[string]interface{}) {
+						m.Add("append", "key", key)
+						m.Add("append", "name", kit.Chains(value, "conf.name"))
+						m.Add("append", "create_user", kit.Chains(value, "conf.create_user"))
+						m.Add("append", "create_time", kit.Chains(value, "conf.create_time"))
+					})
+					m.Table()
+					return
+				}
+
+				switch arg[1] {
+				case "create":
+					h := kit.Hashs("uniq")
+
+					m.Conf("flow", h, map[string]interface{}{
+						"conf": map[string]interface{}{
+							"create_time": m.Time(),
+							"create_user": m.Option("username"),
+							"name":        kit.Select("what", arg, 2),
+						},
+						"user": map[string]interface{}{},
+						"text": map[string]interface{}{},
+					})
+					m.Echo(h)
+
+				case "wave":
+					if len(arg) == 3 {
+						m.Confm("flow", []string{arg[2], "text.list"}, func(index int, value map[string]interface{}) {
+							m.Add("append", "index", index)
+							m.Add("append", "type", value["type"])
+							m.Add("append", "text", value["text"])
+						})
+						m.Table()
+						return
+					}
+
+					m.Conf("flow", []string{arg[2], "text.list.-2"}, map[string]interface{}{
+						"create_time": m.Time(),
+						"type":        arg[3],
+						"text":        arg[4],
+					})
+
+					count := m.Confi("flow", []string{arg[2], "text.count"}) + 1
+					m.Confi("flow", []string{arg[2], "text.count"}, count)
+					m.Echo("%d", count)
+				}
+			case "storm":
+				switch arg[1] {
+				case "wind":
+					switch arg[2] {
+					case "text":
+
+					}
+				}
+			case "steam":
 			}
 			return
 		}},

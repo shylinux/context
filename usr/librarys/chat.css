@@ -1,0 +1,42 @@
+
+fieldset.Ocean {
+    display:none;
+    padding:0;
+}
+fieldset.River {
+    overflow:auto;
+    padding:0;
+    min-width:160px;
+    min-height:200px;
+    float:left;
+}
+fieldset.River div.output div.item {
+
+}
+fieldset.River div.output div.item:hover {
+    background-color:red;
+
+}
+fieldset.Target {
+    padding:0;
+    min-width:160px;
+    min-height:80px;
+}
+fieldset.Target div.output {
+    overflow:auto;
+}
+fieldset.Source {
+    padding:0;
+    min-width:160px;
+    min-height:30px;
+}
+fieldset.Storm {
+    padding:0;
+    min-width:160px;
+    min-height:200px;
+    float:right;
+}
+fieldset.Steam {
+    display:none;
+    padding:0;
+}

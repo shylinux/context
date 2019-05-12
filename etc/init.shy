@@ -4,6 +4,8 @@
     config load tmp/auth.json auth
 ~ssh
     config load tmp/cert.json cert trust
+~chat
+    config load tmp/flow.json flow
 
 source etc/common.shy
 ~ssh
