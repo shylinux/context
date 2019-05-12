@@ -1,26 +1,36 @@
+var pane = {}
 var page = Page({
-    initOcean: function(page, field, option) {
-        page.panes.ocean = field
-        ctx.Run(page, option.dataset, ["ocean"], function(msg) {
-            kit.Log(msg.result)
-        })
-        return [{"text": ["ocean"]}]
+    pane: pane,
+    initOcean: function(page, field, option, output) {
+        return {"button": ["关闭"], "action": function(event) {
+            pane.ocean.showDialog()
+        }}
     },
+
     initRiver: function(page, field, option, output) {
-        page.panes.river = field
-        page.panes.channel = output
+        pane.channel = output
         page.showRiver(page, option)
-		return {"button": ["添加"], "action": function(value) {
-			ctx.Run(page, option.dataset, ["river", "create", prompt("name")], function(msg) {
-				page.showRiver(page, option)
-			})
+		return {"button": ["添加", "查找"], "action": function(value) {
+            switch (value) {
+                case "添加":
+                    var name = prompt("name")
+                    if (name) {
+                        ctx.Run(page, option.dataset, ["river", "create", name], function(msg) {
+                            page.showRiver(page, option)
+                        })
+                    }
+                    break
+                case "查找":
+                    kit.showDialog(pane.ocean)
+                    break
+            }
 		}}
     },
     showRiver: function(page, option) {
-        page.panes.channel.innerHTML = ""
+        pane.channel.innerHTML = ""
         page.getRiver(page, option, function(line, index) {
             page.conf.river = page.conf.river || page.showTarget(page, option, line.key) || line.key
-            kit.AppendChild(page.panes.channel, [{view: ["item", "div", line.name+"("+line.count+")"], click: function(event) {
+            kit.AppendChild(pane.channel, [{view: ["item", "div", line.name+"("+line.count+")"], click: function(event) {
                 if (page.conf.river == line.key) {
                     return
                 }
@@ -37,17 +47,16 @@ var page = Page({
         })
     },
     initTarget: function(page, field, option) {
-        page.panes.target = field
-        page.panes.output = field.querySelector("div.target.output")
+        pane.output = field.querySelector("div.target.output")
         ctx.Run(page, option.dataset, ["river"], function(msg) {
             kit.Log(msg.result)
         })
         return [{"text": ["target"]}]
     },
     showTarget: function(page, option, id) {
-        page.panes.output.innerHTML = ""
+        pane.output.innerHTML = ""
         page.getTarget(page, option, id, function(line, index) {
-            kit.AppendChild(page.panes.output, [{"view": ["item", "div", line.text]}])
+            kit.AppendChild(pane.output, [{"view": ["item", "div", line.text]}])
         })
     },
     getTarget: function(page, option, id, cb) {
@@ -61,8 +70,8 @@ var page = Page({
         var ui = kit.AppendChild(option, [{"view": ["input", "textarea"], "name": "input", "data": {"onkeyup": function(event){
             if (event.key == "Enter" && !event.shiftKey) {
                 var value = event.target.value
-                kit.AppendChild(page.panes.output, [{"text" :[value, "div"]}])
-                page.panes.output.scrollBy(0,100)
+                kit.AppendChild(pane.output, [{"text" :[value, "div"]}])
+                pane.output.scrollBy(0,100)
                 // event.target.value = ""
                 ctx.Run(page, option.dataset, ["river", "wave", page.conf.river, "text", value], function(msg) {
                     kit.Log(msg.result)
@@ -73,9 +82,8 @@ var page = Page({
                 event.preventDefault()
             }
         }}}])
-        page.panes.input = ui.input
+        pane.input = ui.input
 
-        page.panes.source = field
         ctx.Run(page, option.dataset, ["river"], function(msg) {
             msg.Table(function(index, line) {
                 console.log(index)
@@ -86,14 +94,12 @@ var page = Page({
         return
     },
     initStorm: function(page, field, option) {
-        page.panes.storm = field
         ctx.Run(page, option.dataset, ["river"], function(msg) {
             kit.Log(msg.result)
         })
         return [{"text": ["storm"]}]
     },
     initSteam: function(page, field, option) {
-        page.panes.steam = field
         ctx.Run(page, option.dataset, ["river"], function(msg) {
             kit.Log(msg.result)
         })
@@ -104,46 +110,46 @@ var page = Page({
     range: function(sizes) {
         sizes = sizes || {}
         var width = document.body.offsetWidth
-        var river_width = page.panes.river.offsetWidth
-        var storm_width = page.panes.storm.offsetWidth
-        var source_width = page.panes.source.offsetWidth
-        var source_height = page.panes.source.offsetHeight
+        var river_width = pane.river.offsetWidth
+        var storm_width = pane.storm.offsetWidth
+        var source_width = pane.source.offsetWidth
+        var source_height = pane.source.offsetHeight
         var height = document.body.offsetHeight-80
 
 
-        page.panes.river.style.height = height+"px"
-        page.panes.storm.style.height = height+"px"
-        page.panes.target.style.height = (height-source_height)+"px"
+        pane.river.style.height = height+"px"
+        pane.storm.style.height = height+"px"
+        pane.target.style.height = (height-source_height)+"px"
         if (sizes.left != undefined) {
             if (sizes.left == 0) {
-                page.panes.river.style.display = "none"
+                pane.river.style.display = "none"
             } else {
-                page.panes.river.style.display = "block"
-                page.panes.river.style.width = sizes.left+"px"
+                pane.river.style.display = "block"
+                pane.river.style.width = sizes.left+"px"
             }
         }
         if (sizes.right != undefined) {
             if (sizes.right == 0) {
-                page.panes.storm.style.display = "none"
+                pane.storm.style.display = "none"
             } else {
-                page.panes.storm.style.display = "block"
-                page.panes.storm.style.width = sizes.right+"px"
+                pane.storm.style.display = "block"
+                pane.storm.style.width = sizes.right+"px"
             }
         }
         if (sizes.middle != undefined) {
-            page.panes.source.style.height = sizes.middle+"px"
-            page.panes.target.style.height = (height-sizes.middle-4)+"px"
-            page.panes.output.style.height = (height-sizes.middle-8)+"px"
-            page.panes.input.style.height = (sizes.middle-7)+"px"
+            pane.source.style.height = sizes.middle+"px"
+            pane.target.style.height = (height-sizes.middle-4)+"px"
+            pane.output.style.height = (height-sizes.middle-8)+"px"
+            pane.input.style.height = (sizes.middle-7)+"px"
         } else {
-            var source_height = page.panes.source.offsetHeight-10
-            page.panes.input.style.height = source_height+"px"
-            page.panes.output.style.height = source_height+"px"
+            var source_height = pane.source.offsetHeight-10
+            pane.input.style.height = source_height+"px"
+            pane.output.style.height = source_height+"px"
         }
 
-        var source_width = page.panes.source.offsetWidth-10
-        page.panes.input.style.width = source_width+"px"
-        page.panes.output.style.width = source_width+"px"
+        var source_width = pane.source.offsetWidth-10
+        pane.input.style.width = source_width+"px"
+        pane.output.style.width = source_width+"px"
     },
 
     init: function(exp) {
@@ -152,6 +158,7 @@ var page = Page({
         document.querySelectorAll("body>fieldset").forEach(function(field) {
             var option = field.querySelector("form.option")
             var output = field.querySelector("div.output")
+            pane[option.dataset.componet_name] = field
 
             var init = page[field.dataset.init]
             if (typeof init == "function") {

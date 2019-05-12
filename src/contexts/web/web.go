@@ -982,7 +982,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					// 添加设备
 					arg = arg[:0]
 					if kit.Right(val["componet_pod"]) {
-						arg = append(arg, "sh", "node", kit.Format(m.Magic("session", "current.pod")))
+						arg = append(arg, "remote", kit.Format(m.Magic("session", "current.pod")))
 					}
 					// 添加命令
 					if kit.Right(val["componet_cmd"]) {

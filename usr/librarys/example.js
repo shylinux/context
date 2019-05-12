@@ -13,7 +13,6 @@ exp = example = {
         return [{"text": ["shycontext", "div", "title"]}]
     },
     initField: function(page, field, option, output) {
-        ctx.Runs(page, option)
         return
     },
     initBanner: function(page, field, option, output) {
@@ -30,6 +29,7 @@ exp = example = {
     initFooter: function(page, field, option) {
         return [{"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]}]
     },
+
     onscroll: function(event, target, action) {
         var page = this
         switch (action) {
@@ -40,6 +40,7 @@ exp = example = {
                 break
         }
     },
+    onresize: function(event) {},
     reload: function() {
         location.reload()
     },
@@ -50,4 +51,9 @@ function Page(page) {
         page.init(exp._init(page))
     }
     return page
+}
+function Pane(pane) {
+    pane.showDialog = function(width, height) {
+        kit.showDialog(this, width, height)
+    }
 }

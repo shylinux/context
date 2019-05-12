@@ -327,10 +327,76 @@ chat模块提供了信息管理。
 - iOS
 - Android
 
+### 应用接口
+
+context的应用模块都是web的子模块，在web模块启动HTTP服务后，会根据模块名与命令名自动生成路由。
+web模块会将所有的HTTP请求转换成context的命令调用，所以HTTP的应用接口和普通命令，除了名字必须以"/"开头，其它没有太大区别。
+
+当web接收到HTTP请求后，可以调用单个命令如 http://shylinux.com/code/consul 就会调用code模块下的/consul命令
+
+可以调用多个命令如 http://shylinux.com/code/?componet_group=login 就会调用web模块下的/render命令，
+根据code的componet下的login组件，依次调用每个接口的命令，然后将执行结果与参数一起，调用golang的template，渲染生成HTML。
+
+所有命令都解析完成后就可以生成一个完整的网页。当然如果Accept是application/json，则会跳过模块渲染，直接返回多条命令的执行结果。
+所以componet就是接口的集合，统一提供参数配置、权限检查、命令执行、模板渲染，降低内部命令与外部应用的耦合性，但又将前后端完全融合在一起。
+
+
+如下，是web.code模块的应用接口定义。配置componet下定义了多个组件，每个组件下定义了多个接口。
+
+login就是登录页面，下面定义了三个接口code、login、tail，
+其中code，使用模板head生成网页头，会包括一些配置，如favicon可以指定图标文件，styles指定引用模式表。
+其中tail，使用模板tail生成网页尾，会包括一些配置，如scripts指定引用脚本文件。
+
+login就是网页组件了，生成一个网页登录的输入表单，并接收表单请求调用aaa模块的auth命令，进行用户身份的验证。
+其中arguments指定了Form表单字段的列表。
+```
+...
+var Index = &ctx.Context{Name: "code", Help: "代码中心",
+	Caches: map[string]*ctx.Cache{},
+	Configs: map[string]*ctx.Config{
+		"skip_login": &ctx.Config{Name: "skip_login", Value: map[string]interface{}{"/consul": "true"}, Help: "免密登录"},
+        "componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+            "login": []interface{}{
+                map[string]interface{}{"componet_name": "code", "componet_tmpl": "head", "metas": []interface{}{
+                    map[string]interface{}{"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no"},
+                }, "favicon": "favicon.ico", "styles": []interface{}{"example.css", "code.css"}},
+
+                map[string]interface{}{"componet_name": "login", "componet_help": "login", "componet_tmpl": "componet",
+                    "componet_ctx": "aaa", "componet_cmd": "auth", "componet_args": []interface{}{"@sessid", "ship", "username", "@username", "password", "@password"}, "inputs": []interface{}{
+                        map[string]interface{}{"type": "text", "name": "username", "value": "", "label": "username"},
+                        map[string]interface{}{"type": "password", "name": "password", "value": "", "label": "password"},
+                        map[string]interface{}{"type": "button", "value": "login"},
+                    },
+                    "display_append": "", "display_result": "",
+                },
+
+                map[string]interface{}{"componet_name": "tail", "componet_tmpl": "tail",
+                    "scripts": []interface{}{"toolkit.js", "context.js", "example.js", "code.js"},
+                },
+            },
+...
+```
+### 网页开发
+
+#### 模板
+
+usr/template 存放了网页的模板文件，context会调用golang的template接口进行后端渲染，生成html文件。
+
+componet下每一个接口都会指定一个模板，web模块下的/render命令会依次渲染，从而生成一个完整的网页。
+
+
+- usr/template/common.tmpl 公共模板
+- usr/template/code/ code模块的模板
+- usr/template/wiki/ wiki
+- usr/template/chat/
+
+usr/librarys 存放了css与js
+
 ### 小程序
 ### 开发板
 
 ## 接口开发
+### componet
 ### python
 ### java
 ### c

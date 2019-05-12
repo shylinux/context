@@ -906,7 +906,7 @@ func (m *Message) Magic(begin string, chain interface{}, args ...interface{}) in
 func (m *Message) Current(text string) string {
 	cs := []string{}
 	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
-		cs = append(cs, "context", "ssh", "sh", "node", "'"+pod+"'")
+		cs = append(cs, "context", "ssh", "remote", "'"+pod+"'")
 	}
 	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
 		cs = append(cs, "context", ctx)
@@ -1540,7 +1540,7 @@ func (m *Message) Cmdm(args ...interface{}) *Message {
 
 	arg := []string{}
 	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
-		arg = append(arg, "context", "ssh", "sh", "node", pod)
+		arg = append(arg, "context", "ssh", "remote", pod)
 	}
 	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
 		arg = append(arg, "context", ctx)
@@ -1793,7 +1793,9 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} {
 		defer func() { m.target = target }()
 
 		ps := strings.Split(key, ".")
-		m.target, key = m.Sess(ps[0], false).target, ps[1]
+		if msg := m.Sess(ps[0], false); msg != nil {
+			m.target, key = msg.target, ps[1]
+		}
 	}
 
 	var config *Config

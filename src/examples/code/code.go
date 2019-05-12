@@ -160,7 +160,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				},
 				map[string]interface{}{"componet_name": "pod", "componet_help": "pod", "componet_tmpl": "componet",
 					"componet_view": "PodList", "componet_init": "initPodList",
-					"componet_ctx": "ssh", "componet_cmd": "remote", "inputs": []interface{}{
+					"componet_ctx": "ssh", "componet_cmd": "node", "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "value": "@current.pod"},
 						map[string]interface{}{"type": "button", "value": "refresh"},
 					},

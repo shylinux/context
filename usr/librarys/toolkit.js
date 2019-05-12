@@ -420,6 +420,64 @@ kit = toolkit = {
         }
         return true
     },
+
+    setView: function(target, args) {
+        var width = document.body.offsetWidth-10
+        var height = document.body.offsetHeight-10
+        for (var k in args) {
+            switch (k) {
+                case "dialog":
+                    var w = h = args[k]
+                    if (typeof(args[k]) == "object") {
+                        w = args[k][0]
+                        h = args[k][1]
+                    }
+                    if (w > width) {
+                        w = width
+                    }
+
+                    args["top"] = (height-h)/2
+                    args["left"] = (width-w)/2
+                    args["width"] = w
+                    args["height"] = h
+                    break
+                case "window":
+                    var w = h = args[k]
+                    if (typeof(args[k]) == "object") {
+                        w = args[k][0]
+                        h = args[k][1]
+                    }
+
+                    args["top"] = h/2
+                    args["left"] = w/2
+                    args["width"] = width-w
+                    args["height"] = height-h
+                    break
+            }
+        }
+
+        for (var k in args) {
+            switch (k) {
+                case "top":
+                case "left":
+                case "width":
+                case "height":
+                    target.style[k] = args[k]+"px"
+                    break
+            }
+        }
+    },
+    showDialog: function(pane, width, height) {
+        if (pane.style.display == "none") {
+            pane.style.display = "block"
+            this.setView(pane, {dialog: [width||800, height||400]})
+        } else {
+            pane.style.display = "none"
+        }
+    },
+    showWindow: function(pane, width, height) {
+        this.setView(pane, {window: [width||80, height||40]})
+    },
 }
 
 function right(arg) {
