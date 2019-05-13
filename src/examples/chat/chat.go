@@ -113,11 +113,8 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		"flow": &ctx.Command{Name: "flow", Help: "信息流", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "ocean":
-				m.Confm("ssh.cert", func(key string, value map[string]interface{}) {
-					m.Add("append", "key", key)
-					m.Add("append", "user", value["user"])
-				})
-				m.Table()
+				m.Cmdy("ssh.cert", "work", "search")
+
 			case "river":
 				if len(arg) == 1 {
 					m.Confm("flow", func(key string, value map[string]interface{}) {

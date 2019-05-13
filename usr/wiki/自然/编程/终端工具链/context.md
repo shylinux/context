@@ -338,15 +338,13 @@ web模块会将所有的HTTP请求转换成context的命令调用，所以HTTP�
 根据code的componet下的login组件，依次调用每个接口的命令，然后将执行结果与参数一起，调用golang的template，渲染生成HTML。
 
 所有命令都解析完成后就可以生成一个完整的网页。当然如果Accept是application/json，则会跳过模块渲染，直接返回多条命令的执行结果。
-所以componet就是接口的集合，统一提供参数配置、权限检查、命令执行、模板渲染，降低内部命令与外部应用的耦合性，但又将前后端完全融合在一起。
-
+所以componet就是接口的集合，统一提供参数配置、权限检查、命令执行、模板渲染，前端展示样式，前端初始化函数，降低内部命令与外部应用的耦合性，但又将前后端完全融合在一起。
 
 如下，是web.code模块的应用接口定义。配置componet下定义了多个组件，每个组件下定义了多个接口。
 
 login就是登录页面，下面定义了三个接口code、login、tail，
 其中code，使用模板head生成网页头，会包括一些配置，如favicon可以指定图标文件，styles指定引用模式表。
 其中tail，使用模板tail生成网页尾，会包括一些配置，如scripts指定引用脚本文件。
-
 login就是网页组件了，生成一个网页登录的输入表单，并接收表单请求调用aaa模块的auth命令，进行用户身份的验证。
 其中arguments指定了Form表单字段的列表。
 ```
@@ -381,16 +379,32 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 #### 模板
 
 usr/template 存放了网页的模板文件，context会调用golang的template接口进行后端渲染，生成html文件。
-
-componet下每一个接口都会指定一个模板，web模块下的/render命令会依次渲染，从而生成一个完整的网页。
-
+不同的应用模块都会有自己的模板目录，也有公共模板库。
 
 - usr/template/common.tmpl 公共模板
 - usr/template/code/ code模块的模板
-- usr/template/wiki/ wiki
-- usr/template/chat/
+- usr/template/wiki/ wiki模块的模板
+- usr/template/chat/ chat模块的模板
 
-usr/librarys 存放了css与js
+#### 样式
+
+所有的css都存放usr/librarys
+
+- example.css
+- code.css
+- wiki.css
+- chat.css
+
+#### 脚本
+
+所有的js都存放usr/librarys
+
+- toolkit.js 工具库，主要是网页相关的操作，如AppendChild
+- context.js 通信库，主要是用来与后端context进行通信
+- example.js 框架库，统一定义了网页的框架，每个应用网页都会继承
+- code.js 工具链应用的网页
+- wiki.js 知识库应用的网页
+- chat.js 信息流应用的网页
 
 ### 小程序
 ### 开发板

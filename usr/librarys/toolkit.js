@@ -1,4 +1,5 @@
 kit = toolkit = {
+    isMobile: navigator.userAgent.indexOf("Mobile") > -1,
     History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [],
         add: function(type, data) {
             var list = this[type] || []
@@ -19,9 +20,6 @@ kit = toolkit = {
         }
         console.log(arguments.length == 1? args[0]: args)
         return args
-    },
-    isMobile: navigator.userAgent.indexOf("Mobile") > -1,
-    CreateStyle: function(style) {
     },
 
     ModifyNode: function(which, html) {
@@ -54,9 +52,15 @@ kit = toolkit = {
             return elm
         }
 
-        // include require styles style
-        // tree, code, text, view, click
-        // type, name, data, list, style
+        // include require styles // 加载文件
+        // name
+        // click
+        // style
+        // button
+        // tree, fork, leaf // 树状结构
+        // code, text, view // 普通视图
+        // type, data, list // 基本结构
+
         var kit = this
 
         subs = subs || {}
@@ -64,7 +68,7 @@ kit = toolkit = {
             child.data = child.data || {}
             child.type = child.type || "div"
 
-            if (child.style) {
+            if (typeof(child.style) == "object") {
                 var str = []
                 for (var k in child.style) {
                     str.push(k)
@@ -163,9 +167,6 @@ kit = toolkit = {
         return parent.insertBefore(elm, position || parent.firstElementChild)
     },
 
-    AppendStyle: function(parent, style) {
-        return node
-    },
     AppendTable: function(table, data, fields, cb) {
         if (!data || !fields) {
             return
@@ -187,6 +188,7 @@ kit = toolkit = {
             })
         })
     },
+
     RangeTable: function(table, index, sort_asc) {
         var list = table.querySelectorAll("tr")
         var new_list = []
@@ -435,6 +437,9 @@ kit = toolkit = {
                     if (w > width) {
                         w = width
                     }
+                    if (h > height) {
+                        h = height
+                    }
 
                     args["top"] = (height-h)/2
                     args["left"] = (width-w)/2
@@ -467,15 +472,16 @@ kit = toolkit = {
             }
         }
     },
-    showDialog: function(pane, width, height) {
+    ShowDialog: function(pane, width, height) {
         if (pane.style.display == "none") {
             pane.style.display = "block"
             this.setView(pane, {dialog: [width||800, height||400]})
-        } else {
-            pane.style.display = "none"
+            return true
         }
+        pane.style.display = "none"
+        return false
     },
-    showWindow: function(pane, width, height) {
+    ShowWindow: function(pane, width, height) {
         this.setView(pane, {window: [width||80, height||40]})
     },
 }

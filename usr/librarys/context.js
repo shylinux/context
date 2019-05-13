@@ -23,6 +23,13 @@ ctx = context = {
         }
         this.Run(page, data, [], cb || form.ondaemon)
     },
+    Sync: function(page, option, cmds, cb) {
+        this.Run(page, option.dataset, cmds, function(msg) {
+            ctx.Table(msg, function(line, index) {
+                cb(line, index)
+            })
+        })
+    },
     Table: function(msg, cb) {
         var ret = []
         if (!msg || !msg.append || !msg.append.length || !msg[msg.append[0]]) {

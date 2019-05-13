@@ -49,7 +49,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			m.Conf("runtime", "node.route", m.Conf("runtime", "node.name"))
 			m.Conf("runtime", "user.name", m.Conf("runtime", "boot.USER"))
-			m.Conf("runtime", "work.name", m.Conf("runtime", "boot.USER"))
 			return
 		}},
 		"node": &ctx.Command{Name: "node [create|delete [name [type module]]]", Help: "节点", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -192,11 +191,26 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				switch arg[1] {
 				case "create": // 创建证书
-					if name := m.Cmdx("ssh.remote", arg[2], "check", "work", arg[3], m.Conf("runtime", "user.route"), m.Conf("runtime", "user.cert")); name != "" {
-						m.Conf("runtime", "work.route", arg[2])
-						m.Conf("runtime", "work.name", name)
-						m.Echo(name)
+					user := m.Conf("runtime", "user.route")
+					if user == "" {
+						m.Echo("error: no user.route")
+						return
 					}
+
+					name := kit.Select(m.Conf("runtime", "user.name"), arg, 2)
+					work := kit.Select(m.Conf("runtime", "work.route"), arg, 3)
+
+					if n := m.Cmdx("ssh.remote", work, "check", "work", name, user); n != "" {
+						m.Conf("runtime", "work.route", work)
+						m.Conf("runtime", "work.name", n)
+						m.Echo(n)
+					} else {
+						m.Echo("error: %s from %s", name, work)
+					}
+
+				case "search":
+					work := kit.Select(m.Conf("runtime", "work.route"), arg, 3)
+					m.Cmdy("ssh.remote", work, "check", "work", "search")
 
 				case "check": // 数字验签
 					if m.Option("user.route") != m.Cmdx("ssh.remote", arg[2], "check", "work", arg[3]) {
@@ -227,17 +241,28 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 				}
 			case "work": // 工作验签
-				if cert := m.Confm("cert", arg[1]); len(arg) == 2 {
-					if cert != nil {
-						m.Echo("%s", cert["user"])
+				switch arg[1] {
+				case "search":
+					m.Confm("cert", func(key string, value map[string]interface{}) {
+						m.Add("append", "key", key)
+						m.Add("append", "user.route", value["user"])
+						m.Add("append", "create_time", value["create_time"])
+					})
+					m.Table()
+
+				default:
+					if cert := m.Confm("cert", arg[1]); len(arg) == 2 {
+						if cert != nil {
+							m.Echo("%s", cert["user"])
+						}
+					} else { // 工作签证
+						if cert == nil {
+							m.Conf("cert", arg[1], map[string]interface{}{"create_time": m.Time(), "user": arg[2]})
+						} else if cert["user"] != arg[2] {
+							return // 签证失败
+						}
+						m.Echo(arg[1])
 					}
-				} else { // 工作签证
-					if cert == nil {
-						m.Conf("cert", arg[1], map[string]interface{}{"create_time": m.Time(), "user": arg[2]})
-					} else if cert["user"] != arg[2] {
-						return // 签证失败
-					}
-					m.Echo(arg[1])
 				}
 			}
 			return
@@ -364,14 +389,19 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						})
 
 						// 本机路由
-						m.Conf("runtime", "node.route", node.Append("node.route")+"."+node.Result(0))
+						m.Cmd("cli.runtime", "node.route", node.Append("node.route")+"."+node.Result(0))
 
 						// 用户路由
 						if m.Confs("runtime", "user.cert") && m.Confs("runtime", "user.key") {
-							m.Conf("runtime", "user.route", m.Conf("runtime", "node.route"))
+							m.Cmd("cli.runtime", "user.route", m.Conf("runtime", "node.route"))
 
 						} else if node.Appends("user.route") && !m.Confs("runtime", "user.route") {
 							m.Cmd("ssh.node", "share", "root", node.Append("user.route"))
+						}
+
+						// 工作路由
+						if node.Appends("work.route") && !m.Confs("runtime", "work.route") {
+							m.Cmd("cli.runtime", "work.route", node.Append("work.route"))
 						}
 						return nil
 					}, "send", "add", m.Conf("runtime", "node.name"), m.Conf("runtime", "node.type"), m.Conf("runtime", "node.cert"))
@@ -397,9 +427,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				// 同步信息
 				m.Append("node.name", m.Conf("runtime", "node.name"))
+				m.Append("user.name", m.Conf("runtime", "user.name"))
 				m.Append("node.route", m.Conf("runtime", "node.route"))
 				m.Append("user.route", m.Conf("runtime", "user.route"))
-				m.Append("user.name", m.Conf("runtime", "user.name"))
+				m.Append("work.route", m.Conf("runtime", "work.route"))
 				m.Echo(name).Back(m)
 
 			default:
@@ -464,7 +495,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					// 路由转发
 					for _, p := range ps {
 						m.Find(p, true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
-							return m.CopyFuck(sub, "append").CopyFuck(sub, "result").Echo("\n")
+							return m.CopyFuck(sub, "append").CopyFuck(sub, "result")
 						}, "send", rest, arg)
 					}
 					return

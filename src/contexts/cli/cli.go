@@ -99,7 +99,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
-			"init_env": []interface{}{"ctx_cas", "ctx_dev", "ctx_box", "ctx_root", "ctx_home", "USER"},
+			"init_env": []interface{}{"ctx_cas", "ctx_dev", "ctx_box", "ctx_root", "ctx_home", "web_port", "ssh_port", "USER"},
 			"boot":     map[string]interface{}{"web_port": ":9094", "ssh_port": ":9090"},
 		}, Help: "运行环境"},
 
@@ -146,20 +146,35 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			mem := &runtime.MemStats{}
-			runtime.ReadMemStats(mem)
-			m.Append("NumCPU", runtime.NumCPU())
-			m.Append("NumGo", runtime.NumGoroutine())
-			m.Append("NumGC", mem.NumGC)
-			m.Append("other", kit.FmtSize(mem.OtherSys))
-			m.Append("stack", kit.FmtSize(mem.StackSys))
-			m.Append("heapsys", kit.FmtSize(mem.HeapSys))
-			m.Append("heapidle", kit.FmtSize(mem.HeapIdle))
-			m.Append("heapinuse", kit.FmtSize(mem.HeapInuse))
-			m.Append("heapalloc", kit.FmtSize(mem.HeapAlloc))
-			m.Append("objects", mem.HeapObjects)
-			m.Append("lookups", mem.Lookups)
-			m.Table()
+			if len(arg) == 0 {
+				m.Cmdy("ctx.config", "runtime")
+				return
+			}
+
+			switch arg[0] {
+			case "system":
+				mem := &runtime.MemStats{}
+				runtime.ReadMemStats(mem)
+				m.Append("NumCPU", runtime.NumCPU())
+				m.Append("NumGo", runtime.NumGoroutine())
+				m.Append("NumGC", mem.NumGC)
+				m.Append("other", kit.FmtSize(mem.OtherSys))
+				m.Append("stack", kit.FmtSize(mem.StackSys))
+				m.Append("heapsys", kit.FmtSize(mem.HeapSys))
+				m.Append("heapidle", kit.FmtSize(mem.HeapIdle))
+				m.Append("heapinuse", kit.FmtSize(mem.HeapInuse))
+				m.Append("heapalloc", kit.FmtSize(mem.HeapAlloc))
+				m.Append("objects", mem.HeapObjects)
+				m.Append("lookups", mem.Lookups)
+				m.Table()
+			default:
+				if len(arg) == 1 {
+					m.Cmdy("ctx.config", "runtime", arg[0])
+					return
+				}
+				m.Conf("runtime", arg[0], arg[1])
+				m.Echo(arg[1])
+			}
 			return
 		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
@@ -664,7 +679,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Conf("runtime", "boot.pathname", file)
 			}
 			m.Confm("runtime", "init_env", func(index int, key string) {
-				m.Conf("runtime", "boot."+key, os.Getenv(key))
+				if value := os.Getenv(key); value != "" {
+					m.Conf("runtime", "boot."+key, kit.Select("", value, value != "-"))
+				}
 			})
 			return
 		}},

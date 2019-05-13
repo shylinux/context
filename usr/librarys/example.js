@@ -44,6 +44,37 @@ exp = example = {
     reload: function() {
         location.reload()
     },
+
+    eachField: function(page, cb) {
+        document.querySelectorAll("body>fieldset").forEach(function(pane) {
+            // pane init
+            pane.ShowDialog = function(width, height) {
+                return kit.ShowDialog(this, width, height)
+            }
+            pane.Size = function(width, height) {
+                pane.style.display = width==0? "none": "block"
+                pane.style.width = width+"px"
+                pane.style.height = height+"px"
+            }
+
+
+            // form init
+            var form = pane.querySelector("form.option")
+            form.Run = function(cmds, cb) {
+                ctx.Run(page, form.dataset, cmds, cb)
+            }
+            form.Runs = function(cmds, cb) {
+                ctx.Run(page, form.dataset, cmds, function(msg) {
+                    ctx.Table(msg, function(line, index) {
+                        cb(line, index, msg)
+                    })
+                })
+            }
+
+            page[form.dataset.componet_name] = pane
+            typeof cb == "function" && cb(page[pane.dataset.init], pane, form)
+        })
+    },
 }
 
 function Page(page) {
@@ -51,9 +82,4 @@ function Page(page) {
         page.init(exp._init(page))
     }
     return page
-}
-function Pane(pane) {
-    pane.showDialog = function(width, height) {
-        kit.showDialog(this, width, height)
-    }
 }
