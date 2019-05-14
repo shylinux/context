@@ -680,6 +680,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					"username": kit.Select("", arg, 2),
 					"count":    kit.Select("1", arg, 3),
 				})
+			case "count":
+				if len(arg) == 1 {
+					m.Cmdy("aaa.auth", "relay")
+					return
+				}
+				m.Conf("auth", []string{arg[1], "data", "count"}, kit.Select("1", arg, 2))
+				m.Cmdy("ctx.config", "auth", arg[1])
+			default:
+				m.Cmdy("ctx.config", "auth", arg[0])
 			}
 			return
 		}},
@@ -746,8 +755,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber: big.NewInt(1),
-							IsCA:         true,
+							SerialNumber:          big.NewInt(1),
+							IsCA:                  true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},
