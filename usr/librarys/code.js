@@ -323,7 +323,7 @@ var page = Page({
     },
     runCmdList: function(page, option, target, value) {
         target.value = value
-        target.dataset.history_last = page.History.add("cmd", target.value)
+        target.dataset.history_last = kit.History.add("cmd", target.value)
         ctx.Runs(page, option)
     },
     getCmdList: function(input, step, cmd) {
@@ -356,9 +356,9 @@ var page = Page({
             {"code": ["", "result", "result "+alias]},
         ]}])
 
-        page.OrderForm(page, ui.field, ui.option, ui.append, ui.result)
-        page.OrderTable(ui.append)
-        page.OrderCode(ui.result)
+        kit.OrderForm(page, ui.field, ui.option, ui.append, ui.result)
+        kit.OrderTable(ui.append)
+        kit.OrderCode(ui.result)
         ui.cmd.focus()
         return ui
     },
@@ -572,9 +572,9 @@ var page = Page({
             var option = field.querySelector("form.option")
             var append = field.querySelector("table.append")
             var result = field.querySelector("code.result pre")
-            page.OrderForm(page, field, option, append, result)
-            append && page.OrderTable(append)
-            result && page.OrderCode(result)
+            kit.OrderForm(page, field, option, append, result)
+            append && kit.OrderTable(append)
+            result && kit.OrderCode(result)
 
             var init = page[field.dataset.init]
             if (typeof init == "function") {

@@ -1,5 +1,4 @@
 ctx = context = {
-    __proto__: kit,
     Run: function(page, dataset, cmd, cb) {
         var option = {"cmds": cmd}
         for (var k in dataset) {
@@ -22,13 +21,6 @@ ctx = context = {
             }
         }
         this.Run(page, data, [], cb || form.ondaemon)
-    },
-    Sync: function(page, option, cmds, cb) {
-        this.Run(page, option.dataset, cmds, function(msg) {
-            ctx.Table(msg, function(line, index) {
-                cb(line, index)
-            })
-        })
     },
     Table: function(msg, cb) {
         var ret = []
@@ -56,7 +48,6 @@ ctx = context = {
         }
         return ret
     },
-
     Share: function(objs) {
         var args = this.Search()
         for (var k in objs) {
@@ -69,6 +60,44 @@ ctx = context = {
         }
         var arg = as.join("&");
         return location.origin+location.pathname+"?"+arg
+    },
+
+    Current: function(key, value) {
+        context.GET("", {
+            "componet_group": "index",
+            "componet_name": "cmd",
+            "cmds": ["sess", "current", key, value],
+        })
+        return value
+    },
+    Cookie: function(key, value) {
+        if (key == undefined) {
+            cs = {}
+            cookies = document.cookie.split("; ")
+            for (var i = 0; i < cookies.length; i++) {
+                cookie = cookies[i].split("=")
+                cs[cookie[0]] = cookie[1]
+            }
+            return cs
+        }
+        if (typeof key == "object") {
+            for (var k in key) {
+                document.cookie = k+"="+key[k];
+            }
+            return this.Cookie()
+        }
+
+        if (value == undefined) {
+            var pattern = new RegExp(key+"=([^;]*);?");
+            var result = pattern.exec(document.cookie);
+            if (result && result.length > 0) {
+                return result[1];
+            }
+            return "";
+        }
+
+        document.cookie = key+"="+value+";path=/";
+        return this.Cookie(key);
     },
     Search: function(key, value) {
         var args = {};
@@ -103,43 +132,6 @@ ctx = context = {
             arg.push(k+"="+encodeURIComponent(args[k]));
         }
         location.search = arg.join("&");
-        return value
-    },
-    Cookie: function(key, value) {
-        if (key == undefined) {
-            cs = {}
-            cookies = document.cookie.split("; ")
-            for (var i = 0; i < cookies.length; i++) {
-                cookie = cookies[i].split("=")
-                cs[cookie[0]] = cookie[1]
-            }
-            return cs
-        }
-        if (typeof key == "object") {
-            for (var k in key) {
-                document.cookie = k+"="+key[k];
-            }
-            return this.Cookie()
-        }
-
-        if (value == undefined) {
-            var pattern = new RegExp(key+"=([^;]*);?");
-            var result = pattern.exec(document.cookie);
-            if (result && result.length > 0) {
-                return result[1];
-            }
-            return "";
-        }
-
-        document.cookie = key+"="+value+";path=/";
-        return this.Cookie(key);
-    },
-    Current: function(key, value) {
-        context.GET("", {
-            "componet_group": "index",
-            "componet_name": "cmd",
-            "cmds": ["sess", "current", key, value],
-        })
         return value
     },
     GET: function(url, form, cb) {

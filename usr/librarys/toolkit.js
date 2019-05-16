@@ -1,5 +1,8 @@
 kit = toolkit = {
     isMobile: navigator.userAgent.indexOf("Mobile") > -1,
+    isSpace: function(c) {
+        return c == " " || c == "Enter"
+    },
     History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [],
         add: function(type, data) {
             var list = this[type] || []
@@ -22,6 +25,100 @@ kit = toolkit = {
         return args
     },
 
+    ScrollPage: function(event, conf) {
+        switch (event.key) {
+            case "h":
+                if (event.ctrlKey) {
+                    window.scrollBy(-conf.scroll_x*10, 0)
+                } else {
+                    window.scrollBy(-conf.scroll_x, 0)
+                }
+                break
+            case "H":
+                window.scrollBy(-document.body.scrollWidth, 0)
+                break
+            case "l":
+                if (event.ctrlKey) {
+                    window.scrollBy(conf.scroll_x*10, 0)
+                } else {
+                    window.scrollBy(conf.scroll_x, 0)
+                }
+                break
+            case "L":
+                window.scrollBy(document.body.scrollWidth, 0)
+                break
+            case "j":
+                if (event.ctrlKey) {
+                    window.scrollBy(0, conf.scroll_y*10)
+                } else {
+                    window.scrollBy(0, conf.scroll_y)
+                }
+                break
+            case "J":
+                window.scrollBy(0, document.body.scrollHeight)
+                break
+            case "k":
+                if (event.ctrlKey) {
+                    window.scrollBy(0, -conf.scroll_y*10)
+                } else {
+                    window.scrollBy(0, -conf.scroll_y)
+                }
+                break
+            case "K":
+                window.scrollBy(0, -document.body.scrollHeight)
+                break
+        }
+        return true
+    },
+    ModifyView: function(target, args) {
+        var width = document.body.offsetWidth-10
+        var height = document.body.offsetHeight-10
+        for (var k in args) {
+            switch (k) {
+                case "dialog":
+                    var w = h = args[k]
+                    if (typeof(args[k]) == "object") {
+                        w = args[k][0]
+                        h = args[k][1]
+                    }
+                    if (w > width) {
+                        w = width
+                    }
+                    if (h > height) {
+                        h = height
+                    }
+
+                    args["top"] = (height-h)/2
+                    args["left"] = (width-w)/2
+                    args["width"] = w
+                    args["height"] = h
+                    break
+                case "window":
+                    var w = h = args[k]
+                    if (typeof(args[k]) == "object") {
+                        w = args[k][0]
+                        h = args[k][1]
+                    }
+
+                    args["top"] = h/2
+                    args["left"] = w/2
+                    args["width"] = width-w
+                    args["height"] = height-h
+                    break
+            }
+        }
+
+        for (var k in args) {
+            switch (k) {
+                case "top":
+                case "left":
+                case "width":
+                case "height":
+                    target.style[k] = args[k]+"px"
+                    break
+            }
+        }
+    },
     ModifyNode: function(which, html) {
         var node = typeof which == "string"? document.querySelector(which): which
         switch (typeof html) {
@@ -156,7 +253,8 @@ kit = toolkit = {
             var node = kit.CreateNode(child.type, child.data)
             child.list && kit.AppendChild(node, child.list, subs)
             child.name && (subs[child.name] = node)
-            subs.field || (subs.field = node)
+            subs.first || (subs.first = node)
+            subs.last, subs.last = node
             parent.append(node)
         })
         return subs
@@ -188,7 +286,6 @@ kit = toolkit = {
             })
         })
     },
-
     RangeTable: function(table, index, sort_asc) {
         var list = table.querySelectorAll("tr")
         var new_list = []
@@ -278,14 +375,7 @@ kit = toolkit = {
             }
         }
     },
-    OrderCode: function(code) {
-        if (!code) {return}
 
-        var kit = this
-        code.onclick = function(event) {
-            kit.CopyText()
-        }
-    },
     OrderForm: function(page, field, option, append, result) {
         if (!option) {return}
         option.ondaemon = option.ondaemon || function(msg) {
@@ -315,7 +405,7 @@ kit = toolkit = {
                     input.onclick = input.onclick || function(event) {
                         if (index == array.length-1) {
                             if (input.value == "login") {
-                                page.Runs(page, option, function(msg) {
+                                ctx.Runs(page, option, function(msg) {
                                     if (document.referrer) {
                                         location.href = document.referrer
                                     } else {
@@ -352,6 +442,14 @@ kit = toolkit = {
             }
         })
     },
+    OrderCode: function(code) {
+        if (!code) {return}
+
+        var kit = this
+        code.onclick = function(event) {
+            kit.CopyText()
+        }
+    },
     OrderLink: function(link) {
         link.target = "_blank"
     },
@@ -375,114 +473,6 @@ kit = toolkit = {
             }
         }
         return true
-    },
-
-    ScrollPage: function(event, conf) {
-        switch (event.key) {
-            case "h":
-                if (event.ctrlKey) {
-                    window.scrollBy(-conf.scroll_x*10, 0)
-                } else {
-                    window.scrollBy(-conf.scroll_x, 0)
-                }
-                break
-            case "H":
-                window.scrollBy(-document.body.scrollWidth, 0)
-                break
-            case "l":
-                if (event.ctrlKey) {
-                    window.scrollBy(conf.scroll_x*10, 0)
-                } else {
-                    window.scrollBy(conf.scroll_x, 0)
-                }
-                break
-            case "L":
-                window.scrollBy(document.body.scrollWidth, 0)
-                break
-            case "j":
-                if (event.ctrlKey) {
-                    window.scrollBy(0, conf.scroll_y*10)
-                } else {
-                    window.scrollBy(0, conf.scroll_y)
-                }
-                break
-            case "J":
-                window.scrollBy(0, document.body.scrollHeight)
-                break
-            case "k":
-                if (event.ctrlKey) {
-                    window.scrollBy(0, -conf.scroll_y*10)
-                } else {
-                    window.scrollBy(0, -conf.scroll_y)
-                }
-                break
-            case "K":
-                window.scrollBy(0, -document.body.scrollHeight)
-                break
-        }
-        return true
-    },
-
-    setView: function(target, args) {
-        var width = document.body.offsetWidth-10
-        var height = document.body.offsetHeight-10
-        for (var k in args) {
-            switch (k) {
-                case "dialog":
-                    var w = h = args[k]
-                    if (typeof(args[k]) == "object") {
-                        w = args[k][0]
-                        h = args[k][1]
-                    }
-                    if (w > width) {
-                        w = width
-                    }
-                    if (h > height) {
-                        h = height
-                    }
-
-                    args["top"] = (height-h)/2
-                    args["left"] = (width-w)/2
-                    args["width"] = w
-                    args["height"] = h
-                    break
-                case "window":
-                    var w = h = args[k]
-                    if (typeof(args[k]) == "object") {
-                        w = args[k][0]
-                        h = args[k][1]
-                    }
-
-                    args["top"] = h/2
-                    args["left"] = w/2
-                    args["width"] = width-w
-                    args["height"] = height-h
-                    break
-            }
-        }
-
-        for (var k in args) {
-            switch (k) {
-                case "top":
-                case "left":
-                case "width":
-                case "height":
-                    target.style[k] = args[k]+"px"
-                    break
-            }
-        }
-    },
-    ShowDialog: function(pane, width, height) {
-        if (pane.style.display == "none") {
-            pane.style.display = "block"
-            this.setView(pane, {dialog: [width||800, height||400]})
-            return true
-        }
-        pane.style.display = "none"
-        return false
-    },
-    ShowWindow: function(pane, width, height) {
-        this.setView(pane, {window: [width||80, height||40]})
     },
 }
 

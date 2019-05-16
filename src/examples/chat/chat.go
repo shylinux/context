@@ -72,6 +72,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					"componet_view": "Source", "componet_init": "initSource",
 					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"source"},
 				},
+				map[string]interface{}{"componet_name": "action", "componet_tmpl": "fieldset",
+					"componet_view": "Action", "componet_init": "initAction",
+					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"action"},
+				},
 
 				map[string]interface{}{"componet_name": "footer", "componet_tmpl": "fieldset",
 					"componet_view": "Footer", "componet_init": "initFooter",
@@ -136,17 +140,38 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				switch arg[1] {
 				case "create":
 					h := kit.Hashs("uniq")
+					user := map[string]interface{}{}
+					for _, v := range arg[3:] {
+						u := m.Cmdx("ssh.remote", m.Conf("runtime", "work.route"), "check", "work", v)
+						user[v] = map[string]interface{}{
+							"user": u,
+						}
+					}
 
 					m.Conf("flow", h, map[string]interface{}{
 						"conf": map[string]interface{}{
-							"create_time": m.Time(),
 							"create_user": m.Option("username"),
+							"create_time": m.Time(),
 							"name":        kit.Select("what", arg, 2),
 						},
-						"user": map[string]interface{}{},
+						"user": user,
 						"text": map[string]interface{}{},
+						"tool": map[string]interface{}{},
 					})
 					m.Echo(h)
+
+				case "user":
+					if len(arg) == 3 {
+						m.Confm("flow", []string{arg[2], "user"}, func(key string, value map[string]interface{}) {
+							m.Add("append", "key", key)
+							m.Add("append", "user.route", value["user"])
+						})
+						m.Table()
+						return
+					}
+					switch arg[3] {
+					case "add":
+					}
 
 				case "wave":
 					if len(arg) == 3 {
@@ -160,6 +185,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					}
 
 					m.Conf("flow", []string{arg[2], "text.list.-2"}, map[string]interface{}{
+						"create_user": m.Option("username"),
 						"create_time": m.Time(),
 						"type":        arg[3],
 						"text":        arg[4],
@@ -168,6 +194,63 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					count := m.Confi("flow", []string{arg[2], "text.count"}) + 1
 					m.Confi("flow", []string{arg[2], "text.count"}, count)
 					m.Echo("%d", count)
+
+					m.Option("username", m.Conf("runtime", "user.name"))
+					m.Confm("flow", []string{arg[2], "user"}, func(key string, value map[string]interface{}) {
+						m.Cmd("ssh.remote", value["user"], "context", "chat", "flow", "river", "wave", arg[2], arg[3], arg[4])
+					})
+
+				case "tool":
+					if len(arg) == 3 {
+						m.Confm("flow", []string{arg[2], "tool"}, func(key string, value map[string]interface{}) {
+							m.Add("append", "key", key)
+							m.Add("append", "create_user", value["create_user"])
+							m.Add("append", "create_time", value["create_time"])
+							if list, ok := kit.Chain(value, "list").([]interface{}); ok {
+								m.Add("append", "count", len(list))
+							} else {
+								m.Add("append", "count", 0)
+							}
+						})
+						m.Table()
+						return
+					}
+
+					if m.Confs("flow", []string{arg[2], "tool", arg[3]}) {
+						if len(arg) == 4 {
+							m.Confm("flow", []string{arg[2], "tool", arg[3], "list"}, func(index int, value map[string]interface{}) {
+								m.Add("append", "cmd", value["cmd"])
+							})
+							m.Table()
+						} else {
+							switch arg[4] {
+							case "add":
+								for _, v := range arg[5:] {
+									m.Conf("flow", []interface{}{arg[2], "tool", arg[3], "list", -2}, map[string]interface{}{
+										"cmd": v,
+									})
+								}
+
+							default:
+								if cmd := m.Confm("flow", []string{arg[2], "tool", arg[3], "list", arg[4]}); cmd != nil {
+									m.Cmdy("ctx.context", "cli", cmd["cmd"])
+								}
+							}
+						}
+						return
+					}
+
+					list := []interface{}{}
+					for _, v := range arg[4:] {
+						list = append(list, map[string]interface{}{
+							"cmd": v,
+						})
+					}
+					m.Conf("flow", []string{arg[2], "tool", arg[3]}, map[string]interface{}{
+						"create_user": m.Option("username"),
+						"create_time": m.Time(),
+						"list":        list,
+					})
 				}
 			case "storm":
 				switch arg[1] {

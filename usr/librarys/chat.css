@@ -1,17 +1,17 @@
-
+fieldset div.output {
+    padding:6px;
+}
 fieldset.Ocean {
-    position:absolute;
-    width:100px;
-    height:100px;
     background-color:red;
-    display:none;
     padding:0;
+    display:none;
+    position:absolute;
 }
 fieldset.River {
-    overflow:auto;
     padding:0;
     min-width:160px;
     min-height:200px;
+    overflow:auto;
     float:left;
 }
 fieldset.River div.output div.item {
@@ -19,7 +19,9 @@ fieldset.River div.output div.item {
 }
 fieldset.River div.output div.item:hover {
     background-color:red;
-
+}
+fieldset.River div.output div.item.select {
+    background-color:red;
 }
 fieldset.Target {
     padding:0;
@@ -27,10 +29,28 @@ fieldset.Target {
     min-height:80px;
     overflow:auto;
 }
+fieldset.Target div.output {
+    padding:10px;
+}
+fieldset.Target div.output div.item:hover {
+    background-color:lightgreen;
+}
 fieldset.Source {
     padding:0;
     min-width:160px;
     min-height:30px;
+}
+fieldset.Source div.output {
+    padding:0;
+}
+fieldset.Action {
+    padding:0;
+    min-width:160px;
+    min-height:30px;
+    overflow:auto;
+}
+fieldset.Action div.output div.item:hover {
+    background-color:lightblue;
 }
 fieldset.Storm {
     padding:0;
@@ -38,7 +58,15 @@ fieldset.Storm {
     min-height:200px;
     float:right;
 }
+fieldset.Storm div.output div.item:hover {
+    background-color:red;
+}
+fieldset.Storm div.output div.item.select {
+    background-color:red;
+}
 fieldset.Steam {
-    display:none;
+    background-color:red;
     padding:0;
+    display:none;
+    position:absolute;
 }
