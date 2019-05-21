@@ -19,16 +19,93 @@ var page = Page({
         page.action.Size(sizes.width, sizes.action)
     },
 
+    oncontrol: function(event, target, action) {
+        switch (action) {
+            case "control":
+                if (event.ctrlKey) {
+                    switch (event.key) {
+                        case "n":
+                            page.ocean.Show()
+                            break
+                        case "m":
+                            page.steam.Show()
+
+                    }
+                    break
+                }
+                break
+        }
+    },
     initOcean: function(page, pane, form, output) {
         var table = kit.AppendChild(output, "table")
+        var ui = kit.AppendChild(pane, [{view: ["create ocean"], list: [
+            {input: ["name", function(event) {
+                if (event.ctrlKey) {
+                    switch (event.key) {
+                        case "a":
+                            pane.Action["全选"](event)
+                            break
+                        case "c":
+                            pane.Action["清空"](event)
+                            break
+                    }
+                    return
+                }
+
+                if (event.key == "Enter") {
+                    ui.name.nextSibling.click()
+                }
+            }]}, {button: ["create", function(event) {
+                if (!ui.name.value) {
+                    ui.name.focus()
+                    return
+                }
+
+                var cmd = ["river", "create", ui.name.value]
+                ui.list.querySelectorAll("pre").forEach(function(item) {
+                    cmd.push(item.innerText)
+                })
+                if (cmd.length == 3) {
+                    alert("请添加组员")
+                    return
+                }
+
+                form.Run(cmd, function(msg) {
+                    page.river.Show()
+                    pane.Show()
+                })
+            }]}, {name: "list", view: ["list"]},
+        ]}])
+
         pane.Show = function() {
-            pane.ShowDialog() && (table.innerHTML = "", form.Run(["ocean"], function(msg) {
-                kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"])
+            pane.ShowDialog() && (table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = "good", form.Run(["ocean"], function(msg) {
+                kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, row, i, tr, event) {
+                    tr.style.display = "none"
+                    var uis = kit.AppendChild(ui.list, [{text: [row.key], click: function(event) {
+                        tr.style.display = "", uis.last.parentNode.removeChild(uis.last)
+                    }}])
+                })
             }))
         }
-        return {"button": ["关闭"], "action": function(event) {
-            pane.Show()
-        }}
+        pane.Action = {
+            "取消": function(event) {
+                pane.Show()
+            },
+            "全选": function(event) {
+                ui.list.innerHTML = ""
+                table.querySelectorAll("tr").forEach(function(item) {
+                    item.firstChild.click()
+                })
+            },
+            "清空": function(event) {
+                ui.list.innerHTML = ""
+                table.querySelectorAll("tr").forEach(function(item) {
+                    item.style.display = ""
+                })
+
+            },
+        }
+        return {"button": ["取消", "全选", "清空"], "action": pane.Action}
     },
     initRiver: function(page, pane, form, output) {
         pane.Show = function() {
@@ -36,15 +113,11 @@ var page = Page({
         }
         pane.Show()
         pane.Action = {
-            "添加": function(event) {
-                var name = prompt("name")
-                name && form.Run(["river", "create", name], pane.Show)
-            },
-            "查找": function(event) {
+            "创建": function(event) {
                 page.ocean.Show()
             },
         }
-		return {"button": ["添加", "查找"], "action": pane.Action}
+		return {"button": ["创建"], "action": pane.Action}
     },
     initTarget: function(page, pane, form, output) {
         var river = ""
@@ -105,8 +178,17 @@ var page = Page({
             },
         }
         pane.Show = function() {
-            output.Update(["river", "tool", river, water], "text", ["cmd"], "cmd", false, function(line, index) {
-                form.Run(["river", "tool", river, water, index], function(msg) {
+            output.Update(["storm", river, water], "text", ["node", "name"], "index", false, function(line, index) {
+                if (event.shiftKey) {
+                    page.target.Send("field", JSON.stringify({
+                        componet_group: "index",
+                        componet_name: "river",
+                        cmds: ["storm", river, water, index],
+                        input: [{type: "input", data: {name: "hi", value: line.cmd}}]
+                    }))
+                    return
+                }
+                form.Run(["storm", river, water, index], function(msg) {
                     msg.append && msg.append[0]?
                         page.target.Send("table", JSON.stringify(ctx.Table(msg))):
                         page.target.Send("text", msg.result.join(""))
@@ -118,11 +200,8 @@ var page = Page({
                 var name = prompt("name")
                 name && form.Run(["river", "tool", river, water, "add", name], pane.Show)
             },
-            "查找": function(event) {
-                page.ocean.Show()
-            },
         }
-		return {"button": ["添加", "查找"], "action": pane.Action}
+		return {"button": ["添加"], "action": pane.Action}
     },
     initStorm: function(page, pane, form, output) {
         var river = ""
@@ -132,25 +211,73 @@ var page = Page({
             },
         }
         pane.Show = function() {
-            output.Update(["river", "tool", river], "text", ["key", "count"], "key", true)
+            output.Update(["storm", river], "text", ["key", "count"], "key", true)
         }
         pane.Action = {
-            "添加": function(event) {
-                var name = prompt("name")
-                name && form.Run(["river", "tool", river, name, "pwd"], pane.Show)
-            },
-            "查找": function(event) {
+            "创建": function(event) {
                 page.steam.Show()
             },
         }
-		return {"button": ["添加", "查找"], "action": pane.Action}
+		return {"button": ["创建"], "action": pane.Action}
     },
     initSteam: function(page, pane, form, output) {
+        var river = ""
+        pane.Listen = {
+            river: function(value, old) {
+                river = value
+            },
+        }
+
+        var table = kit.AppendChild(output, "table")
+        var device = kit.AppendChild(pane, [{"view": ["device", "table"]}]).last
+        var ui = kit.AppendChild(pane, [{view: ["create steam"], list: [
+            {input: ["name", function(event) {
+                if (event.key == "Enter") {
+                    ui.name.nextSibling.click()
+                }
+            }]}, {button: ["create", function(event) {
+                if (!ui.name.value) {
+                    ui.name.focus()
+                    return
+                }
+
+                var cmd = ["storm", "create", river, ui.name.value]
+
+                ui.list.querySelectorAll("tr").forEach(function(item) {
+                    cmd.push(item.dataset.pod)
+                    cmd.push(item.dataset.group)
+                    cmd.push(item.dataset.index)
+                    cmd.push(item.dataset.name)
+                })
+
+                if (cmd.length == 4) {
+                    alert("请添加命令")
+                    return
+                }
+
+                form.Run(cmd, function(msg) {
+                    page.storm.Show()
+                    pane.Show()
+                })
+            }]}, {name: "list", view: ["list", "table"]},
+        ]}])
+
         pane.Show = function() {
-            pane.ShowDialog() && (table.innerHTML = "", form.Run(["ocean"], function(msg) {
-                kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"])
+            pane.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", form.Run(["river", "user", river], function(msg) {
+                kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, pod, i, tr, event) {
+                    form.Run(["steam", "tool", pod.key], function(msg) {
+                        device.innerHTML = "", kit.AppendTable(device, ctx.Table(msg), ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
+                            var last = kit.AppendChild(ui.list, [{type: "tr", list: [
+                                {text: [com.key, "td"]}, {text: [com.index, "td"]}, {text: [com.name, "td"]}, {text: [com.help, "td"]},
+                            ], dataset: {pod: pod["user.route"], group: com.key, index: com.index, name: com.name}, click: function(event) {
+                                last.parentNode.removeChild(last)
+                            }}]).last
+                        })
+                    })
+                })
             }))
         }
+
         return [{"text": ["steam"]}]
     },
     init: function(page) {
@@ -166,10 +293,13 @@ var page = Page({
                 type = line.type || type
                 var ui = kit.AppendChild(output, page.View(type, line, key, function(event) {
                     output.Select(index), pane.which.set(line[which])
-                    typeof cb == "function" && cb(line, index)
+                    typeof cb == "function" && cb(line, index, event)
                 }))
                 if (type == "table") {
                     kit.OrderTable(ui.last)
+                }
+                if (type == "field") {
+                    kit.OrderForm(page, ui.last, ui.form, ui.table, ui.code)
                 }
                 list.push(ui.last)
                 pane.scrollBy(0, pane.scrollHeight)

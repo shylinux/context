@@ -149,13 +149,18 @@ kit = toolkit = {
             return elm
         }
 
-        // include require styles // 加载文件
         // name
-        // click
+        // value
+        // inner
         // style
-        // button
+        // dataset
+        // click
+        //
+        // button input
         // tree, fork, leaf // 树状结构
-        // code, text, view // 普通视图
+        // view, text, code // 普通视图
+        // include require styles // 加载文件
+        //
         // type, data, list // 基本结构
 
         var kit = this
@@ -165,6 +170,12 @@ kit = toolkit = {
             child.data = child.data || {}
             child.type = child.type || "div"
 
+            if (child.value) {
+                child.data["value"] = child.value
+            }
+            if (child.inner) {
+                child.data["innerHTML"] = child.inner
+            }
             if (typeof(child.style) == "object") {
                 var str = []
                 for (var k in child.style) {
@@ -175,43 +186,24 @@ kit = toolkit = {
                 }
                 child.data["style"] = str.join("")
             }
+            if (child.dataset) {
+                child.data["dataset"] = child.dataset
+            }
             if (child.click) {
                 child.data["onclick"] = child.click
             }
 
-            if (child.include) {
-                child.data["src"] = child.include[0]
-                child.data["type"] = "text/javascript"
-                child.include.length > 1 && (child.data["onload"] = child.include[1])
-                child.type = "script"
-
-            } else if (child.require) {
-                child.data["href"] = child.require[0]
-                child.data["rel"] = child.require.length > 1? child.require[1]: "stylesheet"
-                child.data["type"] = child.require.length > 2? child.require[2]: "text/css"
-                child.type = "link"
-
-            } else if (child.styles) {
-                var str = []
-                for (var key in child.styles) {
-                    str.push(key)
-                    str.push(" {")
-                    for (var k in child.styles[key]) {
-                        str.push(k)
-                        str.push(":")
-                        str.push(child.styles[key][k] + (typeof child.styles[key][k] == "number"? "px": ""))
-                        str.push(";")
-                    }
-                    str.push("}\n")
-                }
-                child.data["innerHTML"] = str.join("")
-                child.data["type"] = "text/css"
-                child.type = "style"
-
-            } else if (child.button) {
+            if (child.button) {
                 child.type = "button"
-                child.data["innerText"] = child.button[0]
                 child.data["onclick"] = child.button[1]
+                child.data["innerText"] = child.button[0]
+                child.name = child.name || child.button[0]
+
+            } else if (child.input) {
+                child.type = "input"
+                child.data["onkeyup"] = child.input[1]
+                child.data["name"] = child.input[0]
+                child.name = child.name || child.input[0]
 
             } else if (child.tree) {
                 child.type = "ul"
@@ -248,6 +240,35 @@ kit = toolkit = {
                 child.type = "code"
                 child.list = [{"type": "pre" ,"data": {"innerText": child.code[0]}, "name": child.code[1]}]
                 child.code.length > 2 && (child.data["className"] = child.code[2])
+            } else if (child.include) {
+                child.data["src"] = child.include[0]
+                child.data["type"] = "text/javascript"
+                child.include.length > 1 && (child.data["onload"] = child.include[1])
+                child.type = "script"
+
+            } else if (child.require) {
+                child.data["href"] = child.require[0]
+                child.data["rel"] = child.require.length > 1? child.require[1]: "stylesheet"
+                child.data["type"] = child.require.length > 2? child.require[2]: "text/css"
+                child.type = "link"
+
+            } else if (child.styles) {
+                var str = []
+                for (var key in child.styles) {
+                    str.push(key)
+                    str.push(" {")
+                    for (var k in child.styles[key]) {
+                        str.push(k)
+                        str.push(":")
+                        str.push(child.styles[key][k] + (typeof child.styles[key][k] == "number"? "px": ""))
+                        str.push(";")
+                    }
+                    str.push("}\n")
+                }
+                child.data["innerHTML"] = str.join("")
+                child.data["type"] = "text/css"
+                child.type = "style"
+
             }
 
             var node = kit.CreateNode(child.type, child.data)
@@ -280,7 +301,7 @@ kit = toolkit = {
                 var td = kit.AppendChild(tr, "td", row[key])
                 if (typeof cb == "function") {
                     td.onclick = function(event) {
-                        cb(row[key], key, row, i, event)
+                        cb(row[key], key, row, i, tr, event)
                     }
                 }
             })
@@ -389,7 +410,7 @@ kit = toolkit = {
         option.querySelectorAll("select").forEach(function(select, index, array) {
             select.onchange = select.onchange || function(event) {
                 if (index == array.length-1) {
-                    page.Runs(page, option)
+                    ctx.Runs(page, option)
                     return
                 }
                 if (array[index+1].type == "button") {
@@ -415,7 +436,7 @@ kit = toolkit = {
                                 return
                             }
 
-                            page.Runs(page, option)
+                            ctx.Runs(page, option)
                             return
                         }
                         if (array[index+1].type == "button") {
@@ -430,7 +451,7 @@ kit = toolkit = {
                             return
                         }
                         if (index == array.length-1) {
-                            page.Runs(page, option)
+                            ctx.Runs(page, option)
                             return
                         }
                         if (array[index+1].type == "button") {

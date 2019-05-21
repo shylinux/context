@@ -252,15 +252,61 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 						"list":        list,
 					})
 				}
+
 			case "storm":
 				switch arg[1] {
+				case "create":
+					list := []interface{}{}
+					for i := 4; i < len(arg)-3; i += 4 {
+						list = append(list, map[string]interface{}{
+							"node": arg[i], "group": arg[i+1], "index": arg[i+2], "name": arg[i+3],
+						})
+					}
+
+					m.Conf("flow", []string{arg[2], "tool", arg[3]}, map[string]interface{}{
+						"create_user": m.Option("username"),
+						"create_time": m.Time(),
+						"list":        list,
+					})
+
 				case "wind":
 					switch arg[2] {
 					case "text":
 
 					}
+
+				default:
+					if len(arg) == 2 {
+						m.Confm("flow", []string{arg[1], "tool"}, func(key string, value map[string]interface{}) {
+							m.Add("append", "key", key)
+							m.Add("append", "count", kit.Len(value["list"]))
+						})
+						m.Table()
+						break
+					}
+					if len(arg) == 3 {
+						m.Confm("flow", []string{arg[1], "tool", arg[2], "list"}, func(index int, value map[string]interface{}) {
+							m.Add("append", "node", value["node"])
+							m.Add("append", "group", value["group"])
+							m.Add("append", "index", value["index"])
+							m.Add("append", "name", value["name"])
+						})
+						m.Table()
+						break
+					}
+
+					if tool := m.Confm("flow", []string{arg[1], "tool", arg[2], "list", arg[3]}); tool != nil {
+						m.Option("username", "shy")
+						m.Cmdy("ssh.remote", tool["node"], "componet", tool["group"], tool["index"])
+						break
+					}
 				}
+
 			case "steam":
+				switch arg[1] {
+				case "tool":
+					m.Cmdy("ssh.cert", "tool", "check", arg[2])
+				}
 			}
 			return
 		}},

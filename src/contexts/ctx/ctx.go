@@ -1427,7 +1427,7 @@ func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context
 	}
 
 	context := []*Context{m.target}
-	for _, v := range []string{"aaa", "cli"} {
+	for _, v := range []string{"aaa", "ssh", "cli", "nfs"} {
 		if msg := m.Sess(v, false); msg != nil && msg.target != nil {
 			context = append(context, msg.target)
 		}
@@ -1730,6 +1730,17 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 				}
 			}
 		}
+	case func(string, int, map[string]interface{}):
+		for k, v := range value {
+			if val, ok := v.([]interface{}); ok {
+				for i, v := range val {
+					if val, ok := v.(map[string]interface{}); ok {
+						fun(k, i, val)
+					}
+				}
+			}
+		}
+
 	case func(string, map[string]interface{}) bool:
 		for k, v := range value {
 			if val, ok := v.(map[string]interface{}); ok {

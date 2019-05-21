@@ -2,7 +2,7 @@ ctx = context = {
     Run: function(page, dataset, cmd, cb) {
         var option = {"cmds": cmd}
         for (var k in dataset) {
-            option[k] = dataset[k]
+            option[k] = dataset[k].split(",")
         }
         this.GET("", option, function(msg) {
             msg = msg && msg[0]

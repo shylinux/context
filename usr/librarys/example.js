@@ -33,16 +33,20 @@ function Page(page) {
         },
         View: function(type, line, key, cb) {
             switch (type) {
+                case "icon":
+                    return [{view: ["item", "div"], list: [{type: "img", data: {src: line[key[0]]}}, {}]}]
+
                 case "text":
                     switch (key.length) {
                         case 0:
-                            return [{view: ["", "div", "null"], click: cb}]
+                            return [{view: ["item", "div", "null"], click: cb}]
                         case 1:
-                            return [{view: ["", "div", line[key[0]]], click: cb}]
+                            return [{view: ["item", "div", line[key[0]]], click: cb}]
                         default:
-                            return [{view: ["", "div", line[key[0]]+"("+line[key[1]]+")"], click: cb}]
+                            return [{view: ["item", "div", line[key[0]]+"("+line[key[1]]+")"], click: cb}]
                     }
                     break
+
                 case "table":
                     var data = JSON.parse(line.text)
                     var list = []
@@ -60,6 +64,25 @@ function Page(page) {
                     }
                     var result = [{view: [""], list: [{view: ["", "table"], list: list}]}]
                     return result
+
+                case "field":
+                    var data = JSON.parse(line.text)
+                    var input = [{type: "input", style: {"display": "none"}}]
+                    for (var i = 0; i < data.input.length; i++) {
+                        input.push(data.input[i])
+                    }
+
+                    var result = [{view: ["", "fieldset"], list: [
+                        {name: "form", view: ["", "form"], dataset: {
+                            componet_group: data.componet_group,
+                            componet_name: data.componet_name,
+                            cmds: data.cmds,
+                        }, list: input},
+                        {name: "table", view: ["", "table"]},
+                        {view: ["", "code"], list: [{name: "code", view: ["", "pre"]}]},
+                    ]}]
+                    return result
+
             }
         },
         reload: function() {
@@ -73,6 +96,9 @@ function Page(page) {
                     }
                     break
             }
+        },
+        showToast: function(text) {
+
         },
 
         initHeader: function(page, field, option, output) {
@@ -130,8 +156,9 @@ function Page(page) {
                 }
 
                 var conf = cb(page[pane.dataset.init], pane, form)
+            })
 
-                // pane listen
+            document.querySelectorAll("body>fieldset").forEach(function(pane) {
                 for (var k in pane.Listen) {
                     page[k].which.change(pane.Listen[k])
                 }
@@ -144,6 +171,9 @@ function Page(page) {
         window.onresize = page.size
         document.body.onkeydown = function(event) {
             page.onscroll && page.onscroll(event, document.body, "scroll")
+        }
+        document.body.onkeyup = function(event) {
+            page.oncontrol && page.oncontrol(event, document.body, "control")
         }
     }
     return page

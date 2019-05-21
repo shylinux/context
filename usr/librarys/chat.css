@@ -2,10 +2,32 @@ fieldset div.output {
     padding:6px;
 }
 fieldset.Ocean {
-    background-color:red;
-    padding:0;
+    background-color:lightgray;
+    padding:10px;
     display:none;
     position:absolute;
+}
+fieldset.Ocean div.action {
+    margin:10px;
+}
+fieldset.Ocean div.output {
+    float:left;
+    padding:0;
+}
+fieldset.Ocean div.output table td {
+    min-width:100px;
+}
+fieldset.Ocean div.output table th {
+    min-width:130px;
+}
+fieldset.Ocean div.create {
+    padding:10px;
+    border:solid 2px green;
+    margin-left:10px;
+    float:left;
+}
+fieldset.Ocean div.create pre:hover {
+    background-color:red;
 }
 fieldset.River {
     padding:0;
@@ -65,8 +87,36 @@ fieldset.Storm div.output div.item.select {
     background-color:red;
 }
 fieldset.Steam {
-    background-color:red;
-    padding:0;
+    background-color:lightgray;
+    padding:10px;
     display:none;
     position:absolute;
+}
+fieldset.Steam div.action {
+    margin:10px;
+}
+fieldset.Steam div.output {
+    float:left;
+    padding:0;
+}
+fieldset.Steam div.output table td {
+    min-width:100px;
+}
+fieldset.Steam div.output table th {
+    min-width:130px;
+}
+fieldset.Steam table.device {
+    padding:10px;
+    border:solid 2px green;
+    margin-left:10px;
+    float:left;
+}
+fieldset.Steam div.create {
+    padding:10px;
+    border:solid 2px green;
+    margin-left:10px;
+    float:left;
+}
+fieldset.Steam div.create pre:hover {
+    background-color:red;
 }

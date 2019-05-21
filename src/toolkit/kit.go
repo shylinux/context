@@ -35,6 +35,15 @@ func Log(action string, str string, args ...interface{}) {
 func Width(str string, mul int) int {
 	return len([]rune(str)) + (len(str)-len([]rune(str)))/2/mul
 }
+func Len(arg interface{}) int {
+	switch arg := arg.(type) {
+	case []interface{}:
+		return len(arg)
+	case map[string]interface{}:
+		return len(arg)
+	}
+	return 0
+}
 func Int(arg ...interface{}) int {
 	result := 0
 	for _, v := range arg {

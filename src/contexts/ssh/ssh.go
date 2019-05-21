@@ -37,6 +37,20 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"cert":  &ctx.Config{Name: "cert", Value: map[string]interface{}{}, Help: "用户信息"},
 		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{"fresh": false, "user": true, "up": true}, Help: "可信节点"},
 		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
+		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+			"index": []interface{}{
+				map[string]interface{}{"componet_name": "pwd", "componet_help": "pwd", "componet_tmpl": "componet",
+					"componet_view": "FlashList", "componet_init": "initFlashList",
+					"componet_ctx": "nfs", "componet_cmd": "pwd",
+					"display_result": "", "display_append": "",
+				},
+				map[string]interface{}{"componet_name": "dir", "componet_help": "dir", "componet_tmpl": "componet",
+					"componet_view": "FlashList", "componet_init": "initFlashList",
+					"componet_ctx": "nfs", "componet_cmd": "dir",
+					"display_result": "", "display_append": "",
+				},
+			},
+		}, Help: "组件列表"},
 	},
 	Commands: map[string]*ctx.Command{
 		"init": &ctx.Command{Name: "init", Help: "启动", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -220,6 +234,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Echo("true")
 					}
 				}
+			case "tool":
+				switch arg[1] {
+				case "check": // 数字验签
+					m.Cmdy("ssh.remote", arg[2], "check", arg[0])
+				}
 			}
 			return
 		}},
@@ -264,6 +283,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Echo(arg[1])
 					}
 				}
+			case "tool":
+				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "index", index)
+					m.Add("append", "name", value["componet_name"])
+					m.Add("append", "help", value["componet_help"])
+				})
+				m.Table()
 			}
 			return
 		}},
@@ -336,6 +363,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			// 执行命令
 			m.Cmdm(arg)
+			return
+		}},
+		"componet": &ctx.Command{Name: "componet", Help: "组件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			tool := m.Confm("componet", []string{arg[0], arg[1]})
+			msg := m.Find(kit.Format(tool["componet_ctx"]))
+			msg.Cmd(tool["componet_cmd"]).CopyTo(m)
 			return
 		}},
 		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
