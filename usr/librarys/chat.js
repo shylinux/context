@@ -277,7 +277,7 @@ var page = Page({
         pane.Show = function() {
             pane.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", form.Run(["river", "user", river], function(msg) {
                 kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, pod, i, tr, event) {
-                    form.Run(["steam", "tool", pod.key], function(msg) {
+                    form.Run(["steam", "tool", pod["user.route"]], function(msg) {
                         device.innerHTML = "", kit.AppendTable(device, ctx.Table(msg), ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                             var last = kit.AppendChild(ui.list, [{type: "tr", list: [
                                 {text: [com.key, "td"]}, {text: [com.index, "td"]}, {text: [com.name, "td"]}, {text: [com.help, "td"]},
