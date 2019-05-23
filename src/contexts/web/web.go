@@ -311,7 +311,7 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 
 	web.ServeMux = http.NewServeMux()
 	web.Template = template.New("render").Funcs(ctx.CGI)
-	web.Template.ParseGlob(path.Join(m.Conf("serve", "template_dir"), m.Cap("route"), "/*.tmpl"))
+	web.Template.ParseGlob(path.Join(m.Cap("directory"), m.Conf("serve", "template_dir"), m.Cap("route"), "/*.tmpl"))
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
@@ -412,7 +412,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "服务配置"},
 		"route": &ctx.Config{Name: "route", Value: map[string]interface{}{
 			"index":          "/render",
-			"template_dir":   "usr/template",
+			"template_dir":   "template",
 			"template_debug": true,
 			"componet_index": "index",
 			"toolkit_view": map[string]interface{}{
@@ -837,7 +837,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					web.Template = template.New("render").Funcs(ctx.CGI)
 				}
 
-				dir := path.Join(m.Confx("template_dir", arg, 1), arg[0])
+				dir := path.Join(m.Cap("directory"), m.Confx("template_dir", arg, 1), arg[0])
 				if t, e := web.Template.ParseGlob(dir); e == nil {
 					web.Template = t
 				} else {
@@ -920,8 +920,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				tmpl := web.Template
 				if m.Confs("route", "template_debug") {
 					tmpl = template.New("render").Funcs(ctx.CGI)
-					tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl"))
-					tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
+					t, e := tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), "/*.tmpl"))
+					m.Log("fuck", "what %v %v", e, t)
+					tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
 				}
 
 				// 权限检查

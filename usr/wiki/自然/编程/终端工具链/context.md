@@ -268,14 +268,25 @@ $ cat etc/local.shy
 
 chat模块提供了信息管理。
 
-访问：http://localhost:9094/chat
-
 启动服务节点
-boot.sh
 ```
-~cli
-    runtime work.route mac
+~ssh
+    cert work serve
 ```
+
+启动用户节点
+```
+~ssh
+    cert user create
+    cert work create
+```
+
+访问用户节点：http://localhost:9094/chat
+
+- 左侧添加群聊
+- 右侧添加组件
+- 中间发送消息
+- 下边发送命令
 
 ### 所有目录
 

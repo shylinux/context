@@ -67,7 +67,7 @@ var page = Page({
                     return
                 }
 
-                var cmd = ["river", "create", ui.name.value]
+                var cmd = ["river", "create", "", ui.name.value]
                 ui.list.querySelectorAll("pre").forEach(function(item) {
                     cmd.push(item.innerText)
                 })
@@ -200,10 +200,6 @@ var page = Page({
             })
         }
         pane.Action = {
-            "添加": function(event) {
-                var name = prompt("name")
-                name && form.Run(["river", "tool", river, water, "add", name], pane.Show)
-            },
             "恢复": function(event) {
                 page.onlayout(event, page.conf.layout)
             },
@@ -217,7 +213,7 @@ var page = Page({
                 page.onlayout(event, {river:0, action: -1, storm:0})
             },
         }
-		return {"button": ["添加", "恢复", "放大", "最宽", "最大"], "action": pane.Action}
+		return {"button": ["恢复", "放大", "最宽", "最大"], "action": pane.Action}
     },
     initStorm: function(page, pane, form, output) {
         var river = ""
