@@ -3,7 +3,7 @@ kit = toolkit = {
     isSpace: function(c) {
         return c == " " || c == "Enter"
     },
-    History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [],
+    History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [], lay: [],
         add: function(type, data) {
             var list = this[type] || []
             data && list.push({time: Date.now(), data: data})
@@ -240,6 +240,11 @@ kit = toolkit = {
                 child.type = "code"
                 child.list = [{"type": "pre" ,"data": {"innerText": child.code[0]}, "name": child.code[1]}]
                 child.code.length > 2 && (child.data["className"] = child.code[2])
+
+            } else if (child.script) {
+                child.data.innerHTML = child.script
+                child.type = "script"
+
             } else if (child.include) {
                 child.data["src"] = child.include[0]
                 child.data["type"] = "text/javascript"

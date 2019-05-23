@@ -2,6 +2,10 @@ package ssh
 
 import (
 	"contexts/ctx"
+	"encoding/hex"
+	"io"
+	"os"
+	"path"
 	"strings"
 	"toolkit"
 )
@@ -35,18 +39,25 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Configs: map[string]*ctx.Config{
 		"node":  &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
 		"cert":  &ctx.Config{Name: "cert", Value: map[string]interface{}{}, Help: "用户信息"},
+		"file":  &ctx.Config{Name: "file", Value: map[string]interface{}{}, Help: "用户信息"},
 		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{"fresh": false, "user": true, "up": true}, Help: "可信节点"},
 		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "pwd", "componet_help": "pwd", "componet_tmpl": "componet",
-					"componet_view": "FlashList", "componet_init": "initFlashList",
-					"componet_ctx": "nfs", "componet_cmd": "pwd",
+					"componet_view": "FlashList", "componet_init": "initFlashList.js",
+					"componet_ctx": "nfs", "componet_cmd": "pwd", "componet_args": []interface{}{"@text"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "当前", "click": "show"},
+						map[string]interface{}{"type": "button", "value": "所有", "click": "show"},
+						map[string]interface{}{"type": "text", "name": "text"},
+					},
 					"display_result": "", "display_append": "",
 				},
 				map[string]interface{}{"componet_name": "dir", "componet_help": "dir", "componet_tmpl": "componet",
-					"componet_view": "FlashList", "componet_init": "initFlashList",
-					"componet_ctx": "nfs", "componet_cmd": "dir",
+					"componet_view": "FlashList", "componet_init": "initFlashList.js",
+					"componet_ctx": "nfs", "componet_cmd": "dir", "componet_args": []interface{}{"@text"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "text"},
+					},
 					"display_result": "", "display_append": "",
 				},
 			},
@@ -89,6 +100,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			"node [create|check text|trust node]",
 			"user [create|check text|share role node...|proxy node|trust node]",
 			"work [create node name|check node name]",
+			"file [import]",
+			"tool ",
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Add("append", "key", "node.cert")
@@ -204,6 +217,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				switch arg[1] {
+				case "serve": // 注册节点
+					m.Conf("runtime", "work.serve", true)
+					m.Conf("runtime", "work.route", m.Conf("runtime", "node.route"))
+
 				case "create": // 创建证书
 					user := m.Conf("runtime", "user.route")
 					if user == "" {
@@ -234,10 +251,75 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Echo("true")
 					}
 				}
+
 			case "tool":
 				switch arg[1] {
 				case "check": // 数字验签
-					m.Cmdy("ssh.remote", arg[2], "check", arg[0])
+					m.Cmdy("ssh.remote", arg[2], "check", arg[0], arg[3:])
+				case "run":
+					m.Cmdy("ssh.remote", arg[2], "check", arg[0], "run", arg[3:])
+				}
+
+			case "file":
+				switch arg[1] {
+				case "import":
+					if msg := m.Cmd("nfs.hash", arg[2]); msg.Results(0) {
+						h := msg.Result(0)
+						m.Conf("file", kit.Hashs(h, msg.Append("name")), map[string]interface{}{
+							"create_time": m.Time(),
+							"create_user": m.Option("username"),
+							"name":        msg.Append("name"),
+							"type":        msg.Append("type"),
+							"size":        msg.Append("size"),
+							"hash":        h,
+						})
+
+						m.Cmdy("nfs.copy", path.Join("var/file/hash", h[:2], h), arg[2])
+					}
+
+				case "fetch":
+					if m.Confs("file", arg[2]) {
+						m.Echo(arg[2])
+						break
+					}
+
+					msg := m.Cmd("ssh.remote", arg[3], "check", "file", arg[2])
+					h := msg.Append("hash")
+					m.Conf("file", arg[2], map[string]interface{}{
+						"create_time": m.Time(),
+						"create_user": m.Option("username"),
+						"name":        msg.Append("name"),
+						"type":        msg.Append("type"),
+						"size":        msg.Append("size"),
+						"hash":        h,
+					})
+
+					p := path.Join("var/file/hash", h[:2], h)
+					if m.Cmds("nfs.path", p) {
+						m.Echo(arg[2])
+						break
+					}
+					m.Cmdy("nfs.copy", p)
+					f, e := os.Create(p)
+					m.Assert(e)
+					for i := 0; int64(i) < msg.Appendi("size"); i += 1024 {
+						msg := m.Cmd("ssh.remote", arg[3], "check", "file", arg[2], 1, 1024, i)
+						for _, d := range msg.Meta["data"] {
+							b, e := hex.DecodeString(d)
+							m.Assert(e)
+							_, e = f.Write(b)
+							m.Assert(e)
+						}
+					}
+
+				default:
+					m.Confm("file", arg[1], func(file map[string]interface{}) {
+						m.Append("hash", file["hash"])
+						m.Append("size", file["size"])
+						m.Append("type", file["type"])
+						m.Append("name", file["name"])
+					})
+					m.Table()
 				}
 			}
 			return
@@ -259,6 +341,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Echo(m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "user.key"), arg[2]))
 					}
 				}
+
 			case "work": // 工作验签
 				switch arg[1] {
 				case "search":
@@ -283,14 +366,69 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Echo(arg[1])
 					}
 				}
+
 			case "tool":
-				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
-					m.Add("append", "key", key)
-					m.Add("append", "index", index)
-					m.Add("append", "name", value["componet_name"])
-					m.Add("append", "help", value["componet_help"])
-				})
-				m.Table()
+				if len(arg) == 1 {
+					m.Confm("componet", func(key string, index int, value map[string]interface{}) {
+						m.Add("append", "key", key)
+						m.Add("append", "index", index)
+						m.Add("append", "name", value["componet_name"])
+						m.Add("append", "help", value["componet_help"])
+					})
+					m.Table()
+					break
+				}
+				switch arg[1] {
+				case "run":
+					tool := m.Confm("componet", []string{arg[2], arg[3]})
+					msg := m.Find(kit.Format(tool["componet_ctx"]))
+					msg.Cmd(tool["componet_cmd"], arg[4:]).CopyTo(m)
+
+				default:
+					m.Confm("componet", arg[1:], func(value map[string]interface{}) {
+						m.Add("append", "name", value["componet_name"])
+						m.Add("append", "help", value["componet_help"])
+						m.Add("append", "view", value["componet_view"])
+						m.Add("append", "init", m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1))
+						m.Add("append", "inputs", kit.Format(value["inputs"]))
+					})
+					m.Table()
+				}
+				break
+
+			case "file":
+				if len(arg) == 2 {
+					m.Confm("file", arg[1], func(file map[string]interface{}) {
+						m.Append("hash", file["hash"])
+						m.Append("size", file["size"])
+						m.Append("type", file["type"])
+						m.Append("name", file["name"])
+					})
+					m.Table()
+					break
+				}
+
+				h := m.Conf("file", []string{arg[1], "hash"})
+
+				if f, e := os.Open(path.Join("var/file/hash", h[:2], h)); e == nil {
+					defer f.Close()
+
+					pos := kit.Int(kit.Select("0", arg, 4))
+					size := kit.Int(kit.Select("1024", arg, 3))
+					count := kit.Int(kit.Select("3", arg, 2))
+
+					buf := make([]byte, count*size)
+
+					if l, e := f.ReadAt(buf, int64(pos)); e == io.EOF || m.Assert(e) {
+						for i := 0; i < count; i++ {
+							if l < (i+1)*size {
+								m.Add("append", "data", hex.EncodeToString(buf[i*size:l]))
+								break
+							}
+							m.Add("append", "data", hex.EncodeToString(buf[i*size:(i+1)*size]))
+						}
+					}
+				}
 			}
 			return
 		}},
@@ -363,12 +501,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			// 执行命令
 			m.Cmdm(arg)
-			return
-		}},
-		"componet": &ctx.Command{Name: "componet", Help: "组件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			tool := m.Confm("componet", []string{arg[0], arg[1]})
-			msg := m.Find(kit.Format(tool["componet_ctx"]))
-			msg.Cmd(tool["componet_cmd"]).CopyTo(m)
 			return
 		}},
 		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

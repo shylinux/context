@@ -1,9 +1,10 @@
 function Page(page) {
     page.__proto__ = {
+        _id: 1, ID: function() {
+            return this._id++
+        },
         Sync: function(m) {
-            var meta = m
-            var data = ""
-            var list = []
+            var meta = m, data = "", list = []
             return {
                 change: function(cb) {
                     list.push(cb)
@@ -31,19 +32,24 @@ function Page(page) {
                 },
             }
         },
-        View: function(type, line, key, cb) {
+        View: function(parent, type, line, key, cb) {
+            var ui = {}
+            var result = []
             switch (type) {
                 case "icon":
-                    return [{view: ["item", "div"], list: [{type: "img", data: {src: line[key[0]]}}, {}]}]
+                    result = [{view: ["item", "div"], list: [{type: "img", data: {src: line[key[0]]}}, {}]}]
+                    break
 
                 case "text":
                     switch (key.length) {
                         case 0:
-                            return [{view: ["item", "div", "null"], click: cb}]
+                            result = [{view: ["item", "div", "null"], click: cb}]
+                            break
                         case 1:
-                            return [{view: ["item", "div", line[key[0]]], click: cb}]
+                            result = [{view: ["item", "div", line[key[0]]], click: cb}]
+                            break
                         default:
-                            return [{view: ["item", "div", line[key[0]]+"("+line[key[1]]+")"], click: cb}]
+                            result = [{view: ["item", "div", line[key[0]]+"("+line[key[1]]+")"], click: cb}]
                     }
                     break
 
@@ -63,7 +69,7 @@ function Page(page) {
                         list.push({view: ["", "tr"], list: line})
                     }
                     var result = [{view: [""], list: [{view: ["", "table"], list: list}]}]
-                    return result
+                    break
 
                 case "field":
                     var data = JSON.parse(line.text)
@@ -73,6 +79,7 @@ function Page(page) {
                     }
 
                     var result = [{view: ["", "fieldset"], list: [
+                        {text: ["", "legend"]},
                         {name: "form", view: ["", "form"], dataset: {
                             componet_group: data.componet_group,
                             componet_name: data.componet_name,
@@ -81,12 +88,97 @@ function Page(page) {
                         {name: "table", view: ["", "table"]},
                         {view: ["", "code"], list: [{name: "code", view: ["", "pre"]}]},
                     ]}]
-                    return result
+                    break
 
+                case "plugin":
+                    var id = "plugin"+page.ID()
+                    var input = [{type: "input", style: {"display": "none"}}]
+                    JSON.parse(line.inputs || "[]").forEach(function(item, index, inputs) {
+                        function run(event) {
+                            var args = []
+                            ui.option.querySelectorAll("input").forEach(function(item, index){
+                                if (index==0) {
+                                    return
+                                }
+                                if (item.type == "text") {
+                                    args.push(item.value)
+                                }
+                            })
+                            ui.option.Run(event, args, function(msg) {
+                                ui.option.ondaemon(msg)
+                            })
+                        }
+
+                        item.type == "button"? item.onclick = function(event) {
+                            var plugin = page[id];
+                            (plugin[item.click] || function() {
+                                run(event)
+                            })(item, index, inputs, event, ui.option)
+
+                        }: item.onkeyup = function(event) {
+                            event.key == "Enter" && (index == inputs.length-1? run(event): event.target.nextSibling.focus())
+                            if (event.ctrlKey) {
+                                switch (event.key) {
+                                    case "k":
+                                        kit.DelText(target, target.selectionStart)
+                                        break
+                                    case "u":
+                                        kit.DelText(target, 0, target.selectionEnd)
+                                        break
+                                    case "w":
+                                        var start = target.selectionStart-2
+                                        var end = target.selectionEnd-1
+                                        for (var i = start; i >= 0; i--) {
+                                            if (target.value[end] == " " && target.value[i] != " ") {
+                                                break
+                                            }
+                                            if (target.value[end] != " " && target.value[i] == " ") {
+                                                break
+                                            }
+                                        }
+                                        kit.DelText(target, i+1, end-i)
+                                        break
+
+                                    case "c":
+                                        ui.output.innerHTML = ""
+                                        break
+                                    case "r":
+                                        ui.output.innerHTML = ""
+                                    case "j":
+                                        run(event)
+                                        break
+                                    case "l":
+                                        page.action.scrollTo(0, ui.option.parentNode.offsetTop)
+                                        break
+                                    case "m":
+                                        event.stopPropagation()
+                                        var uis = page.View(parent, type, line, key, cb)
+                                        page.action.scrollTo(0, uis.option.parentNode.offsetTop)
+                                        ui.option.querySelectorAll("input")[1].focus()
+                                        break
+                                }
+                            }
+                        }
+                        input.push({type: "input", data: item})
+                    })
+
+                    var result = [{view: [line.view, "fieldset"], data: {id: id}, list: [
+                        {script: "Plugin("+id+","+line.init+")"},
+                        {text: [line.name, "legend"]},
+                        {name: "option", view: ["option", "form"], data: {Run: cb}, list: input},
+                        {name: "output", view: ["output", "div"]},
+                    ]}]
+                    break
             }
+
+            ui = kit.AppendChild(parent, result)
+            return ui
         },
         reload: function() {
             location.reload()
+        },
+        showToast: function(text) {
+
         },
         onscroll: function(event, target, action) {
             switch (action) {
@@ -96,9 +188,6 @@ function Page(page) {
                     }
                     break
             }
-        },
-        showToast: function(text) {
-
         },
 
         initHeader: function(page, field, option, output) {
@@ -138,7 +227,7 @@ function Page(page) {
                     return false
                 }
                 pane.Size = function(width, height) {
-                    pane.style.display = width==0? "none": "block"
+                    pane.style.display = (width==0 || height==0)? "none": "block"
                     pane.style.width = width+"px"
                     pane.style.height = height+"px"
                 }
@@ -168,7 +257,9 @@ function Page(page) {
     window.onload = function() {
         page.init(page)
 
-        window.onresize = page.size
+        window.onresize = function(event) {
+            page.onlayout && page.onlayout(event)
+        }
         document.body.onkeydown = function(event) {
             page.onscroll && page.onscroll(event, document.body, "scroll")
         }
@@ -177,4 +268,14 @@ function Page(page) {
         }
     }
     return page
+}
+function Plugin(field, plugin) {
+    var option = field.querySelector("form.option")
+    var output = field.querySelector("div.output")
+
+    plugin.__proto__ = {
+        field: field,
+    }
+    plugin.init(page, page.action, field, option, output)
+    page[field.id] = plugin
 }

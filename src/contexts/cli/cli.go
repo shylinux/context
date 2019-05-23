@@ -172,7 +172,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Cmdy("ctx.config", "runtime", arg[0])
 					return
 				}
+
 				m.Conf("runtime", arg[0], arg[1])
+				if arg[0] == "node.route" && m.Confs("runtime", "work.serve") {
+					m.Conf("runtime", "work.route", arg[1])
+					return
+				}
 				m.Echo(arg[1])
 			}
 			return
@@ -664,6 +669,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				return
 			}},
+		"notice": &ctx.Command{Name: "notice", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("cli.system", "osascript", "-e", fmt.Sprintf("display notification \"%s\"", kit.Select("", arg, 0)))
+			return
+		}},
 
 		"init": &ctx.Command{Name: "init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)

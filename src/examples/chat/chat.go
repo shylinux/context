@@ -284,12 +284,25 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 						m.Table()
 						break
 					}
+
 					if len(arg) == 3 {
-						m.Confm("flow", []string{arg[1], "tool", arg[2], "list"}, func(index int, value map[string]interface{}) {
-							m.Add("append", "node", value["node"])
-							m.Add("append", "group", value["group"])
-							m.Add("append", "index", value["index"])
-							m.Add("append", "name", value["name"])
+						m.Confm("flow", []string{arg[1], "tool", arg[2], "list"}, func(index int, tool map[string]interface{}) {
+							m.Add("append", "river", arg[1])
+							m.Add("append", "storm", arg[2])
+							m.Add("append", "action", index)
+
+							m.Add("append", "node", tool["node"])
+							m.Add("append", "group", tool["group"])
+							m.Add("append", "index", tool["index"])
+
+							m.Option("username", "shy")
+							msg := m.Cmd("ssh.cert", "tool", "check", tool["node"], tool["group"], tool["index"])
+
+							m.Add("append", "name", msg.Append("name"))
+							m.Add("append", "help", msg.Append("help"))
+							m.Add("append", "view", msg.Append("view"))
+							m.Add("append", "init", msg.Append("init"))
+							m.Add("append", "inputs", msg.Append("inputs"))
 						})
 						m.Table()
 						break
@@ -297,7 +310,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 					if tool := m.Confm("flow", []string{arg[1], "tool", arg[2], "list", arg[3]}); tool != nil {
 						m.Option("username", "shy")
-						m.Cmdy("ssh.remote", tool["node"], "componet", tool["group"], tool["index"])
+						m.Cmdy("ssh.cert", "tool", "run", tool["node"], tool["group"], tool["index"], arg[4:])
 						break
 					}
 				}

@@ -2,6 +2,7 @@ package nfs
 
 import (
 	"contexts/ctx"
+	"crypto/md5"
 	"toolkit"
 
 	"crypto/sha1"
@@ -954,6 +955,15 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			nfs.Send(meta, v)
 		}
 		for _, k := range msg.Meta[body] {
+			if k == "binary" {
+				switch d := msg.Data[k].(type) {
+				case []byte:
+					nfs.Send("size", len(d))
+					n, e := nfs.io.Write(d)
+					m.Log("info", "send %v %v", n, e)
+				}
+				continue
+			}
 			for _, v := range msg.Meta[k] {
 				nfs.Send(k, v)
 			}
@@ -1279,6 +1289,43 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
+		"hash": &ctx.Command{Name: "hash filename", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			dir, name := path.Split(arg[0])
+			m.Append("dir", dir)
+			m.Append("name", name)
+			m.Append("type", strings.TrimPrefix(path.Ext(arg[0]), "."))
+			if s, e := os.Stat(arg[0]); e == nil && !s.IsDir() {
+				m.Append("size", s.Size())
+				if f, e := os.Open(arg[0]); e == nil {
+					defer f.Close()
+					md := md5.New()
+					io.Copy(md, f)
+					h := md.Sum(nil)
+					m.Echo(hex.EncodeToString(h[:]))
+				}
+			}
+			return
+		}},
+		"copy": &ctx.Command{Name: "copy to from", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			dir, _ := path.Split(arg[0])
+			m.Assert(os.MkdirAll(dir, 0777))
+
+			to, e := os.Create(arg[0])
+			m.Assert(e)
+			defer to.Close()
+
+			for _, from := range arg[1:] {
+				f, e := os.Open(from)
+				m.Assert(e)
+				defer f.Close()
+
+				n, e := io.Copy(to, f)
+				m.Assert(e)
+				m.Log("info", "copy %d from %s to %s", n, from, arg[0])
+			}
+			m.Echo(arg[0])
+			return
+		}},
 		"path": &ctx.Command{Name: "path filename", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				return
@@ -1294,12 +1341,18 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			})
 			return
 		}},
+
 		"load": &ctx.Command{Name: "load file [buf_size [pos]]", Help: "加载文件, buf_size: 加载大小, pos: 加载位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if p, f, e := open(m, arg[0]); e == nil {
 				defer f.Close()
 
 				pos := kit.Int(kit.Select("0", arg, 2))
 				size := kit.Int(m.Confx("buf_size", arg, 1))
+				if size == -1 {
+					s, e := f.Stat()
+					m.Assert(e)
+					size = int(s.Size())
+				}
 				buf := make([]byte, size)
 
 				if l, e := f.ReadAt(buf, int64(pos)); e == io.EOF || m.Assert(e) {
