@@ -36,7 +36,8 @@ func Marshal(m *ctx.Message, meta string) string {
 var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "默认组件"},
+		"login":          &ctx.Config{Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "默认组件"},
+		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "chat", "componet_tmpl": "head", "metas": []interface{}{
@@ -49,32 +50,32 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 				map[string]interface{}{"componet_name": "ocean", "componet_tmpl": "fieldset",
 					"componet_view": "Ocean", "componet_init": "initOcean",
-					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"ocean"},
+					"componet_ctx": "web.chat", "componet_cmd": "ocean",
 				},
 				map[string]interface{}{"componet_name": "steam", "componet_tmpl": "fieldset",
 					"componet_view": "Steam", "componet_init": "initSteam",
-					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"steam"},
+					"componet_ctx": "web.chat", "componet_cmd": "steam",
 				},
 				map[string]interface{}{"componet_name": "river", "componet_tmpl": "fieldset",
 					"componet_view": "River", "componet_init": "initRiver",
-					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"river"},
+					"componet_ctx": "web.chat", "componet_cmd": "river",
 				},
 				map[string]interface{}{"componet_name": "storm", "componet_tmpl": "fieldset",
 					"componet_view": "Storm", "componet_init": "initStorm",
-					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"storm"},
+					"componet_ctx": "web.chat", "componet_cmd": "storm",
 				},
 
 				map[string]interface{}{"componet_name": "target", "componet_tmpl": "fieldset",
 					"componet_view": "Target", "componet_init": "initTarget",
-					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"target"},
+					"componet_ctx": "web.chat", "componet_cmd": "river",
 				},
 				map[string]interface{}{"componet_name": "source", "componet_tmpl": "fieldset",
 					"componet_view": "Source", "componet_init": "initSource",
-					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"source"},
+					"componet_ctx": "web.chat", "componet_cmd": "storm",
 				},
 				map[string]interface{}{"componet_name": "action", "componet_tmpl": "fieldset",
 					"componet_view": "Action", "componet_init": "initAction",
-					"componet_ctx": "web.chat", "componet_cmd": "flow", "arguments": []interface{}{"action"},
+					"componet_ctx": "web.chat", "componet_cmd": "storm",
 				},
 
 				map[string]interface{}{"componet_name": "footer", "componet_tmpl": "fieldset",
@@ -86,7 +87,6 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				},
 			},
 		}, Help: "组件列表"},
-		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 
 		"chat_msg":      &ctx.Config{Name: "chat_msg", Value: []interface{}{}, Help: "聊天记录"},
 		"default":       &ctx.Config{Name: "default", Value: "", Help: "聊天记录"},
@@ -114,170 +114,178 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		"flow": &ctx.Config{Name: "flow", Value: map[string]interface{}{}, Help: "聊天记录"},
 	},
 	Commands: map[string]*ctx.Command{
-		"flow": &ctx.Command{Name: "flow", Help: "信息流", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"ocean": &ctx.Command{Name: "ocean", Help: "海洋", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmdy("ssh.work", "search")
+				return
+			}
+
 			switch arg[0] {
-			case "ocean":
-				m.Cmdy("ssh.cert", "work", "search")
+			case "spawn":
+				h := kit.Select(kit.Hashs("uniq"), arg, 1)
+				user := map[string]interface{}{}
+				for _, v := range arg[3:] {
+					u := m.Cmdx("ssh._route", m.Conf("runtime", "work.route"), "_check", "work", v)
+					user[v] = map[string]interface{}{
+						"user": u,
+					}
+				}
 
-			case "river":
-				if len(arg) == 1 {
-					m.Confm("flow", func(key string, value map[string]interface{}) {
-						m.Add("append", "key", key)
-						m.Add("append", "name", kit.Chains(value, "conf.name"))
-						m.Add("append", "create_user", kit.Chains(value, "conf.create_user"))
-						m.Add("append", "create_time", kit.Chains(value, "conf.create_time"))
+				m.Conf("flow", h, map[string]interface{}{
+					"conf": map[string]interface{}{
+						"create_user": m.Option("username"),
+						"create_time": m.Time(),
+						"name":        kit.Select("what", arg, 2),
+						"route":       kit.Select(m.Conf("runtime", "node.route"), m.Option("node.route"), arg[1] != ""),
+					},
+					"user": user,
+					"text": map[string]interface{}{},
+					"tool": map[string]interface{}{},
+				})
+				m.Echo(h)
 
-						if list, ok := kit.Chain(value, "text.list").([]interface{}); ok {
-							m.Add("append", "count", len(list))
-						} else {
-							m.Add("append", "count", 0)
-						}
+				m.Option("username", m.Conf("runtime", "user.name"))
+				m.Confm("flow", []string{h, "user"}, func(key string, value map[string]interface{}) {
+					if kit.Format(value["user"]) != m.Conf("runtime", "node.route") {
+						m.Cmd("ssh._route", value["user"], "context", "chat", "ocean", "spawn", h, arg[2])
+					}
+				})
+			}
+			return
+		}},
+		"river": &ctx.Command{Name: "river", Help: "河流", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Confm("flow", func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "name", kit.Chains(value, "conf.name"))
+					m.Add("append", "create_user", kit.Chains(value, "conf.create_user"))
+					m.Add("append", "create_time", kit.Chains(value, "conf.create_time"))
+
+					if list, ok := kit.Chain(value, "text.list").([]interface{}); ok {
+						m.Add("append", "count", len(list))
+					} else {
+						m.Add("append", "count", 0)
+					}
+				})
+				m.Table()
+				return
+			}
+
+			switch arg[0] {
+			case "flow":
+				if len(arg) == 2 {
+					m.Confm("flow", []string{arg[1], "text.list"}, func(index int, value map[string]interface{}) {
+						m.Add("append", "index", index)
+						m.Add("append", "type", value["type"])
+						m.Add("append", "text", value["text"])
 					})
 					m.Table()
 					return
 				}
 
-				switch arg[1] {
-				case "create":
-					h := kit.Select(kit.Hashs("uniq"), arg, 2)
-					user := map[string]interface{}{}
-					for _, v := range arg[4:] {
-						u := m.Cmdx("ssh.remote", m.Conf("runtime", "work.route"), "check", "work", v)
-						user[v] = map[string]interface{}{
-							"user": u,
-						}
+				if m.Conf("flow", []string{arg[1], "conf.route"}) != m.Conf("runtime", "node.route") && len(arg) == 4 {
+					m.Cmdy("ssh._route", m.Conf("flow", []string{arg[1], "conf.route"}),
+						"context", "chat", "river", "flow", arg[1], arg[2], arg[3])
+					m.Log("info", "upstream")
+					return
+				}
+
+				m.Conf("flow", []string{arg[1], "text.list.-2"}, map[string]interface{}{
+					"create_user": m.Option("username"),
+					"create_time": m.Time(),
+					"type":        arg[2],
+					"text":        arg[3],
+				})
+
+				count := m.Confi("flow", []string{arg[1], "text.count"}) + 1
+				m.Confi("flow", []string{arg[1], "text.count"}, count)
+				m.Echo("%d", count)
+
+				m.Option("username", m.Conf("runtime", "user.name"))
+				m.Confm("flow", []string{arg[1], "user"}, func(key string, value map[string]interface{}) {
+					if kit.Format(value["user"]) != m.Conf("runtime", "node.route") {
+						m.Cmd("ssh._route", value["user"], "context", "chat", "river", "flow", arg[1], arg[2], arg[3], "sync")
 					}
+				})
 
-					m.Conf("flow", h, map[string]interface{}{
-						"conf": map[string]interface{}{
-							"create_user": m.Option("username"),
-							"create_time": m.Time(),
-							"name":        kit.Select("what", arg, 3),
-							"route":       kit.Select(m.Conf("runtime", "node.route"), m.Option("node.route"), arg[2] != ""),
-						},
-						"user": user,
-						"text": map[string]interface{}{},
-						"tool": map[string]interface{}{},
-					})
-					m.Echo(h)
+			case "wave":
+				m.Option("username", "shy")
+				m.Cmdy("ssh._route", arg[2], "tool", "run", arg[3], arg[4], arg[5:])
+			}
+			return
+		}},
+		"storm": &ctx.Command{Name: "storm", Help: "风雨", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 1 {
+				m.Confm("flow", []string{arg[0], "tool"}, func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "count", kit.Len(value["list"]))
+				})
+				m.Table()
+				return
+			}
+			if len(arg) == 2 {
+				m.Confm("flow", []string{arg[0], "tool", arg[1], "list"}, func(index int, tool map[string]interface{}) {
+					m.Add("append", "river", arg[0])
+					m.Add("append", "storm", arg[1])
+					m.Add("append", "action", index)
 
-					m.Option("username", m.Conf("runtime", "user.name"))
-					m.Confm("flow", []string{h, "user"}, func(key string, value map[string]interface{}) {
-						m.Cmd("ssh.remote", value["user"], "context", "chat", "flow", "river", "create", h, arg[3])
-					})
+					m.Add("append", "node", tool["node"])
+					m.Add("append", "group", tool["group"])
+					m.Add("append", "index", tool["index"])
 
-				case "user":
-					if m.Conf("flow", []string{arg[2], "conf.route"}) != m.Conf("runtime", "node.route") {
-						m.Cmdy("ssh.remote", m.Conf("flow", []string{arg[2], "conf.route"}), "context", "chat", "flow", arg)
-						m.Log("info", "upstream")
-						return
-					}
+					m.Option("username", "shy")
+					msg := m.Cmd("ssh._route", tool["node"], "tool", tool["group"], tool["index"])
 
-					if len(arg) == 3 {
-						m.Confm("flow", []string{arg[2], "user"}, func(key string, value map[string]interface{}) {
-							m.Add("append", "key", key)
-							m.Add("append", "user.route", value["user"])
-						})
-						m.Table()
-						return
-					}
+					m.Add("append", "name", msg.Append("name"))
+					m.Add("append", "help", msg.Append("help"))
+					m.Add("append", "view", msg.Append("view"))
+					m.Add("append", "init", msg.Append("init"))
+					m.Add("append", "inputs", msg.Append("inputs"))
+				})
+				m.Table()
+				return
+			}
 
-				case "wave":
-					if len(arg) == 3 {
-						m.Confm("flow", []string{arg[2], "text.list"}, func(index int, value map[string]interface{}) {
-							m.Add("append", "index", index)
-							m.Add("append", "type", value["type"])
-							m.Add("append", "text", value["text"])
-						})
-						m.Table()
-						return
-					}
+			if tool := m.Confm("flow", []string{arg[0], "tool", arg[1], "list", arg[2]}); tool != nil {
+				m.Option("username", "shy")
+				m.Cmdy("ssh._route", tool["node"], "tool", "run", tool["group"], tool["index"], arg[3:])
+				return
+			}
+			return
+		}},
+		"steam": &ctx.Command{Name: "steam", Help: "天空", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if m.Conf("flow", []string{arg[0], "conf.route"}) != m.Conf("runtime", "node.route") {
+				m.Cmdy("ssh._remote", m.Conf("flow", []string{arg[0], "conf.route"}), "context", "chat", "steam", arg)
+				m.Log("info", "upstream")
+				return
+			}
+			if len(arg) == 1 {
+				m.Confm("flow", []string{arg[0], "user"}, func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "user.route", value["user"])
+				})
+				m.Table()
+				return
+			}
 
-					if m.Conf("flow", []string{arg[2], "conf.route"}) != m.Conf("runtime", "node.route") && len(arg) == 5 {
-						m.Cmdy("ssh.remote", m.Conf("flow", []string{arg[2], "conf.route"}),
-							"context", "chat", "flow", "river", "wave", arg[2], arg[3], arg[4])
-						m.Log("info", "upstream")
-						return
-					}
-
-					m.Conf("flow", []string{arg[2], "text.list.-2"}, map[string]interface{}{
-						"create_user": m.Option("username"),
-						"create_time": m.Time(),
-						"type":        arg[3],
-						"text":        arg[4],
-					})
-
-					count := m.Confi("flow", []string{arg[2], "text.count"}) + 1
-					m.Confi("flow", []string{arg[2], "text.count"}, count)
-					m.Echo("%d", count)
-
-					m.Option("username", m.Conf("runtime", "user.name"))
-					m.Confm("flow", []string{arg[2], "user"}, func(key string, value map[string]interface{}) {
-						m.Cmd("ssh.remote", value["user"], "context", "chat", "flow", "river", "wave", arg[2], arg[3], arg[4], "sync")
+			switch arg[1] {
+			case "spawn":
+				list := []interface{}{}
+				for i := 3; i < len(arg)-3; i += 4 {
+					list = append(list, map[string]interface{}{
+						"node": arg[i], "group": arg[i+1], "index": arg[i+2], "name": arg[i+3],
 					})
 				}
 
-			case "storm":
-				switch arg[1] {
-				case "create":
-					list := []interface{}{}
-					for i := 4; i < len(arg)-3; i += 4 {
-						list = append(list, map[string]interface{}{
-							"node": arg[i], "group": arg[i+1], "index": arg[i+2], "name": arg[i+3],
-						})
-					}
+				m.Conf("flow", []string{arg[0], "tool", arg[2]}, map[string]interface{}{
+					"create_user": m.Option("username"),
+					"create_time": m.Time(),
+					"list":        list,
+				})
 
-					m.Conf("flow", []string{arg[2], "tool", arg[3]}, map[string]interface{}{
-						"create_user": m.Option("username"),
-						"create_time": m.Time(),
-						"list":        list,
-					})
-
-				default:
-					if len(arg) == 2 {
-						m.Confm("flow", []string{arg[1], "tool"}, func(key string, value map[string]interface{}) {
-							m.Add("append", "key", key)
-							m.Add("append", "count", kit.Len(value["list"]))
-						})
-						m.Table()
-						break
-					}
-
-					if len(arg) == 3 {
-						m.Confm("flow", []string{arg[1], "tool", arg[2], "list"}, func(index int, tool map[string]interface{}) {
-							m.Add("append", "river", arg[1])
-							m.Add("append", "storm", arg[2])
-							m.Add("append", "action", index)
-
-							m.Add("append", "node", tool["node"])
-							m.Add("append", "group", tool["group"])
-							m.Add("append", "index", tool["index"])
-
-							m.Option("username", "shy")
-							msg := m.Cmd("ssh.cert", "tool", "check", tool["node"], tool["group"], tool["index"])
-
-							m.Add("append", "name", msg.Append("name"))
-							m.Add("append", "help", msg.Append("help"))
-							m.Add("append", "view", msg.Append("view"))
-							m.Add("append", "init", msg.Append("init"))
-							m.Add("append", "inputs", msg.Append("inputs"))
-						})
-						m.Table()
-						break
-					}
-
-					if tool := m.Confm("flow", []string{arg[1], "tool", arg[2], "list", arg[3]}); tool != nil {
-						m.Option("username", "shy")
-						m.Cmdy("ssh.cert", "tool", "run", tool["node"], tool["group"], tool["index"], arg[4:])
-						break
-					}
-				}
-
-			case "steam":
-				switch arg[1] {
-				case "tool":
-					m.Cmdy("ssh.cert", "tool", "check", arg[2])
-				}
+			default:
+				m.Option("username", "shy")
+				m.Cmdy("ssh._route", m.Conf("flow", []string{arg[0], "user", arg[1], "user"}), "tool")
 			}
 			return
 		}},

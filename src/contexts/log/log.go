@@ -152,12 +152,13 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 				"aaa": map[string]interface{}{
 					"auth": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
 					"hash": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+					"rsa":  map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
 				},
 			},
 		}, Help: "日志输出配置"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "启动日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "启动日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Target().Start(m)
 			return
 		}},

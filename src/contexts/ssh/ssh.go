@@ -38,7 +38,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"node":  &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
-		"cert":  &ctx.Config{Name: "cert", Value: map[string]interface{}{}, Help: "用户信息"},
+		"work":  &ctx.Config{Name: "work", Value: map[string]interface{}{}, Help: "用户信息"},
 		"file":  &ctx.Config{Name: "file", Value: map[string]interface{}{}, Help: "用户信息"},
 		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{"fresh": false, "user": true, "up": true}, Help: "可信节点"},
 		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
@@ -64,7 +64,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		}, Help: "组件列表"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "启动", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "启动初始化", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Confs("runtime", "boot.ctx_box") {
 				m.Conf("runtime", "node.type", "worker")
 				m.Conf("runtime", "node.name", m.Conf("runtime", "boot.pathname"))
@@ -74,30 +74,348 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			m.Conf("runtime", "node.route", m.Conf("runtime", "node.name"))
 			m.Conf("runtime", "user.name", m.Conf("runtime", "boot.USER"))
+
+			m.Cmd("aaa.role", "tech", "componet", "remote", "command", "tool")
+			m.Cmd("aaa.role", "tech", "componet", "source", "command", "tool")
 			return
 		}},
-		"node": &ctx.Command{Name: "node [create|delete [name [type module]]]", Help: "节点", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_node": &ctx.Command{Name: "_node [init|create name type module|delete name]", Help: "节点", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "node", "format", "table", "fields", "type", "module", "create_time")
 				return
 			}
 
 			switch arg[0] {
-			case "create": // 添加节点
-				m.Log("info", "create node %s %s", arg[1], arg[2])
-				m.Confv("node", arg[1], map[string]interface{}{
-					"name": arg[1], "type": arg[2], "module": arg[3],
+			case "init": // 节点证书
+				if !m.Confs("runtime", "node.cert") || !m.Confs("runtime", "node.key") {
+					msg := m.Cmd("aaa.rsa", "gen")
+					m.Conf("runtime", "node.cert", msg.Append("certificate"))
+					m.Conf("runtime", "node.key", msg.Append("private"))
+					m.Echo(m.Conf("runtime", "node.cert"))
+				}
+
+			case "create": // 创建节点
+				name := arg[1]
+				if arg[2] != "master" {
+					for node := m.Confm("node", name); node != nil; node = m.Confm("node", name) {
+						name = kit.Format("%s_%s", arg[1], m.Capi("nnode", 1))
+					}
+				}
+
+				m.Log("info", "create node %s %s", name, arg[2])
+				m.Confv("node", name, map[string]interface{}{
+					"name": name, "type": arg[2], "module": arg[3],
 					"create_time": m.Time(),
 				})
+				m.Echo(name)
 
 			case "delete": // 删除节点
 				m.Log("info", "delete node %s %s", arg[1], kit.Formats(m.Conf("node", arg[1])))
+				m.Cmd("aaa.auth", m.Cmdx("aaa.auth", "nodes", arg[1]), "delete", "node")
 				delete(m.Confm("node"), arg[1])
 			}
 			return
 		}},
-		"cert": &ctx.Command{Name: "cert [node|user|work]", Help: []string{"认证",
-			"node [create|check text|trust node]",
+		"user": &ctx.Command{Name: "user create [node]", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Echo(m.Conf("runtime", "user.route"))
+				return
+			}
+			switch arg[0] {
+			case "create": // 创建用户
+				m.Cmd("aaa.auth", "username", m.Conf("runtime", "user.name"), "delete", "node")
+				if len(arg) == 1 {
+					msg := m.Cmd("aaa.rsa", "gen")
+					m.Conf("runtime", "user.route", m.Conf("runtime", "node.route"))
+					m.Conf("runtime", "user.cert", msg.Append("certificate"))
+					m.Conf("runtime", "user.key", msg.Append("private"))
+				} else {
+					msg := m.Cmd("ssh._route", arg[1], "_check", "user")
+					m.Conf("runtime", "user.route", msg.Append("user.route"))
+					m.Conf("runtime", "user.cert", msg.Append("user.cert"))
+					m.Conf("runtime", "user.name", msg.Append("user.name"))
+					m.Conf("runtime", "user.key", "")
+				}
+				m.Cmd("aaa.user", "root", m.Conf("runtime", "user.name"))
+				m.Echo(m.Conf("runtime", "user.cert"))
+			}
+			return
+		}},
+		"work": &ctx.Command{Name: "work [serve|create|search]", Help: "工作", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Confm("work", func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "user", value["user"])
+				})
+				m.Table()
+				return
+			}
+
+			switch arg[0] {
+			case "serve":
+				m.Conf("runtime", "work.serve", true)
+				m.Conf("runtime", "work.route", m.Conf("runtime", "node.route"))
+				m.Conf("work", m.Conf("runtime", "user.name"), map[string]interface{}{"create_time": m.Time(), "user": m.Conf("runtime", "node.route")})
+
+			case "create":
+				user := m.Conf("runtime", "user.route")
+				if user == "" {
+					m.Echo("error: no user.route")
+					return
+				}
+
+				name := kit.Select(m.Conf("runtime", "user.name"), arg, 1)
+				work := kit.Select(m.Conf("runtime", "work.route"), arg, 2)
+
+				if n := m.Cmdx("ssh._route", work, "_check", "work", name, user); n != "" {
+					m.Conf("runtime", "work.route", work)
+					m.Conf("runtime", "work.name", n)
+					m.Echo(n)
+				} else {
+					m.Echo("error: %s from %s", name, work)
+				}
+
+			case "search":
+				m.Cmdy("ssh._route", m.Conf("runtime", "work.route"), "_check", "work", "search", arg[1:])
+
+			case "delete":
+				delete(m.Confm("ctx.config"), arg[1])
+			}
+			return
+		}},
+		"tool": &ctx.Command{Name: "tool", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "index", index)
+					m.Add("append", "name", value["componet_name"])
+					m.Add("append", "help", value["componet_help"])
+				})
+				m.Table()
+				return
+			}
+
+			switch arg[0] {
+			case "run":
+				tool := m.Confm("componet", []string{arg[1], arg[2]})
+				msg := m.Find(kit.Format(tool["componet_ctx"]))
+				msg.Cmd(tool["componet_cmd"], arg[3:]).CopyTo(m)
+
+			default:
+				m.Confm("componet", arg[0:], func(value map[string]interface{}) {
+					m.Add("append", "name", value["componet_name"])
+					m.Add("append", "help", value["componet_help"])
+					m.Add("append", "view", value["componet_view"])
+					m.Add("append", "init", m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1))
+					m.Add("append", "inputs", kit.Format(value["inputs"]))
+				})
+				m.Table()
+			}
+			return
+		}},
+		"file": &ctx.Command{Name: "file", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			return
+		}},
+
+		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmd("_node")
+				return
+			}
+			switch arg[0] {
+			case "auto": // 自动连接
+				if m.Cmd("ssh.remote", "dial", "dev", "/shadow"); !m.Confs("runtime", "boot.ctx_box") {
+					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "boot.ssh_port"))
+					m.Cmd("web.serve", "usr", m.Conf("runtime", "boot.web_port"))
+				}
+
+			case "listen": // 监听连接
+				m.Cmd("ssh._node", "init")
+
+				m.Call(func(nfs *ctx.Message) *ctx.Message {
+					if nfs.Has("node.port") {
+						m.Log("info", "node.port %v", nfs.Optionv("node.port"))
+						m.Conf("runtime", "node.port", nfs.Optionv("node.port"))
+					}
+					return nil
+				}, "nfs.remote", arg)
+
+			case "_redial": // 断线重连
+				if !m.Caps("stream") {
+					m.Cmdx("remote", "dial", arg[1:])
+				}
+
+			case "dial": // 连接主机
+				m.Cmd("ssh._node", "init")
+
+				m.Call(func(nfs *ctx.Message) *ctx.Message {
+					// 删除重连
+					if m.Confs("timer", "timer") {
+						m.Conf("timer", "timer", m.Cmdx("cli.timer", "delete", m.Conf("timer", "timer")))
+					}
+
+					// 注册设备
+					m.Spawn(nfs.Target()).Call(func(node *ctx.Message) *ctx.Message {
+						// 添加网关
+						name := m.Cmd("ssh._node", "create", node.Append("node.name"), "master", m.Cap("stream", nfs.Format("target")))
+
+						// 清理回调
+						nfs.Free(func(nfs *ctx.Message) bool {
+							m.Cmd("ssh._node", "delete", name)
+
+							// 断线重连
+							m.Cap("stream", "")
+							m.Conf("timer", "timer", m.Cmdx("cli.timer", "repeat", m.Conf("timer", "interval"), "context", "ssh", "remote", "_redial", arg[1:]))
+							return true
+						})
+
+						// 本机路由
+						m.Cmd("cli.runtime", "node.route", node.Append("node.route")+"."+node.Result(0))
+
+						// 用户路由
+						if m.Confs("runtime", "user.cert") && m.Confs("runtime", "user.key") {
+							m.Cmd("cli.runtime", "user.route", m.Conf("runtime", "node.route"))
+
+						} else if node.Appends("user.route") && !m.Confs("runtime", "user.route") {
+							m.Cmd("ssh.user", "create", node.Append("user.route"))
+						}
+
+						// 工作路由
+						if node.Appends("work.route") && !m.Confs("runtime", "work.route") {
+							m.Cmd("cli.runtime", "work.route", node.Append("work.route"))
+						}
+						return nil
+					}, "send", "", "_add", m.Conf("runtime", "node.name"), m.Conf("runtime", "node.type"))
+					return nil
+				}, "nfs.remote", arg)
+
+			case "_add":
+				// 添加节点
+				name := m.Cmdx("ssh._node", "create", arg[1], arg[2], m.Format("source"), arg[3:])
+
+				// 清理回调
+				m.Sess("ms_source", false).Free(func(msg *ctx.Message) bool {
+					m.Cmd("ssh._node", "delete", name)
+					return true
+				})
+
+				// 同步信息
+				m.Append("node.name", m.Conf("runtime", "node.name"))
+				m.Append("user.name", m.Conf("runtime", "user.name"))
+				m.Append("work.name", m.Conf("runtime", "work.name"))
+				m.Append("node.route", m.Conf("runtime", "node.route"))
+				m.Append("user.route", m.Conf("runtime", "user.route"))
+				m.Append("work.route", m.Conf("runtime", "work.route"))
+				m.Echo(name).Back(m)
+
+			default:
+				m.Cmd("_route", arg)
+			}
+			return
+		}},
+		"_route": &ctx.Command{Name: "_route", Help: "路由", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			// 同步异步
+			sync := true
+			switch arg[0] {
+			case "async", "sync":
+				sync, arg = arg[0] == "sync", arg[1:]
+			}
+
+			// 局域路由
+			if arg[0] == m.Conf("runtime", "node.name") || arg[0] == m.Conf("runtime", "node.route") {
+				arg[0] = ""
+			}
+			arg[0] = strings.TrimPrefix(arg[0], m.Conf("runtime", "node.route")+".")
+			arg[0] = strings.TrimPrefix(arg[0], m.Conf("runtime", "node.name")+".")
+
+			// 拆分路由
+			route, names, arg := arg[0], strings.SplitN(arg[0], ".", 2), arg[1:]
+			if len(names) > 1 && names[0] == "" && names[1] != "" {
+				names[0], names[1] = names[1], names[0]
+			}
+
+			if rest := kit.Select("", names, 1); names[0] != "" {
+				// 数字签名
+				if !m.Options("remote_code") && arg[0] != "_check" {
+					hash, meta := kit.Hash("rand",
+						m.Option("text.time", m.Time("stamp")),
+						m.Option("text.cmd", strings.Join(arg, " ")),
+						m.Option("text.route", route),
+						m.Option("node.route", m.Conf("runtime", "node.route")),
+						m.Option("user.route", kit.Select(m.Conf("runtime", "node.route"), m.Conf("runtime", "user.route"))),
+						m.Option("user.name", m.Option("username")),
+						m.Option("work.name", m.Conf("runtime", "work.name")),
+						m.Option("work.route", m.Conf("runtime", "work.route")),
+					)
+					m.Option("text.rand", meta[0])
+					m.Option("node.sign", m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "node.key"), m.Option("text.hash", hash)))
+				}
+
+				// 查找路由
+				ps := []string{}
+				if names[0] == "%" || names[0] == "*" { // 广播命令
+					m.Confm("node", names[0], func(name string, node map[string]interface{}) {
+						if kit.Format(node["type"]) != "master" {
+							ps = append(ps, kit.Format(node["module"]))
+						}
+					})
+
+				} else if m.Confm("node", names[0], func(node map[string]interface{}) { // 单播命令
+					ps = append(ps, kit.Format(node["module"]))
+
+				}) == nil && m.Caps("stream") { // 上报命令
+					rest = strings.Join(names, ".")
+					ps = append(ps, m.Cap("stream"))
+				}
+				if len(ps) == 0 { // 查找失败
+					m.Echo("error: not found %s", names[0]).Back(m)
+					return
+				}
+
+				// 路由转发
+				for _, p := range ps {
+					m.Find(p, true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
+						return m.CopyFuck(sub, "append").CopyFuck(sub, "result")
+					}, "send", rest, arg)
+				}
+				return
+			}
+
+			defer func() { m.Back(m) }()
+
+			if !m.Options("remote_code") { // 本地调用
+				m.Cmdm(arg)
+
+			} else if arg[0] == "_check" { // 公有命令
+				m.Cmd(arg)
+
+			} else if arg[0] == "_add" { // 公有命令
+				m.Cmd("remote", arg)
+
+			} else if h := kit.Hashs(
+				m.Option("text.rand"),
+				m.Option("text.time"),
+				m.Option("text.cmd"),
+				m.Option("text.route"),
+				m.Option("node.route"),
+				m.Option("user.route"),
+				m.Option("user.name"),
+				m.Option("work.name"),
+				m.Option("work.route"),
+			); h != m.Option("text.hash") { // 文本验签
+				m.Echo("text error %s != %s", h, m.Option("text.hash"))
+				m.Log("warn", "text error")
+
+			} else if !m.Cmds("ssh._right", "node", "check", h) { // 设备验签
+				m.Echo("node error of %s", m.Option("node.route"))
+
+			} else { // 执行命令
+				m.Cmd("_exec", arg)
+			}
+			return
+		}},
+		"_right": &ctx.Command{Name: "_right [node|user|work]", Help: []string{"认证",
+			"node [check text|trust node]",
 			"user [create|check text|share role node...|proxy node|trust node]",
 			"work [create node name|check node name]",
 			"file [import]",
@@ -125,15 +443,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				switch arg[1] {
-				case "create": // 创建证书
-					msg := m.Cmd("aaa.rsa", "gen")
-					m.Conf("runtime", "node.cert", msg.Append("certificate"))
-					m.Conf("runtime", "node.key", msg.Append("private"))
-					m.Echo(m.Conf("runtime", "node.cert"))
-
 				case "check": // 数字验签
 					if m.Option("node.cert", m.Cmd("aaa.auth", "nodes", m.Option("node.route"), "cert").Append("meta")); !m.Options("node.cert") {
-						m.Option("node.cert", m.Cmdx("ssh.remote", m.Option("node.route"), "check", "node"))
+						m.Option("node.cert", m.Cmdx("ssh._route", m.Option("node.route"), "_check", "node"))
 						m.Cmd("aaa.auth", "nodes", m.Option("node.route"), "cert", m.Option("node.cert"))
 					}
 
@@ -163,16 +475,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				switch arg[1] {
-				case "create": // 创建证书
-					msg := m.Cmd("aaa.rsa", "gen")
-					m.Conf("runtime", "user.route", m.Conf("runtime", "node.route"))
-					m.Conf("runtime", "user.cert", msg.Append("certificate"))
-					m.Conf("runtime", "user.key", msg.Append("private"))
-					m.Echo(m.Conf("runtime", "user.cert"))
-
 				case "check": // 数字验签
 					if m.Option("user.cert", m.Cmd("aaa.auth", "username", m.Option("username"), "cert").Append("meta")); !m.Options("user.cert") {
-						m.Option("user.cert", m.Cmd("ssh.remote", m.Option("user.route"), "check", "user").Append("user.cert"))
+						m.Option("user.cert", m.Cmd("ssh._route", m.Option("user.route"), "_check", "user").Append("user.cert"))
 						m.Cmd("aaa.auth", "username", m.Option("username"), "cert", m.Option("user.cert"))
 						m.Cmd("aaa.auth", "username", m.Option("username"), "userrole", "void")
 					}
@@ -186,7 +491,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				case "share": // 共享用户
 					for _, route := range arg[3:] {
-						user := m.Cmd("ssh.remote", route, "check", "user")
+						user := m.Cmd("ssh._route", route, "_check", "user")
 						if m.Cmd("aaa.role", arg[2], "user", user.Append("user.name"), "cert", user.Append("user.cert")); arg[2] == "root" && route != m.Conf("runtime", "node.route") {
 							m.Conf("runtime", "user.route", user.Append("user.route"))
 							m.Conf("runtime", "user.name", user.Append("user.name"))
@@ -206,8 +511,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				case "trust": // 可信代理
 					hash := kit.Hashs("rand", m.Option("text.time", m.Time("stamp")), arg[2])
-					m.Option("user.sign", m.Cmdx("ssh.remote", m.Option("user.route"), "check", "user", arg[2], hash))
-					m.Echo("%s", m.Options("user.sign") && m.Cmds("ssh.check", hash))
+					m.Option("user.sign", m.Cmdx("ssh._route", m.Option("user.route"), "_check", "user", arg[2], hash))
+					m.Echo("%v", m.Options("user.sign") && m.Cmds("ssh._check", hash))
 				}
 
 			case "work": // 公有认证
@@ -217,47 +522,13 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				switch arg[1] {
-				case "serve": // 注册节点
-					m.Conf("runtime", "work.serve", true)
-					m.Conf("runtime", "work.route", m.Conf("runtime", "node.route"))
-
-				case "create": // 创建证书
-					user := m.Conf("runtime", "user.route")
-					if user == "" {
-						m.Echo("error: no user.route")
-						return
-					}
-
-					name := kit.Select(m.Conf("runtime", "user.name"), arg, 2)
-					work := kit.Select(m.Conf("runtime", "work.route"), arg, 3)
-
-					if n := m.Cmdx("ssh.remote", work, "check", "work", name, user); n != "" {
-						m.Conf("runtime", "work.route", work)
-						m.Conf("runtime", "work.name", n)
-						m.Echo(n)
-					} else {
-						m.Echo("error: %s from %s", name, work)
-					}
-
-				case "search":
-					work := kit.Select(m.Conf("runtime", "work.route"), arg, 3)
-					m.Cmdy("ssh.remote", work, "check", "work", "search")
-
 				case "check": // 数字验签
-					if m.Option("user.route") != m.Cmdx("ssh.remote", arg[2], "check", "work", arg[3]) {
+					if m.Option("user.route") != m.Cmdx("ssh._route", kit.Select(m.Conf("runtime", "work.route"), arg, 3), "_check", "work", arg[2]) {
 						m.Log("warn", "work error")
 						m.Echo("false")
 					} else {
 						m.Echo("true")
 					}
-				}
-
-			case "tool":
-				switch arg[1] {
-				case "check": // 数字验签
-					m.Cmdy("ssh.remote", arg[2], "check", arg[0], arg[3:])
-				case "run":
-					m.Cmdy("ssh.remote", arg[2], "check", arg[0], "run", arg[3:])
 				}
 
 			case "file":
@@ -283,7 +554,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						break
 					}
 
-					msg := m.Cmd("ssh.remote", arg[3], "check", "file", arg[2])
+					msg := m.Cmd("ssh._route", arg[3], "_check", "file", arg[2])
 					h := msg.Append("hash")
 					m.Conf("file", arg[2], map[string]interface{}{
 						"create_time": m.Time(),
@@ -303,7 +574,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					f, e := os.Create(p)
 					m.Assert(e)
 					for i := 0; int64(i) < msg.Appendi("size"); i += 1024 {
-						msg := m.Cmd("ssh.remote", arg[3], "check", "file", arg[2], 1, 1024, i)
+						msg := m.Cmd("ssh._route", arg[3], "_check", "file", arg[2], 1, 1024, i)
 						for _, d := range msg.Meta["data"] {
 							b, e := hex.DecodeString(d)
 							m.Assert(e)
@@ -324,7 +595,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"check": &ctx.Command{Name: "check node|user|work", Help: []string{"验签",
+		"_check": &ctx.Command{Name: "_check node|user|work", Help: []string{"验签",
 			"node", "user [node text]", "work name [node cert]",
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
@@ -345,7 +616,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			case "work": // 工作验签
 				switch arg[1] {
 				case "search":
-					m.Confm("cert", func(key string, value map[string]interface{}) {
+					m.Confm("work", func(key string, value map[string]interface{}) {
 						m.Add("append", "key", key)
 						m.Add("append", "user.route", value["user"])
 						m.Add("append", "create_time", value["create_time"])
@@ -353,48 +624,19 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Table()
 
 				default:
-					if cert := m.Confm("cert", arg[1]); len(arg) == 2 {
+					if cert := m.Confm("work", arg[1]); len(arg) == 2 {
 						if cert != nil {
 							m.Echo("%s", cert["user"])
 						}
 					} else { // 工作签证
 						if cert == nil {
-							m.Conf("cert", arg[1], map[string]interface{}{"create_time": m.Time(), "user": arg[2]})
+							m.Conf("work", arg[1], map[string]interface{}{"create_time": m.Time(), "user": arg[2]})
 						} else if cert["user"] != arg[2] {
 							return // 签证失败
 						}
 						m.Echo(arg[1])
 					}
 				}
-
-			case "tool":
-				if len(arg) == 1 {
-					m.Confm("componet", func(key string, index int, value map[string]interface{}) {
-						m.Add("append", "key", key)
-						m.Add("append", "index", index)
-						m.Add("append", "name", value["componet_name"])
-						m.Add("append", "help", value["componet_help"])
-					})
-					m.Table()
-					break
-				}
-				switch arg[1] {
-				case "run":
-					tool := m.Confm("componet", []string{arg[2], arg[3]})
-					msg := m.Find(kit.Format(tool["componet_ctx"]))
-					msg.Cmd(tool["componet_cmd"], arg[4:]).CopyTo(m)
-
-				default:
-					m.Confm("componet", arg[1:], func(value map[string]interface{}) {
-						m.Add("append", "name", value["componet_name"])
-						m.Add("append", "help", value["componet_help"])
-						m.Add("append", "view", value["componet_view"])
-						m.Add("append", "init", m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1))
-						m.Add("append", "inputs", kit.Format(value["inputs"]))
-					})
-					m.Table()
-				}
-				break
 
 			case "file":
 				if len(arg) == 2 {
@@ -432,55 +674,47 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"action": &ctx.Command{Name: "action", Help: "命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			hash := kit.Hashs(
-				m.Option("text.rand"),
-				m.Option("text.time"),
-				m.Option("text.cmd"),
-				m.Option("text.route"),
+		"_exec": &ctx.Command{Name: "_exec", Help: "命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			access := kit.Hashs(
 				m.Option("node.route"),
 				m.Option("user.route"),
-				m.Option("user.name"),
-				m.Option("work.name"),
 				m.Option("work.route"),
+				m.Option("work.name"),
+				m.Option("user.name"),
 			)
 
-			// 文本验签
-			if m.Option("text.hash") != hash {
-				m.Echo("text error %s != %s", m.Option("text.hash"), hash)
-				m.Log("warn", "text error")
-				return
-			}
+			if m.Option("sessid", m.Cmd("aaa.auth", "access", access, "session").Append("key")); m.Option("username", m.Cmd("aaa.sess", "user").Append("meta")) != "" { // 历史会话
+				m.Log("warn", "access: %s", access)
+				m.Log("info", "sessid: %s", m.Option("sessid"))
+				m.Option("trust", m.Cmdx("aaa.auth", "access", access, "data", "trust"))
+				m.Option("userrole", m.Cmdx("aaa.auth", "access", access, "data", "userrole"))
 
-			// 设备验签
-			if !m.Cmds("ssh.cert", "node", "check", hash) {
-				m.Echo("node error of %s", m.Option("node.route"))
-				return
-			}
-
-			// 用户验签
-			m.Option("username", m.Option("user.name"))
-			if !m.Confs("runtime", "user.route") && m.Confs("trust", "fresh") {
+			} else if m.Option("username", m.Option("user.name")); !m.Confs("runtime", "user.route") && m.Confs("trust", "fresh") { // 免签节点
 				m.Log("warn", "trust fresh %s", m.Option("node.route"))
 				m.Option("trust", "fresh")
 
-			} else if m.Cmds("ssh.cert", "node", "trust", m.Option("node.route")) {
+			} else if m.Cmds("ssh._right", "node", "trust", m.Option("node.route")) { // 可信节点
 				m.Log("warn", "trust node %s", m.Option("node.route"))
 				m.Option("trust", "node")
 
-			} else if m.Options("user.route") && m.Cmds("ssh.cert", "node", "trust", m.Option("user.route")) && m.Cmds("ssh.cert", "user", "trust", m.Option("node.route")) {
+			} else if m.Options("user.route") &&
+				m.Cmds("ssh._right", "node", "trust", m.Option("user.route")) &&
+				m.Cmds("ssh._right", "user", "trust", m.Option("node.route")) { // 可信用户
 				m.Log("warn", "trust user %s", m.Option("user.route"))
 				m.Option("trust", "user")
 
-			} else if m.Option("username", m.Option("work.name")); m.Options("work.route") && m.Cmds("ssh.cert", "node", "trust", m.Option("work.route")) && m.Cmds("ssh.cert", "work", "check", m.Option("work.route"), m.Option("username")) {
+			} else if m.Option("username", m.Option("work.name")); m.Options("work.route") &&
+				m.Cmds("ssh._right", "node", "trust", m.Option("work.route")) &&
+				m.Cmds("ssh._right", "work", "check", m.Option("username"), m.Option("work.route")) { // 可信工作
 				m.Log("warn", "trust work %s", m.Option("work.route"))
+				m.Option("userrole", "tech")
 				m.Option("trust", "work")
 
-			} else if m.Option("userrole", "void"); m.Confs("trust", "none") {
+			} else if m.Option("userrole", "void"); m.Confs("trust", "none") { // 免签用户
 				m.Log("warn", "trust none")
 				m.Option("trust", "none")
 
-			} else {
+			} else { // 验证失败
 				m.Log("warn", "user error of %s", m.Option("user.route"))
 				m.Echo("user error")
 				return
@@ -488,7 +722,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Log("info", "username: %s", m.Option("username"))
 
 			// 创建会话
-			m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
+			if !m.Options("sessid") {
+				m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
+				m.Cmd("aaa.auth", m.Cmdx("aaa.auth", m.Option("sessid"), "access", access),
+					"data", "trust", m.Option("trust"), "userrole", m.Option("userrole"))
+			}
 
 			// 创建空间
 			m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
@@ -501,185 +739,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			// 执行命令
 			m.Cmdm(arg)
-			return
-		}},
-		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			// 设备证书
-			if !m.Confs("runtime", "node.cert") || !m.Confs("runtime", "node.key") {
-				m.Cmd("ssh.cert", "node", "create")
-			}
-
-			switch arg[0] {
-			case "auto": // 自动连接
-				if m.Cmd("ssh.remote", "dial", "consul", "/shadow"); !m.Confs("runtime", "boot.ctx_box") {
-					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "boot.ssh_port"))
-					m.Cmd("web.serve", "usr", m.Conf("runtime", "boot.web_port"))
-				}
-
-			case "listen": // 监听连接
-				m.Call(func(nfs *ctx.Message) *ctx.Message {
-					if nfs.Has("node.port") {
-						m.Log("info", "node.port %v", nfs.Optionv("node.port"))
-						m.Conf("runtime", "node.port", nfs.Optionv("node.port"))
-					}
-					return nil
-				}, "nfs.remote", arg)
-
-			case "redial": // 断线重连
-				if !m.Caps("stream") {
-					m.Cmdx("remote", "dial", arg[1:])
-				}
-
-			case "dial": // 连接主机
-				m.Call(func(nfs *ctx.Message) *ctx.Message {
-					// 删除重连
-					if m.Confs("timer", "timer") {
-						m.Conf("timer", "timer", m.Cmdx("cli.timer", "delete", m.Conf("timer", "timer")))
-					}
-
-					// 注册设备
-					m.Spawn(nfs.Target()).Call(func(node *ctx.Message) *ctx.Message {
-						// 添加网关
-						m.Cmd("ssh.node", "create", node.Append("node.name"), "master", m.Cap("stream", nfs.Format("target")))
-
-						// 清理回调
-						nfs.Free(func(nfs *ctx.Message) bool {
-							m.Cmd("aaa.auth", m.Cmdx("aaa.auth", "nodes", node.Append("node.name")), "delete", "node")
-							m.Cmd("ssh.node", "delete", node.Append("node.name"))
-							m.Cap("stream", "")
-
-							// 断线重连
-							m.Conf("timer", "timer", m.Cmdx("cli.timer", "repeat", m.Conf("timer", "interval"), "context", "ssh", "remote", "redial", arg[1:]))
-							return true
-						})
-
-						// 本机路由
-						m.Cmd("cli.runtime", "node.route", node.Append("node.route")+"."+node.Result(0))
-
-						// 用户路由
-						if m.Confs("runtime", "user.cert") && m.Confs("runtime", "user.key") {
-							m.Cmd("cli.runtime", "user.route", m.Conf("runtime", "node.route"))
-
-						} else if node.Appends("user.route") && !m.Confs("runtime", "user.route") {
-							m.Cmd("ssh.node", "share", "root", node.Append("user.route"))
-						}
-
-						// 工作路由
-						if node.Appends("work.route") && !m.Confs("runtime", "work.route") {
-							m.Cmd("cli.runtime", "work.route", node.Append("work.route"))
-						}
-						return nil
-					}, "send", "add", m.Conf("runtime", "node.name"), m.Conf("runtime", "node.type"), m.Conf("runtime", "node.cert"))
-					return nil
-				}, "nfs.remote", arg)
-
-			case "add":
-				// 命名节点
-				name := arg[1]
-				for node := m.Confm("node", name); node != nil; node = m.Confm("node", name) {
-					name = kit.Format("%s_%s", arg[1], m.Capi("nnode", 1))
-				}
-
-				// 添加节点
-				m.Cmd("ssh.node", "create", name, arg[2], m.Format("source"))
-
-				// 清理回调
-				m.Sess("ms_source", false).Free(func(msg *ctx.Message) bool {
-					m.Cmd("aaa.auth", m.Cmdx("aaa.auth", "nodes", name), "delete", "node")
-					m.Cmd("ssh.node", "delete", name)
-					return true
-				})
-
-				// 同步信息
-				m.Append("node.name", m.Conf("runtime", "node.name"))
-				m.Append("user.name", m.Conf("runtime", "user.name"))
-				m.Append("node.route", m.Conf("runtime", "node.route"))
-				m.Append("user.route", m.Conf("runtime", "user.route"))
-				m.Append("work.route", m.Conf("runtime", "work.route"))
-				m.Echo(name).Back(m)
-
-			default:
-				// 同步异步
-				sync := true
-				switch arg[0] {
-				case "async", "sync":
-					sync, arg = arg[0] == "sync", arg[1:]
-				}
-
-				// 局域路由
-				if arg[0] == m.Conf("runtime", "node.name") || arg[0] == m.Conf("runtime", "node.route") {
-					arg[0] = ""
-				}
-				arg[0] = strings.TrimPrefix(arg[0], m.Conf("runtime", "node.route")+".")
-				arg[0] = strings.TrimPrefix(arg[0], m.Conf("runtime", "node.name")+".")
-
-				// 拆分路由
-				route, names, arg := arg[0], strings.SplitN(arg[0], ".", 2), arg[1:]
-				if len(names) > 1 && names[0] == "" && names[1] != "" {
-					names[0], names[1] = names[1], names[0]
-				}
-
-				if rest := kit.Select("", names, 1); names[0] != "" {
-					// 数字签名
-					if !m.Options("remote_code") && arg[0] != "check" {
-						hash, meta := kit.Hash("rand",
-							m.Option("text.time", m.Time("stamp")),
-							m.Option("text.cmd", strings.Join(arg, " ")),
-							m.Option("text.route", route),
-							m.Option("node.route", m.Conf("runtime", "node.route")),
-							m.Option("user.route", kit.Select(m.Conf("runtime", "node.route"), m.Conf("runtime", "user.route"))),
-							m.Option("user.name", m.Option("username")),
-							m.Option("work.name", m.Conf("runtime", "work.name")),
-							m.Option("work.route", m.Conf("runtime", "work.route")),
-						)
-						m.Option("text.rand", meta[0])
-						m.Option("node.sign", m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "node.key"), m.Option("text.hash", hash)))
-					}
-
-					// 查找路由
-					ps := []string{}
-					if names[0] == "%" || names[0] == "*" { // 广播命令
-						m.Confm("node", names[0], func(name string, node map[string]interface{}) {
-							if kit.Format(node["type"]) != "master" {
-								ps = append(ps, kit.Format(node["module"]))
-							}
-						})
-
-					} else if m.Confm("node", names[0], func(node map[string]interface{}) { // 单播命令
-						ps = append(ps, kit.Format(node["module"]))
-
-					}) == nil && m.Caps("stream") { // 上报命令
-						rest = strings.Join(names, ".")
-						ps = append(ps, m.Cap("stream"))
-					}
-					if len(ps) == 0 {
-						m.Echo("error: not found %s", names[0]).Back(m)
-						return
-					}
-
-					// 路由转发
-					for _, p := range ps {
-						m.Find(p, true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
-							return m.CopyFuck(sub, "append").CopyFuck(sub, "result")
-						}, "send", rest, arg)
-					}
-					return
-				}
-
-				// 远程回调
-				defer func() { m.Back(m) }()
-
-				// 执行命令
-				if arg[0] == "check" { // 数字验签
-					m.Cmd(arg)
-
-				} else if m.Options("remote_code") { // 远程调用
-					m.Cmd("action", arg)
-
-				} else { // 本地调用
-					m.Cmdm(arg)
-				}
-			}
 			return
 		}},
 	},

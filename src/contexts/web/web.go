@@ -437,7 +437,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "工具列表"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmd("web.spide", "cas", "client", "new", m.Conf("runtime", "boot.ctx_cas"))
 			m.Cmd("web.spide", "dev", "client", "new", kit.Select(m.Conf("runtime", "boot.ctx_dev"), m.Conf("runtime", "boot.ctx_box")))
 			return

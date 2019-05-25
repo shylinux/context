@@ -89,8 +89,8 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 }
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	address := []string{}
-	if arg[1] == "consul" {
-		m.Cmd("web.get", "dev", arg[2], "temp", "ports", "format", "object").Table(func(line map[string]string) {
+	if arg[1] == "dev" {
+		m.Cmd("web.get", arg[1], arg[2], "temp", "ports", "format", "object").Table(func(line map[string]string) {
 			address = append(address, line["value"])
 		})
 		if len(address) == 0 {

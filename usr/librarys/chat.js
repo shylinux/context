@@ -67,7 +67,7 @@ var page = Page({
                     return
                 }
 
-                var cmd = ["river", "create", "", ui.name.value]
+                var cmd = ["spawn", "", ui.name.value]
                 ui.list.querySelectorAll("pre").forEach(function(item) {
                     cmd.push(item.innerText)
                 })
@@ -84,7 +84,7 @@ var page = Page({
         ]}])
 
         pane.Show = function() {
-            pane.ShowDialog() && (table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = "good", form.Run(["ocean"], function(msg) {
+            pane.ShowDialog() && (table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = "good", form.Run([], function(msg) {
                 kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, row, i, tr, event) {
                     tr.style.display = "none"
                     var uis = kit.AppendChild(ui.list, [{text: [row.key], click: function(event) {
@@ -115,7 +115,7 @@ var page = Page({
     },
     initRiver: function(page, pane, form, output) {
         pane.Show = function() {
-            output.Update(["river"], "text", ["name", "count"], "key", true)
+            output.Update([], "text", ["name", "count"], "key", true)
         }
         pane.Show()
         pane.Action = {
@@ -133,8 +133,14 @@ var page = Page({
             },
         }
 
+        function fun(line, index, event, args, cbs) {
+            var data = JSON.parse(line.text)
+            var cmds = ["wave", river, data.node, data.group, data.index].concat(args)
+            form.Run(cmds, cbs)
+        }
+
         pane.Show = function() {
-            output.Update(["river", "wave", river], "text", ["text"], "index")
+            output.Update(["flow", river], "text", ["text"], "index", false, fun)
         }
 
         pane.postion = page.Sync()
@@ -143,8 +149,8 @@ var page = Page({
         }
 
         pane.Send = function(type, text, cb) {
-            form.Run(["river", "wave", river, type, text], function(msg) {
-                output.Append(type, {text:text, index: msg.result[0]}, ["text"], "index"), typeof cb == "function" && cb()
+            form.Run(["flow", river, type, text], function(msg) {
+                output.Append(type, {text:text, index: msg.result[0]}, ["text"], "index", fun), typeof cb == "function" && cb()
             })
         }
         return [{"text": ["target"]}]
@@ -184,13 +190,17 @@ var page = Page({
             },
         }
         pane.Show = function() {
-            output.Update(["storm", river, water], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
-                var cmds = ["storm", river, water, index].concat(args)
+            output.Update([river, water], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
+                var cmds = [river, water, index].concat(args)
 
+                // event.shiftKey? page.target.Send("field", JSON.stringify({
+                //     componet_group: "index", componet_name: "river",
+                //     cmds: ["wave", river, line.node, line.group, line.index], input: [{type: "input", data: {name: "hi", value: line.cmd}}]
+                //
                 event.shiftKey? page.target.Send("field", JSON.stringify({
-                    componet_group: "index", componet_name: "river",
-                    cmds: cmds, input: [{type: "input", data: {name: "hi", value: line.cmd}}]
-
+                    name: line.name, view: line.view, init: line.init,
+                    node: line.node, group: line.group, index: line.index,
+                    inputs: line.inputs,
                 })): form.Run(cmds, function(msg) {
                     event.ctrlKey && (msg.append && msg.append[0]?
                         page.target.Send("table", JSON.stringify(ctx.Table(msg))):
@@ -220,10 +230,11 @@ var page = Page({
         pane.Listen = {
             river: function(value, old) {
                 river = value, pane.Show()
+                pane.which.set("")
             },
         }
         pane.Show = function() {
-            output.Update(["storm", river], "text", ["key", "count"], "key", true)
+            output.Update([river], "text", ["key", "count"], "key", true)
         }
         pane.Action = {
             "创建": function(event) {
@@ -253,7 +264,7 @@ var page = Page({
                     return
                 }
 
-                var cmd = ["storm", "create", river, ui.name.value]
+                var cmd = [river, "spawn", ui.name.value]
 
                 ui.list.querySelectorAll("tr").forEach(function(item) {
                     cmd.push(item.dataset.pod)
@@ -275,9 +286,9 @@ var page = Page({
         ]}])
 
         pane.Show = function() {
-            pane.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", form.Run(["river", "user", river], function(msg) {
+            pane.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", form.Run([river], function(msg) {
                 kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, pod, i, tr, event) {
-                    form.Run(["steam", "tool", pod["user.route"]], function(msg) {
+                    form.Run([river, pod.key], function(msg) {
                         device.innerHTML = "", kit.AppendTable(device, ctx.Table(msg), ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                             var last = kit.AppendChild(ui.list, [{type: "tr", list: [
                                 {text: [com.key, "td"]}, {text: [com.index, "td"]}, {text: [com.name, "td"]}, {text: [com.help, "td"]},
@@ -310,9 +321,9 @@ var page = Page({
                 if (type == "table") {
                     kit.OrderTable(ui.last)
                 }
-                if (type == "field") {
-                    kit.OrderForm(page, ui.last, ui.form, ui.table, ui.code)
-                }
+                // if (type == "field") {
+                //     kit.OrderForm(page, ui.last, ui.form, ui.table, ui.code)
+                // }
                 list.push(ui.last)
                 pane.scrollBy(0, pane.scrollHeight)
                 return ui

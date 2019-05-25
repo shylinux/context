@@ -141,8 +141,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}, Help: "启动脚本"},
 	},
 	Commands: map[string]*ctx.Command{
-		"ps": &ctx.Command{Name: "ps", Help: "ps", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmdy("cli.system", "ps", "-ef", "cmd_parse", "cli")
+		"_init": &ctx.Command{Name: "_init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
+			m.Conf("runtime", "host.GOOS", runtime.GOOS)
+			m.Conf("runtime", "host.pid", os.Getpid())
+			runtime.GOMAXPROCS(1)
+
+			if name, e := os.Hostname(); e == nil {
+				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))
+			}
+			if name, e := os.Getwd(); e == nil {
+				_, file := path.Split(name)
+				m.Conf("runtime", "boot.pathname", file)
+			}
+			m.Confm("runtime", "init_env", func(index int, key string) {
+				if value := os.Getenv(key); value != "" {
+					m.Conf("runtime", "boot."+key, kit.Select("", value, value != "-"))
+				}
+			})
 			return
 		}},
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -167,6 +183,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Append("objects", mem.HeapObjects)
 				m.Append("lookups", mem.Lookups)
 				m.Table()
+
 			default:
 				if len(arg) == 1 {
 					m.Cmdy("ctx.config", "runtime", arg[0])
@@ -182,6 +199,22 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
+		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Confm("daemon", func(key string, info map[string]interface{}) {
+				m.Cmd("cli.system", key, "stop")
+			})
+			return
+		}},
+		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("cli.source", m.Conf("system", "script.exit"))
+
+			m.GoFunc(m, func(m *ctx.Message) {
+				time.Sleep(time.Second * 3)
+				os.Exit(kit.Int(arg[0]))
+			})
+			return
+		}},
+
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
 			"cmd_timeout: 命令超时",
 			"cmd_active(true/false): 是否交互",
@@ -671,42 +704,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}},
 		"notice": &ctx.Command{Name: "notice", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmd("cli.system", "osascript", "-e", fmt.Sprintf("display notification \"%s\"", kit.Select("", arg, 0)))
-			return
-		}},
-
-		"init": &ctx.Command{Name: "init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
-			m.Conf("runtime", "host.GOOS", runtime.GOOS)
-			m.Conf("runtime", "host.pid", os.Getpid())
-			runtime.GOMAXPROCS(1)
-
-			if name, e := os.Hostname(); e == nil {
-				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))
-			}
-			if name, e := os.Getwd(); e == nil {
-				_, file := path.Split(name)
-				m.Conf("runtime", "boot.pathname", file)
-			}
-			m.Confm("runtime", "init_env", func(index int, key string) {
-				if value := os.Getenv(key); value != "" {
-					m.Conf("runtime", "boot."+key, kit.Select("", value, value != "-"))
-				}
-			})
-			return
-		}},
-		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Confm("daemon", func(key string, info map[string]interface{}) {
-				m.Cmd("cli.system", key, "stop")
-			})
-			return
-		}},
-		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.source", m.Conf("system", "script.exit"))
-
-			m.GoFunc(m, func(m *ctx.Message) {
-				time.Sleep(time.Second * 3)
-				os.Exit(kit.Int(arg[0]))
-			})
 			return
 		}},
 

@@ -323,7 +323,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		}, Help: "嵌套层级日志的标记"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "添加语法规则, page: 语法集合, hash: 语句类型, word: 语法模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				yac.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: "64", Help: "状态机状态的数量"}
 				yac.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "状态机连接的逻辑数量"}

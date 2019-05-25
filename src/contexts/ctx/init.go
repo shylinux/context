@@ -38,7 +38,7 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	return ctx
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
-	m.Cmd("ctx.init")
+	m.Cmd("ctx._init")
 	if m.Optionv("ps_target", Index); len(arg) == 0 {
 		m.Cap("stream", "shy")
 		m.Cmd("cli.source", m.Conf("system", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("system", "script.exit"))
@@ -94,9 +94,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"call_timeout": &Config{Name: "call_timeout", Value: "10s", Help: "回调超时"},
 	},
 	Commands: map[string]*Command{
-		"init": &Command{Name: "init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+		"_init": &Command{Name: "_init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			for _, x := range []string{"cli", "yac", "nfs", "aaa", "log", "ssh", "web", "gdb"} {
-				m.Cmd(x + ".init")
+				m.Cmd(x + "._init")
 			}
 			return
 		}},
@@ -121,6 +121,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				m.Echo("^_^  Welcome to context world  ^_^\n")
 				m.Echo("Version: 1.0 A New Language, A New Framework\n")
 				m.Echo("More: https://github.com/shylinux/context\n")
+				m.Echo("More: https://shylinux.com/\n")
 				return
 			}
 

@@ -143,7 +143,7 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 		}},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "等待调试", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "等待调试", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Target().Start(m)
 			return
 		}},

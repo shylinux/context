@@ -3,7 +3,7 @@
 ~aaa
     config load tmp/auth.json auth
 ~ssh
-    config load tmp/cert.json cert trust
+    config load tmp/cert.json work trust
 ~chat
     config load tmp/flow.json flow
 

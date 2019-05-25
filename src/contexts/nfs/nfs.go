@@ -955,15 +955,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			nfs.Send(meta, v)
 		}
 		for _, k := range msg.Meta[body] {
-			if k == "binary" {
-				switch d := msg.Data[k].(type) {
-				case []byte:
-					nfs.Send("size", len(d))
-					n, e := nfs.io.Write(d)
-					m.Log("info", "send %v %v", n, e)
-				}
-				continue
-			}
 			for _, v := range msg.Meta[k] {
 				nfs.Send(k, v)
 			}
@@ -992,7 +983,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			case "":
 				m.Log("recv", "time %v", time.Now().Format(m.Conf("time_format")))
 				if head == "detail" { // 接收请求
-					msg.Detail(-1, "remote")
+					msg.Detail(-1, "_route")
 					msg.Option("remote_code", code)
 					m.GoFunc(msg, func(msg *ctx.Message) {
 						msg.Call(func(msg *ctx.Message) *ctx.Message {
@@ -1001,9 +992,11 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 						})
 					})
 				} else { // 接收响应
-					if h, ok := nfs.hand[kit.Int(code)]; ok {
-						h.CopyFuck(msg, "result").CopyFuck(msg, "append").Back(h)
-					}
+					m.Set("option", "code", code).GoFunc(msg, func(msg *ctx.Message) {
+						if h, ok := nfs.hand[kit.Int(m.Option("code"))]; ok {
+							h.CopyFuck(msg, "result").CopyFuck(msg, "append").Back(h)
+						}
+					})
 				}
 				msg, code, head, body = nil, "0", "result", "append"
 
@@ -1141,7 +1134,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", "bin", ""}, Help: "文件路径"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Conf("paths", -2, m.Conf("runtime", "boot.ctx_home"))
 			m.Conf("paths", -2, m.Conf("runtime", "boot.ctx_root"))
 			return

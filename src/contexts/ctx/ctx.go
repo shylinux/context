@@ -1579,7 +1579,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	msg := m
 	if strings.Contains(key, ":") {
 		ps := strings.Split(key, ":")
-		msg, key, arg = msg.Sess("ssh"), "remote", append([]string{"sync", ps[0], ps[1]}, arg...)
+		msg, key, arg = msg.Sess("ssh"), "_route", append([]string{"sync", ps[0], ps[1]}, arg...)
 		defer func() { m.Copy(msg, "append").Copy(msg, "result") }()
 		m.Hand = true
 

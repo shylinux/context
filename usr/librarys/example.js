@@ -72,23 +72,7 @@ function Page(page) {
                     break
 
                 case "field":
-                    var data = JSON.parse(line.text)
-                    var input = [{type: "input", style: {"display": "none"}}]
-                    for (var i = 0; i < data.input.length; i++) {
-                        input.push(data.input[i])
-                    }
-
-                    var result = [{view: ["", "fieldset"], list: [
-                        {text: ["", "legend"]},
-                        {name: "form", view: ["", "form"], dataset: {
-                            componet_group: data.componet_group,
-                            componet_name: data.componet_name,
-                            cmds: data.cmds,
-                        }, list: input},
-                        {name: "table", view: ["", "table"]},
-                        {view: ["", "code"], list: [{name: "code", view: ["", "pre"]}]},
-                    ]}]
-                    break
+                    line = JSON.parse(line.text)
 
                 case "plugin":
                     var id = "plugin"+page.ID()

@@ -125,7 +125,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"auth_expire": &ctx.Config{Name: "auth_expire", Value: "10m", Help: "权限超时"},
 		"auth_type": &ctx.Config{Name: "auth_type", Value: map[string]interface{}{
 			"unique":  map[string]interface{}{"session": true, "bench": true, "relay": true},
-			"public":  map[string]interface{}{"userrole": true, "username": true, "cert": true},
+			"public":  map[string]interface{}{"userrole": true, "username": true, "cert": true, "access": true},
 			"single":  map[string]interface{}{"password": true, "token": true, "uuid": true, "ppid": true},
 			"secrete": map[string]interface{}{"password": true, "token": true, "uuid": true, "ppid": true},
 		}, Help: "散列"},
@@ -133,7 +133,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"expire": &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Conf("runtime", "node.cert", m.Cmdx("nfs.load", os.Getenv("node_cert")))
 			m.Conf("runtime", "node.key", m.Cmdx("nfs.load", os.Getenv("node_key")))
 			m.Conf("runtime", "user.cert", m.Cmdx("nfs.load", os.Getenv("user_cert")))
@@ -164,9 +164,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								case "0":
 									if !up {
 										up = true
-										m.Add("append", "up_key", k)
+										m.Add("append", "up_key", k[:6])
 										m.Add("append", "up_type", val["type"])
-										m.Add("append", "up_ship", val["ship"])
+										// m.Add("append", "up_ship", val["ship"])
 									}
 								}
 							}
@@ -174,13 +174,13 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						if !up {
 							m.Add("append", "up_key", "")
 							m.Add("append", "up_type", "")
-							m.Add("append", "up_ship", "")
+							// m.Add("append", "up_ship", "")
 						}
 						m.Add("append", "key", key)
 						m.Add("append", "type", node["type"])
 						m.Add("append", "meta", node["meta"])
 					})
-					m.Table()
+					m.Sort("type").Table()
 					return
 				}
 
@@ -393,7 +393,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								})
 							}
 						}
-						return
+						break
 					}
 				}
 
@@ -619,36 +619,38 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						m.Cmd("aaa.auth", m.Option("bench"), "ship", "componet").CopyTo(m, "append")
 						m.Cmd("aaa.auth", m.Option("bench"), "ship", "command").CopyTo(m, "append")
 						m.Table()
-						return
+						break
 					}
 
 					// 检查权限
-					m.Cmd("aaa.auth", "ship", "username", m.Option("username"), "userrole").Table(func(node map[string]string) {
-						if m.Options("userrole") && node["meta"] != m.Option("userrole") {
-							return // 失败
-						} else if node["meta"] == "root" { // 超级用户
+					for _, role := range kit.Trans(m.Option("userrole"), m.Cmd("aaa.auth", "ship", "username", m.Option("username"), "userrole").Appendv("meta")) {
+						if role == "" {
+							continue
+						}
+						if role == "root" { // 超级用户
 
 						} else if len(arg) > 2 { // 接口权限
 							if m.Cmds("aaa.auth", m.Option("bench"), "ship", "check", arg[2]) {
 
-							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "componet", arg[1], "check", arg[2]); kit.Right(cid) {
+							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", role, "componet", arg[1], "check", arg[2]); kit.Right(cid) {
 								m.Cmd("aaa.auth", m.Option("bench"), cid)
 							} else {
-								return // 失败
+								continue // 失败
 							}
 						} else if len(arg) > 1 { // 组件权限
 							if m.Cmds("aaa.auth", m.Option("bench"), "ship", "check", arg[1]) {
 
-							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", node["meta"], "check", arg[1]); kit.Right(cid) {
+							} else if cid := m.Cmdx("aaa.auth", "ship", "userrole", role, "check", arg[1]); kit.Right(cid) {
 								m.Cmd("aaa.auth", m.Option("bench"), cid)
 							} else {
-								return // 失败
+								continue // 失败
 							}
 						}
 
-						m.Log("info", "role: %s %v", node["meta"], arg[1:])
-						m.Echo(node["meta"])
-					})
+						m.Log("info", "role: %s %v", role, arg[1:])
+						m.Echo(role)
+						break
+					}
 
 					m.Log("right", "bench: %s sessid: %s user: %s com: %v result: %v",
 						m.Option("bench"), m.Option("sessid"), m.Option("username"), arg[2:], m.Result(0))
@@ -755,8 +757,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber:          big.NewInt(1),
-							IsCA:                  true,
+							SerialNumber: big.NewInt(1),
+							IsCA:         true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},
