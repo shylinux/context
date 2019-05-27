@@ -1,8 +1,61 @@
-html, body {
+html, body, fieldset {
+    background-color:#d8d8d8;
+    padding:0px;
     height:100%;
     width:100%;
     margin:0px;
-    background-color:#d8d8d8;
+}
+fieldset {
+    min-width:160px;
+    overflow:auto;
+}
+legend {
+    margin-left:10px;
+}
+fieldset div.output {
+    padding:6px;
+}
+fieldset div.output div.item:hover {
+    background-color:red;
+}
+fieldset div.output div.item.select {
+    background-color:red;
+}
+fieldset.toast {
+    background-color:#ffffff00;
+    position:absolute;
+    display:none;
+}
+fieldset.toast div.output {
+    padding:0 10px;
+}
+fieldset.toast div.output pre {
+    word-break:break-word;
+    white-space:pre-wrap;
+    text-align:center;
+    margin:0px;
+}
+fieldset.dialog {
+    background-color:lightgray;
+    padding:10px;
+    display:none;
+    position:absolute;
+}
+fieldset.dialog div.output {
+    padding:10px;
+    float:left;
+}
+fieldset.dialog div.output table th {
+    min-width:130px;
+}
+fieldset.dialog div.output table td {
+    min-width:100px;
+}
+fieldset.dialog div.create {
+    padding:10px;
+    border:solid 1px red;
+    margin-left:10px;
+    float:left;
 }
 
 fieldset table {

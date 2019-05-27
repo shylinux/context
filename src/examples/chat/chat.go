@@ -49,11 +49,11 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				},
 
 				map[string]interface{}{"componet_name": "ocean", "componet_tmpl": "fieldset",
-					"componet_view": "Ocean", "componet_init": "initOcean",
+					"componet_view": "Ocean dialog", "componet_init": "initOcean",
 					"componet_ctx": "web.chat", "componet_cmd": "ocean",
 				},
 				map[string]interface{}{"componet_name": "steam", "componet_tmpl": "fieldset",
-					"componet_view": "Steam", "componet_init": "initSteam",
+					"componet_view": "Steam dialog", "componet_init": "initSteam",
 					"componet_ctx": "web.chat", "componet_cmd": "steam",
 				},
 				map[string]interface{}{"componet_name": "river", "componet_tmpl": "fieldset",
@@ -126,9 +126,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				user := map[string]interface{}{}
 				for _, v := range arg[3:] {
 					u := m.Cmdx("ssh._route", m.Conf("runtime", "work.route"), "_check", "work", v)
-					user[v] = map[string]interface{}{
-						"user": u,
-					}
+					user[v] = map[string]interface{}{"user": u}
 				}
 
 				m.Conf("flow", h, map[string]interface{}{

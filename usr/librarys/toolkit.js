@@ -25,6 +25,79 @@ kit = toolkit = {
         return args
     },
 
+    ModifyNode: function(which, html) {
+        var node = typeof which == "string"? document.querySelector(which): which
+        switch (typeof html) {
+            case "string":
+                node.innerHTML = html
+                break
+            case "object":
+                for (var k in html) {
+                    if (typeof html[k] == "object") {
+                        for (var d in html[k]) {
+                            node[k][d] = html[k][d]
+                        }
+                        continue
+                    }
+                    node[k] = html[k]
+                }
+                break
+        }
+        return node
+    },
+    ModifyView: function(which, args) {
+        var height = document.body.clientHeight-4
+        var width = document.body.clientWidth-4
+        for (var k in args) {
+            switch (k) {
+                case "dialog":
+                    var w = h = args[k]
+                    if (typeof(args[k]) == "object") {
+                        w = args[k][0]
+                        h = args[k][1]
+                    }
+                    if (w > width) {
+                        w = width
+                    }
+                    if (h > height) {
+                        h = height
+                    }
+
+                    args["top"] = (height-h)/2
+                    args["left"] = (width-w)/2
+                    args["width"] = w
+                    args["height"] = h
+                    args[k] = undefined
+                    break
+                case "window":
+                    var w = h = args[k]
+                    if (typeof(args[k]) == "object") {
+                        w = args[k][0]
+                        h = args[k][1]
+                    }
+
+                    args["top"] = h/2
+                    args["left"] = w/2
+                    args["width"] = width-w-20
+                    args["height"] = height-h-20
+                    args[k] = undefined
+                    break
+            }
+        }
+
+        for (var k in args) {
+            switch (k) {
+                case "top":
+                case "left":
+                case "width":
+                case "height":
+                case "padding":
+                    args[k] = args[k]+"px"
+                    break
+            }
+        }
+        return kit.ModifyNode(which, {style: args})
+    },
     ScrollPage: function(event, conf) {
         switch (event.key) {
             case "h":
@@ -70,75 +143,6 @@ kit = toolkit = {
         }
         return true
     },
-    ModifyView: function(target, args) {
-        var width = document.body.offsetWidth-10
-        var height = document.body.offsetHeight-10
-        for (var k in args) {
-            switch (k) {
-                case "dialog":
-                    var w = h = args[k]
-                    if (typeof(args[k]) == "object") {
-                        w = args[k][0]
-                        h = args[k][1]
-                    }
-                    if (w > width) {
-                        w = width
-                    }
-                    if (h > height) {
-                        h = height
-                    }
-
-                    args["top"] = (height-h)/2
-                    args["left"] = (width-w)/2
-                    args["width"] = w
-                    args["height"] = h
-                    break
-                case "window":
-                    var w = h = args[k]
-                    if (typeof(args[k]) == "object") {
-                        w = args[k][0]
-                        h = args[k][1]
-                    }
-
-                    args["top"] = h/2
-                    args["left"] = w/2
-                    args["width"] = width-w
-                    args["height"] = height-h
-                    break
-            }
-        }
-
-        for (var k in args) {
-            switch (k) {
-                case "top":
-                case "left":
-                case "width":
-                case "height":
-                    target.style[k] = args[k]+"px"
-                    break
-            }
-        }
-    },
-    ModifyNode: function(which, html) {
-        var node = typeof which == "string"? document.querySelector(which): which
-        switch (typeof html) {
-            case "string":
-                node.innerHTML = html
-                break
-            case "object":
-                for (var k in html) {
-                    if (typeof html[k] == "object") {
-                        for (var d in html[k]) {
-                            node[k][d] = html[k][d]
-                        }
-                        continue
-                    }
-                    node[k] = html[k]
-                }
-                break
-        }
-        return node
-    },
     CreateNode: function(element, html) {
         return this.ModifyNode(document.createElement(element), html)
     },
@@ -170,6 +174,9 @@ kit = toolkit = {
             child.data = child.data || {}
             child.type = child.type || "div"
 
+            if (child.name) {
+                child.data["name"] = child.name
+            }
             if (child.value) {
                 child.data["value"] = child.value
             }

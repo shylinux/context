@@ -41,34 +41,19 @@ function Page(page) {
                     break
 
                 case "text":
-                    switch (key.length) {
-                        case 0:
-                            result = [{view: ["item", "div", "null"], click: cb}]
-                            break
-                        case 1:
-                            result = [{view: ["item", "div", line[key[0]]], click: cb}]
-                            break
-                        default:
-                            result = [{view: ["item", "div", line[key[0]]+"("+line[key[1]]+")"], click: cb}]
-                    }
+                    result = [{view: ["item", "div", key.length>1? line[key[0]]+"("+line[key[1]]+")": (key.length>0? line[key[0]]: "null")], click: cb}]
                     break
 
                 case "table":
-                    var data = JSON.parse(line.text)
-                    var list = []
-                    var line = []
-                    for (var k in data[0]) {
-                        line.push({view: ["", "th", k]})
-                    }
-                    list.push({view: ["", "tr"], list: line})
-                    for (var i = 0; i < data.length; i++) {
-                        var line = []
-                        for (var k in data[i]) {
-                            line.push({view: ["", "td", data[i][k]]})
-                        }
-                        list.push({view: ["", "tr"], list: line})
-                    }
-                    var result = [{view: [""], list: [{view: ["", "table"], list: list}]}]
+                    result = [{view: [""], list: [
+                        {view: ["", "table"], list: JSON.parse(line.text || "[]").map(function(item, index) {
+                            var line = []
+                            for (var k in item) {
+                                line.push({text: index == 0? [k, "th"]: [item[k], "td"]})
+                            }
+                            return {type: "tr", list: line}
+                        })},
+                    ]}]
                     break
 
                 case "field":
@@ -76,93 +61,102 @@ function Page(page) {
 
                 case "plugin":
                     var id = "plugin"+page.ID()
-                    var input = [{type: "input", style: {"display": "none"}}]
-                    JSON.parse(line.inputs || "[]").forEach(function(item, index, inputs) {
-                        function run(event) {
-                            var args = []
-                            ui.option.querySelectorAll("input").forEach(function(item, index){
-                                if (index==0) {
-                                    return
-                                }
-                                if (item.type == "text") {
-                                    args.push(item.value)
-                                }
-                            })
-                            ui.option.Run(event, args, function(msg) {
-                                ui.option.ondaemon(msg)
-                            })
-                        }
-
-                        item.type == "button"? item.onclick = function(event) {
-                            var plugin = page[id];
-                            (plugin[item.click] || function() {
-                                run(event)
-                            })(item, index, inputs, event, ui.option)
-
-                        }: item.onkeyup = function(event) {
-                            event.key == "Enter" && (index == inputs.length-1? run(event): event.target.nextSibling.focus())
-                            if (event.ctrlKey) {
-                                switch (event.key) {
-                                    case "k":
-                                        kit.DelText(target, target.selectionStart)
-                                        break
-                                    case "u":
-                                        kit.DelText(target, 0, target.selectionEnd)
-                                        break
-                                    case "w":
-                                        var start = target.selectionStart-2
-                                        var end = target.selectionEnd-1
-                                        for (var i = start; i >= 0; i--) {
-                                            if (target.value[end] == " " && target.value[i] != " ") {
-                                                break
-                                            }
-                                            if (target.value[end] != " " && target.value[i] == " ") {
-                                                break
-                                            }
-                                        }
-                                        kit.DelText(target, i+1, end-i)
-                                        break
-
-                                    case "c":
-                                        ui.output.innerHTML = ""
-                                        break
-                                    case "r":
-                                        ui.output.innerHTML = ""
-                                    case "j":
-                                        run(event)
-                                        break
-                                    case "l":
-                                        page.action.scrollTo(0, ui.option.parentNode.offsetTop)
-                                        break
-                                    case "m":
-                                        event.stopPropagation()
-                                        var uis = page.View(parent, type, line, key, cb)
-                                        page.action.scrollTo(0, uis.option.parentNode.offsetTop)
-                                        ui.option.querySelectorAll("input")[1].focus()
-                                        break
-                                }
-                            }
-                        }
-                        input.push({type: "input", data: item})
-                    })
-
-                    var result = [{view: [line.view, "fieldset"], data: {id: id}, list: [
-                        {script: "Plugin("+id+","+line.init+")"},
+                    result = [{view: [line.view, "fieldset"], data: {id: id}, list: [
                         {text: [line.name, "legend"]},
-                        {name: "option", view: ["option", "form"], data: {Run: cb}, list: input},
+                        {name: "option", view: ["option", "form"], data: {Run: cb}, list: [{type: "input", style: {"display": "none"}}]},
                         {name: "output", view: ["output", "div"]},
+                        {script: "Plugin("+id+","+line.inputs+","+line.init+")"},
                     ]}]
                     break
             }
 
             ui = kit.AppendChild(parent, result)
+            ui.last.Meta = line
             return ui
         },
         reload: function() {
             location.reload()
         },
-        showToast: function(text) {
+        oninput: function(event, local) {
+            var target = event.target
+            if (event.ctrlKey) {
+                if (typeof local == "function" && local(event)) {
+                    return
+                }
+                switch (event.key) {
+                    case "a":
+                    case "e":
+                    case "f":
+                    case "b":
+                    case "h":
+                    case "d":
+                        break
+                    case "k":
+                        kit.DelText(target, target.selectionStart)
+                        break
+                    case "u":
+                        kit.DelText(target, 0, target.selectionEnd)
+                        break
+                    case "w":
+                        var start = target.selectionStart-2
+                        var end = target.selectionEnd-1
+                        for (var i = start; i >= 0; i--) {
+                            if (target.value[end] == " " && target.value[i] != " ") {
+                                break
+                            }
+                            if (target.value[end] != " " && target.value[i] == " ") {
+                                break
+                            }
+                        }
+                        kit.DelText(target, i+1, end-i)
+                        break
+                    default:
+                        return false
 
+                }
+                return true
+            }
+            return false
+        },
+        ontoast: function(text, title, duration) {
+            var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
+            var toast = kit.ModifyView("fieldset.toast", {
+                display: "block", dialog: [args.width||200, args.height||40], padding: 10,
+            })
+
+            var list = [{text: [args.text||""]}]
+            args.inputs && args.inputs.forEach(function(input) {
+                if (typeof input == "string") {
+                    list.push({inner: input, type: "label", style: {"margin-right": "5px"}})
+                    list.push({input: [input, page.oninput]})
+                } else {
+                    list.push({inner: input[0], type: "label", style: {"margin-right": "5px"}})
+                    var option = []
+                    for (var i = 1; i < input.length; i++) {
+                        option.push({type: "option", inner: input[i]})
+                    }
+                    list.push({name: input[0], type: "select", list: option})
+                }
+                list.push({type: "br"})
+            })
+            args.button && args.button.forEach(function(input) {
+                list.push({type: "button", inner: input, click: function(event) {
+                    var values = {}
+                    toast.querySelectorAll("input").forEach(function(input) {
+                        values[input.name] = input.value
+                    })
+                    toast.querySelectorAll("select").forEach(function(input) {
+                        values[input.name] = input.value
+                    })
+                    typeof args.cb == "function" && args.cb(input, values)
+                    toast.style.display = "none"
+                }})
+            })
+
+            kit.ModifyNode(toast.querySelector("legend"), args.title||"tips")
+            var ui = kit.AppendChild(kit.ModifyNode(toast.querySelector("div.output"), ""), list)
+            args.duration !=- 1 && setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
+            page.toast = toast
         },
         onscroll: function(event, target, action) {
             switch (action) {
@@ -198,20 +192,18 @@ function Page(page) {
 
                 // pane init
                 pane.which = page.Sync(form.dataset.componet_name)
-                pane.ShowWindow = function(width, height) {
-                    kit.ModifyView(pane, {window: [width||80, height||40]})
-                }
                 pane.ShowDialog = function(width, height) {
                     if (pane.style.display != "block") {
-                        pane.style.display = "block"
-                        kit.ModifyView(pane, {dialog: [width||800, height||400]})
+                        page.dialog && page.dialog != pane && page.dialog.style.display == "block" && page.dialog.Show()
+                        pane.style.display = "block", page.dialog = pane
+                        kit.ModifyView(pane, {window: [width||80, height||200]})
                         return true
                     }
                     pane.style.display = "none"
                     return false
                 }
                 pane.Size = function(width, height) {
-                    pane.style.display = (width==0 || height==0)? "none": "block"
+                    pane.style.display = (width<=0 || height<=0)? "none": "block"
                     pane.style.width = width+"px"
                     pane.style.height = height+"px"
                 }
@@ -253,12 +245,56 @@ function Page(page) {
     }
     return page
 }
-function Plugin(field, plugin) {
+function Plugin(field, inputs, plugin) {
     var option = field.querySelector("form.option")
     var output = field.querySelector("div.output")
 
-    plugin.__proto__ = {
-        field: field,
+    function run(event) {
+        var args = []
+        option.querySelectorAll("input").forEach(function(item, index){
+            item.type == "text" && args.push(item.value)
+        })
+        option.Run(event, args.slice(1), function(msg) {
+            (option.ondaemon || function(msg) {
+                output.innerHTML = "", kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
+            })(msg)
+        })
+    }
+
+    inputs && kit.AppendChild(option, inputs.map(function(item, index, inputs) {
+        item.type == "button"? item.onclick = function(event) {
+            (plugin[item.click] || run)(event)
+        }: item.onkeyup = function(event) {
+            page.oninput(event, function(event) {
+                switch (event.key) {
+                    case "c":
+                        output.innerHTML = ""
+                        break
+                    case "r":
+                        output.innerHTML = ""
+                    case "j":
+                        run(event)
+                        break
+                    case "l":
+                        page.action.scrollTo(0, option.parentNode.offsetTop)
+                        break
+                    case "m":
+                        page.View(field.parentNode, "plugin", field.Meta, [], option.Run)
+                        event.stopPropagation()
+                        break
+                    default:
+                        return false
+                }
+                return true
+            })
+            event.key == "Enter" && (index == inputs.length-1? run(event): event.target.nextSibling.focus())
+        }
+        return {type: "input", data: item}
+    }))
+
+    plugin = plugin || {}, plugin.__proto__ = {
+        show: function() {},
+        init: function() {},
     }
     plugin.init(page, page.action, field, option, output)
     page[field.id] = plugin

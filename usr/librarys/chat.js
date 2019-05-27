@@ -1,27 +1,32 @@
 var page = Page({
-    conf: {border: 4, banner: 105, layout: {river:160, source:60, action:60, storm:160}},
+    conf: {border: 4, layout: {header:30, river:180, action:180, source:60, storm:180, footer:30}},
     onlayout: function(event, sizes) {
-        var width = document.body.offsetWidth
-        var height = document.body.offsetHeight-page.conf.banner
-        sizes = sizes || {}
+        var height = document.body.clientHeight-page.conf.border
+        var width = document.body.clientWidth-page.conf.border
+        page.conf.height = height
+        page.conf.width = width
 
-        sizes.river == undefined && (sizes.river = page.river.offsetWidth-page.conf.border)
-        sizes.storm == undefined && (sizes.storm = page.storm.offsetWidth-page.conf.border)
-        sizes.width = width - sizes.river - sizes.storm-5*page.conf.border
+        sizes = sizes || {}
+        sizes.header == undefined && (sizes.header = page.header.clientHeight)
+        sizes.footer == undefined && (sizes.footer = page.footer.clientHeight)
+        page.header.Size(width, sizes.header)
+        page.footer.Size(width, sizes.footer)
+
+        sizes.river == undefined && (sizes.river = page.river.clientWidth)
+        sizes.storm == undefined && (sizes.storm = page.storm.clientWidth)
+        height -= page.header.offsetHeight+page.footer.offsetHeight
         page.river.Size(sizes.river, height)
         page.storm.Size(sizes.storm, height)
 
-        sizes.action == undefined && (sizes.action = page.action.offsetHeight-page.conf.border)
-        sizes.source == undefined && (sizes.source = page.source.offsetHeight-page.conf.border)
-        sizes.target = height - sizes.action - sizes.source - 2*page.conf.border
-        if (sizes.action == -1) {
-            sizes.action = height
-            sizes.target = 0
-            sizes.source = 0
-        }
-        page.target.Size(sizes.width, sizes.target)
-        page.source.Size(sizes.width, sizes.source)
-        page.action.Size(sizes.width, sizes.action)
+        sizes.action == undefined && (sizes.action = page.action.clientHeight)
+        sizes.source == undefined && (sizes.source = page.source.clientHeight)
+        sizes.action == -1 && (sizes.action = height, sizes.source = 0)
+        width -= page.river.offsetWidth+page.storm.offsetWidth
+        page.action.Size(width, sizes.action)
+        page.source.Size(width, sizes.source)
+
+        height -= page.source.offsetHeight+page.action.offsetHeight
+        page.target.Size(width, height)
         kit.History.add("lay", sizes)
     },
     oncontrol: function(event, target, action) {
@@ -46,21 +51,18 @@ var page = Page({
         var table = kit.AppendChild(output, "table")
         var ui = kit.AppendChild(pane, [{view: ["create ocean"], list: [
             {input: ["name", function(event) {
-                if (event.ctrlKey) {
+                page.oninput(event, function(event) {
                     switch (event.key) {
                         case "a":
                             pane.Action["全选"](event)
-                            break
+                            return
                         case "c":
                             pane.Action["清空"](event)
-                            break
+                            return
                     }
-                    return
-                }
+                })
+                event.key == "Enter" && this.nextSibling.click()
 
-                if (event.key == "Enter") {
-                    ui.name.nextSibling.click()
-                }
             }]}, {button: ["create", function(event) {
                 if (!ui.name.value) {
                     ui.name.focus()
@@ -98,17 +100,14 @@ var page = Page({
                 pane.Show()
             },
             "全选": function(event) {
-                ui.list.innerHTML = ""
-                table.querySelectorAll("tr").forEach(function(item) {
+                ui.list.innerHTML = "", table.querySelectorAll("tr").forEach(function(item) {
                     item.firstChild.click()
                 })
             },
             "清空": function(event) {
-                ui.list.innerHTML = ""
-                table.querySelectorAll("tr").forEach(function(item) {
+                ui.list.innerHTML = "", table.querySelectorAll("tr").forEach(function(item) {
                     item.style.display = ""
                 })
-
             },
         }
         return {"button": ["取消", "全选", "清空"], "action": pane.Action}
@@ -133,24 +132,19 @@ var page = Page({
             },
         }
 
-        function fun(line, index, event, args, cbs) {
-            var data = JSON.parse(line.text)
-            var cmds = ["wave", river, data.node, data.group, data.index].concat(args)
-            form.Run(cmds, cbs)
-        }
-
         pane.Show = function() {
             output.Update(["flow", river], "text", ["text"], "index", false, fun)
         }
 
-        pane.postion = page.Sync()
-        pane.onscroll = function(event) {
-            pane.postion.set({top: event.target.scrollTop, height: event.target.clientHeight, bottom: event.target.scrollHeight})
+        function fun(line, index, event, args, cbs) {
+            var data = JSON.parse(line.text)
+            form.Run(["wave", river, data.node, data.group, data.index].concat(args), cbs)
         }
 
         pane.Send = function(type, text, cb) {
             form.Run(["flow", river, type, text], function(msg) {
-                output.Append(type, {text:text, index: msg.result[0]}, ["text"], "index", fun), typeof cb == "function" && cb()
+                output.Append(type, {text:text, index: msg.result[0]}, ["text"], "index", fun)
+                typeof cb == "function" && cb()
             })
         }
         return [{"text": ["target"]}]
@@ -164,7 +158,7 @@ var page = Page({
         }}}])
 
         pane.Size = function(width, height) {
-            pane.style.display = (width==0 || height==0)? "none": "block"
+            pane.style.display = (width<=0 || height<=0)? "none": "block"
             pane.style.width = width+"px"
             pane.style.height = height+"px"
             ui.first.style.width = (width-7)+"px"
@@ -177,31 +171,27 @@ var page = Page({
         return
     },
     initAction: function(page, pane, form, output) {
-        var river = "", input = "", water = 0
+        var river = "", water = 0, input = "", share = ""
         pane.Listen = {
             river: function(value, old) {
                 river = value
             },
+            storm: function(value, old) {
+                water = value, pane.Show()
+            },
             source: function(value, old) {
                 input = value, kit.Log(value)
             },
-            storm: function(value, old) {
-                water = value, pane.Show()
+            target: function(value, old) {
+                share = value, kit.Log(value)
             },
         }
         pane.Show = function() {
             output.Update([river, water], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
-                var cmds = [river, water, index].concat(args)
-
-                // event.shiftKey? page.target.Send("field", JSON.stringify({
-                //     componet_group: "index", componet_name: "river",
-                //     cmds: ["wave", river, line.node, line.group, line.index], input: [{type: "input", data: {name: "hi", value: line.cmd}}]
-                //
                 event.shiftKey? page.target.Send("field", JSON.stringify({
                     name: line.name, view: line.view, init: line.init,
-                    node: line.node, group: line.group, index: line.index,
-                    inputs: line.inputs,
-                })): form.Run(cmds, function(msg) {
+                    node: line.node, group: line.group, index: line.index, inputs: line.inputs,
+                })): form.Run([river, water, index].concat(args), function(msg) {
                     event.ctrlKey && (msg.append && msg.append[0]?
                         page.target.Send("table", JSON.stringify(ctx.Table(msg))):
                         page.target.Send("text", msg.result.join("")))
@@ -209,28 +199,34 @@ var page = Page({
                 })
             })
         }
+
         pane.Action = {
             "恢复": function(event) {
                 page.onlayout(event, page.conf.layout)
             },
+            "缩小": function(event) {
+                page.onlayout(event, {action:60, source:60})
+            },
             "放大": function(event) {
-                page.onlayout(event, {action:300})
+                page.onlayout(event, {action:300, source:60})
+            },
+            "最高": function(event) {
+                page.onlayout(event, {action: -1})
             },
             "最宽": function(event) {
                 page.onlayout(event, {river:0, storm:0})
             },
-            "最大": function(event) {
-                page.onlayout(event, {river:0, action: -1, storm:0})
+            "全屏": function(event) {
+                page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})
             },
         }
-		return {"button": ["恢复", "放大", "最宽", "最大"], "action": pane.Action}
+        return {"button": ["恢复", "缩小", "放大", "最高", "最宽", "全屏"], "action": pane.Action}
     },
     initStorm: function(page, pane, form, output) {
         var river = ""
         pane.Listen = {
             river: function(value, old) {
-                river = value, pane.Show()
-                pane.which.set("")
+                pane.which.set(""), river = value, pane.Show()
             },
         }
         pane.Show = function() {
@@ -241,7 +237,7 @@ var page = Page({
                 page.steam.Show()
             },
         }
-		return {"button": ["创建"], "action": pane.Action}
+        return {"button": ["创建"], "action": pane.Action}
     },
     initSteam: function(page, pane, form, output) {
         var river = ""
@@ -255,9 +251,17 @@ var page = Page({
         var device = kit.AppendChild(pane, [{"view": ["device", "table"]}]).last
         var ui = kit.AppendChild(pane, [{view: ["create steam"], list: [
             {input: ["name", function(event) {
-                if (event.key == "Enter") {
-                    ui.name.nextSibling.click()
-                }
+                page.oninput(event, function(event) {
+                    switch (event.key) {
+                        case "a":
+                            pane.Action["全选"](event)
+                            return
+                        case "c":
+                            pane.Action["清空"](event)
+                            return
+                    }
+                })
+                event.key == "Enter" && this.nextSibling.click()
             }]}, {button: ["create", function(event) {
                 if (!ui.name.value) {
                     ui.name.focus()
@@ -265,7 +269,6 @@ var page = Page({
                 }
 
                 var cmd = [river, "spawn", ui.name.value]
-
                 ui.list.querySelectorAll("tr").forEach(function(item) {
                     cmd.push(item.dataset.pod)
                     cmd.push(item.dataset.group)
@@ -279,6 +282,7 @@ var page = Page({
                 }
 
                 form.Run(cmd, function(msg) {
+                    page.action.Show()
                     page.storm.Show()
                     pane.Show()
                 })
@@ -301,7 +305,20 @@ var page = Page({
             }))
         }
 
-        return [{"text": ["steam"]}]
+        pane.Action = {
+            "取消": function(event) {
+                pane.Show()
+            },
+            "全选": function(event) {
+                ui.list.innerHTML = "", device.querySelectorAll("tr").forEach(function(item) {
+                    item.firstChild.click()
+                })
+            },
+            "清空": function(event) {
+                ui.list.innerHTML = ""
+            },
+        }
+        return {"button": ["取消", "全选", "清空"], "action": pane.Action}
     },
     init: function(page) {
         page.initField(page, function(init, pane, form) {
@@ -311,26 +328,17 @@ var page = Page({
             output.Clear = function() {
                 output.innerHTML = "", list = [], last = -1
             }
-            output.Append = function(type, line, key, which, cb) {
-                var index = list.length
-                type = line.type || type
-                var ui = page.View(output, type, line, key, function(event, cmds, cbs) {
-                    output.Select(index), pane.which.set(line[which])
-                    typeof cb == "function" && cb(line, index, event, cmds, cbs)
-                })
-                if (type == "table") {
-                    kit.OrderTable(ui.last)
-                }
-                // if (type == "field") {
-                //     kit.OrderForm(page, ui.last, ui.form, ui.table, ui.code)
-                // }
-                list.push(ui.last)
-                pane.scrollBy(0, pane.scrollHeight)
-                return ui
-            }
             output.Select = function(index) {
                 -1 < last && last < list.length && (list[last].className = "item")
                 last = index, list[index].className = "item select"
+            }
+            output.Append = function(type, line, key, which, cb) {
+                var index = list.length, ui = page.View(output, line.type || type, line, key, function(event, cmds, cbs) {
+                    output.Select(index), pane.which.set(line[which])
+                    typeof cb == "function" && cb(line, index, event, cmds, cbs)
+                })
+                list.push(ui.last), pane.scrollBy(0, pane.scrollHeight)
+                return ui
             }
             output.Update = function(cmds, type, key, which, first, cb) {
                 output.Clear(), form.Runs(cmds, function(line, index, msg) {
@@ -356,7 +364,6 @@ var page = Page({
             }
             return conf
         })
-
         page.onlayout(null, page.conf.layout)
     },
 })

@@ -1,121 +1,31 @@
-fieldset div.output {
-    padding:6px;
-}
-fieldset.Ocean {
-    background-color:lightgray;
-    padding:10px;
-    display:none;
-    position:absolute;
-}
-fieldset.Ocean div.action {
-    margin:10px;
-}
-fieldset.Ocean div.output {
-    float:left;
-    padding:0;
-}
-fieldset.Ocean div.output table td {
-    min-width:100px;
-}
-fieldset.Ocean div.output table th {
-    min-width:130px;
-}
-fieldset.Ocean div.create {
-    padding:10px;
-    border:solid 2px green;
-    margin-left:10px;
-    float:left;
-}
 fieldset.Ocean div.create pre:hover {
     background-color:red;
 }
-fieldset.River {
-    padding:0;
-    min-width:160px;
-    min-height:200px;
-    overflow:auto;
-    float:left;
-}
-fieldset.River div.output div.item {
 
-}
-fieldset.River div.output div.item:hover {
-    background-color:red;
-}
-fieldset.River div.output div.item.select {
-    background-color:red;
-}
-fieldset.Target {
-    padding:0;
-    min-width:160px;
-    min-height:80px;
-    overflow:auto;
-}
-fieldset.Target div.output {
-    padding:10px;
+fieldset.River {
+    float:left;
 }
 fieldset.Target div.output div.item:hover {
     background-color:lightgreen;
 }
-fieldset.Source {
-    padding:0;
-    min-width:160px;
-    min-height:30px;
-}
 fieldset.Source div.output {
     padding:0;
-}
-fieldset.Action {
-    padding:0;
-    min-width:160px;
-    min-height:30px;
-    overflow:auto;
 }
 fieldset.Action div.output div.item:hover {
     background-color:lightblue;
 }
 fieldset.Storm {
-    padding:0;
-    min-width:160px;
-    min-height:200px;
     float:right;
 }
-fieldset.Storm div.output div.item:hover {
-    background-color:red;
-}
-fieldset.Storm div.output div.item.select {
-    background-color:red;
-}
-fieldset.Steam {
-    background-color:lightgray;
-    padding:10px;
-    display:none;
-    position:absolute;
-}
-fieldset.Steam div.action {
-    margin:10px;
-}
-fieldset.Steam div.output {
-    float:left;
-    padding:0;
-}
-fieldset.Steam div.output table td {
-    min-width:100px;
-}
-fieldset.Steam div.output table th {
-    min-width:130px;
-}
+
 fieldset.Steam table.device {
     padding:10px;
-    border:solid 2px green;
+    border:solid 1px green;
     margin-left:10px;
     float:left;
 }
 fieldset.Steam div.create {
-    padding:10px;
-    border:solid 2px green;
-    margin-left:10px;
-    float:left;
+    clear:both;
 }
 fieldset.Steam div.create pre:hover {
     background-color:red;
