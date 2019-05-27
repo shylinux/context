@@ -79,6 +79,8 @@ function Page(page) {
         },
         oninput: function(event, local) {
             var target = event.target
+            kit.History.add("key", (event.ctrlKey? "Control+": "")+(event.shiftKey? "Shift+": "")+event.key)
+
             if (event.ctrlKey) {
                 if (typeof local == "function" && local(event)) {
                     return
@@ -115,6 +117,16 @@ function Page(page) {
 
                 }
                 return true
+            }
+            switch (event.key) {
+                case "Escape":
+                    target.blur()
+                    break
+                default:
+                    if (kit.HitText(target, "jk")) {
+                        kit.DelText(target, target.selectionStart-2, 2)
+                        target.blur()
+                    }
             }
             return false
         },
@@ -182,8 +194,22 @@ function Page(page) {
             })
             return [{"text": ["shylinux", "div", "title"]}]
         },
-        initFooter: function(page, field, option) {
-            return [{"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]}]
+        initFooter: function(page, pane, form, output) {
+            var state = {}, list = []
+            pane.State = function(name, value) {
+                state[name] = value, pane.Show()
+            }
+            pane.Order = function(value) {
+                list = value, pane.Show()
+            }
+
+            pane.Show = function() {
+                output.innerHTML = "", kit.AppendChild(output, [
+                    {"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]},
+                    {"view": ["state"], list: list.map(function(item) {return {text: [item+":"+state[item], "div"]}})},
+                ])
+            }
+            return
         },
         initField: function(page, cb) {
             document.querySelectorAll("body>fieldset").forEach(function(pane) {
@@ -260,13 +286,28 @@ function Plugin(field, inputs, plugin) {
             })(msg)
         })
     }
+    field.onclick = function(event) {
+        page.plugin = field
+        page.footer.State("action", field.id)
+    }
 
-    inputs && kit.AppendChild(option, inputs.map(function(item, index, inputs) {
+    var ui = kit.AppendChild(option, inputs.map(function(item, index, inputs) {
         item.type == "button"? item.onclick = function(event) {
-            (plugin[item.click] || run)(event)
-        }: item.onkeyup = function(event) {
+            plugin[item.click]? plugin[item.click](event, item, option, field): run(event)
+
+        }: (item.onkeyup = function(event) {
             page.oninput(event, function(event) {
                 switch (event.key) {
+                    case "i":
+                        var next = field.nextSibling;
+                        // (next? next: field.parentNode.firstChild).querySelectorAll("input")[1].focus()
+                        next && (next.querySelectorAll("input")[1].focus(), event.stopPropagation())
+                        break
+                    case "o":
+                        var prev = field.previousSibling;
+                        // (prev? prev: field.parentNode.lastChild).querySelectorAll("input")[1].focus()
+                        prev && (prev.querySelectorAll("input")[1].focus(), event.stopPropagation())
+                        break
                     case "c":
                         output.innerHTML = ""
                         break
@@ -288,9 +329,12 @@ function Plugin(field, inputs, plugin) {
                 return true
             })
             event.key == "Enter" && (index == inputs.length-1? run(event): event.target.nextSibling.focus())
-        }
+        }, field.Select = function() {
+            ui.first.focus()
+        })
         return {type: "input", data: item}
     }))
+    ui.first.focus()
 
     plugin = plugin || {}, plugin.__proto__ = {
         show: function() {},

@@ -57,6 +57,19 @@ fieldset.dialog div.create {
     margin-left:10px;
     float:left;
 }
+fieldset.Footer {
+    clear:both;
+}
+fieldset.Footer div.output div.title {
+    float:left;
+}
+fieldset.Footer div.output div.state {
+    float:right;
+}
+fieldset.Footer div.output div.state div {
+    margin-left:5px;
+    float:right;
+}
 
 fieldset table {
     font-size:14px;
@@ -115,7 +128,4 @@ fieldset.Banner>ul>li {
 }
 fieldset.Banner>ul>li:hover {
     background-color:red;
-}
-fieldset.Footer {
-    clear:both;
 }

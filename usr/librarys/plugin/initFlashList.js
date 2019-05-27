@@ -1,5 +1,5 @@
 {
-    show: function(item, index, intpus, event, option) {
+    show: function(event, item, option, plugin) {
         var args = item.value == "所有"? ["all"]: []
         option.Run(event, args, function(msg) {
             option.ondaemon(msg)

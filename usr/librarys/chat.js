@@ -34,11 +34,34 @@ var page = Page({
             case "control":
                 if (event.ctrlKey) {
                     switch (event.key) {
+                        case "0":
+                            page.source.Select()
+                            break
+                        case "1":
+                        case "2":
+                        case "3":
+                        case "4":
+                        case "5":
+                        case "6":
+                        case "7":
+                        case "8":
+                        case "9":
+                            page.action.Select(parseInt(event.key))
+                            break
                         case "n":
                             page.ocean.Show()
                             break
                         case "m":
                             page.steam.Show()
+                            break
+                        case "i":
+                            page.storm.Next()
+                            break
+                        case "o":
+                            page.storm.Prev()
+                            break
+                        case "b":
+                            page.action.Action["最大"](event)
 
                     }
                     break
@@ -133,6 +156,7 @@ var page = Page({
         }
 
         pane.Show = function() {
+            page.footer.State("text", 0)
             output.Update(["flow", river], "text", ["text"], "index", false, fun)
         }
 
@@ -144,6 +168,7 @@ var page = Page({
         pane.Send = function(type, text, cb) {
             form.Run(["flow", river, type, text], function(msg) {
                 output.Append(type, {text:text, index: msg.result[0]}, ["text"], "index", fun)
+                page.footer.State("text", msg.result[0])
                 typeof cb == "function" && cb()
             })
         }
@@ -164,6 +189,9 @@ var page = Page({
             ui.first.style.width = (width-7)+"px"
             ui.first.style.height = (height-7)+"px"
         }
+        pane.Select = function() {
+            ui.first.focus()
+        }
 
         pane.Clear = function(value) {
             ui.first.value = value || ""
@@ -171,13 +199,21 @@ var page = Page({
         return
     },
     initAction: function(page, pane, form, output) {
-        var river = "", water = 0, input = "", share = ""
+        var cache = {}
+        var river = "", storm = 0, input = "", share = ""
         pane.Listen = {
             river: function(value, old) {
                 river = value
             },
             storm: function(value, old) {
-                water = value, pane.Show()
+                var temp = document.createDocumentFragment()
+                while (output.childNodes.length>0) {
+                    item = output.childNodes[0]
+                    item.parentNode.removeChild(item)
+                    temp.appendChild(item)
+                }
+                cache[river+storm] = temp
+                storm = value, pane.Show()
             },
             source: function(value, old) {
                 input = value, kit.Log(value)
@@ -187,11 +223,21 @@ var page = Page({
             },
         }
         pane.Show = function() {
-            output.Update([river, water], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
+            if (cache[river+storm]) {
+                while (cache[river+storm].childNodes.length>0) {
+                    item = cache[river+storm].childNodes[0]
+                    item.parentNode.removeChild(item)
+                    output.appendChild(item)
+                }
+                cache[river+storm] = undefined
+                return
+            }
+
+            output.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                 event.shiftKey? page.target.Send("field", JSON.stringify({
                     name: line.name, view: line.view, init: line.init,
                     node: line.node, group: line.group, index: line.index, inputs: line.inputs,
-                })): form.Run([river, water, index].concat(args), function(msg) {
+                })): form.Run([river, storm, index].concat(args), function(msg) {
                     event.ctrlKey && (msg.append && msg.append[0]?
                         page.target.Send("table", JSON.stringify(ctx.Table(msg))):
                         page.target.Send("text", msg.result.join("")))
@@ -200,6 +246,11 @@ var page = Page({
             })
         }
 
+        pane.Select = function(index) {
+            output.querySelectorAll("fieldset")[index-1].Select()
+        }
+
+        var toggle = false
         pane.Action = {
             "恢复": function(event) {
                 page.onlayout(event, page.conf.layout)
@@ -216,14 +267,17 @@ var page = Page({
             "最宽": function(event) {
                 page.onlayout(event, {river:0, storm:0})
             },
+            "最大": function(event) {
+                (toggle = !toggle)? page.onlayout(event, page.conf.layout): page.onlayout(event, {river:0, action:-1, source:60})
+            },
             "全屏": function(event) {
                 page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})
             },
         }
-        return {"button": ["恢复", "缩小", "放大", "最高", "最宽", "全屏"], "action": pane.Action}
+        return {"button": ["恢复", "缩小", "放大", "最高", "最宽", "最大", "全屏"], "action": pane.Action}
     },
     initStorm: function(page, pane, form, output) {
-        var river = ""
+        var river = "", index = -1
         pane.Listen = {
             river: function(value, old) {
                 pane.which.set(""), river = value, pane.Show()
@@ -231,6 +285,14 @@ var page = Page({
         }
         pane.Show = function() {
             output.Update([river], "text", ["key", "count"], "key", true)
+        }
+        pane.Next = function() {
+            var next = output.querySelector("div.item.select").nextSibling
+            next? next.click(): output.firstChild.click()
+        }
+        pane.Prev = function() {
+            var prev = output.querySelector("div.item.select").previousSibling
+            prev? prev.click(): output.lastChild.click()
         }
         pane.Action = {
             "创建": function(event) {
@@ -282,8 +344,9 @@ var page = Page({
                 }
 
                 form.Run(cmd, function(msg) {
-                    page.action.Show()
                     page.storm.Show()
+                    page.storm.which.set(ui.name.value)
+                    page.action.Show()
                     pane.Show()
                 })
             }]}, {name: "list", view: ["list", "table"]},
@@ -302,6 +365,8 @@ var page = Page({
                         })
                     })
                 })
+                table.querySelector("td").click()
+                ui.name.focus()
             }))
         }
 
@@ -330,7 +395,8 @@ var page = Page({
             }
             output.Select = function(index) {
                 -1 < last && last < list.length && (list[last].className = "item")
-                last = index, list[index].className = "item select"
+                last = index
+                list[index] && (list[index].className = "item select")
             }
             output.Append = function(type, line, key, which, cb) {
                 var index = list.length, ui = page.View(output, line.type || type, line, key, function(event, cmds, cbs) {
@@ -365,5 +431,7 @@ var page = Page({
             return conf
         })
         page.onlayout(null, page.conf.layout)
+        page.footer.State("action", "")
+        page.footer.Order(["action", "text"])
     },
 })
