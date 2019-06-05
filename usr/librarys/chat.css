@@ -1,6 +1,9 @@
 fieldset.Ocean div.create pre:hover {
     background-color:red;
 }
+fieldset.Ocean div.create pre:hover {
+    background-color:red;
+}
 
 fieldset.River {
     float:left;
@@ -24,9 +27,15 @@ fieldset.Steam table.device {
     margin-left:10px;
     float:left;
 }
+fieldset.Steam div.output tr.select {
+    background-color:red;
+}
 fieldset.Steam div.create {
     clear:both;
 }
 fieldset.Steam div.create pre:hover {
     background-color:red;
+}
+fieldset div.output {
+    clear:both;
 }

@@ -25,25 +25,50 @@ kit = toolkit = {
         return args
     },
 
-    ModifyNode: function(which, html) {
-        var node = typeof which == "string"? document.querySelector(which): which
-        switch (typeof html) {
-            case "string":
-                node.innerHTML = html
-                break
-            case "object":
-                for (var k in html) {
-                    if (typeof html[k] == "object") {
-                        for (var d in html[k]) {
-                            node[k][d] = html[k][d]
-                        }
-                        continue
-                    }
-                    node[k] = html[k]
+    ScrollPage: function(event, conf) {
+        switch (event.key) {
+            case "h":
+                if (event.ctrlKey) {
+                    window.scrollBy(-conf.scroll_x*10, 0)
+                } else {
+                    window.scrollBy(-conf.scroll_x, 0)
                 }
                 break
+            case "H":
+                window.scrollBy(-document.body.scrollWidth, 0)
+                break
+            case "l":
+                if (event.ctrlKey) {
+                    window.scrollBy(conf.scroll_x*10, 0)
+                } else {
+                    window.scrollBy(conf.scroll_x, 0)
+                }
+                break
+            case "L":
+                window.scrollBy(document.body.scrollWidth, 0)
+                break
+            case "j":
+                if (event.ctrlKey) {
+                    window.scrollBy(0, conf.scroll_y*10)
+                } else {
+                    window.scrollBy(0, conf.scroll_y)
+                }
+                break
+            case "J":
+                window.scrollBy(0, document.body.scrollHeight)
+                break
+            case "k":
+                if (event.ctrlKey) {
+                    window.scrollBy(0, -conf.scroll_y*10)
+                } else {
+                    window.scrollBy(0, -conf.scroll_y)
+                }
+                break
+            case "K":
+                window.scrollBy(0, -document.body.scrollHeight)
+                break
         }
-        return node
+        return true
     },
     ModifyView: function(which, args) {
         var height = document.body.clientHeight-4
@@ -98,50 +123,25 @@ kit = toolkit = {
         }
         return kit.ModifyNode(which, {style: args})
     },
-    ScrollPage: function(event, conf) {
-        switch (event.key) {
-            case "h":
-                if (event.ctrlKey) {
-                    window.scrollBy(-conf.scroll_x*10, 0)
-                } else {
-                    window.scrollBy(-conf.scroll_x, 0)
+    ModifyNode: function(which, html) {
+        var node = typeof which == "string"? document.querySelector(which): which
+        switch (typeof html) {
+            case "string":
+                node.innerHTML = html
+                break
+            case "object":
+                for (var k in html) {
+                    if (typeof html[k] == "object") {
+                        for (var d in html[k]) {
+                            node[k][d] = html[k][d]
+                        }
+                        continue
+                    }
+                    node[k] = html[k]
                 }
-                break
-            case "H":
-                window.scrollBy(-document.body.scrollWidth, 0)
-                break
-            case "l":
-                if (event.ctrlKey) {
-                    window.scrollBy(conf.scroll_x*10, 0)
-                } else {
-                    window.scrollBy(conf.scroll_x, 0)
-                }
-                break
-            case "L":
-                window.scrollBy(document.body.scrollWidth, 0)
-                break
-            case "j":
-                if (event.ctrlKey) {
-                    window.scrollBy(0, conf.scroll_y*10)
-                } else {
-                    window.scrollBy(0, conf.scroll_y)
-                }
-                break
-            case "J":
-                window.scrollBy(0, document.body.scrollHeight)
-                break
-            case "k":
-                if (event.ctrlKey) {
-                    window.scrollBy(0, -conf.scroll_y*10)
-                } else {
-                    window.scrollBy(0, -conf.scroll_y)
-                }
-                break
-            case "K":
-                window.scrollBy(0, -document.body.scrollHeight)
                 break
         }
-        return true
+        return node
     },
     CreateNode: function(element, html) {
         return this.ModifyNode(document.createElement(element), html)
@@ -160,12 +160,12 @@ kit = toolkit = {
         // dataset
         // click
         //
-        // button input
-        // tree, fork, leaf // 树状结构
-        // view, text, code // 普通视图
-        // include require styles // 加载文件
+        // button input label
+        // 树状结构: tree, fork, leaf
+        // 普通视图: view, text, code
+        // 加载文件: include require styles
         //
-        // type, data, list // 基本结构
+        // 基本结构: type, data, list
 
         var kit = this
 
@@ -211,6 +211,17 @@ kit = toolkit = {
                 child.data["onkeyup"] = child.input[1]
                 child.data["name"] = child.input[0]
                 child.name = child.name || child.input[0]
+
+            } else if (child.password) {
+                child.type = "input"
+                child.data["onkeyup"] = child.password[1]
+                child.data["name"] = child.password[0]
+                child.data["type"] = "password"
+                child.name = child.name || child.password[0]
+
+            } else if (child.label) {
+                child.type = "label"
+               child.data["innerText"] = child.label
 
             } else if (child.tree) {
                 child.type = "ul"
@@ -308,7 +319,7 @@ kit = toolkit = {
             var td = kit.AppendChild(tr, "th", key)
         })
         data.forEach(function(row, i) {
-            var tr = kit.AppendChild(table, "tr")
+            var tr = kit.AppendChild(table, "tr", {className: "normal"})
             fields.forEach(function(key, j) {
                 var td = kit.AppendChild(tr, "td", row[key])
                 if (typeof cb == "function") {
@@ -507,6 +518,9 @@ kit = toolkit = {
         }
         return true
     },
+    Selector(target, name) {
+        return target.Selector(name)
+    }
 }
 
 function right(arg) {

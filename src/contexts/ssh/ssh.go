@@ -37,14 +37,25 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"nnode": &ctx.Cache{Name: "nnode", Value: "0", Help: "节点数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"node":  &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
-		"work":  &ctx.Config{Name: "work", Value: map[string]interface{}{}, Help: "用户信息"},
-		"file":  &ctx.Config{Name: "file", Value: map[string]interface{}{}, Help: "用户信息"},
+		"node": &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
+		"work": &ctx.Config{Name: "work", Value: map[string]interface{}{}, Help: "用户信息"},
+		"file": &ctx.Config{Name: "file", Value: map[string]interface{}{}, Help: "用户信息"},
+		"flow": &ctx.Config{Name: "flow", Value: map[string]interface{}{}, Help: "聊天记录"},
+
 		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{"fresh": false, "user": true, "up": true}, Help: "可信节点"},
 		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
+				map[string]interface{}{"componet_name": "salary", "componet_help": "salary", "componet_tmpl": "componet",
+					"componet_type": "public",
+					"componet_view": "Salary", "componet_init": "",
+					"componet_ctx": "web.chat", "componet_cmd": "salary", "componet_args": []interface{}{"@text", "@total"}, "inputs": []interface{}{
+						map[string]interface{}{"label": "total", "type": "text", "name": "text"},
+						map[string]interface{}{"label": "base", "type": "text", "name": "total"},
+					},
+				},
 				map[string]interface{}{"componet_name": "pwd", "componet_help": "pwd", "componet_tmpl": "componet",
+					"componet_type": "protected",
 					"componet_view": "FlashList", "componet_init": "initFlashList.js",
 					"componet_ctx": "nfs", "componet_cmd": "pwd", "componet_args": []interface{}{"@text"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "button", "value": "当前", "click": "show"},
@@ -54,13 +65,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"display_result": "", "display_append": "",
 				},
 				map[string]interface{}{"componet_name": "dir", "componet_help": "dir", "componet_tmpl": "componet",
-					"componet_view": "FlashList", "componet_init": "initFlashList.js",
-					"componet_ctx": "nfs", "componet_cmd": "dir", "componet_args": []interface{}{"@text"}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "text"},
-					},
-					"display_result": "", "display_append": "",
-				},
-				map[string]interface{}{"componet_name": "dir", "componet_help": "dir", "componet_tmpl": "componet",
+					"componet_type": "private",
 					"componet_view": "FlashList", "componet_init": "initFlashList.js",
 					"componet_ctx": "nfs", "componet_cmd": "dir", "componet_args": []interface{}{"@text"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "text"},
@@ -164,6 +169,15 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Conf("runtime", "work.route", m.Conf("runtime", "node.route"))
 				m.Conf("work", m.Conf("runtime", "user.name"), map[string]interface{}{"create_time": m.Time(), "user": m.Conf("runtime", "node.route")})
 
+			case "share":
+				user := m.Conf("runtime", "node.route")
+				name := kit.Select(m.Conf("runtime", "user.name"), arg, 1)
+				work := kit.Select(m.Conf("runtime", "work.route"), arg, 2)
+
+				if n := m.Cmdx("ssh._route", work, "_check", "work", name, user); n != "" {
+					m.Echo(n)
+				}
+
 			case "create":
 				user := m.Conf("runtime", "user.route")
 				if user == "" {
@@ -193,6 +207,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"tool": &ctx.Command{Name: "tool", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
+					if kit.Format(value["componet_type"]) != "public" && m.Option("username") != m.Conf("runtime", "work.name") {
+						return
+					}
+
 					m.Add("append", "key", key)
 					m.Add("append", "index", index)
 					m.Add("append", "name", value["componet_name"])
@@ -205,8 +223,16 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			switch arg[0] {
 			case "run":
 				tool := m.Confm("componet", []string{arg[1], arg[2]})
+				if kit.Format(tool["componet_type"]) == "private" && m.Option("username") != m.Conf("runtime", "work.name") {
+					m.Echo("private componet of %s", m.Conf("runtime", "work.name"))
+					break
+				}
+				if kit.Format(tool["componet_type"]) == "protected" && !m.Confs("flow", []string{arg[3], "user", m.Option("username")}) {
+					m.Echo("private componet of %s", m.Conf("runtime", "work.name"))
+					break
+				}
 				msg := m.Find(kit.Format(tool["componet_ctx"]))
-				msg.Cmd(tool["componet_cmd"], arg[3:]).CopyTo(m)
+				msg.Cmd(tool["componet_cmd"], arg[4:]).CopyTo(m)
 
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {

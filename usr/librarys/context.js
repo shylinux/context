@@ -48,6 +48,33 @@ ctx = context = {
         }
         return ret
     },
+    Tables: function(msg, cb) {
+        var ret = []
+        if (!msg || !msg.append || !msg.append.length || !msg[msg.append[0]]) {
+            return ret
+        }
+        ret.push(msg.append)
+
+        var ncol = msg.append.length
+        var nrow = msg[msg.append[0]].length
+        for (var i = 0; i < nrow; i++) {
+            var one = []
+            for (var j = 0; j < ncol; j++) {
+                one.push(msg[msg.append[j]][i])
+            }
+            ret.push(one)
+        }
+
+        var list = []
+        typeof cb == "function" && ret.forEach(function(value, index, array) {
+            var item = cb(value, index, array)
+            item && list.push(item)
+        })
+        if (list.length > 0) {
+            return list
+        }
+        return ret
+    },
     Share: function(objs) {
         var args = this.Search()
         for (var k in objs) {

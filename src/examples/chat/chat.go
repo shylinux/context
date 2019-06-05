@@ -47,6 +47,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					"componet_view": "Header", "componet_init": "initHeader",
 					"title": "shylinux 天行健，君子以自强不息",
 				},
+				map[string]interface{}{"componet_name": "login", "componet_help": "login", "componet_tmpl": "fieldset",
+					"componet_view": "Login dialog", "componet_init": "initLogin",
+					"componet_ctx": "web.chat", "componet_cmd": "login",
+				},
 
 				map[string]interface{}{"componet_name": "ocean", "componet_tmpl": "fieldset",
 					"componet_view": "Ocean dialog", "componet_init": "initOcean",
@@ -87,6 +91,18 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				},
 			},
 		}, Help: "组件列表"},
+		"salary": &ctx.Config{Name: "salary", Value: map[string]interface{}{
+			"公基金": 120, "养老": 80, "医疗": 20, "失业": 2,
+			"个税": []interface{}{
+				85000, 45,
+				60000, 35,
+				40000, 30,
+				30000, 25,
+				17000, 20,
+				8000, 10,
+				5000, 3,
+			},
+		}, Help: "聊天记录"},
 
 		"chat_msg":      &ctx.Config{Name: "chat_msg", Value: []interface{}{}, Help: "聊天记录"},
 		"default":       &ctx.Config{Name: "default", Value: "", Help: "聊天记录"},
@@ -110,11 +126,25 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			"tool_path":    "/Applications/wechatwebdevtools.app/Contents/MacOS/cli",
 			"project_path": "/Users/shaoying/context/usr/client/mp",
 		}, Help: "聊天记录"},
-
-		"flow": &ctx.Config{Name: "flow", Value: map[string]interface{}{}, Help: "聊天记录"},
 	},
 	Commands: map[string]*ctx.Command{
+		"login": &ctx.Command{Name: "login [username password]", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 1 {
+				if m.Cmds("ssh.work", "share", arg[0]) {
+					if m.Cmds("aaa.auth", "username", arg[0], "password", arg[1]) {
+						m.Option("username", arg[0])
+						m.Copy(m.Cmd("aaa.user", "session", "select"), "result")
+					}
+				}
+			} else if m.Options("sessid") {
+				m.Echo(m.Option("username"))
+			}
+			return
+		}},
 		"ocean": &ctx.Command{Name: "ocean", Help: "海洋", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if !m.Options("sessid") || !m.Options("username") {
+				return
+			}
 			if len(arg) == 0 {
 				m.Cmdy("ssh.work", "search")
 				return
@@ -122,6 +152,8 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			switch arg[0] {
 			case "spawn":
+				arg = append(arg, m.Conf("runtime", "work.name"))
+
 				h := kit.Select(kit.Hashs("uniq"), arg, 1)
 				user := map[string]interface{}{}
 				for _, v := range arg[3:] {
@@ -152,8 +184,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			return
 		}},
 		"river": &ctx.Command{Name: "river", Help: "河流", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if !m.Options("sessid") || !m.Options("username") {
+				return
+			}
 			if len(arg) == 0 {
 				m.Confm("flow", func(key string, value map[string]interface{}) {
+					if kit.Chain(value, []string{"user", m.Option("username")}) == nil {
+						return
+					}
+
 					m.Add("append", "key", key)
 					m.Add("append", "name", kit.Chains(value, "conf.name"))
 					m.Add("append", "create_user", kit.Chains(value, "conf.create_user"))
@@ -207,8 +246,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				})
 
 			case "wave":
-				m.Option("username", "shy")
-				m.Cmdy("ssh._route", arg[2], "tool", "run", arg[3], arg[4], arg[5:])
+				m.Cmdy("ssh._route", arg[2], "tool", "run", arg[3], arg[4], arg[1], arg[5:])
 			}
 			return
 		}},
@@ -231,7 +269,6 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					m.Add("append", "group", tool["group"])
 					m.Add("append", "index", tool["index"])
 
-					m.Option("username", "shy")
 					msg := m.Cmd("ssh._route", tool["node"], "tool", tool["group"], tool["index"])
 
 					m.Add("append", "name", msg.Append("name"))
@@ -245,8 +282,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			}
 
 			if tool := m.Confm("flow", []string{arg[0], "tool", arg[1], "list", arg[2]}); tool != nil {
-				m.Option("username", "shy")
-				m.Cmdy("ssh._route", tool["node"], "tool", "run", tool["group"], tool["index"], arg[3:])
+				m.Cmdy("ssh._route", tool["node"], "tool", "run", tool["group"], tool["index"], arg[0], arg[3:])
 				return
 			}
 			return
@@ -282,9 +318,29 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				})
 
 			default:
-				m.Option("username", "shy")
 				m.Cmdy("ssh._route", m.Conf("flow", []string{arg[0], "user", arg[1], "user"}), "tool")
 			}
+			return
+		}},
+		"salary": &ctx.Command{Name: "salary", Help: "天空", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			arg[0] = kit.Select(arg[1], arg, 0)
+			total := kit.Int64(kit.Select(arg[0], arg, 1))
+			base := kit.Int64(arg[0]) - m.Appendi("公基金", total*kit.Int64(m.Conf("salary", "公基金"))/1000) -
+				m.Appendi("养老", total*kit.Int64(m.Conf("salary", "养老"))/1000) -
+				m.Appendi("医疗", total*kit.Int64(m.Conf("salary", "医疗"))/1000) -
+				m.Appendi("失业", total*kit.Int64(m.Conf("salary", "失业"))/1000)
+
+			list := kit.Trans(m.Confv("salary", "个税"))
+			calc, tax := base, int64(0)
+			for i := 0; i < len(list); i += 2 {
+				if calc > kit.Int64(list[i]) {
+					tax += (calc - kit.Int64(list[i])) * kit.Int64(list[i+1])
+					calc = kit.Int64(list[i])
+				}
+			}
+			m.Append("个税", tax/100)
+			m.Append("结余", (base*100-tax)/100)
+			m.Table()
 			return
 		}},
 

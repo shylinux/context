@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strings"
 	"toolkit"
 )
 
@@ -60,6 +61,33 @@ var Index = &ctx.Context{Name: "sort", Help: "sort code",
 		}},
 	},
 	Commands: map[string]*ctx.Command{
+		"_init": &ctx.Command{Name: "_init", Help: "_init", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 {
+				keys := []string{}
+				for key, _ := range c.Commands {
+					if !strings.HasPrefix(key, "_") && !strings.HasPrefix(key, "/") {
+						keys = append(keys, key)
+					}
+				}
+
+				list := []interface{}{}
+				for _, key := range keys {
+					cmd := c.Commands[key]
+
+					list = append(list, map[string]interface{}{"componet_name": cmd.Name, "componet_help": cmd.Help,
+						"componet_tmpl": "componet", "componet_view": "", "componet_init": "",
+						"componet_ctx": "cli." + arg[0], "componet_cmd": key,
+						"componet_args": []interface{}{"@text", "@total"}, "inputs": []interface{}{
+							map[string]interface{}{"type": "input"},
+							map[string]interface{}{"type": "button", "value": "show"},
+						},
+					})
+				}
+
+				m.Confv("ssh.componet", arg[0], list)
+			}
+			return
+		}},
 		"data": &ctx.Command{Name: "data", Help: "data", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			data := []int{}
 			for i := 0; i < kit.Int(kit.Select("10", arg, 0)); i++ {

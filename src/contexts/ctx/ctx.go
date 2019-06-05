@@ -1234,6 +1234,7 @@ func (m *Message) Assert(e interface{}, msg ...string) bool {
 			return true
 		}
 		e = v.Result(1)
+		e = errors.New(v.Result(1))
 	default:
 		if kit.Right(v) {
 			return true

@@ -19,8 +19,8 @@ function Page(page) {
                 get: function() {
                     return data
                 },
-                set: function(value) {
-                    if (value == data) {
+                set: function(value, force) {
+                    if (value == data && !force) {
                         return value
                     }
                     old_value = data, data = value
@@ -44,14 +44,16 @@ function Page(page) {
                     result = [{view: ["item", "div", key.length>1? line[key[0]]+"("+line[key[1]]+")": (key.length>0? line[key[0]]: "null")], click: cb}]
                     break
 
+                case "code":
+                    result = [{type: "code", list: [{text: [key.length>1? line[key[0]]+"("+line[key[1]]+")": (key.length>0? line[key[0]]: "null")], click: cb}]}]
+                    break
+
                 case "table":
                     result = [{view: [""], list: [
                         {view: ["", "table"], list: JSON.parse(line.text || "[]").map(function(item, index) {
-                            var line = []
-                            for (var k in item) {
-                                line.push({text: index == 0? [k, "th"]: [item[k], "td"]})
-                            }
-                            return {type: "tr", list: line}
+                            return {type: "tr", list: item.map(function(value) {
+                                return {text: [value, index == 0? "th": "td"]}
+                            })}
                         })},
                     ]}]
                     break
@@ -74,6 +76,12 @@ function Page(page) {
             ui.last.Meta = line
             return ui
         },
+        alert: function(text) {
+            alert(text)
+        },
+        confirm: function(text) {
+            return confirm(text)
+        },
         reload: function() {
             location.reload()
         },
@@ -83,7 +91,8 @@ function Page(page) {
 
             if (event.ctrlKey) {
                 if (typeof local == "function" && local(event)) {
-                    return
+                    event.stopPropagation()
+                    return true
                 }
                 switch (event.key) {
                     case "a":
@@ -116,16 +125,19 @@ function Page(page) {
                         return false
 
                 }
+                event.stopPropagation()
                 return true
             }
             switch (event.key) {
                 case "Escape":
                     target.blur()
-                    break
+                    event.stopPropagation()
+                    return true
                 default:
                     if (kit.HitText(target, "jk")) {
                         kit.DelText(target, target.selectionStart-2, 2)
                         target.blur()
+                        return true
                     }
             }
             return false
@@ -180,8 +192,24 @@ function Page(page) {
             }
         },
 
-        initHeader: function(page, field, option, output) {
-            return [{"text": ["shycontext", "div", "title"]}]
+        initHeader: function(page, pane, form, output) {
+            var state = {}, list = [], cb = function(event, item, value) {
+            }
+            pane.State = function(name, value) {
+                state[name] = value, pane.Show()
+            }
+            pane.Order = function(value, cbs) {
+                list = value, cb = cbs || cb, pane.Show()
+            }
+            pane.Show = function() {
+                output.innerHTML = "", kit.AppendChild(output, [
+                    {"view": ["title", "div", "shycontext"]},
+                    {"view": ["state"], list: list.map(function(item) {return {text: [state[item], "div"], click: function(event) {
+                        cb(event, item, state[item])
+                    }}})},
+                ])
+            }
+            return
         },
         initBanner: function(page, field, option, output) {
             field.querySelectorAll("li").forEach(function(item) {
@@ -226,6 +254,7 @@ function Page(page) {
                         return true
                     }
                     pane.style.display = "none"
+                    delete(page.dialog)
                     return false
                 }
                 pane.Size = function(width, height) {
@@ -235,15 +264,18 @@ function Page(page) {
                 }
 
                 // form init
-                form.Run = function(cmds, cb) {
+                pane.Run = form.Run = function(cmds, cb) {
                     ctx.Run(page, form.dataset, cmds, cb)
                 }
-                form.Runs = function(cmds, cb) {
+                pane.Runs = form.Runs = function(cmds, cb) {
                     ctx.Run(page, form.dataset, cmds, function(msg) {
                         ctx.Table(msg, function(line, index) {
                             cb(line, index, msg)
                         })
                     })
+                }
+                form.onsubmit = function(event) {
+                    event.preventDefault()
                 }
 
                 var conf = cb(page[pane.dataset.init], pane, form)
@@ -282,7 +314,9 @@ function Plugin(field, inputs, plugin) {
         })
         option.Run(event, args.slice(1), function(msg) {
             (option.ondaemon || function(msg) {
-                output.innerHTML = "", kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
+                output.innerHTML = "",
+                msg.append? kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append)
+                     :kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
             })(msg)
         })
     }
@@ -300,13 +334,11 @@ function Plugin(field, inputs, plugin) {
                 switch (event.key) {
                     case "i":
                         var next = field.nextSibling;
-                        // (next? next: field.parentNode.firstChild).querySelectorAll("input")[1].focus()
-                        next && (next.querySelectorAll("input")[1].focus(), event.stopPropagation())
+                        next && next.Select()
                         break
                     case "o":
                         var prev = field.previousSibling;
-                        // (prev? prev: field.parentNode.lastChild).querySelectorAll("input")[1].focus()
-                        prev && (prev.querySelectorAll("input")[1].focus(), event.stopPropagation())
+                        prev && prev.Select()
                         break
                     case "c":
                         output.innerHTML = ""
@@ -328,13 +360,13 @@ function Plugin(field, inputs, plugin) {
                 }
                 return true
             })
-            event.key == "Enter" && (index == inputs.length-1? run(event): event.target.nextSibling.focus())
+            event.key == "Enter" && (index == inputs.length-1? run(event): event.target.parentNode.nextSibling.childNodes[1].focus())
         }, field.Select = function() {
-            ui.first.focus()
+            ui.last.childNodes[1].focus()
         })
-        return {type: "input", data: item}
+        return {type: "div", list: [{type: "label", inner: item.label||""}, {type: "input", name: item.name, data: item}]}
     }))
-    ui.first.focus()
+    ui.last.childNodes[1].focus()
 
     plugin = plugin || {}, plugin.__proto__ = {
         show: function() {},

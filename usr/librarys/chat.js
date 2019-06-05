@@ -65,23 +65,79 @@ var page = Page({
 
                     }
                     break
+                } else {
+                    switch (event.key) {
+                        case "Escape":
+                            page.dialog && page.dialog.Show()
+                    }
                 }
                 break
         }
     },
 
+    initLogin: function(page, pane, form, output) {
+        var ui = kit.AppendChild(form, [
+            {label: "username"}, {input: ["username"]}, {type: "br"},
+            {label: "password"}, {password: ["password"]}, {type: "br"},
+            {button: ["login", function(event) {
+                form.Run([ui.username.value, ui.password.value], function(msg) {
+                    if (msg.result && msg.result[0]) {
+                        pane.ShowDialog(1, 1)
+                        ctx.Cookie("sessid", msg.result.join(""))
+                        page.header.State("user", ui.username.value)
+                        page.river.Show()
+                        return
+                    }
+                    page.alert("用户或密码错误")
+                })
+            }]}
+        ])
+
+        form.Run([], function(msg) {
+            if (msg.result && msg.result[0]) {
+                page.header.State("user", msg.result[0])
+                page.river.Show()
+                return
+            }
+            pane.ShowDialog(1, 1)
+        })
+        pane.Exit = function() {
+            ctx.Cookie("sessid", "")
+            page.reload()
+
+        }
+    },
     initOcean: function(page, pane, form, output) {
         var table = kit.AppendChild(output, "table")
         var ui = kit.AppendChild(pane, [{view: ["create ocean"], list: [
             {input: ["name", function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
-                        case "a":
+                        case "1":
+                        case "2":
+                        case "3":
+                        case "4":
+                        case "5":
+                        case "6":
+                        case "7":
+                        case "8":
+                            var tr = table.querySelectorAll("tr.normal")[parseInt(event.key)-1]
+                            tr && tr.childNodes[0].click()
+                            return true
+                        case "9":
                             pane.Action["全选"](event)
-                            return
-                        case "c":
+                            return true
+                        case "0":
                             pane.Action["清空"](event)
-                            return
+                            return true
+                        case "-":
+                            var pre = ui.list.querySelector("pre")
+                            pre && pre.click()
+                            return true
+                        case "=":
+                            var td = table.querySelector("tr.normal td")
+                            td && td.click()
+                            return true
                     }
                 })
                 event.key == "Enter" && this.nextSibling.click()
@@ -109,11 +165,11 @@ var page = Page({
         ]}])
 
         pane.Show = function() {
-            pane.ShowDialog() && (table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = "good", form.Run([], function(msg) {
+            pane.ShowDialog() && (table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = "good", ui.name.focus(), form.Run([], function(msg) {
                 kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, row, i, tr, event) {
-                    tr.style.display = "none"
+                    tr.className = "hidden"
                     var uis = kit.AppendChild(ui.list, [{text: [row.key], click: function(event) {
-                        tr.style.display = "", uis.last.parentNode.removeChild(uis.last)
+                        tr.className = "normal", uis.last.parentNode.removeChild(uis.last)
                     }}])
                 })
             }))
@@ -123,13 +179,13 @@ var page = Page({
                 pane.Show()
             },
             "全选": function(event) {
-                ui.list.innerHTML = "", table.querySelectorAll("tr").forEach(function(item) {
+                table.querySelectorAll("tr.normal").forEach(function(item) {
                     item.firstChild.click()
                 })
             },
             "清空": function(event) {
-                ui.list.innerHTML = "", table.querySelectorAll("tr").forEach(function(item) {
-                    item.style.display = ""
+                ui.list.querySelectorAll("pre").forEach(function(item) {
+                    item.click()
                 })
             },
         }
@@ -139,7 +195,6 @@ var page = Page({
         pane.Show = function() {
             output.Update([], "text", ["name", "count"], "key", true)
         }
-        pane.Show()
         pane.Action = {
             "创建": function(event) {
                 page.ocean.Show()
@@ -239,8 +294,8 @@ var page = Page({
                     node: line.node, group: line.group, index: line.index, inputs: line.inputs,
                 })): form.Run([river, storm, index].concat(args), function(msg) {
                     event.ctrlKey && (msg.append && msg.append[0]?
-                        page.target.Send("table", JSON.stringify(ctx.Table(msg))):
-                        page.target.Send("text", msg.result.join("")))
+                        page.target.Send("table", JSON.stringify(ctx.Tables(msg))):
+                        page.target.Send("code", msg.result.join("")))
                     cbs(msg)
                 })
             })
@@ -250,7 +305,7 @@ var page = Page({
             output.querySelectorAll("fieldset")[index-1].Select()
         }
 
-        var toggle = false
+        var toggle = true
         pane.Action = {
             "恢复": function(event) {
                 page.onlayout(event, page.conf.layout)
@@ -315,12 +370,39 @@ var page = Page({
             {input: ["name", function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
-                        case "a":
+                        case "i":
+                            var prev = table.querySelector("tr.select").previousSibling
+                            prev && prev.childNodes[0].click()
+                            return true
+                        case "o":
+                            var next = table.querySelector("tr.select").nextSibling
+                            next && next.childNodes[0].click()
+                            return true
+                        case "1":
+                        case "2":
+                        case "3":
+                        case "4":
+                        case "5":
+                        case "6":
+                        case "7":
+                        case "8":
+                            var tr = device.querySelectorAll("tr.normal")[parseInt(event.key)-1]
+                            tr && tr.childNodes[0].click()
+                            return true
+                        case "9":
                             pane.Action["全选"](event)
-                            return
-                        case "c":
+                            return true
+                        case "0":
                             pane.Action["清空"](event)
-                            return
+                            return true
+                        case "-":
+                            var tr = ui.list.querySelectorAll("tr")[1]
+                            tr && tr.childNodes[0].click()
+                            return true
+                        case "=":
+                            var td = device.querySelector("tr.normal td")
+                            td && td.click()
+                            return true
                     }
                 })
                 event.key == "Enter" && this.nextSibling.click()
@@ -344,10 +426,9 @@ var page = Page({
                 }
 
                 form.Run(cmd, function(msg) {
-                    page.storm.Show()
-                    page.storm.which.set(ui.name.value)
-                    page.action.Show()
                     pane.Show()
+                    page.storm.Show()
+                    page.storm.which.set(ui.name.value, true)
                 })
             }]}, {name: "list", view: ["list", "table"]},
         ]}])
@@ -355,6 +436,8 @@ var page = Page({
         pane.Show = function() {
             pane.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", form.Run([river], function(msg) {
                 kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, pod, i, tr, event) {
+                    var old = table.querySelector("tr.select")
+                    tr.className = "select", old && (old.className = "normal")
                     form.Run([river, pod.key], function(msg) {
                         device.innerHTML = "", kit.AppendTable(device, ctx.Table(msg), ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                             var last = kit.AppendChild(ui.list, [{type: "tr", list: [
@@ -433,5 +516,9 @@ var page = Page({
         page.onlayout(null, page.conf.layout)
         page.footer.State("action", "")
         page.footer.Order(["action", "text"])
+        page.header.State("user", "")
+        page.header.Order(["user"], function(event, item, value) {
+            page.confirm("logout?") && page.login.Exit()
+        })
     },
 })

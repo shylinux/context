@@ -270,6 +270,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 检查链接
 						if arg[i] == "check" {
+							m.Log("fuck", "waht %v", p)
 							has := "false"
 							m.Confm("auth", []string{p, "ship"}, func(k string, ship map[string]interface{}) {
 								if i == len(arg)-2 && (ship["meta"] != arg[i+1] && k != arg[i+1]) {
@@ -331,7 +332,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						m.Echo(h)
 					case "node": // 节点操作
 						if i > len(arg)-1 { // 查看节点
+							m.Set("result")
 							m.Cmdy("aaa.config", "auth", p)
+							return
 						} else if arg[i] == "delete" { // 删除节点
 							m.Confm("auth", []string{p, "ship"}, func(ship map[string]interface{}) {
 								for k, _ := range ship {
@@ -364,7 +367,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						return
 					case "data": // 数据操作
 						if i > len(arg)-1 { // 查看数据
-							m.Cmdy("ctx.config", "auth", strings.Join([]string{p, "data"}, "."))
+							m.Set("result").Cmdy("ctx.config", "auth", strings.Join([]string{p, "data"}, "."))
+							return
 						} else if arg[i] == "delete" { // 删除数据
 							m.Confm("auth", []string{s, "data"}, func(data map[string]interface{}) {
 								for _, k := range arg[i+1:] {
@@ -373,6 +377,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 								}
 							})
 						} else if i < len(arg)-1 { // 修改数据
+							m.Set("result")
 							if arg[i] == "option" {
 								m.Confv("auth", []string{p, "data", arg[i+1]}, m.Optionv(arg[i+1]))
 							} else {
@@ -511,6 +516,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 						m.Cmdy("aaa.auth", "ship", "username", m.Option("username"), "session", kit.Select("web", arg, 2))
 						m.Cmd("aaa.auth", m.Result(0), "data", "current.ctx", "mdb")
 					}
+				default:
+					m.Option("format", "object")
+					m.Cmdy("aaa.auth", "username", arg[0], "data")
 				}
 				return
 			}},
@@ -532,6 +540,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 				switch arg[0] {
 				case "user": // 查看用户
+					m.Log("fuck", "what %v", arg)
 					m.Cmdy("aaa.auth", sid, "ship", "username")
 
 				case "current":

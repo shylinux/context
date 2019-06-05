@@ -94,6 +94,56 @@ func Int(arg ...interface{}) int {
 	}
 	return result
 }
+func Int64(arg ...interface{}) int64 {
+	var result int64
+	for _, v := range arg {
+		switch val := v.(type) {
+		case int:
+			result += int64(val)
+		case int8:
+			result += int64(val)
+		case int16:
+			result += int64(val)
+		// case int32:
+		// 	result += int64(val)
+		case int64:
+			result += int64(val)
+		// case uint8:
+		// 	result += int64(val)
+		case uint16:
+			result += int64(val)
+		case uint32:
+			result += int64(val)
+		case uint64:
+			result += int64(val)
+		case float64:
+			result += int64(val)
+		case byte: // uint8
+			result += int64(val)
+		case rune: // int32
+			result += int64(val)
+		case string:
+			if i, e := strconv.ParseInt(val, 10, 64); e == nil {
+				result += i
+			}
+		case bool:
+			if val {
+				result += 1
+			}
+		case time.Time:
+			result += int64(val.Unix())
+		case []string:
+			result += int64(len(val))
+		case map[string]string:
+			result += int64(len(val))
+		case []interface{}:
+			result += int64(len(val))
+		case map[string]interface{}:
+			result += int64(len(val))
+		}
+	}
+	return result
+}
 func Right(arg ...interface{}) bool {
 	result := false
 	for _, v := range arg {

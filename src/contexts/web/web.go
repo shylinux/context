@@ -89,9 +89,9 @@ func Merge(m *ctx.Message, client map[string]interface{}, uri string, arg ...str
 }
 
 func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) bool {
-	if msg.Confs("skip_login", msg.Option("path")) {
-		return true
-	}
+	// if msg.Confs("skip_login", msg.Option("path")) {
+	// 	return true
+	// }
 	if msg.Confs("login", "cas") {
 		if !cas.IsAuthenticated(r) {
 			r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))

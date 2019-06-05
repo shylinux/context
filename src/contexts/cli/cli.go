@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"plugin"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -102,6 +103,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"init_env": []interface{}{"ctx_cas", "ctx_dev", "ctx_box", "ctx_root", "ctx_home", "web_port", "ssh_port", "USER"},
 			"boot":     map[string]interface{}{"web_port": ":9094", "ssh_port": ":9090"},
 		}, Help: "运行环境"},
+
+		"plugin": &ctx.Config{Name: "plugin", Value: map[string]interface{}{
+			"go": map[string]interface{}{
+				"build": []interface{}{"go", "build", "-buildmode=plugin"},
+				"next":  []interface{}{"so", "load"},
+			},
+			"so": map[string]interface{}{
+				"load": []interface{}{"load"},
+			},
+		}, Help: "免密登录"},
 
 		"system": &ctx.Config{Name: "system", Value: map[string]interface{}{
 			"timeout": "60s",
@@ -215,6 +226,49 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 
+		"plugin": &ctx.Command{Name: "plugin [action] file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			suffix, action, target := "go", "build", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/examples/app/bench.go")
+			if len(arg) == 0 {
+				arg = append(arg, target)
+			}
+			if cs := strings.Split(arg[0], "."); len(cs) > 1 {
+				suffix = cs[len(cs)-1]
+			} else if cs := strings.Split(arg[1], "."); len(cs) > 1 {
+				suffix, action, arg = cs[len(cs)-1], arg[0], arg[1:]
+			}
+
+			if target = m.Cmdx("nfs.path", arg[0]); target == "" {
+				target = m.Cmdx("nfs.path", path.Join("src/plugin/", arg[0]))
+			}
+
+			for suffix != "" && action != "" {
+				m.Log("info", "%v %v %v", suffix, action, target)
+				cook := m.Confv("plugin", suffix)
+				next := strings.Replace(target, "."+suffix, "."+kit.Chains(cook, "next.0"), -1)
+
+				args := []string{}
+				if suffix == "so" {
+					if p, e := plugin.Open(target); m.Assert(e) {
+						s, e := p.Lookup("Index")
+						m.Assert(e)
+						w := *(s.(**ctx.Context))
+						w.Name = kit.Select(w.Name, arg, 1)
+						c.Register(w, nil)
+						m.Spawn(w).Cmd("_init", arg[1:])
+					}
+				} else {
+					if suffix == "go" {
+						args = append(args, "-o", next)
+					}
+					m.Assert(m.Cmd("cli.system", kit.Chain(cook, action), args, target))
+				}
+
+				suffix = kit.Chains(cook, "next.0")
+				action = kit.Chains(cook, "next.1")
+				target = next
+			}
+			return
+		}},
 		"system": &ctx.Command{Name: "system word...", Help: []string{"调用系统命令, word: 命令",
 			"cmd_timeout: 命令超时",
 			"cmd_active(true/false): 是否交互",

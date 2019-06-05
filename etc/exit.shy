@@ -1,7 +1,5 @@
-~chat
-    config save tmp/flow.json flow
 ~ssh
-    config save tmp/cert.json work trust
+    config save tmp/cert.json work flow trust
 ~aaa
     config save tmp/auth.json auth
 ~cli
