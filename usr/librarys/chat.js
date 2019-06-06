@@ -513,6 +513,7 @@ var page = Page({
             }
             return conf
         })
+
         page.onlayout(null, page.conf.layout)
         page.footer.State("action", "")
         page.footer.Order(["action", "text"])

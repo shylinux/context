@@ -5,7 +5,7 @@ import (
 	"contexts/ctx"
 	"encoding/json"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
+	// "github.com/PuerkitoBio/goquery"
 	"github.com/go-cas/cas"
 	"html/template"
 	"io"
@@ -656,6 +656,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
 
 				case parse == "html":
+                    /*
 					page, e := goquery.NewDocumentFromReader(res.Body)
 					m.Assert(e)
 
@@ -702,6 +703,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					})
 					m.Table()
 
+                    */
 				default:
 					if m.Options("save") {
 						f, e := os.Create(m.Option("save"))

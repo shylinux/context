@@ -1,10 +1,46 @@
 var page = Page({
-    initTree: function(field, option, output) {
+    conf: {
+        border: 4,
+        scroll_x: 50,
+        scroll_y: 50,
+    },
+    onlayout: function(event, sizes) {
+        return
+        var height = document.body.clientHeight-page.conf.border
+        var width = document.body.clientWidth-page.conf.border
+        page.conf.height = height
+        page.conf.width = width
+
+        sizes = sizes || {}
+        sizes.header == undefined && (sizes.header = page.header.clientHeight)
+        sizes.footer == undefined && (sizes.footer = page.footer.clientHeight)
+        page.header.Size(width, sizes.header)
+        page.footer.Size(width, sizes.footer)
+
+        sizes.tree == undefined && (sizes.tree = page.tree.clientHeight)
+        page.tree.Size(width, sizes.tree)
+
+        sizes.text = height - sizes.tree - sizes.header - sizes.footer
+        page.text.Size(width, sizes.text)
+    },
+    initList: function(page, pane, form, output) {
+        ctx.Runs(page, form, function(msg) {
+            output.innerHTML = ""
+            kit.AppendChild(output, [{"tree": ctx.Table(msg, function(value, index) {
+                return {"leaf": [value.file, function(event, target) {
+                    ctx.Search("wiki_favor", value.file)
+                }]}
+            })}])
+        })
+        return
+    },
+
+    initTree: function(page, pane, form, output) {
         // if (!ctx.isMobile) {
-        //     field.style.float = "left"
+        //     pane.style.float = "left"
         // }
 
-        ctx.Runs(page, option, function(msg) {
+        ctx.Runs(page, form, function(msg) {
             output.innerHTML = ""
             var back = [{"button": ["知识", function(event) {
                 ctx.Search({"wiki_level": "", "wiki_class": "", "wiki_favor": ""})
@@ -42,19 +78,8 @@ var page = Page({
         })
         return
     },
-    initList: function(field, option, output) {
-        ctx.Runs(page, option, function(msg) {
-            output.innerHTML = ""
-            kit.AppendChild(output, [{"tree": ctx.Table(msg, function(value, index) {
-                return {"leaf": [value.file, function(event, target) {
-                    ctx.Search("wiki_favor", value.file)
-                }]}
-            })}])
-        })
-        return
-    },
-    initText: function(field, option, output) {
-        ctx.Runs(page, option, function(msg) {
+    initText: function(page, pane, form, output) {
+        ctx.Runs(page, form, function(msg) {
             if (!msg.result) {
                 return
             }
@@ -75,7 +100,7 @@ var page = Page({
             })
 
             ui.text.querySelectorAll("a").forEach(function(value, index, array) {
-                kit.OrderLink(value, field)
+                kit.OrderLink(value, pane)
             })
 
 
@@ -85,7 +110,7 @@ var page = Page({
                 var id = ""
                 var level = 0
                 var text = value.innerText
-                var ratio = parseInt(value.offsetTop/field.scrollHeight*100)
+                var ratio = parseInt(value.offsetTop/pane.scrollHeight*100)
 
                 if (value.tagName == "H2") {
                     j=k=0
@@ -125,12 +150,10 @@ var page = Page({
                 var width = ui.menu.offsetWidth
                 var height = ui.menu.offsetHeight>400?ui.menu.offsetHeight:600
 
-                field.style.marginLeft = width+10+"px"
+                pane.style.marginLeft = width+10+"px"
                 ui.menu.style.marginLeft = -width-20+"px"
                 ui.text.style.height = height+"px"
-                ui.text.style.width = field.offsetWidth-30-width+"px"
-
-                // ui.text.style.width = field.offsetWidth-ui.menu.offsetWidth+"px"
+                ui.text.style.width = pane.offsetWidth-30+"px"
             }
             if (location.hash) {
                 location.href = location.hash
@@ -138,32 +161,16 @@ var page = Page({
         })
         return
     },
+    init: function(page) {
+        page.initField(page, function(init, pane, form) {
+            var output = pane.querySelector("div.output")
 
-    onaction: function(event, target, action) {
-        var page = this
-        switch (action) {
-            case "scroll":
-                break
-        }
-    },
-    init: function(exp) {
-        var page = this
-
-        document.querySelectorAll("body>fieldset").forEach(function(field) {
-            var option = field.querySelector("form.option")
-            var output = field.querySelector("div.output")
-
-            var init = page[field.dataset.init]
             if (typeof init == "function") {
-                var conf = init(field, option, output)
+                var conf = init(page, pane, form, output)
                 if (conf) {
                     kit.AppendChild(output, conf)
                 }
             }
         })
-    },
-    conf: {
-        scroll_x: 50,
-        scroll_y: 50,
     },
 })

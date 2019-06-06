@@ -1,4 +1,4 @@
-html, body, fieldset {
+html, body {
     background-color:#d8d8d8;
     padding:0px;
     height:100%;
@@ -6,8 +6,11 @@ html, body, fieldset {
     margin:0px;
 }
 fieldset {
+    background-color:#d8d8d8;
+    padding:0px;
     min-width:160px;
     overflow:auto;
+    margin:0px;
 }
 legend {
     margin-left:10px;
