@@ -539,6 +539,15 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				}
 
 				switch arg[0] {
+				case "access": // 查看用户
+					h := m.Cmdx("aaa.auth", "access", kit.Hashs(m.Option("remote_ip"), m.Option("username")))
+					m.Cmd("aaa.auth", h, "data",
+						"remote_ip", m.Option("remote_ip"),
+						"username", m.Option("username"),
+					)
+					m.Echo(h)
+					return
+
 				case "user": // 查看用户
 					m.Log("fuck", "what %v", arg)
 					m.Cmdy("aaa.auth", sid, "ship", "username")
@@ -766,8 +775,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber: big.NewInt(1),
-							IsCA:         true,
+							SerialNumber:          big.NewInt(1),
+							IsCA:                  true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},

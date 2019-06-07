@@ -73,9 +73,9 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			which := m.Cmdx("nfs.path", path.Join(m.Confx("wiki_level"), m.Option("wiki_class"), m.Confx("wiki_favor", arg, 0)))
 
 			if ls, e := ioutil.ReadFile(which); e == nil {
-				m.Confi("wiki_visit", []string{which, m.Option("remote_ip")},
-					m.Confi("wiki_visit", []string{which, m.Option("remote_ip")})+1)
-				m.Append("visit_count", m.Confi("wiki_visit", []string{which, m.Option("remote_ip")}))
+				m.Conf("wiki_visit", []string{which, m.Option("access")},
+					m.Confi("wiki_visit", []string{which, m.Option("access")})+1)
+				m.Append("visit_count", m.Confi("wiki_visit", []string{which, m.Option("access")}))
 				m.Append("visit_total", len(m.Confm("wiki_visit", []string{which})))
 
 				buffer := bytes.NewBuffer([]byte{})
