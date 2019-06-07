@@ -176,7 +176,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 				m.Option("username", m.Conf("runtime", "user.name"))
 				m.Confm("flow", []string{h, "user"}, func(key string, value map[string]interface{}) {
-					if kit.Format(value["user"]) != m.Conf("runtime", "node.route") {
+					if kit.Right(value["user"]) && kit.Format(value["user"]) != m.Conf("runtime", "node.route") {
 						m.Cmd("ssh._route", value["user"], "context", "chat", "ocean", "spawn", h, arg[2])
 					}
 				})
