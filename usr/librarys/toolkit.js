@@ -25,6 +25,9 @@ kit = toolkit = {
         return args
     },
 
+    Position: function(which) {
+        return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
+    },
     ScrollPage: function(event, conf) {
         switch (event.key) {
             case "h":
@@ -171,6 +174,9 @@ kit = toolkit = {
 
         subs = subs || {}
         children.forEach(function(child, i) {
+            if (!child) {
+                return
+            }
             child.data = child.data || {}
             child.type = child.type || "div"
 
@@ -494,6 +500,55 @@ kit = toolkit = {
             kit.CopyText()
         }
     },
+    OrderText: function(pane, text) {
+        text.querySelectorAll("a").forEach(function(value, index, array) {
+            kit.OrderLink(value, pane)
+        })
+        text.querySelectorAll("table").forEach(function(value, index, array) {
+            kit.OrderTable(value)
+        })
+
+        var i = 0, j = 0, k = 0
+        var h0 = [], h2 = [], h3 = []
+        text.querySelectorAll("h2,h3,h4").forEach(function(value, index, array) {
+            var id = ""
+            var text = value.innerText
+            var ratio = parseInt(value.offsetTop/pane.scrollHeight*100)
+            if (value.tagName == "H2") {
+                j=k=0
+                h2 = []
+                id = ++i+"."
+                text = id+" "+text
+                h0.push({"fork": [text+" ("+ratio+"%)", h2, function(event) {
+                    location.hash = id
+                }]})
+            } else if (value.tagName == "H3") {
+                k=0
+                h3 = []
+                id = i+"."+(++j)
+                text = id+" "+text
+                h2.push({"fork": [text+" ("+ratio+"%)", h3, function(event) {
+                    location.hash = id
+                }]})
+            } else if (value.tagName == "H4") {
+                id = i+"."+j+"."+(++k)
+                text = id+" "+text
+                h3.push({"leaf": [text+" ("+ratio+"%)", function(event) {
+                    location.hash = id
+                }]})
+            }
+            value.innerText = text
+            value.id = id
+        })
+        return h0
+
+        text.querySelectorAll("table.wiki_list").forEach(function(value, index, array) {
+            kit.OrderTable(value, "path", function(event) {
+                var text = event.target.innerText
+                ctx.Search({"wiki_class": text})
+            })
+        })
+    },
     OrderLink: function(link) {
         link.target = "_blank"
     },
@@ -518,9 +573,6 @@ kit = toolkit = {
         }
         return true
     },
-    Selector(target, name) {
-        return target.Selector(name)
-    }
 }
 
 function right(arg) {

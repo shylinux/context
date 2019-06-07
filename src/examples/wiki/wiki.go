@@ -1,26 +1,30 @@
 package wiki
 
 import (
-	"bufio"
-	"bytes"
+	"github.com/gomarkdown/markdown"
+
 	"contexts/ctx"
 	"contexts/web"
+	"toolkit"
+
+	"bufio"
+	"bytes"
 	"encoding/xml"
 	"fmt"
-	"github.com/gomarkdown/markdown"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
 	"strings"
-	"toolkit"
 )
 
 var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "默认组件"},
+
+		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "wiki", "componet_tmpl": "head", "metas": []interface{}{
@@ -49,10 +53,10 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				},
 			},
 		}, Help: "组件列表"},
-		"componet_group": &ctx.Config{Name: "component_group", Value: "index", Help: "默认组件"},
 
 		"wiki_level": &ctx.Config{Name: "wiki_level", Value: "wiki/自然/编程", Help: "路由数量"},
 		"wiki_favor": &ctx.Config{Name: "wiki_favor", Value: "index.md", Help: "路由数量"},
+		"wiki_visit": &ctx.Config{Name: "wiki_visit", Value: map[string]interface{}{}, Help: "路由数量"},
 
 		"wiki_dir":  &ctx.Config{Name: "wiki_dir", Value: "wiki", Help: "路由数量"},
 		"wiki_list": &ctx.Config{Name: "wiki_list", Value: []interface{}{}, Help: "路由数量"},
@@ -69,6 +73,11 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			which := m.Cmdx("nfs.path", path.Join(m.Confx("wiki_level"), m.Option("wiki_class"), m.Confx("wiki_favor", arg, 0)))
 
 			if ls, e := ioutil.ReadFile(which); e == nil {
+				m.Confi("wiki_visit", []string{which, m.Option("remote_ip")},
+					m.Confi("wiki_visit", []string{which, m.Option("remote_ip")})+1)
+				m.Append("visit_count", m.Confi("wiki_visit", []string{which, m.Option("remote_ip")}))
+				m.Append("visit_total", len(m.Confm("wiki_visit", []string{which})))
+
 				buffer := bytes.NewBuffer([]byte{})
 				temp, e := template.New("temp").Funcs(ctx.CGI).Parse(string(ls))
 				if e != nil {

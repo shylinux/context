@@ -1,3 +1,5 @@
+~wiki
+    config save tmp/wiki.json wiki_visit
 ~ssh
     config save tmp/cert.json work flow trust
 ~aaa

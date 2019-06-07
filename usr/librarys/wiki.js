@@ -5,7 +5,6 @@ var page = Page({
         scroll_y: 50,
     },
     onlayout: function(event, sizes) {
-        return
         var height = document.body.clientHeight-page.conf.border
         var width = document.body.clientWidth-page.conf.border
         page.conf.height = height
@@ -18,146 +17,119 @@ var page = Page({
         page.footer.Size(width, sizes.footer)
 
         sizes.tree == undefined && (sizes.tree = page.tree.clientHeight)
-        page.tree.Size(width, sizes.tree)
+        // page.tree.Size(width, sizes.tree)
 
-        sizes.text = height - sizes.tree - sizes.header - sizes.footer
+        sizes.text = height - sizes.tree - sizes.header - sizes.footer - page.conf.border * 3
         page.text.Size(width, sizes.text)
     },
-    initList: function(page, pane, form, output) {
-        ctx.Runs(page, form, function(msg) {
-            output.innerHTML = ""
-            kit.AppendChild(output, [{"tree": ctx.Table(msg, function(value, index) {
-                return {"leaf": [value.file, function(event, target) {
-                    ctx.Search("wiki_favor", value.file)
-                }]}
-            })}])
-        })
-        return
+    oncontrol: function(event) {
+        if (event.ctrlKey) {
+            switch (event.key) {
+                case "t":
+                    page.tree.Tree()
+                    break
+                case "m":
+                    page.text.Menu()
+                    break
+                case "n":
+                    page.tree.Tree("none")
+                    page.text.Menu("none")
+                    break
+            }
+        }
     },
 
     initTree: function(page, pane, form, output) {
-        // if (!ctx.isMobile) {
-        //     pane.style.float = "left"
-        // }
+        var ui = kit.AppendChild(output, [
+            {"view": ["back"], "name": "back"}, {"view": ["gap"]},
+            {"view": ["tree"], "name": "tree"}, {"view": ["gap"]},
+            {"view": ["list"], "name": "list"}, {"view": ["gap"]},
+        ])
+
+        pane.Conf("tree.display", "", function(value, old) {
+            pane.style.display = value
+            page.onlayout()
+        })
+        pane.Tree = function(value) {
+            pane.Conf("tree.display", value || (pane.Conf("tree.display")? "": "none"))
+        }
 
         ctx.Runs(page, form, function(msg) {
-            output.innerHTML = ""
-            var back = [{"button": ["知识", function(event) {
-                ctx.Search({"wiki_level": "", "wiki_class": "", "wiki_favor": ""})
-            }]}]
-            ctx.Search("wiki_class").split("/").forEach(function(value, index, array) {
-                if (value) {
-                    var favor = []
-                    for (var i = 0; i <= index; i++) {
-                        favor.push(array[i])
-                    }
-                    favor.push("")
-                    back.push({"button": [value, function(event) {
-                        ctx.Search({"wiki_class": favor.join("/"), "wiki_favor":""})
-                    }]})
-                }
-            })
+            ui.back.innerHTML = "", kit.AppendChild(ui.back, [
+                {"button": ["知识", function(event) {
+                    ctx.Search({"wiki_level": "", "wiki_class": "", "wiki_favor": ""})
+                }]},
+            ].concat(ctx.Search("wiki_class").split("/").map(function(value, index, array) {
+                return value && {"button": [value, function(event) {
+                    location.hash = "", ctx.Search({"wiki_class": array.slice(0, index+1).join("/")+"/", "wiki_favor":""})
+                }]}
+            })))
 
-            var ui = kit.AppendChild(output, [
-                {"view": ["back"], "list": back},
-                {"view": ["tree"], "list": [{"tree": ctx.Table(msg, function(value, index) {
-                    if (value.filename.endsWith("/")) {
-                        return {"leaf": [value.filename, function(event, target) {
-                            ctx.Search({"wiki_class": ctx.Search("wiki_class")+value.filename, "wiki_favor": ""})
-                        }]}
-                    }
-                })}]},
-                {"view": ["list"], "list": [{"tree": ctx.Table(msg, function(value, index) {
-                    if (!value.filename.endsWith("/")) {
-                        return {"leaf": [value.time.substr(5, 5)+" "+value.filename, function(event, target) {
-                            ctx.Search("wiki_favor", value.filename)
-                        }]}
-                    }
-                })}]},
-            ])
+            ui.tree.innerHTML = "", kit.AppendChild(ui.tree, ctx.Table(msg, function(value, index) {
+                return value.filename.endsWith("/") && {"text": [value.filename, "div"], click: function(event, target) {
+                    location.hash = "", ctx.Search({"wiki_class": ctx.Search("wiki_class")+value.filename, "wiki_favor": ""})
+                }}
+            }))
+            ui.list.innerHTML = "", kit.AppendChild(ui.list, ctx.Table(msg, function(value, index) {
+                return !value.filename.endsWith("/") && {"text": [value.time.substr(5, 5)+" "+value.filename, "div"], click: function(event, target) {
+                    location.hash = "", ctx.Search("wiki_favor", value.filename)
+                }}
+            }))
         })
         return
     },
     initText: function(page, pane, form, output) {
-        ctx.Runs(page, form, function(msg) {
-            if (!msg.result) {
-                return
+        var ui = kit.AppendChild(output, [
+            {"view": ["menu", "div", "", "menu"]},
+            {"view": ["text", "div", "", "text"]},
+        ])
+        ui.text.onscroll = function(event) {
+            page.footer.State("text", kit.Position(ui.text))
+        }
+        ui.menu.onscroll = function(event) {
+            page.footer.State("menu", kit.Position(ui.menu))
+        }
+
+        pane.Conf("menu.display", "", function(value, old) {
+            ui.menu.style.display = value
+        })
+        pane.Conf("menu.float", !kit.isMobile, function(value, old) {
+            page.onlayout()
+        })
+        pane.Conf("menu.scroll", true, function(value, old) {
+            page.onlayout()
+        })
+        pane.Menu = function(value) {
+            pane.Conf("menu.display", value || (pane.Conf("menu.display")? "": "none"))
+        }
+        pane.Size = function(width, height) {
+            if (pane.Conf("menu.float")) {
+                ui.menu.className = "menu left"
+            } else {
+                ui.menu.className = "menu"
             }
-            output.innerHTML = ""
-            var ui = kit.AppendChild(output, [
-                {"view": ["menu", "div", "", "menu"]},
-                {"view": ["text", "div", msg.result.join(""), "text"]},
-            ])
-
-            ui.text.querySelectorAll("table").forEach(function(value, index, array) {
-                kit.OrderTable(value)
-            })
-            ui.text.querySelectorAll("table.wiki_list").forEach(function(value, index, array) {
-                kit.OrderTable(value, "path", function(event) {
-                    var text = event.target.innerText
-                    ctx.Search({"wiki_class": text})
-                })
-            })
-
-            ui.text.querySelectorAll("a").forEach(function(value, index, array) {
-                kit.OrderLink(value, pane)
-            })
-
-
-            var i = 0, j = 0, k = 0
-            var h0 = [], h2 = [], h3 = []
-            ui.text.querySelectorAll("h2,h3,h4").forEach(function(value, index, array) {
-                var id = ""
-                var level = 0
-                var text = value.innerText
-                var ratio = parseInt(value.offsetTop/pane.scrollHeight*100)
-
-                if (value.tagName == "H2") {
-                    j=k=0
-                    h2 = []
-                    id = ++i+"."
-                    text = id+" "+text
-                    h0.push({"fork": [text+" ("+ratio+"%)", h2, function(event) {
-                        console.log(text)
-                        location.hash = id
-                    }]})
-                } else if (value.tagName == "H3") {
-                    k=0
-                    h3 = []
-                    id = i+"."+(++j)
-                    text = id+" "+text
-                    h2.push({"fork": [text+" ("+ratio+"%)", h3, function(event) {
-                        console.log(text)
-                        location.hash = id
-                    }]})
-                } else if (value.tagName == "H4") {
-                    id = i+"."+j+"."+(++k)
-                    text = id+" "+text
-                    h3.push({"leaf": [text+" ("+ratio+"%)", function(event) {
-                        console.log(text)
-                        location.hash = id
-                    }]})
-                }
-                value.innerText = text
-                value.id = id
-            })
-            kit.AppendChild(ui.menu, [{"tree": h0}])
-
-
-            ui.text.style.width = document.body.offsetWidth-30+"px"
-            if (i > 0 && !ctx.isMobile) {
-                ui.menu.style.position = "absolute"
-                var width = ui.menu.offsetWidth
-                var height = ui.menu.offsetHeight>400?ui.menu.offsetHeight:600
-
-                pane.style.marginLeft = width+10+"px"
-                ui.menu.style.marginLeft = -width-20+"px"
-                ui.text.style.height = height+"px"
-                ui.text.style.width = pane.offsetWidth-30+"px"
+            if (pane.Conf("menu.float") && pane.Conf("menu.scroll")) {
+                ui.menu.style.height = (height-8)+"px"
+                ui.text.style.height = ((ui.menu.clientHeight||height)-8-20)+"px"
+            } else {
+                ui.menu.style.height = " "
+                ui.text.style.height = " "
             }
+
             if (location.hash) {
                 location.href = location.hash
             }
+            ui.text.onscroll()
+            ui.menu.onscroll()
+        }
+
+        ctx.Runs(page, form, function(msg) {
+            ui.menu.innerHTML = "", ui.text.innerHTML = msg.result? msg.result.join(""): ""
+            kit.AppendChild(ui.menu, [{"tree": kit.OrderText(pane, ui.text)}])
+            page.footer.State("count", msg.visit_count)
+            page.footer.State("visit", msg.visit_total)
+            page.onlayout()
+            return
         })
         return
     },
@@ -170,6 +142,20 @@ var page = Page({
                 if (conf) {
                     kit.AppendChild(output, conf)
                 }
+            }
+        })
+
+        page.footer.Order({"text": "", "menu": "", "count": "0", "visit": "0"}, ["visit", "count", "menu", "text"])
+        page.header.Order({"tree": "tree", "menu": "menu"}, ["tree", "menu"], function(event, item, value) {
+            switch (item) {
+                case "menu":
+                    page.text.Menu()
+                    break
+                case "tree":
+                    page.tree.Tree()
+                    break
+                default:
+                    page.confirm("logout?") && page.login.Exit()
             }
         })
     },

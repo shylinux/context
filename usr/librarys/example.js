@@ -1,7 +1,24 @@
 function Page(page) {
+    var id = 1
+    var conf = {}
+    var conf_cb = {}
     page.__proto__ = {
-        _id: 1, ID: function() {
-            return this._id++
+        ID: function() {
+            return id++
+        },
+        Conf: function(key, value, cb) {
+            if (value != undefined) {
+                var old = conf[key]
+                conf[key] = value
+                conf_cb[key] && conf_cb[key](value, old)
+            }
+            if (cb != undefined) {
+                conf_cb[key] = cb
+            }
+            if (key != undefined) {
+                return conf[key]
+            }
+            return conf
         },
         Sync: function(m) {
             var meta = m, data = "", list = []
@@ -195,11 +212,8 @@ function Page(page) {
         initHeader: function(page, pane, form, output) {
             var state = {}, list = [], cb = function(event, item, value) {
             }
-            pane.State = function(name, value) {
-                state[name] = value, pane.Show()
-            }
-            pane.Order = function(value, cbs) {
-                list = value, cb = cbs || cb, pane.Show()
+            pane.Order = function(value, order, cbs) {
+                state = value, list = order, cb = cbs || cb, pane.Show()
             }
             pane.Show = function() {
                 output.innerHTML = "", kit.AppendChild(output, [
@@ -208,6 +222,9 @@ function Page(page) {
                         cb(event, item, state[item])
                     }}})},
                 ])
+            }
+            pane.State = function(name, value) {
+                state[name] = value, pane.Show()
             }
             return
         },
@@ -223,12 +240,19 @@ function Page(page) {
             return [{"text": ["shylinux", "div", "title"]}]
         },
         initFooter: function(page, pane, form, output) {
-            var state = {}, list = []
-            pane.State = function(name, value) {
-                state[name] = value, pane.Show()
+            var state = {}, list = [], cb = function(event, item, value) {
             }
-            pane.Order = function(value) {
-                list = value, pane.Show()
+            pane.Order = function(value, order, cbs) {
+                state = value, list = order, cb = cbs || cb, pane.Show()
+            }
+            pane.State = function(name, value) {
+                if (value != undefined) {
+                    state[name] = value, pane.Show()
+                }
+                if (name != undefined) {
+                    return state[name]
+                }
+                return state
             }
 
             pane.Show = function() {
@@ -263,6 +287,23 @@ function Page(page) {
                     pane.style.height = height+"px"
                 }
 
+                var conf = {}
+                var conf_cb = {}
+                pane.Conf = function(key, value, cb) {
+                    if (value != undefined) {
+                        var old = conf[key]
+                        conf[key] = value
+                        conf_cb[key] && conf_cb[key](value, old)
+                    }
+                    if (cb != undefined) {
+                        conf_cb[key] = cb
+                    }
+                    if (key != undefined) {
+                        return conf[key]
+                    }
+                    return conf
+                }
+
                 // form init
                 pane.Run = form.Run = function(cmds, cb) {
                     ctx.Run(page, form.dataset, cmds, cb)
@@ -278,7 +319,7 @@ function Page(page) {
                     event.preventDefault()
                 }
 
-                var conf = cb(page[pane.dataset.init], pane, form)
+                cb(page[pane.dataset.init], pane, form)
             })
 
             document.querySelectorAll("body>fieldset").forEach(function(pane) {

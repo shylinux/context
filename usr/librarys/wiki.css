@@ -1,37 +1,32 @@
-fieldset.Tree>div.output li>div:hover {
-    background-color:green;
-}
-fieldset.Tree>div.output>div.tree li {
-    display:inline;
-}
-fieldset.Tree>div.output>div.tree li div {
-    float:left;
-    padding:5px;
-    border:solid 2px green;
-}
-fieldset.Tree>div.output>div.list {
+fieldset.Tree>div.output>div.gap {
+    height:6px;
     clear:both;
-    padding-top:5px;
 }
-fieldset.Tree>div.output>div.list li {
-    display:inline;
-}
-fieldset.Tree>div.output>div.list li div {
+fieldset.Tree>div.output>div.tree>div {
+    border:solid 2px green;
+    padding:4px;
     float:left;
-    padding:5px;
+}
+fieldset.Tree>div.output>div.list>div {
     border:solid 1px green;
+    padding:4px;
+    float:left;
 }
 
-fieldset.Text {
-    padding:0;
+fieldset.Text>div.output>div.menu {
+    border-right:solid 1px black;
+    padding-right:10px;
+    overflow:auto;
+}
+fieldset.Text>div.output>div.menu.left {
+    float:left;
 }
 fieldset.Text>div.output>div.menu li>div:hover {
     background-color:red;
 }
 fieldset.Text>div.output>div.text {
-    position:relative;
-    overflow:auto;
     padding:10px;
+    overflow:auto;
 }
 fieldset.Text>div.output>div.text strong {
     background-color:yellow;
@@ -39,3 +34,4 @@ fieldset.Text>div.output>div.text strong {
     border-top:solid 2px green;
     color:red;
 }
+

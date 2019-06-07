@@ -4,6 +4,8 @@
     config load tmp/auth.json auth
 ~ssh
     config load tmp/cert.json work flow trust
+~wiki
+    config load tmp/wiki.json wiki_visit
 
 source etc/common.shy
 ~ssh
