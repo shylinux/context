@@ -52,13 +52,14 @@ function Page(page) {
         View: function(parent, type, line, key, cb) {
             var ui = {}
             var result = []
+            var text = line
             switch (type) {
                 case "icon":
                     result = [{view: ["item", "div"], list: [{type: "img", data: {src: line[key[0]]}}, {}]}]
                     break
 
                 case "text":
-                    result = [{view: ["item", "div", key.length>1? line[key[0]]+"("+line[key[1]]+")": (key.length>0? line[key[0]]: "null")], click: cb}]
+                    result = [{text: [key.length>1? line[key[0]]+"("+line[key[1]]+")": (key.length>0? line[key[0]]: "null"), "span"], click: cb}]
                     break
 
                 case "code":
@@ -76,20 +77,27 @@ function Page(page) {
                     break
 
                 case "field":
-                    line = JSON.parse(line.text)
+                    var text = JSON.parse(line.text)
 
                 case "plugin":
                     var id = "plugin"+page.ID()
-                    result = [{view: [line.view, "fieldset"], data: {id: id}, list: [
-                        {text: [line.name, "legend"]},
+                    result = [{view: [text.view, "fieldset"], data: {id: id}, list: [
+                        {text: [text.name, "legend"]},
                         {name: "option", view: ["option", "form"], data: {Run: cb}, list: [{type: "input", style: {"display": "none"}}]},
                         {name: "output", view: ["output", "div"]},
-                        {script: "Plugin("+id+","+line.inputs+","+line.init+")"},
+                        {script: "Plugin("+id+","+text.inputs+","+"["+(text.args||"")+"]"+","+(text.init||"")+")"},
                     ]}]
                     break
             }
+            if (parent.DisplayUser) {
+                ui = kit.AppendChild(parent, [{view: ["item"], list:[
+                    {view: ["user", "div", line.create_user]},
+                    {view: ["text"], list:result}
+                ]}])
+            } else {
+                ui = kit.AppendChild(parent, [{view: ["item"], list:result}])
+            }
 
-            ui = kit.AppendChild(parent, result)
             ui.last.Meta = line
             return ui
         },
@@ -315,6 +323,27 @@ function Page(page) {
                         })
                     })
                 }
+                pane.Time = form.Time = function(time, cmds, cb) {
+                    function loop() {
+                        ctx.Run(page, form.dataset, cmds, cb)
+                        setTimeout(loop, time)
+                    }
+                    setTimeout(loop, time)
+                }
+
+                var timer = ""
+                pane.Times = form.Times = function(time, cmds, cb) {
+                    timer && clearTimeout(timer)
+                    function loop() {
+                        ctx.Run(page, form.dataset, cmds, function(msg) {
+                            ctx.Table(msg, function(line, index) {
+                                cb(line, index, msg)
+                            })
+                        })
+                        timer = setTimeout(loop, time)
+                    }
+                    timer = setTimeout(loop, time)
+                }
                 form.onsubmit = function(event) {
                     event.preventDefault()
                 }
@@ -344,7 +373,7 @@ function Page(page) {
     }
     return page
 }
-function Plugin(field, inputs, plugin) {
+function Plugin(field, inputs, args, plugin) {
     var option = field.querySelector("form.option")
     var output = field.querySelector("div.output")
 
@@ -405,7 +434,7 @@ function Plugin(field, inputs, plugin) {
         }, field.Select = function() {
             ui.last.childNodes[1].focus()
         })
-        return {type: "div", list: [{type: "label", inner: item.label||""}, {type: "input", name: item.name, data: item}]}
+        return {type: "div", list: [{type: "label", inner: item.label||""}, {type: "input", name: item.name, data: item, value: args && args[index]}]}
     }))
     ui.last.childNodes[1].focus()
 

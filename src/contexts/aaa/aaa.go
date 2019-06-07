@@ -270,7 +270,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 检查链接
 						if arg[i] == "check" {
-							m.Log("fuck", "waht %v", p)
 							has := "false"
 							m.Confm("auth", []string{p, "ship"}, func(k string, ship map[string]interface{}) {
 								if i == len(arg)-2 && (ship["meta"] != arg[i+1] && k != arg[i+1]) {
@@ -368,6 +367,9 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					case "data": // 数据操作
 						if i > len(arg)-1 { // 查看数据
 							m.Set("result").Cmdy("ctx.config", "auth", strings.Join([]string{p, "data"}, "."))
+							return
+						} else if i == len(arg)-1 { // 查看数据
+							m.Set("result").Cmdy("ctx.config", "auth", strings.Join([]string{p, "data", arg[i]}, "."))
 							return
 						} else if arg[i] == "delete" { // 删除数据
 							m.Confm("auth", []string{s, "data"}, func(data map[string]interface{}) {
@@ -549,7 +551,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					return
 
 				case "user": // 查看用户
-					m.Log("fuck", "what %v", arg)
 					m.Cmdy("aaa.auth", sid, "ship", "username")
 
 				case "current":
@@ -775,8 +776,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber:          big.NewInt(1),
-							IsCA:                  true,
+							SerialNumber: big.NewInt(1),
+							IsCA:         true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},

@@ -203,6 +203,7 @@ var page = Page({
 		return {"button": ["创建"], "action": pane.Action}
     },
     initTarget: function(page, pane, form, output) {
+        output.DisplayUser = true
         var river = ""
         pane.Listen = {
             river: function(value, old) {
@@ -211,8 +212,11 @@ var page = Page({
         }
 
         pane.Show = function() {
-            page.footer.State("text", 0)
-            output.Update(["flow", river], "text", ["text"], "index", false, fun)
+            var cmds = ["brow", river, 0]
+            output.innerHTML = "", pane.Times(100, cmds, function(line, index, msg) {
+                output.Append("", line, ["text"], "index", fun)
+                cmds[2] = parseInt(line.index)+1
+            })
         }
 
         function fun(line, index, event, args, cbs) {
@@ -222,8 +226,7 @@ var page = Page({
 
         pane.Send = function(type, text, cb) {
             form.Run(["flow", river, type, text], function(msg) {
-                output.Append(type, {text:text, index: msg.result[0]}, ["text"], "index", fun)
-                page.footer.State("text", msg.result[0])
+                // output.Append(type, {create_user: msg.create_user[0], text:text, index: msg.result[0]}, ["text"], "index", fun)
                 typeof cb == "function" && cb()
             })
         }
@@ -291,7 +294,8 @@ var page = Page({
             output.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                 event.shiftKey? page.target.Send("field", JSON.stringify({
                     name: line.name, view: line.view, init: line.init,
-                    node: line.node, group: line.group, index: line.index, inputs: line.inputs,
+                    node: line.node, group: line.group, index: line.index,
+                    inputs: line.inputs, args: args,
                 })): form.Run([river, storm, index].concat(args), function(msg) {
                     event.ctrlKey && (msg.append && msg.append[0]?
                         page.target.Send("table", JSON.stringify(ctx.Tables(msg))):

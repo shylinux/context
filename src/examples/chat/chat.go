@@ -134,6 +134,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					if m.Cmds("aaa.auth", "username", arg[0], "password", arg[1]) {
 						m.Option("username", arg[0])
 						m.Copy(m.Cmd("aaa.user", "session", "select"), "result")
+						m.Option("sessid", m.Result(0))
+						if !m.Cmds("aaa.auth", "username", arg[0], "data", "chat.default") && m.Option("username") != m.Conf("runtime", "work.name") {
+							m.Cmds("aaa.auth", "username", arg[0], "data", "chat.default", m.Spawn().Cmd(".ocean", "spawn", "", m.Option("username")+"@"+m.Conf("runtime", "work.name")))
+						}
 					}
 				}
 			} else if m.Options("sessid") {
@@ -152,13 +156,16 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			switch arg[0] {
 			case "spawn":
+				arg = append(arg, m.Option("username"))
 				arg = append(arg, m.Conf("runtime", "work.name"))
 
 				h := kit.Select(kit.Hashs("uniq"), arg, 1)
 				user := map[string]interface{}{}
 				for _, v := range arg[3:] {
 					u := m.Cmdx("ssh._route", m.Conf("runtime", "work.route"), "_check", "work", v)
-					user[v] = map[string]interface{}{"user": u}
+					if u != "" {
+						user[v] = map[string]interface{}{"user": u}
+					}
 				}
 
 				m.Conf("flow", h, map[string]interface{}{
@@ -209,18 +216,20 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			}
 
 			switch arg[0] {
-			case "flow":
-				if len(arg) == 2 {
-					m.Confm("flow", []string{arg[1], "text.list"}, func(index int, value map[string]interface{}) {
-						m.Add("append", "index", index)
-						m.Add("append", "type", value["type"])
-						m.Add("append", "text", value["text"])
-					})
-					m.Table()
-					return
-				}
+			case "brow":
+				m.Option("page.begin", kit.Select("0", arg, 2))
+				m.Confm("flow", []string{arg[1], "text.list"}, func(index int, value map[string]interface{}) {
+					m.Add("append", "index", index)
+					m.Add("append", "type", value["type"])
+					m.Add("append", "text", value["text"])
+					m.Add("append", "create_time", value["create_time"])
+					m.Add("append", "create_user", value["create_user"])
+				})
+				m.Table()
+				return
 
-				if m.Conf("flow", []string{arg[1], "conf.route"}) != m.Conf("runtime", "node.route") && len(arg) == 4 {
+			case "flow":
+				if kit.Right(m.Conf("flow", []string{arg[1], "conf.route"})) && m.Conf("flow", []string{arg[1], "conf.route"}) != m.Conf("runtime", "node.route") && len(arg) == 4 {
 					m.Cmdy("ssh._route", m.Conf("flow", []string{arg[1], "conf.route"}),
 						"context", "chat", "river", "flow", arg[1], arg[2], arg[3])
 					m.Log("info", "upstream")
@@ -236,6 +245,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 				count := m.Confi("flow", []string{arg[1], "text.count"}) + 1
 				m.Confi("flow", []string{arg[1], "text.count"}, count)
+				m.Append("create_user", m.Option("username"))
 				m.Echo("%d", count)
 
 				m.Option("username", m.Conf("runtime", "user.name"))

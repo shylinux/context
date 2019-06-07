@@ -11,6 +11,20 @@ fieldset.River {
 fieldset.Target div.output div.item:hover {
     background-color:lightgreen;
 }
+fieldset.Target>div.output>div.item {
+    padding-top:6px;
+    clear:both;
+}
+fieldset.Target>div.output>div.item>div.text {
+    padding:6px;
+    float:left;
+}
+fieldset.Target>div.output>div.item>div.user {
+    border-right:solid 1px green;
+    border-bottom:solid 1px green;
+    float:left;
+    padding:6px;
+}
 fieldset.Source div.output {
     padding:0;
 }

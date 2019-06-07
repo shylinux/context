@@ -925,8 +925,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				tmpl := web.Template
 				if m.Confs("route", "template_debug") {
 					tmpl = template.New("render").Funcs(ctx.CGI)
-					t, e := tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), "/*.tmpl"))
-					m.Log("fuck", "what %v %v", e, t)
+					tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), "/*.tmpl"))
 					tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
 				}
 
@@ -983,7 +982,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 					}
-					msg.Log("fuck", "%s", msg.Option("componet_name"))
 
 					// 添加设备
 					arg = arg[:0]

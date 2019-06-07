@@ -1751,8 +1751,8 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 			}
 		}
 	case func(int, map[string]interface{}):
-		for i, v := range table {
-			if val, ok := v.(map[string]interface{}); ok {
+		for i := m.Optioni("page.begin"); i < len(table); i++ {
+			if val, ok := table[i].(map[string]interface{}); ok {
 				fun(i, val)
 			}
 		}
