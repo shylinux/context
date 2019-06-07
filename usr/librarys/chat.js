@@ -83,7 +83,7 @@ var page = Page({
                 form.Run([ui.username.value, ui.password.value], function(msg) {
                     if (msg.result && msg.result[0]) {
                         pane.ShowDialog(1, 1)
-                        ctx.Cookie("sessid", msg.result.join(""))
+                        ctx.Cookie("sessid", msg.result[0])
                         page.header.State("user", ui.username.value)
                         page.river.Show()
                         return
