@@ -515,12 +515,8 @@ var page = Page({
         })
 
         page.onlayout(null, page.conf.layout)
-        page.footer.State("text", "")
-        page.footer.State("action", "")
-        page.footer.Order(["action", "text"])
-
-        page.header.State("user", "")
-        page.header.Order(["user"], function(event, item, value) {
+        page.footer.Order({"action": "", "text": ""}, ["action", "text"])
+        page.header.Order({"user": ""}, ["user"], function(event, item, value) {
             page.confirm("logout?") && page.login.Exit()
         })
     },
