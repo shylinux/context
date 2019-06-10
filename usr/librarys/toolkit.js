@@ -2,6 +2,7 @@ kit = toolkit = {
     isMobile: navigator.userAgent.indexOf("Mobile") > -1,
     isWeiXin: navigator.userAgent.indexOf("MicroMessenger") > -1,
     isMacOSX: navigator.userAgent.indexOf("Mac OS X") > -1,
+    isWindows: navigator.userAgent.indexOf("Windows") > -1,
     isIPhone: navigator.userAgent.indexOf("iPhone") > -1,
     isSpace: function(c) {
         return c == " " || c == "Enter"
@@ -340,6 +341,7 @@ kit = toolkit = {
                 }
             })
         })
+        return table
     },
     RangeTable: function(table, index, sort_asc) {
         var list = table.querySelectorAll("tr")
@@ -409,25 +411,24 @@ kit = toolkit = {
     },
     OrderTable: function(table, field, cb) {
         if (!table) {return}
-        var kit = this
         table.onclick = function(event) {
             var target = event.target
             var dataset = target.dataset
-            var nodes = target.parentElement.childNodes
-            for (var i = 0; i < nodes.length; i++) {
-                if (nodes[i] == target) {
-                    if (target.tagName == "TH") {
-                        dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
-                        kit.RangeTable(table, i, dataset["sort_asc"] == "1")
-                    } else if (target.tagName == "TD") {
-                        var tr = target.parentElement.parentElement.querySelector("tr")
-                        if (tr.childNodes[i].innerText.startsWith(field)) {
-                            typeof cb == "function" && cb(event)
-                        }
-                        kit.CopyText()
-                    }
+            var head = target.parentElement.parentElement.querySelector("tr")
+            target.parentElement.childNodes.forEach(function(item, i) {
+                if (item != target) {
+                    return
                 }
-            }
+                if (target.tagName == "TH") {
+                    dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
+                    kit.RangeTable(table, i, dataset["sort_asc"] == "1")
+                    return
+                }
+                if (field && head.childNodes[i].innerText.startsWith(field)) {
+                    typeof cb == "function" && cb(event, item.innerText)
+                }
+                kit.CopyText()
+            })
         }
     },
 

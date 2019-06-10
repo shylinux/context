@@ -327,6 +327,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					m.Add("append", "view", msg.Append("view"))
 					m.Add("append", "init", msg.Append("init"))
 					m.Add("append", "inputs", msg.Append("inputs"))
+					m.Add("append", "exports", msg.Append("exports"))
 				})
 				m.Table()
 				return

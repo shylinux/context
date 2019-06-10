@@ -1,6 +1,8 @@
 var page = Page({
     conf: {border: 4, layout: {header:30, river:180, action:180, source:60, storm:180, footer:30}},
     onlayout: function(event, sizes) {
+        kit.isWindows && (document.body.style.overflow = "hidden")
+
         var height = document.body.clientHeight-page.conf.border
         var width = document.body.clientWidth-page.conf.border
         page.conf.height = height
@@ -265,6 +267,7 @@ var page = Page({
             },
         }
 
+        pane.Stop = false
         pane.Show = function() {
             var cmds = ["brow", river, 0]
             output.innerHTML = "", pane.Times(1000, cmds, function(line, index, msg) {
@@ -383,6 +386,7 @@ var page = Page({
             },
             "最大": function(event) {
                 (toggle = !toggle)? page.onlayout(event, page.conf.layout): page.onlayout(event, {river:0, action:-1, source:60})
+                page.target.Stop = !toggle
             },
             "全屏": function(event) {
                 page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})

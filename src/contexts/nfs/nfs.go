@@ -1234,9 +1234,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return
 			}
 
-			wd, e := os.Getwd()
-			m.Assert(e)
-			m.Option("git_dir", wd)
+			if p := m.Cmdx("nfs.path", arg[0]); p != "" {
+				m.Option("git_dir", p)
+				arg = arg[1:]
+			} else {
+				wd, e := os.Getwd()
+				m.Assert(e)
+				m.Option("git_dir", wd)
+			}
 
 			cmds := []string{}
 			if v := m.Confv("git", []string{arg[0], "cmds"}); v != nil {

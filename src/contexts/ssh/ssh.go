@@ -80,6 +80,84 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"display_result": "", "display_append": "",
 				},
 			},
+			"project": []interface{}{
+				map[string]interface{}{"componet_name": "compile", "componet_help": "compile",
+					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "compile",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "编译"},
+					},
+				},
+				map[string]interface{}{"componet_name": "runtime", "componet_help": "runtime",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "runtime",
+					"componet_args": []interface{}{"system"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "运行"},
+					},
+				},
+				map[string]interface{}{"componet_name": "ifconfig", "componet_help": "ifconfig",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "tcp", "componet_cmd": "ifconfig",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "网卡"},
+					},
+				},
+				map[string]interface{}{"componet_name": "context", "componet_help": "context",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "ctx", "componet_cmd": "context",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "模块"},
+					},
+				},
+				map[string]interface{}{"componet_name": "dir", "componet_help": "dir",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "nfs", "componet_cmd": "dir",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "pod"},
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+					"exports": []interface{}{"dir", "filename"},
+				},
+				map[string]interface{}{"componet_name": "git", "componet_help": "git",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "git",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "dir", "imports": "dir"},
+						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{"status", "diff"}},
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+				},
+				map[string]interface{}{"componet_name": "pod", "componet_help": "pod",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "remote",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+					"exports": []interface{}{"pod", "key"},
+				},
+				map[string]interface{}{"componet_name": "cmd", "componet_help": "cmd",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "pod", "imports": "pod"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "gg"},
+						map[string]interface{}{"type": "select", "name": "sub", "values": []interface{}{"status", ""}},
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+				},
+				map[string]interface{}{"componet_name": "cmd", "componet_help": "cmd",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "pod", "imports": "pod"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "gg"},
+						map[string]interface{}{"type": "select", "name": "sub", "values": []interface{}{"status", ""}},
+						map[string]interface{}{"type": "text", "name": "sub", "imports": "dir"},
+						map[string]interface{}{"type": "text", "name": "sub", "imports": "branch"},
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+				},
+			},
 		}, Help: "组件列表"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -192,13 +270,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			case "create":
 				user := m.Conf("runtime", "user.route")
-				if user == "" {
-					m.Echo("error: no user.route")
-					return
-				}
-
 				name := kit.Select(m.Conf("runtime", "user.name"), arg, 1)
 				work := kit.Select(m.Conf("runtime", "work.route"), arg, 2)
+				m.Assert(user != "", "error: no user.route")
+				m.Assert(name != "", "error: no user.name")
 
 				if n := m.Cmdx("ssh._route", work, "_check", "work", name, user); n != "" {
 					m.Conf("runtime", "work.route", work)
@@ -259,6 +334,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Add("append", "view", value["componet_view"])
 					m.Add("append", "init", m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1))
 					m.Add("append", "inputs", kit.Format(value["inputs"]))
+					m.Add("append", "exports", kit.Format(value["exports"]))
 				})
 				m.Table()
 			}

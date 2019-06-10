@@ -99,6 +99,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "终端数量"},
 	},
 	Configs: map[string]*ctx.Config{
+		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
+			"bench": "src/examples/app/bench.go",
+		}, Help: "运行环境"},
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
 			"init_env": []interface{}{"ctx_cas", "ctx_dev", "ctx_box", "ctx_root", "ctx_home", "web_port", "ssh_port", "USER"},
 			"boot":     map[string]interface{}{"web_port": ":9094", "ssh_port": ":9090"},
@@ -172,6 +175,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			})
 			return
 		}},
+		"compile": &ctx.Command{Name: "compile", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+				m.Cmdy("cli.quit", 1)
+			}
+			return
+		}},
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "runtime")
@@ -218,10 +227,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmd("cli.source", m.Conf("system", "script.exit"))
+			m.Append("directory", "")
+			m.Echo("1s restarting...")
 
 			m.GoFunc(m, func(m *ctx.Message) {
-				time.Sleep(time.Second * 3)
-				os.Exit(kit.Int(arg[0]))
+				time.Sleep(time.Second * 1)
+				os.Exit(kit.Int(kit.Select("0", arg, 0)))
 			})
 			return
 		}},

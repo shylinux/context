@@ -138,7 +138,7 @@ fieldset pre code, fieldset code pre {
     color:white;
     font-size:14px;
     background-color:#272822;
-    overflow:scroll;
+    overflow:auto;
     padding:5px;
     border:solid 2px green;
     border-left:solid 4px green;
