@@ -80,23 +80,77 @@ var page = Page({
             {label: "username"}, {input: ["username"]}, {type: "br"},
             {label: "password"}, {password: ["password"]}, {type: "br"},
             {button: ["login", function(event) {
+                if (!ui.username.value) {
+                    ui.username.focus()
+                    return
+                }
+                if (!ui.password.value) {
+                    ui.password.focus()
+                    return
+                }
                 form.Run([ui.username.value, ui.password.value], function(msg) {
                     if (msg.result && msg.result[0]) {
                         pane.ShowDialog(1, 1)
                         ctx.Cookie("sessid", msg.result[0])
-                        page.header.State("user", ui.username.value)
-                        page.river.Show()
+                        location.reload()
                         return
                     }
                     page.alert("用户或密码错误")
                 })
-            }]}
+            }]},
+            {button: ["scan", function(event) {
+                scan(event, function(text) {
+                    alert(text)
+                })
+            }]},
+            {type: "br"},
+            {type: "img", data: {"src": "/chat/qrcode?text=hi"}}
         ])
 
+
+        if (true||kit.isWeiXin) {
+            pane.Run(["weixin"], function(msg) {
+                // if (!ctx.Search("state")) {
+                //     location.href = msg["auth2.0"][0]
+                // }
+                // return
+                kit.AppendChild(document.body, [{include: ["https://res.wx.qq.com/open/js/jweixin-1.4.0.js", function(event) {
+                    kit.AppendChild(document.body, [{include: ["/static/librarys/weixin.js", function(event) {
+                        wx.error(function(res){
+                        })
+                        wx.ready(function(){
+                            wx.getNetworkType({success: function (res) {
+                            }})
+                            return
+                            wx.getLocation({
+                                success: function (res) {
+                                    page.footer.State("site", parseInt(res.latitude*10000)+","+parseInt(res.longitude*10000))
+                                },
+                            })
+                        })
+                        wx.config({
+                            appId: msg.appid[0],
+                            timestamp: msg.timestamp[0],
+                            nonceStr: msg.nonce[0],
+                            signature: msg.signature[0],
+                            jsApiList: [
+                                "scanQRCode",
+                                "chooseImage",
+                                "closeWindow",
+                                "openAddress",
+                                "getNetworkType",
+                                "getLocation",
+                            ]
+                        })
+                    }]}])
+                }]}])
+            })
+        }
         form.Run([], function(msg) {
             if (msg.result && msg.result[0]) {
-                page.header.State("user", msg.result[0])
+                page.header.State("user", msg.nickname[0])
                 page.river.Show()
+                page.footer.State("ip", msg.remote_ip[0])
                 return
             }
             pane.ShowDialog(1, 1)
@@ -193,7 +247,7 @@ var page = Page({
     },
     initRiver: function(page, pane, form, output) {
         pane.Show = function() {
-            output.Update([], "text", ["name", "count"], "key", true)
+            output.Update([], "text", ["name", "count"], "key", ctx.Search("river")||true, function(line, index, event) {})
         }
         pane.Action = {
             "创建": function(event) {
@@ -213,9 +267,10 @@ var page = Page({
 
         pane.Show = function() {
             var cmds = ["brow", river, 0]
-            output.innerHTML = "", pane.Times(100, cmds, function(line, index, msg) {
+            output.innerHTML = "", pane.Times(1000, cmds, function(line, index, msg) {
                 output.Append("", line, ["text"], "index", fun)
                 cmds[2] = parseInt(line.index)+1
+                page.footer.State("text", cmds[2])
             })
         }
 
@@ -293,7 +348,7 @@ var page = Page({
 
             output.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                 event.shiftKey? page.target.Send("field", JSON.stringify({
-                    name: line.name, view: line.view, init: line.init,
+                    name: line.name, help: line.help, view: line.view, init: line.init,
                     node: line.node, group: line.group, index: line.index,
                     inputs: line.inputs, args: args,
                 })): form.Run([river, storm, index].concat(args), function(msg) {
@@ -343,7 +398,7 @@ var page = Page({
             },
         }
         pane.Show = function() {
-            output.Update([river], "text", ["key", "count"], "key", true)
+            output.Update([river], "text", ["key", "count"], "key", ctx.Search("storm")||true)
         }
         pane.Next = function() {
             var next = output.querySelector("div.item.select").nextSibling
@@ -490,13 +545,17 @@ var page = Page({
                     output.Select(index), pane.which.set(line[which])
                     typeof cb == "function" && cb(line, index, event, cmds, cbs)
                 })
-                list.push(ui.last), pane.scrollBy(0, pane.scrollHeight)
+                list.push(ui.last), pane.scrollBy(0, pane.scrollHeight+100)
                 return ui
             }
             output.Update = function(cmds, type, key, which, first, cb) {
                 output.Clear(), form.Runs(cmds, function(line, index, msg) {
                     var ui = output.Append(type, line, key, which, cb)
-                    first && index == 0 && ui.first.click()
+                    if (typeof first == "string") {
+                        (line.key == first || line.name == first) && ui.first.click()
+                    } else {
+                        first && index == 0 && ui.first.click()
+                    }
                 })
             }
 
@@ -519,9 +578,27 @@ var page = Page({
         })
 
         page.onlayout(null, page.conf.layout)
-        page.footer.Order({"action": "", "text": ""}, ["action", "text"])
-        page.header.Order({"user": ""}, ["user"], function(event, item, value) {
-            page.confirm("logout?") && page.login.Exit()
+        kit.isMobile && page.action.Action["最宽"]()
+
+        page.footer.Order({"text": "", "ip": ""}, ["ip", "text"])
+        kit.isMobile && page.footer.Order({"text": "", "site": "", "ip": ""}, ["ip", "text", "site"])
+        page.header.Order({"user": "", "logout": "logout"}, ["logout", "user"], function(event, item, value) {
+            switch (item) {
+                case "title":
+                    ctx.Search({"river": page.river.which.get(), "storm": page.storm.which.get()})
+                    break
+                case "user":
+                    var name = page.prompt("new name")
+                    name && page.login.Run(["rename", name], function(msg) {
+                        page.header.State("user", name)
+                    })
+                    break
+                case "logout":
+                    page.confirm("logout?") && page.login.Exit()
+                    break
+                default:
+            }
         })
+
     },
 })

@@ -46,28 +46,35 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
-				map[string]interface{}{"componet_name": "salary", "componet_help": "salary", "componet_tmpl": "componet",
-					"componet_type": "public",
-					"componet_view": "Salary", "componet_init": "",
-					"componet_ctx": "web.chat", "componet_cmd": "salary", "componet_args": []interface{}{"@text", "@total"}, "inputs": []interface{}{
+				map[string]interface{}{"componet_name": "salary", "componet_help": "计算工资",
+					"componet_tmpl": "componet", "componet_view": "Salary", "componet_init": "",
+					"componet_type": "public", "componet_ctx": "web.chat", "componet_cmd": "salary",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"label": "total", "type": "text", "name": "text"},
 						map[string]interface{}{"label": "base", "type": "text", "name": "total"},
 					},
 				},
-				map[string]interface{}{"componet_name": "pwd", "componet_help": "pwd", "componet_tmpl": "componet",
-					"componet_type": "protected",
-					"componet_view": "FlashList", "componet_init": "initFlashList.js",
-					"componet_ctx": "nfs", "componet_cmd": "pwd", "componet_args": []interface{}{"@text"}, "inputs": []interface{}{
+				map[string]interface{}{"componet_name": "qrcode", "componet_help": "生成二维码",
+					"componet_tmpl": "componet", "componet_view": "QRCode", "componet_init": "initQRCode.js",
+					"componet_type": "public", "componet_ctx": "web.chat", "componet_cmd": "login",
+					"componet_args": []interface{}{"qrcode"}, "inputs": []interface{}{
+						map[string]interface{}{"label": "content", "type": "text", "name": "content"},
+					},
+				},
+				map[string]interface{}{"componet_name": "pwd", "componet_help": "pwd",
+					"componet_tmpl": "componet", "componet_view": "FlashList", "componet_init": "initFlashList.js",
+					"componet_type": "protected", "componet_ctx": "nfs", "componet_cmd": "pwd",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "button", "value": "当前", "click": "show"},
 						map[string]interface{}{"type": "button", "value": "所有", "click": "show"},
 						map[string]interface{}{"type": "text", "name": "text"},
 					},
 					"display_result": "", "display_append": "",
 				},
-				map[string]interface{}{"componet_name": "dir", "componet_help": "dir", "componet_tmpl": "componet",
-					"componet_type": "private",
-					"componet_view": "FlashList", "componet_init": "initFlashList.js",
-					"componet_ctx": "nfs", "componet_cmd": "dir", "componet_args": []interface{}{"@text"}, "inputs": []interface{}{
+				map[string]interface{}{"componet_name": "dir", "componet_help": "dir",
+					"componet_tmpl": "componet", "componet_view": "FlashList", "componet_init": "initFlashList.js",
+					"componet_type": "private", "componet_ctx": "nfs", "componet_cmd": "dir",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "text"},
 					},
 					"display_result": "", "display_append": "",
@@ -134,6 +141,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				return
 			}
 			switch arg[0] {
+			case "init": // 创建用户
+				if m.Confs("runtime", "user.cert") && m.Confs("runtime", "user.key") {
+					break
+				}
+				fallthrough
 			case "create": // 创建用户
 				m.Cmd("aaa.auth", "username", m.Conf("runtime", "user.name"), "delete", "node")
 				if len(arg) == 1 {
@@ -231,8 +243,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Echo("private componet of %s", m.Conf("runtime", "work.name"))
 					break
 				}
+
 				msg := m.Find(kit.Format(tool["componet_ctx"]))
-				msg.Cmd(tool["componet_cmd"], arg[4:]).CopyTo(m)
+
+				args := []string{}
+				for _, v := range kit.Trans(tool["componet_args"]) {
+					args = append(args, msg.Parse(v))
+				}
+				msg.Cmd(tool["componet_cmd"], args, arg[4:]).CopyTo(m)
 
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {

@@ -1,5 +1,8 @@
 kit = toolkit = {
     isMobile: navigator.userAgent.indexOf("Mobile") > -1,
+    isWeiXin: navigator.userAgent.indexOf("MicroMessenger") > -1,
+    isMacOSX: navigator.userAgent.indexOf("Mac OS X") > -1,
+    isIPhone: navigator.userAgent.indexOf("iPhone") > -1,
     isSpace: function(c) {
         return c == " " || c == "Enter"
     },
@@ -156,19 +159,16 @@ kit = toolkit = {
             return elm
         }
 
-        // name
-        // value
-        // inner
-        // style
-        // dataset
-        // click
+        // 基本属性: name value inner style
         //
-        // button input label
-        // 树状结构: tree, fork, leaf
-        // 普通视图: view, text, code
+        // dataset click
+        // button input label img
+        //
+        // 树状结构: tree fork leaf
+        // 普通视图: view text code
         // 加载文件: include require styles
         //
-        // 基本结构: type, data, list
+        // 基本结构: type data list
 
         var kit = this
 
@@ -227,7 +227,12 @@ kit = toolkit = {
 
             } else if (child.label) {
                 child.type = "label"
-               child.data["innerText"] = child.label
+                child.data["innerText"] = child.label
+
+            } else if (child.img) {
+                child.type = "img"
+                child.data["src"] = child.img[0]
+                child.img.length > 1 && (child.data["onload"] = child.img[1])
 
             } else if (child.tree) {
                 child.type = "ul"

@@ -1,11 +1,10 @@
-function scan(event) {
-    alert("begin scan")
+function scan(event, cb) {
     wx.scanQRCode({
-        needResult: 0,
+        needResult: 1,
         scanType: ["qrCode", "barCode"],
         desc: "what",
         success: function(res) {
-            alert(res.resultStr)
+            cb(res.resultStr)
         },
         fail: function(res) {
             alert(res.errMsg)

@@ -776,8 +776,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber: big.NewInt(1),
-							IsCA:         true,
+							SerialNumber:          big.NewInt(1),
+							IsCA:                  true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},

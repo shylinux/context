@@ -1,3 +1,14 @@
+fieldset.Login {
+    font-size:28px;
+}
+fieldset.Login input {
+    font-size:18px;
+    height:28px;
+}
+fieldset.Login button {
+    font-size:18px;
+    height:28px;
+}
 fieldset.Ocean div.create pre:hover {
     background-color:red;
 }

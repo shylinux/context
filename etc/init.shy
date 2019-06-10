@@ -6,9 +6,10 @@
     config load tmp/cert.json work flow trust
 ~wiki
     config load tmp/wiki.json wiki_visit
-
 source etc/common.shy
 ~ssh
     remote auto
+~cli
+    plugin sort.go sort
 source local.shy
 

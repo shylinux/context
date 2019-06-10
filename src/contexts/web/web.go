@@ -5,6 +5,7 @@ import (
 	"contexts/ctx"
 	"encoding/json"
 	"fmt"
+	"github.com/skip2/go-qrcode"
 	// "github.com/PuerkitoBio/goquery"
 	"github.com/go-cas/cas"
 	"html/template"
@@ -136,6 +137,10 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	if msg.Options("sessid") {
 		msg.Log("info", "sessid: %s", msg.Option("sessid"))
 		msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta")))
+		msg.Log("info", "nickname: %s", msg.Option("nickname", msg.Cmdx("aaa.auth", "username", msg.Option("username"), "data", "nickname")))
+		if !msg.Options("nickname") {
+			msg.Option("nickname", msg.Option("username"))
+		}
 	}
 
 	if !msg.Options("username") && msg.Options("relay") {
@@ -167,7 +172,9 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			// 请求环境
 			msg.Option("dir_root", msg.Cap("directory"))
 			for _, v := range r.Cookies() {
-				msg.Option(v.Name, v.Value)
+				if v.Value != "" {
+					msg.Option(v.Name, v.Value)
+				}
 			}
 
 			// 请求参数
@@ -223,10 +230,19 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			switch {
 			case msg.Has("redirect"):
 				http.Redirect(w, r, msg.Append("redirect"), http.StatusTemporaryRedirect)
+
 			case msg.Has("directory"):
 				http.ServeFile(w, r, msg.Append("directory"))
+
 			case msg.Has("componet"):
 				msg.Spawn().Add("option", "componet_group", msg.Meta["componet"]).Cmd("/render")
+
+			case msg.Has("qrcode"):
+				w.Header().Set("Content-Type", "image/png")
+				qr, e := qrcode.New(msg.Append("qrcode"), qrcode.Medium)
+				m.Assert(e)
+				m.Assert(qr.Write(256, w))
+
 			case msg.Has("append"):
 				meta := map[string]interface{}{}
 				if len(msg.Meta["result"]) > 0 {
@@ -915,7 +931,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
 				w := m.Optionv("response").(http.ResponseWriter)
 				if accept_json {
-					w.Header().Add("Content-Type", "application/json")
+					// w.Header().Add("Content-Type", "application/json")
 				} else {
 					w.Header().Add("Content-Type", "text/html")
 				}
@@ -1022,7 +1038,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					// 添加响应
-					if msg.Appends("directory") {
+					if msg.Appends("qrcode") {
+						m.Append("qrcode", msg.Append("qrcode"))
+					} else if msg.Appends("directory") {
 						m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
 						return
 					} else if accept_json {

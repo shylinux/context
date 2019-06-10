@@ -55,7 +55,9 @@ function Page(page) {
             var text = line
             switch (type) {
                 case "icon":
-                    result = [{view: ["item", "div"], list: [{type: "img", data: {src: line[key[0]]}}, {}]}]
+                    result = [{view: ["item", "div"], list: [{img: [line[key[0]], function(event) {
+                        event.target.scrollIntoView()
+                    }]}]}]
                     break
 
                 case "text":
@@ -81,28 +83,31 @@ function Page(page) {
 
                 case "plugin":
                     var id = "plugin"+page.ID()
-                    result = [{view: [text.view, "fieldset"], data: {id: id}, list: [
-                        {text: [text.name, "legend"]},
+                    result = [{name: "field", view: [text.view, "fieldset"], data: {id: id}, list: [
+                        {text: [text.name+"("+text.help+")", "legend"]},
                         {name: "option", view: ["option", "form"], data: {Run: cb}, list: [{type: "input", style: {"display": "none"}}]},
                         {name: "output", view: ["output", "div"]},
-                        {script: "Plugin("+id+","+text.inputs+","+"["+(text.args||"")+"]"+","+(text.init||"")+")"},
+                        {script: "Plugin("+id+","+text.inputs+","+"[\""+(text.args||[]).join("\",\"")+"\"]"+","+(text.init||"")+")"},
                     ]}]
                     break
             }
             if (parent.DisplayUser) {
                 ui = kit.AppendChild(parent, [{view: ["item"], list:[
-                    {view: ["user", "div", line.create_user]},
+                    {view: ["user", "div", line.create_nick]},
                     {view: ["text"], list:result}
                 ]}])
             } else {
                 ui = kit.AppendChild(parent, [{view: ["item"], list:result}])
             }
 
-            ui.last.Meta = line
+            ui.field && (ui.field.Meta = text)
             return ui
         },
         alert: function(text) {
             alert(text)
+        },
+        prompt: function(text) {
+            return prompt(text)
         },
         confirm: function(text) {
             return confirm(text)
@@ -225,7 +230,9 @@ function Page(page) {
             }
             pane.Show = function() {
                 output.innerHTML = "", kit.AppendChild(output, [
-                    {"view": ["title", "div", "shycontext"]},
+                    {"view": ["title", "div", "shycontext"], click: function(event) {
+                        cb(event, "title", "shycontext")
+                    }},
                     {"view": ["state"], list: list.map(function(item) {return {text: [state[item], "div"], click: function(event) {
                         cb(event, item, state[item])
                     }}})},
@@ -342,7 +349,7 @@ function Page(page) {
                         })
                         timer = setTimeout(loop, time)
                     }
-                    timer = setTimeout(loop, time)
+                    time && (timer = setTimeout(loop, time))
                 }
                 form.onsubmit = function(event) {
                     event.preventDefault()
@@ -377,7 +384,7 @@ function Plugin(field, inputs, args, plugin) {
     var option = field.querySelector("form.option")
     var output = field.querySelector("div.output")
 
-    function run(event) {
+    option.Runs = function(event) {
         var args = []
         option.querySelectorAll("input").forEach(function(item, index){
             item.type == "text" && args.push(item.value)
@@ -390,14 +397,14 @@ function Plugin(field, inputs, args, plugin) {
             })(msg)
         })
     }
+
     field.onclick = function(event) {
         page.plugin = field
-        page.footer.State("action", field.id)
     }
 
     var ui = kit.AppendChild(option, inputs.map(function(item, index, inputs) {
         item.type == "button"? item.onclick = function(event) {
-            plugin[item.click]? plugin[item.click](event, item, option, field): run(event)
+            plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
 
         }: (item.onkeyup = function(event) {
             page.oninput(event, function(event) {
@@ -430,7 +437,7 @@ function Plugin(field, inputs, args, plugin) {
                 }
                 return true
             })
-            event.key == "Enter" && (index == inputs.length-1? run(event): event.target.parentNode.nextSibling.childNodes[1].focus())
+            event.key == "Enter" && (index == inputs.length-1? option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus())
         }, field.Select = function() {
             ui.last.childNodes[1].focus()
         })
@@ -442,6 +449,6 @@ function Plugin(field, inputs, args, plugin) {
         show: function() {},
         init: function() {},
     }
-    plugin.init(page, page.action, field, option, output)
+    plugin.init(page, page.action, field, option, output, ui)
     page[field.id] = plugin
 }

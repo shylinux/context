@@ -9,6 +9,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -117,6 +118,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 		"chat": &ctx.Config{Name: "chat", Value: map[string]interface{}{
 			"appid": "", "appmm": "", "token": "", "site": "https://shylinux.com",
+			"auth":   "https://open.weixin.qq.com/connect/oauth2/authorize?appid=%s&redirect_uri=%s&response_type=code&scope=%s&state=STATE#wechat_redirect",
 			"access": map[string]interface{}{"token": "", "expire": 0, "url": "/cgi-bin/token?grant_type=client_credential"},
 			"ticket": map[string]interface{}{"value": "", "expire": 0, "url": "/cgi-bin/ticket/getticket?type=jsapi"},
 		}, Help: "聊天记录"},
@@ -128,21 +130,46 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		}, Help: "聊天记录"},
 	},
 	Commands: map[string]*ctx.Command{
+		"/qrcode": &ctx.Command{Name: "qrcode text", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Append("qrcode", m.Option("text"))
+			return
+		}},
 		"login": &ctx.Command{Name: "login [username password]", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 1 {
-				if m.Cmds("ssh.work", "share", arg[0]) {
-					if m.Cmds("aaa.auth", "username", arg[0], "password", arg[1]) {
-						m.Option("username", arg[0])
-						m.Copy(m.Cmd("aaa.user", "session", "select"), "result")
-						m.Option("sessid", m.Result(0))
-						if !m.Cmds("aaa.auth", "username", arg[0], "data", "chat.default") && m.Option("username") != m.Conf("runtime", "work.name") {
-							m.Cmds("aaa.auth", "username", arg[0], "data", "chat.default", m.Spawn().Cmd(".ocean", "spawn", "", m.Option("username")+"@"+m.Conf("runtime", "work.name")))
+			if len(arg) > 0 { // 非登录态
+				switch arg[0] {
+				case "weixin":
+					m.Cmdy(".js_token")
+				case "qrcode":
+					m.Append("qrcode", arg[1])
+				case "rename":
+				default:
+					if m.Cmds("ssh.work", "share", arg[0]) {
+						if m.Cmds("aaa.auth", "username", arg[0], "password", arg[1]) {
+							m.Option("username", arg[0])
+							m.Copy(m.Cmd("aaa.user", "session", "select"), "result")
+							m.Option("sessid", m.Result(0))
+							if !m.Cmds("aaa.auth", "username", arg[0], "data", "chat.default") && m.Option("username") != m.Conf("runtime", "work.name") {
+								m.Cmds("aaa.auth", "username", arg[0], "data", "chat.default", m.Spawn().Cmdx(".ocean", "spawn", "", m.Option("username")+"@"+m.Conf("runtime", "work.name")))
+							}
 						}
 					}
 				}
-			} else if m.Options("sessid") {
-				m.Echo(m.Option("username"))
 			}
+
+			// 登录检查
+			if !m.Options("sessid") && !m.Options("username") {
+				return
+			}
+			if len(arg) > 0 {
+				switch arg[0] {
+				case "rename":
+					m.Cmd("aaa.auth", "username", m.Option("username"), "data", "nickname", arg[1])
+				}
+			}
+
+			m.Append("remote_ip", m.Option("remote_ip"))
+			m.Append("nickname", m.Option("nickname"))
+			m.Echo(m.Option("username"))
 			return
 		}},
 		"ocean": &ctx.Command{Name: "ocean", Help: "海洋", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -172,6 +199,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					"conf": map[string]interface{}{
 						"create_user": m.Option("username"),
 						"create_time": m.Time(),
+						"update_time": m.Time(),
 						"name":        kit.Select("what", arg, 2),
 						"route":       kit.Select(m.Conf("runtime", "node.route"), m.Option("node.route"), arg[1] != ""),
 					},
@@ -194,6 +222,14 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			if !m.Options("sessid") || !m.Options("username") {
 				return
 			}
+
+			if m.Options("river") {
+				if m.Confs("flow", m.Option("river")) && !m.Confs("flow", []string{m.Option("river"), "user", m.Option("username")}) {
+					u := m.Cmdx("ssh._route", m.Conf("runtime", "work.route"), "_check", "work", m.Option("username"))
+					m.Conf("flow", []string{m.Option("river"), "user", m.Option("username"), "user"}, u)
+				}
+			}
+
 			if len(arg) == 0 {
 				m.Confm("flow", func(key string, value map[string]interface{}) {
 					if kit.Chain(value, []string{"user", m.Option("username")}) == nil {
@@ -204,6 +240,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					m.Add("append", "name", kit.Chains(value, "conf.name"))
 					m.Add("append", "create_user", kit.Chains(value, "conf.create_user"))
 					m.Add("append", "create_time", kit.Chains(value, "conf.create_time"))
+					m.Add("append", "update_time", kit.Chains(value, "conf.update_time"))
 
 					if list, ok := kit.Chain(value, "text.list").([]interface{}); ok {
 						m.Add("append", "count", len(list))
@@ -211,7 +248,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 						m.Add("append", "count", 0)
 					}
 				})
-				m.Table()
+				m.Sort("name").Sort("update_time", "time_r").Table()
 				return
 			}
 
@@ -224,6 +261,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					m.Add("append", "text", value["text"])
 					m.Add("append", "create_time", value["create_time"])
 					m.Add("append", "create_user", value["create_user"])
+					m.Add("append", "create_nick", value["create_nick"])
 				})
 				m.Table()
 				return
@@ -238,10 +276,13 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 				m.Conf("flow", []string{arg[1], "text.list.-2"}, map[string]interface{}{
 					"create_user": m.Option("username"),
+					"create_nick": m.Option("nickname"),
 					"create_time": m.Time(),
 					"type":        arg[2],
 					"text":        arg[3],
 				})
+
+				m.Conf("flow", []string{arg[1], "conf.update_time"}, m.Time())
 
 				count := m.Confi("flow", []string{arg[1], "text.count"}) + 1
 				m.Confi("flow", []string{arg[1], "text.count"}, count)
@@ -266,7 +307,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					m.Add("append", "key", key)
 					m.Add("append", "count", kit.Len(value["list"]))
 				})
-				m.Table()
+				m.Sort("key").Table()
 				return
 			}
 			if len(arg) == 2 {
@@ -380,18 +421,22 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			m.Option("selfname", data.ToUserName)
 
 			// 创建会话
-			if m.Option("sessid", m.Cmd("aaa.user", m.Option("username", data.FromUserName), "chat").Append("key")) == "" {
-				m.Cmd("aaa.sess", m.Option("sessid", m.Cmdx("aaa.sess", "chat", "ip", "what")), m.Option("username"), "ppid", "what")
-			}
+			m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
+			m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
 
-			// 创建空间
-			if m.Option("bench", m.Cmd("aaa.sess", m.Option("sessid"), "bench").Append("key")) == "" {
-				m.Option("bench", m.Cmdx("aaa.work", m.Option("sessid"), "chat"))
-			}
 			m.Option("current_ctx", kit.Select("chat", m.Magic("bench", "current_ctx")))
 
 			switch data.MsgType {
 			case "text":
+				m.Echo(web.Merge(m, map[string]interface{}{"path": "chat"}, m.Conf("chat", "site"), "sessid", m.Option("sessid")))
+				if !m.Cmds("aaa.auth", "username", m.Option("usernmae"), "data", "chat.default") && m.Option("username") != m.Conf("runtime", "work.name") {
+					if m.Cmds("ssh.work", "share", m.Option("username")) {
+						m.Cmd("aaa.auth", "username", m.Option("username"), "data", "nickname", "someone")
+						m.Cmds("aaa.auth", "username", m.Option("username"), "data", "chat.default", m.Spawn().Cmdx(".ocean", "spawn", "", m.Option("username")+"@"+m.Conf("runtime", "work.name")))
+					}
+				}
+				Marshal(m, "text")
+				return
 				// 执行命令
 				cmd := strings.Split(data.Content, " ")
 				if !m.Cmds("aaa.work", m.Option("bench"), "right", data.FromUserName, "chat", cmd[0]) {
@@ -440,6 +485,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			m.Append("signature", hex.EncodeToString(h[:]))
 			m.Append("appid", m.Conf("chat", "appid"))
+			m.Append("remote_ip", m.Option("remote_ip"))
+			m.Append("auth2.0", fmt.Sprintf(m.Conf("chat", "auth"), m.Conf("chat", "appid"),
+				url.QueryEscape(fmt.Sprintf("%s%s", m.Conf("chat", "site"), m.Option("index_url"))), kit.Select("snsapi_base", m.Option("scope"))))
 			return
 		}},
 		"share": &ctx.Command{Name: "share", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
