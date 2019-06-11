@@ -579,6 +579,18 @@ kit = toolkit = {
         }
         return true
     },
+    Selector: function(obj, item, cb) {
+        var list = []
+        obj.querySelectorAll(item).forEach(function(item, index) {
+            if (typeof cb == "function") {
+                var value = cb(item)
+                value && list.push(value)
+            } else {
+                list.push(item)
+            }
+        })
+        return list
+    },
 }
 
 function right(arg) {

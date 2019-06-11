@@ -2,8 +2,8 @@ function Page(page) {
     var id = 1
     var conf = {}
     var conf_cb = {}
+    var sync = {}
     page.__proto__ = {
-        sync: {},
         ID: function() {
             return id++
         },
@@ -23,7 +23,7 @@ function Page(page) {
         },
         Sync: function(m) {
             var meta = m, data = "", list = []
-            return {
+            return sync[m] || (sync[m] = {
                 change: function(cb) {
                     list.push(cb)
                     return list.length-1
@@ -48,7 +48,7 @@ function Page(page) {
                     }
                     return value
                 },
-            }
+            })
         },
         View: function(parent, type, line, key, cb) {
             var ui = {}
@@ -381,117 +381,40 @@ function Page(page) {
     }
     return page
 }
-function Plugin(field, text, args, plugin) {
-    var inputs = JSON.parse(text.inputs)
-    var exports = JSON.parse(text.exports||'["",""]')
+function Plugin(field, tool, args, plugin) {
     var option = field.querySelector("form.option")
     var output = field.querySelector("div.output")
 
-    page.sync["plugin"+exports[0]] = page.Sync("plugin"+exports[0])
-
+    var exports = JSON.parse(tool.exports||'["",""]')
+    var display = JSON.parse(tool.display||'{}')
     option.Runs = function(event) {
-        var args = []
-        option.querySelectorAll(".args").forEach(function(item, index){
-            item.type == "text" && args.push(item.value)
-            item.type == "select-one" && args.push(item.value)
-        })
-        option.Run(event, args, function(msg) {
+        option.Run(event, kit.Selector(option, ".args", function(item, index) {
+            return item.value
+        }), function(msg) {
             (option.ondaemon || function(msg) {
-                output.innerHTML = "",
-                msg.append? kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value) {
-                    page.sync["plugin"+exports[0]].set(value)
-                }) :kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
+                output.innerHTML = ""
+                !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value) {
+                    page.Sync("plugin_"+exports[0]).set(value)
+                });
+                (!display.hide_result || !msg.append) && msg.result && kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
             })(msg)
         })
     }
 
-    field.onclick = function(event) {
-        page.plugin = field
-    }
-
     var total = 0
-    field.Add = option.Add = function(item) {
+    var count = 0
+    field.Check = option.Check = function(event, index) {
+        index == total-1 || (index == total-2 && event.target.parentNode.nextSibling.childNodes[1].type == "button")?
+            option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus()
+    }
+    field.Append = option.Append = function(item) {
         var index = total
         total += 1
-        page.sync["plugin"+item.imports] || (page.sync["plugin"+item.imports] = page.Sync("plugin"+item.imports))
-        item.imports && page.sync["plugin"+item.imports].change(function(value, old) {
-            ui[item.name].value = value
-        })
 
-        switch (item.type) {
-            case "button":
-                item.onclick = function(event) {
-                    plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
-                }
-                break
-            case "select":
-                break
-            default:
-                item.onkeyup = function(event) {
-                    page.oninput(event, function(event) {
-                        switch (event.key) {
-                            case "i":
-                                var next = field.nextSibling;
-                                next && next.Select()
-                                break
-                            case "o":
-                                var prev = field.previousSibling;
-                                prev && prev.Select()
-                                break
-                            case "c":
-                                output.innerHTML = ""
-                                break
-                            case "r":
-                                output.innerHTML = ""
-                            case "j":
-                                run(event)
-                                break
-                            case "l":
-                                page.action.scrollTo(0, option.parentNode.offsetTop)
-                                break
-                            case "m":
-                                page.View(field.parentNode, "plugin", field.Meta, [], option.Run)
-                                event.stopPropagation()
-                                break
-                            case "b":
-                                option.Add({})
-                                break
-                            default:
-                                return false
-                        }
-                        return true
-                    })
-                    event.key == "Enter" && (index == total-1? option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus())
-                    event.key == "Enter" && (index == total-2 && event.target.parentNode.nextSibling.childNodes[1].type == "button" ? option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus())
-                }
+        item.onfocus = function(event) {
+            page.plugin = field
         }
-                    // , field.Select = function() {
-                    //     // ui.last.childNodes[1].focus()
-                    // })
-
-        item.className = "args"
-        var ui = kit.AppendChild(option, [{type: "div", list: [{type: "label", inner: item.label||""},
-            item.type == "select"? {type: "select", name: item.name, data: {className: "args", onchange: function(event) {
-                (index == total-1? option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus());
-                (index == total-2 && event.target.parentNode.nextSibling.childNodes[1].type == "button" ? option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus())
-
-            }}, list: item.values.map(function(value) {
-                return {type: "option", value: value, inner: value}
-            })}: {type: "input", name: item.name, data: item}]}])
-    }
-
-    inputs.map(function(item, index, inputs) {
-        option.Add(item)
-    })
-
-/*
-    var ui = kit.AppendChild(option, inputs.map(function(item, index, inputs) {
-        
-        total += 1
-        item.type == "button"? item.onclick = function(event) {
-            plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
-
-        }: (item.onkeyup = function(event) {
+        item.onkeyup = function(event) {
             page.oninput(event, function(event) {
                 switch (event.key) {
                     case "i":
@@ -517,19 +440,51 @@ function Plugin(field, text, args, plugin) {
                         page.View(field.parentNode, "plugin", field.Meta, [], option.Run)
                         event.stopPropagation()
                         break
+                    case "b":
+                        option.Append({})
+                        break
                     default:
                         return false
                 }
                 return true
             })
-            event.key == "Enter" && (index == inputs.length-1? option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus())
-        }, field.Select = function() {
-            ui.last.childNodes[1].focus()
+            event.key == "Enter" && option.Check(event, index)
+        }
+
+        var input = {type: "input", name: item.name, data: item}
+        switch (item.type) {
+            case "button":
+                item.onclick = function(event) {
+                    plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
+                }
+                break
+
+            case "select":
+                input = {type: "select", name: item.name, data: {className: "args", onchange: function(event) {
+                    option.Check(event, index)
+
+                }}, list: item.values.map(function(value) {
+                    return {type: "option", value: value, inner: value}
+                })}
+                args && count < args.length && (item.value = args[count++])
+                break
+
+            default:
+                args && count < args.length && (item.value = args[count++])
+                item.className = "args"
+        }
+
+        var ui = kit.AppendChild(option, [{type: "div", list: [{type: "label", inner: item.label||""}, input]}])
+
+        item.imports && page.Sync(item.imports).change(function(value, old) {
+            ui[item.name].value = value
         })
-        return {type: "div", list: [{type: "label", inner: item.label||""}, {type: "input", name: item.name, data: item, value: args && args[index]}]}
-    }))
-    ui.last.childNodes[1].focus()
-*/
+    }
+
+    var inputs = JSON.parse(tool.inputs)
+    inputs.map(function(item, index, inputs) {
+        option.Append(item)
+    })
 
     plugin = plugin || {}, plugin.__proto__ = {
         show: function() {},
