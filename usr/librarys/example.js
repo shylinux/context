@@ -396,7 +396,7 @@ function Plugin(field, tool, args, plugin) {
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value) {
                     page.Sync("plugin_"+exports[0]).set(value)
                 });
-                (!display.hide_result || !msg.append) && msg.result && kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
+                (display.display_result || !msg.append) && msg.result && kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
             })(msg)
         })
     }
