@@ -1123,6 +1123,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"args":   []interface{}{"-C", "@git_dir"},
 			"info":   map[string]interface{}{"cmds": []interface{}{"log", "status", "branch"}},
 			"branch": map[string]interface{}{"args": []interface{}{"branch", "-v"}},
+			"commit": map[string]interface{}{"args": []interface{}{"commit", "-am"}},
 			"status": map[string]interface{}{"args": []interface{}{"status", "-sb"}},
 			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "limit", "--reverse", "pretty", "date"}},
 			"trans": map[string]interface{}{
