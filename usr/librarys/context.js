@@ -6,7 +6,19 @@ ctx = context = {
         }
         this.GET("", option, function(msg) {
             msg = msg && msg[0]
-            msg && (msg.__proto__ = (page || {}))
+            // msg && (msg.__proto__ = (page || {}))
+            msg.Result = msg.result? msg.result.join(""): ""
+            msg.Results = function() {
+                var s = msg.Result
+                s = s.replace(/</g, "&lt;")
+                s = s.replace(/>/g, "&gt;")
+                s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
+                s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
+                s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
+                s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
+                s = s.replace(/\033\[m/g, "</span>")
+                return s
+            }
             typeof cb == "function" && cb(msg || {})
         })
     },

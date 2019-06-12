@@ -31,6 +31,22 @@ fieldset div.output div.item:hover {
 fieldset div.output div.item.select {
     background-color:red;
 }
+fieldset div.output div.code {
+    color:white;
+    font-size:14px;
+    font-family:monospace;
+    background-color:#272822;
+    white-space:pre;
+    padding:10px;
+    overflow:auto;
+    border:solid 3px green;
+}
+fieldset div.output div.code span.red {
+    color:red;
+}
+fieldset div.output div.code span.green {
+    color:green;
+}
 
 fieldset.toast {
     background-color:#ffffff00;

@@ -464,7 +464,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"spide": &ctx.Command{Name: "spide [which [client|cookie [name [value]]]]", Help: "爬虫配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
-				m.Cmdy("ctx.config", "spide")
+				m.Confm("spide", func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "protocol", kit.Chains(value, "client.protocol"))
+					m.Add("append", "hostname", kit.Chains(value, "client.hostname"))
+					m.Add("append", "path", kit.Chains(value, "client.path"))
+				})
+				m.Sort("key").Table()
 			case 1:
 				m.Cmdy("ctx.config", "spide", arg[0])
 			case 2:
