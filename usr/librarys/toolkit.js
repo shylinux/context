@@ -563,11 +563,18 @@ kit = toolkit = {
         obj.querySelectorAll(item).forEach(function(item, index) {
             if (typeof cb == "function") {
                 var value = cb(item)
-                value && list.push(value)
+                value != undefined && list.push(value)
             } else {
                 list.push(item)
             }
         })
+        for (var i = list.length-1; i >= 0; i--) {
+            if (list[i] == "") {
+                list.pop()
+            } else {
+                break
+            }
+        }
         return list
     },
 }

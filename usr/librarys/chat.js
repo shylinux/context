@@ -21,8 +21,8 @@ var page = Page({
         page.storm.Size(sizes.storm, height)
 
         sizes.action == undefined && (sizes.action = page.action.clientHeight)
-        sizes.source == undefined && (sizes.source = page.source.clientHeight)
-        sizes.action == -1 && (sizes.action = height, sizes.source = 0)
+        sizes.source == undefined && (sizes.source = page.source.clientHeight);
+        (sizes.action == -1 || sizes.source == 0) && (sizes.action = height, sizes.source = 0)
         width -= page.river.offsetWidth+page.storm.offsetWidth
         page.action.Size(width, sizes.action)
         page.source.Size(width, sizes.source)
@@ -391,8 +391,20 @@ var page = Page({
             "全屏": function(event, value) {
                 page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})
             },
+            "添加": function(event, value) {
+                page.plugin && page.plugin.Clone()
+            },
+            "删除": function(event, value) {
+                page.plugin && page.plugin.Clear()
+            },
+            "加参": function(event, value) {
+                page.plugin.Append({})
+            },
+            "去参": function(event, value) {
+                page.input && page.plugin.Remove(page.input)
+            },
         }
-        return {"button": ["恢复", "缩小", "放大", "最高", "最宽", "最大", "全屏"], "action": pane.Action}
+        return {"button": ["恢复", "缩小", "放大", "最高", "最宽", "最大", "全屏", "br", "添加", "删除", "加参", "去参"], "action": pane.Action}
     },
     initStorm: function(page, pane, form, output) {
         var river = "", index = -1
@@ -568,11 +580,15 @@ var page = Page({
                 if (conf && conf["button"]) {
                     var buttons = []
                     conf.button.forEach(function(value, index) {
-                        buttons.push({"button": [value, function(event) {
-                            typeof conf["action"] == "function" && conf["action"](value, event)
-                            typeof conf["action"] == "object" && conf["action"][value](event, value)
-                            pane.Button = value
-                        }]})
+                        if (value == "br") {
+                            buttons.push({type: "br"})
+                        } else {
+                            buttons.push({"button": [value, function(event) {
+                                typeof conf["action"] == "function" && conf["action"](value, event)
+                                typeof conf["action"] == "object" && conf["action"][value](event, value)
+                                pane.Button = value
+                            }]})
+                        }
                     })
                     kit.InsertChild(pane, output, "div", buttons).className = "action "+form.dataset.componet_name
                 } else if (conf) {
@@ -586,7 +602,7 @@ var page = Page({
         kit.isMobile && page.action.Action["最宽"]()
         ctx.Search("layout") && page.action.Action[ctx.Search("layout")]()
 
-        page.footer.Order({"text": "", "ip": ""}, ["ip", "text"])
+        page.footer.Order({"text": "", "ip": "", ".": "", ":":""}, ["ip", "text", ":", "."])
         kit.isMobile && page.footer.Order({"text": "", "site": "", "ip": ""}, ["ip", "text", "site"])
         page.header.Order({"user": "", "logout": "logout"}, ["logout", "user"], function(event, item, value) {
             switch (item) {

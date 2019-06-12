@@ -1127,11 +1127,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"commit": map[string]interface{}{"args": []interface{}{"commit", "-am"}},
 			"branch": map[string]interface{}{"args": []interface{}{"branch", "-v"}},
 			"status": map[string]interface{}{"args": []interface{}{"status", "-sb"}},
-			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "limit", "--reverse", "pretty", "date"}},
+			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "@page.limit", "--skip", "@page.offset", "pretty", "date"}},
 			"trans": map[string]interface{}{
 				"date":   "--date=format:%m/%d %H:%M",
 				"pretty": "--pretty=format:%h %ad %an %s",
-				"limit":  "10",
 			},
 		}, Help: "命令集合"},
 		"paths": &ctx.Config{Name: "paths", Value: []interface{}{"var", "usr", "etc", "bin", ""}, Help: "文件路径"},
@@ -1245,7 +1244,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Assert(e)
 				m.Option("git_dir", wd)
 			}
-			m.Log("fuck", "what %v", arg[0])
 
 			cmds := []string{}
 			if v := m.Confv("git", []string{arg[0], "cmds"}); v != nil {
@@ -1264,8 +1262,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				args = append(args, arg[1:]...)
 
 				for i, _ := range args {
-					args[i] = m.Parse(args[i])
-					args[i] = kit.Select(args[i], m.Conf("git", []string{"trans", args[i]}))
+					v := m.Parse(args[i])
+					if v == args[i] || v == "" {
+						args[i] = kit.Select(args[i], m.Conf("git", []string{"trans", args[i]}))
+					} else {
+						args[i] = v
+					}
 				}
 
 				m.Cmd("cli.system", "git", args).Echo("\n\n").CopyTo(m)
