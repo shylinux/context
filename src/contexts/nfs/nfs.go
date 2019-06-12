@@ -1237,7 +1237,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return
 			}
 
-			if p := m.Cmdx("nfs.path", arg[0]); p != "" {
+			if p := m.Cmdx("nfs.path", arg[0]); p != "" && !m.Confs("git", arg[0]) {
 				m.Option("git_dir", p)
 				arg = arg[1:]
 			} else {
@@ -1245,6 +1245,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Assert(e)
 				m.Option("git_dir", wd)
 			}
+			m.Log("fuck", "what %v", arg[0])
 
 			cmds := []string{}
 			if v := m.Confv("git", []string{arg[0], "cmds"}); v != nil {
