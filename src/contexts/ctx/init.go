@@ -1417,6 +1417,8 @@ func Start(args ...string) bool {
 	}
 
 	Pulse.Option("routine", 0)
+	Pulse.Option("page.limit", 10)
+	Pulse.Option("page.offset", 0)
 	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
 		return Index.Close(Pulse, args...)
 	}

@@ -677,6 +677,24 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 				return
 			}},
 
+		"clip": &ctx.Command{Name: "clip", Help: "授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			h := m.Cmdx("aaa.auth", "username", m.Option("username"))
+
+			if len(arg) == 0 { // 会话列表
+				m.Cmdy("aaa.config", "auth", h+".data.clip")
+				return
+			}
+
+			switch arg[0] {
+			case "clear":
+				m.Conf("auth", []string{h, "data", "clip"}, []interface{}{})
+			default:
+				m.Conf("auth", []string{h, "data", "clip", kit.Select("-2", arg, 1)}, arg[0])
+				m.Echo("%d", len(m.Confv("auth", []string{h, "data", "clip"}).([]interface{}))-1)
+			}
+			return
+		}},
+
 		"relay": &ctx.Command{Name: "relay check hash | share role", Help: "授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 { // 会话列表
 				m.Cmdy("aaa.auth", "relay")

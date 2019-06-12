@@ -21,8 +21,8 @@ var page = Page({
         page.storm.Size(sizes.storm, height)
 
         sizes.action == undefined && (sizes.action = page.action.clientHeight)
-        sizes.source == undefined && (sizes.source = page.source.clientHeight)
-        sizes.action == -1 && (sizes.action = height, sizes.source = 0)
+        sizes.source == undefined && (sizes.source = page.source.clientHeight);
+        (sizes.action == -1 || sizes.source == 0) && (sizes.action = height, sizes.source = 0)
         width -= page.river.offsetWidth+page.storm.offsetWidth
         page.action.Size(width, sizes.action)
         page.source.Size(width, sizes.source)
@@ -369,30 +369,42 @@ var page = Page({
 
         var toggle = true
         pane.Action = {
-            "恢复": function(event) {
+            "恢复": function(event, value) {
                 page.onlayout(event, page.conf.layout)
             },
-            "缩小": function(event) {
+            "缩小": function(event, value) {
                 page.onlayout(event, {action:60, source:60})
             },
-            "放大": function(event) {
+            "放大": function(event, value) {
                 page.onlayout(event, {action:300, source:60})
             },
-            "最高": function(event) {
+            "最高": function(event, value) {
                 page.onlayout(event, {action: -1})
             },
-            "最宽": function(event) {
+            "最宽": function(event, value) {
                 page.onlayout(event, {river:0, storm:0})
             },
-            "最大": function(event) {
+            "最大": function(event, value) {
                 (toggle = !toggle)? page.onlayout(event, page.conf.layout): page.onlayout(event, {river:0, action:-1, source:60})
                 page.target.Stop = !toggle
             },
-            "全屏": function(event) {
+            "全屏": function(event, value) {
                 page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})
             },
+            "添加": function(event, value) {
+                page.plugin && page.plugin.Clone()
+            },
+            "删除": function(event, value) {
+                page.plugin && page.plugin.Clear()
+            },
+            "加参": function(event, value) {
+                page.plugin.Append({})
+            },
+            "去参": function(event, value) {
+                page.input && page.plugin.Remove(page.input)
+            },
         }
-        return {"button": ["恢复", "缩小", "放大", "最高", "最宽", "最大", "全屏"], "action": pane.Action}
+        return {"button": ["恢复", "缩小", "放大", "最高", "最宽", "最大", "全屏", "br", "添加", "删除", "加参", "去参"], "action": pane.Action}
     },
     initStorm: function(page, pane, form, output) {
         var river = "", index = -1
@@ -568,10 +580,15 @@ var page = Page({
                 if (conf && conf["button"]) {
                     var buttons = []
                     conf.button.forEach(function(value, index) {
-                        buttons.push({"button": [value, function(event) {
-                            typeof conf["action"] == "function" && conf["action"](value, event)
-                            typeof conf["action"] == "object" && conf["action"][value](event)
-                        }]})
+                        if (value == "br") {
+                            buttons.push({type: "br"})
+                        } else {
+                            buttons.push({"button": [value, function(event) {
+                                typeof conf["action"] == "function" && conf["action"](value, event)
+                                typeof conf["action"] == "object" && conf["action"][value](event, value)
+                                pane.Button = value
+                            }]})
+                        }
                     })
                     kit.InsertChild(pane, output, "div", buttons).className = "action "+form.dataset.componet_name
                 } else if (conf) {
@@ -583,13 +600,14 @@ var page = Page({
 
         page.onlayout(null, page.conf.layout)
         kit.isMobile && page.action.Action["最宽"]()
+        ctx.Search("layout") && page.action.Action[ctx.Search("layout")]()
 
-        page.footer.Order({"text": "", "ip": ""}, ["ip", "text"])
+        page.footer.Order({"text": "", "ip": "", ".": "", ":":""}, ["ip", "text", ":", "."])
         kit.isMobile && page.footer.Order({"text": "", "site": "", "ip": ""}, ["ip", "text", "site"])
         page.header.Order({"user": "", "logout": "logout"}, ["logout", "user"], function(event, item, value) {
             switch (item) {
                 case "title":
-                    ctx.Search({"river": page.river.which.get(), "storm": page.storm.which.get()})
+                    ctx.Search({"river": page.river.which.get(), "storm": page.storm.which.get(), "layout": page.action.Button})
                     break
                 case "user":
                     var name = page.prompt("new name")

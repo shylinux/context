@@ -1599,28 +1599,31 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 			msg.TryCatch(msg, true, func(msg *Message) {
 				msg.Log("cmd", "%s %s %v %v", c.Name, key, arg, msg.Meta["option"])
 
-				if args := []string{}; x.Form != nil {
-					for i := 0; i < len(arg); i++ {
-						if n, ok := x.Form[arg[i]]; ok {
-							if n < 0 {
-								n += len(arg) - i
-							}
-							for j := i + 1; j <= i+n && j < len(arg); j++ {
-								if _, ok := x.Form[arg[j]]; ok {
-									n = j - i - 1
+				for _, form := range []map[string]int{map[string]int{"page.limit": 1, "page.offset": 1}, x.Form} {
+
+					if args := []string{}; form != nil {
+						for i := 0; i < len(arg); i++ {
+							if n, ok := form[arg[i]]; ok {
+								if n < 0 {
+									n += len(arg) - i
 								}
-							}
-							if i+1+n > len(arg) {
-								msg.Add("option", arg[i], arg[i+1:])
+								for j := i + 1; j <= i+n && j < len(arg); j++ {
+									if _, ok := form[arg[j]]; ok {
+										n = j - i - 1
+									}
+								}
+								if i+1+n > len(arg) {
+									msg.Add("option", arg[i], arg[i+1:])
+								} else {
+									msg.Add("option", arg[i], arg[i+1:i+1+n])
+								}
+								i += n
 							} else {
-								msg.Add("option", arg[i], arg[i+1:i+1+n])
+								args = append(args, arg[i])
 							}
-							i += n
-						} else {
-							args = append(args, arg[i])
 						}
+						arg = args
 					}
-					arg = args
 				}
 
 				target := msg.target

@@ -345,69 +345,48 @@ kit = toolkit = {
     },
     RangeTable: function(table, index, sort_asc) {
         var list = table.querySelectorAll("tr")
-        var new_list = []
 
-        var is_time = true
-        var is_number = true
+        var is_time = true, is_number = true
         for (var i = 1; i < list.length; i++) {
-            var value = Date.parse(list[i].childNodes[index].innerText)
+            var text = list[i].childNodes[index].innerText
+            var value = Date.parse(text)
             if (!(value > 0)) {
                 is_time = false
             }
 
-            var value = parseInt(list[i].childNodes[index].innerText)
-            if (!(value >= 0 || value <= 0)) {
+            var value = parseInt(text)
+            if (text != "" && !(value >= 0 || value <= 0)) {
                 is_number = false
             }
-
-            new_list.push(list[i])
         }
 
-        var sort_order = ""
-        if (is_time) {
-            if (sort_asc) {
-                method = function(a, b) {return Date.parse(a) > Date.parse(b)}
-                sort_order = "time"
+        var num_list = [], new_list = []
+        for (var i = 1; i < list.length; i++) {
+            var text = list[i].childNodes[index].innerText
+            if (is_time) {
+                num_list.push(Date.parse(text))
+            } else if (is_number) {
+                num_list.push(parseInt(text) || 0)
             } else {
-                method = function(a, b) {return Date.parse(a) < Date.parse(b)}
-                sort_order = "time_r"
-            }
-        } else if (is_number) {
-            if (sort_asc) {
-                method = function(a, b) {return parseInt(a) > parseInt(b)}
-                sort_order = "int"
-            } else {
-                method = function(a, b) {return parseInt(a) < parseInt(b)}
-                sort_order = "int_r"
-            }
-        } else {
-            if (sort_asc) {
-                method = function(a, b) {return a > b}
-                sort_order = "str"
-            } else {
-                method = function(a, b) {return a < b}
-                sort_order = "str_r"
-            }
-        }
-
-        list = new_list
-        new_list = []
-        for (var i = 0; i < list.length; i++) {
-            list[i].parentElement && list[i].parentElement.removeChild(list[i])
-            for (var j = i+1; j < list.length; j++) {
-                if (typeof method == "function" && method(list[i].childNodes[index].innerText, list[j].childNodes[index].innerText)) {
-                    var temp = list[i]
-                    list[i] = list[j]
-                    list[j] = temp
-                }
+                num_list.push(text)
             }
             new_list.push(list[i])
         }
 
         for (var i = 0; i < new_list.length; i++) {
+            for (var j = i+1; j < new_list.length; j++) {
+                if (sort_asc? num_list[i] < num_list[j]: num_list[i] > num_list[j]) {
+                    var temp = num_list[i]
+                    num_list[i] = num_list[j]
+                    num_list[j] = temp
+                    var temp = new_list[i]
+                    new_list[i] = new_list[j]
+                    new_list[j] = temp
+                }
+            }
+            new_list[i].parentElement && new_list[i].parentElement.removeChild(new_list[i])
             table.appendChild(new_list[i])
         }
-        return sort_order
     },
     OrderTable: function(table, field, cb) {
         if (!table) {return}
@@ -584,11 +563,18 @@ kit = toolkit = {
         obj.querySelectorAll(item).forEach(function(item, index) {
             if (typeof cb == "function") {
                 var value = cb(item)
-                value && list.push(value)
+                value != undefined && list.push(value)
             } else {
                 list.push(item)
             }
         })
+        for (var i = list.length-1; i >= 0; i--) {
+            if (list[i] == "") {
+                list.pop()
+            } else {
+                break
+            }
+        }
         return list
     },
 }

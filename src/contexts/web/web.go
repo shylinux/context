@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/skip2/go-qrcode"
+	"strconv"
 	// "github.com/PuerkitoBio/goquery"
 	"github.com/go-cas/cas"
 	"html/template"
@@ -63,7 +64,8 @@ func merge(m *ctx.Message, uri string, arg ...string) string {
 		if value == "" {
 			query.Del(arg[i])
 		} else {
-			query.Set(arg[i], value)
+			// query.Set(arg[i], value)
+			query.Add(arg[i], value)
 		}
 	}
 	add.RawQuery = query.Encode()
@@ -464,7 +466,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"spide": &ctx.Command{Name: "spide [which [client|cookie [name [value]]]]", Help: "爬虫配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
-				m.Cmdy("ctx.config", "spide")
+				m.Confm("spide", func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "protocol", kit.Chains(value, "client.protocol"))
+					m.Add("append", "hostname", kit.Chains(value, "client.hostname"))
+					m.Add("append", "path", kit.Chains(value, "client.path"))
+				})
+				m.Sort("key").Table()
 			case 1:
 				m.Cmdy("ctx.config", "spide", arg[0])
 			case 2:
@@ -567,9 +575,19 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							var data interface{}
 							for k, v := range uuu.Query() {
 								if len(v) == 1 {
-									data = kit.Chain(data, k, v[0])
+									if i, e := strconv.Atoi(v[0]); e == nil {
+										data = kit.Chain(data, k, i)
+									} else {
+										data = kit.Chain(data, k, v[0])
+									}
 								} else {
-									data = kit.Chain(data, k, v)
+									for _, val := range v {
+										if i, e := strconv.Atoi(v[0]); e == nil {
+											data = kit.Chain(data, []string{k, "-2"}, i)
+										} else {
+											data = kit.Chain(data, []string{k, "-2"}, val)
+										}
+									}
 								}
 							}
 

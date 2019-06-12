@@ -396,7 +396,7 @@ function Plugin(field, tool, args, plugin) {
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value) {
                     page.Sync("plugin_"+exports[0]).set(value)
                 });
-                (display.display_result || !msg.append) && msg.result && kit.AppendChild(output, [{type: "code", list: [{text: [msg.result.join(""), "pre"]}]}])
+                (display.show_result || !msg.append) && msg.result && kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}])
             })(msg)
         })
     }
@@ -407,12 +407,28 @@ function Plugin(field, tool, args, plugin) {
         index == total-1 || (index == total-2 && event.target.parentNode.nextSibling.childNodes[1].type == "button")?
             option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus()
     }
+    field.Clone = option.Clone = function() {
+        page.View(field.parentNode, "plugin", field.Meta, [], option.Run)
+    }
+    field.Clear = option.Clear = function() {
+        field.parentNode && field.parentNode.removeChild(field)
+    }
+    field.Remove = option.Remove = function(who) {
+        who.parentNode && who.parentNode.removeChild(who)
+    }
+    field.Select = option.Select = function(who) {
+        page.plugin = field
+        page.footer.State(".", field.id)
+    }
     field.Append = option.Append = function(item) {
         var index = total
         total += 1
 
         item.onfocus = function(event) {
             page.plugin = field
+            page.input = event.target
+            page.footer.State(".", field.id)
+            page.footer.State(":", index)
         }
         item.onkeyup = function(event) {
             page.oninput(event, function(event) {
@@ -476,6 +492,8 @@ function Plugin(field, tool, args, plugin) {
 
         var ui = kit.AppendChild(option, [{type: "div", list: [{type: "label", inner: item.label||""}, input]}])
 
+        page.plugin = field
+        page.input = ui[item.name]
         item.imports && page.Sync(item.imports).change(function(value, old) {
             ui[item.name].value = value
         })
