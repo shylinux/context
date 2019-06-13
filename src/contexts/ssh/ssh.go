@@ -66,6 +66,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "clip",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"label": "content", "type": "text", "name": "content"},
+						map[string]interface{}{"type": "button", "value": "运行"},
 					},
 				},
 			},
