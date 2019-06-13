@@ -413,8 +413,8 @@ var page = Page({
                 pane.which.set(""), river = value, pane.Show()
             },
         }
-        pane.Show = function() {
-            output.Update([river], "text", ["key", "count"], "key", ctx.Search("storm")||true)
+        pane.Show = function(which) {
+            output.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
         }
         pane.Next = function() {
             var next = output.querySelector("div.item.select").nextSibling
@@ -502,8 +502,7 @@ var page = Page({
 
                 form.Run(cmd, function(msg) {
                     pane.Show()
-                    page.storm.Show()
-                    page.storm.which.set(ui.name.value, true)
+                    page.storm.Show(ui.name.value)
                 })
             }]}, {name: "list", view: ["list", "table"]},
         ]}])
@@ -512,8 +511,7 @@ var page = Page({
             pane.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", form.Run([river], function(msg) {
                 kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, pod, i, tr, event) {
                     var old = table.querySelector("tr.select")
-                    tr.className = "select", old && (old.className = "normal")
-                    form.Run([river, pod.key], function(msg) {
+                    tr.className = "select", old && (old.className = "normal"), form.Run([river, pod.key], function(msg) {
                         device.innerHTML = "", kit.AppendTable(device, ctx.Table(msg), ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                             var last = kit.AppendChild(ui.list, [{type: "tr", list: [
                                 {text: [com.key, "td"]}, {text: [com.index, "td"]}, {text: [com.name, "td"]}, {text: [com.help, "td"]},

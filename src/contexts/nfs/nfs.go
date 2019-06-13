@@ -1275,24 +1275,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
-		"temp": &ctx.Command{Name: "temp data", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			h, _ := kit.Hash("uniq")
-			name := fmt.Sprintf("var/tmp/file/%s", h)
-
-			m.Assert(os.MkdirAll("var/tmp/file/", 0777))
-			f, e := os.Create(name)
-			m.Assert(e)
-			defer f.Close()
-			f.Write([]byte(arg[0]))
-
-			m.Echo(name)
-			return
-		}},
-		"trash": &ctx.Command{Name: "trash file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			os.Remove(arg[0])
-			return
-		}},
-
 		"hash": &ctx.Command{Name: "hash filename", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			dir, name := path.Split(arg[0])
 			m.Append("dir", dir)
@@ -1308,6 +1290,21 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Echo(hex.EncodeToString(h[:]))
 				}
 			}
+			return
+		}},
+		"path": &ctx.Command{Name: "path filename", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				return
+			}
+
+			m.Confm("paths", func(index int, value string) bool {
+				p := path.Join(value, arg[0])
+				if _, e := os.Stat(p); e == nil {
+					m.Echo(p)
+					return true
+				}
+				return false
+			})
 			return
 		}},
 		"copy": &ctx.Command{Name: "copy to from", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -1330,19 +1327,21 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			m.Echo(arg[0])
 			return
 		}},
-		"path": &ctx.Command{Name: "path filename", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				return
-			}
+		"temp": &ctx.Command{Name: "temp data", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			h, _ := kit.Hash("uniq")
+			name := fmt.Sprintf("var/tmp/file/%s", h)
 
-			m.Confm("paths", func(index int, value string) bool {
-				p := path.Join(value, arg[0])
-				if _, e := os.Stat(p); e == nil {
-					m.Echo(p)
-					return true
-				}
-				return false
-			})
+			m.Assert(os.MkdirAll("var/tmp/file/", 0777))
+			f, e := os.Create(name)
+			m.Assert(e)
+			defer f.Close()
+			f.Write([]byte(arg[0]))
+
+			m.Echo(name)
+			return
+		}},
+		"trash": &ctx.Command{Name: "trash file", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			os.Remove(arg[0])
 			return
 		}},
 

@@ -401,114 +401,117 @@ function Plugin(field, tool, args, plugin) {
         })
     }
 
-    var total = 0
-    var count = 0
-    field.Check = option.Check = function(event, index) {
-        index == total-1 || (index == total-2 && event.target.parentNode.nextSibling.childNodes[1].type == "button")?
-            option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus()
-    }
-    field.Clone = option.Clone = function() {
-        page.View(field.parentNode, "plugin", field.Meta, [], option.Run)
-    }
-    field.Clear = option.Clear = function() {
-        field.parentNode && field.parentNode.removeChild(field)
-    }
-    field.Remove = option.Remove = function(who) {
-        who.parentNode && who.parentNode.removeChild(who)
-    }
-    field.Select = option.Select = function(who) {
-        page.plugin = field
-        page.footer.State(".", field.id)
-    }
-    field.Append = option.Append = function(item) {
-        var index = total
-        total += 1
-
-        item.onfocus = function(event) {
-            page.plugin = field
-            page.input = event.target
-            page.footer.State(".", field.id)
-            page.footer.State(":", index)
-        }
-        item.onkeyup = function(event) {
-            page.oninput(event, function(event) {
-                switch (event.key) {
-                    case "i":
-                        var next = field.nextSibling;
-                        next && next.Select()
-                        break
-                    case "o":
-                        var prev = field.previousSibling;
-                        prev && prev.Select()
-                        break
-                    case "c":
-                        output.innerHTML = ""
-                        break
-                    case "r":
-                        output.innerHTML = ""
-                    case "j":
-                        run(event)
-                        break
-                    case "l":
-                        page.action.scrollTo(0, option.parentNode.offsetTop)
-                        break
-                    case "m":
-                        page.View(field.parentNode, "plugin", field.Meta, [], option.Run)
-                        event.stopPropagation()
-                        break
-                    case "b":
-                        option.Append({})
-                        break
-                    default:
-                        return false
-                }
-                return true
+    var total = 0, count = 0
+    plugin = plugin || {}, plugin.__proto__ = {
+        show: function() {},
+        init: function() {},
+        Clone: function() {
+            field.Meta.args = kit.Selector(option, ".args", function(item, index) {
+                return item.value
             })
-            event.key == "Enter" && option.Check(event, index)
-        }
+            page.View(field.parentNode, "plugin", field.Meta, [], option.Run)
+        },
+        Clear: function() {
+            field.parentNode && field.parentNode.removeChild(field)
+        },
+        Check: function(event, index) {
+            index == total-1 || (index == total-2 && event.target.parentNode.nextSibling.childNodes[1].type == "button")?
+                option.Runs(event): event.target.parentNode.nextSibling.childNodes[1].focus()
+        },
+        Remove: function(who) {
+            who.parentNode && who.parentNode.removeChild(who)
+        },
+        Append: function(item, name) {
+            var index = total
+            total += 1
+            name = name || item.name
 
-        var input = {type: "input", name: item.name, data: item}
-        switch (item.type) {
-            case "button":
-                item.onclick = function(event) {
-                    plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
-                }
-                break
+            item.onfocus = function(event) {
+                page.plugin = plugin
+                page.input = event.target
+                page.footer.State(".", field.id)
+                page.footer.State(":", index)
+            }
+            item.onkeyup = function(event) {
+                page.oninput(event, function(event) {
+                    switch (event.key) {
+                        case "i":
+                            var next = field.nextSibling;
+                            next && next.Select()
+                            break
+                        case "o":
+                            var prev = field.previousSibling;
+                            prev && prev.Select()
+                            break
+                        case "c":
+                            output.innerHTML = ""
+                            break
+                        case "r":
+                            output.innerHTML = ""
+                        case "j":
+                            run(event)
+                            break
+                        case "l":
+                            page.action.scrollTo(0, option.parentNode.offsetTop)
+                            break
+                        case "m":
+                            plugin.Clone()
+                            break
+                        case "b":
+                            plugin.Append(item, "args"+total).focus()
+                            break
+                        default:
+                            return false
+                    }
+                    return true
+                })
+                event.key == "Enter" && plugin.Check(event, index)
+            }
 
-            case "select":
-                input = {type: "select", name: item.name, data: {className: "args", onchange: function(event) {
-                    option.Check(event, index)
+            var input = {type: "input", name: name, data: item}
+            switch (item.type) {
+                case "button":
+                    item.onclick = function(event) {
+                        plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
+                    }
+                    break
 
-                }}, list: item.values.map(function(value) {
-                    return {type: "option", value: value, inner: value}
-                })}
-                args && count < args.length && (item.value = args[count++])
-                break
+                case "select":
+                    input = {type: "select", name: name, data: {className: "args", onchange: function(event) {
+                        plugin.Check(event, index)
 
-            default:
-                args && count < args.length && (item.value = args[count++])
-                item.className = "args"
-        }
+                    }}, list: item.values.map(function(value) {
+                        return {type: "option", value: value, inner: value}
+                    })}
+                    args && count < args.length && (item.value = args[count++])
+                    break
 
-        var ui = kit.AppendChild(option, [{type: "div", list: [{type: "label", inner: item.label||""}, input]}])
+                default:
+                    args && count < args.length && (item.value = args[count++])
+                    item.className = "args"
+            }
 
-        page.plugin = field
-        page.input = ui[item.name]
-        item.imports && page.Sync(item.imports).change(function(value, old) {
-            ui[item.name].value = value
-        })
+            var ui = kit.AppendChild(option, [{type: "div", list: [{type: "label", inner: item.label||""}, input]}])
+
+            page.plugin = field
+            page.input = ui[name]
+            index == 0 && ui[name] && ui[name].focus && ui[name].focus()
+            item.imports && page.Sync(item.imports).change(function(value, old) {
+                ui[name].value = value
+            })
+            return ui[name]
+        },
+        Select: function() {
+            page.plugin = field
+            page.footer.State(".", field.id)
+        },
     }
 
     var inputs = JSON.parse(tool.inputs)
     inputs.map(function(item, index, inputs) {
-        option.Append(item)
+        plugin.Append(item)
     })
 
-    plugin = plugin || {}, plugin.__proto__ = {
-        show: function() {},
-        init: function() {},
-    }
-    // plugin.init(page, page.action, field, option, output, ui)
     plugin.init(page, page.action, field, option, output)
     page[field.id] = plugin
 }
