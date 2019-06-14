@@ -394,6 +394,9 @@ function Plugin(field, tool, args, plugin) {
             (option.ondaemon || function(msg) {
                 output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value) {
+                    if (exports.length > 2) {
+                        value = option[exports[2]].value + "/" + value
+                    }
                     page.Sync("plugin_"+exports[0]).set(value)
                 });
                 (display.show_result || !msg.append) && msg.result && kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}])
@@ -487,7 +490,7 @@ function Plugin(field, tool, args, plugin) {
                     break
 
                 default:
-                    args && count < args.length && (item.value = args[count++])
+                    args && count < args.length && (item.value = args[count++]||item.value||"")
                     item.className = "args"
             }
 

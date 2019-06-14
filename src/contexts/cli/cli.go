@@ -5,6 +5,7 @@ import (
 	"contexts/ctx"
 	"encoding/csv"
 	"encoding/json"
+	"os/user"
 	"path"
 	"toolkit"
 
@@ -168,6 +169,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				_, file := path.Split(name)
 				m.Conf("runtime", "boot.pathname", file)
 			}
+			if user, e := user.Current(); e == nil {
+				ns := strings.Split(user.Username, "\\")
+				m.Conf("runtime", "boot.USER", ns[len(ns)-1])
+				m.Conf("runtime", "boot.username", ns[len(ns)-1])
+			}
 			m.Confm("runtime", "init_env", func(index int, key string) {
 				if value := os.Getenv(key); value != "" {
 					m.Conf("runtime", "boot."+key, kit.Select("", value, value != "-"))
@@ -178,6 +184,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"compile": &ctx.Command{Name: "compile", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
 				m.Cmdy("cli.quit", 1)
+			}
+			return
+		}},
+		"publish": &ctx.Command{Name: "publish", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if user, e := user.Current(); e == nil {
+				ns := strings.Split(user.Username, "\\")
+				m.Conf("runtime", "boot.username", ns[len(ns)-1])
+				m.Echo("%v--\n", ns)
+				m.Echo("%v--\n", ns[len(ns)-1])
 			}
 			return
 		}},
