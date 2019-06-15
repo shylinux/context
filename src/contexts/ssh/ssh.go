@@ -204,7 +204,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Conf("runtime", "node.name", strings.Replace(strings.TrimSuffix(m.Conf("runtime", "boot.hostname"), ".local"), ".", "_", -1))
 			}
 			m.Conf("runtime", "node.route", m.Conf("runtime", "node.name"))
-			m.Conf("runtime", "user.name", m.Conf("runtime", "boot.USER"))
+			m.Conf("runtime", "user.name", m.Conf("runtime", "boot.username"))
 
 			m.Cmd("aaa.role", "tech", "componet", "remote", "command", "tool")
 			m.Cmd("aaa.role", "tech", "componet", "source", "command", "tool")

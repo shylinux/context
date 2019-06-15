@@ -33,7 +33,7 @@ install() {
 }
 main() {
     while true; do
-        ${ctx_bin} "$@" 2>${ctx_log}/boot.log && break
+        ${ctx_bin} "$@" && break
         log "restarting..." && sleep 3
     done
 }

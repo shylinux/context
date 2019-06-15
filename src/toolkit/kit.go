@@ -17,23 +17,22 @@ import (
 )
 
 var DisableLog = false
-func Errorf(str string, args ...interface{}) {
-	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", str)
-		return
-	}
-	fmt.Fprintf(os.Stderr, str, args...)
-}
+
 func Log(action string, str string, args ...interface{}) {
 	if DisableLog {
 		return
 	}
-	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "%s", str)
-	} else {
-		fmt.Fprintf(os.Stderr, str, args...)
+
+	if len(args) > 0 {
+		str = fmt.Sprintf(str, args...)
 	}
-	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s: %s\n", action, str)
+}
+func Errorf(str string, args ...interface{}) {
+	Log("error", str, args...)
+}
+func Debugf(str string, args ...interface{}) {
+	Log("debug", str, args...)
 }
 
 func Env(key string) {

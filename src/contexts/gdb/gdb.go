@@ -80,11 +80,12 @@ func (gdb *GDB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return gdb
 }
 func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
-	gdb.goon = make(chan os.Signal, 10)
+	m.Cmd("nfs.save", m.Conf("logpid"), os.Getpid())
 	gdb.wait = make(chan interface{}, 10)
+	gdb.goon = make(chan os.Signal, 10)
 
 	m.Confm("signal", func(sig string, action string) {
-		m.Log("error", "signal add %s %s", sig, action)
+		m.Log("signal", "add %s: %s", action, sig)
 		signal.Notify(gdb.goon, syscall.Signal(kit.Int(sig)))
 	})
 
@@ -92,7 +93,8 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 		select {
 		case sig := <-gdb.goon:
 			action := m.Conf("signal", sig)
-			m.Log("signal", "signal %v %v", sig, action)
+			m.Log("signal", "%v: %v", action, sig)
+			break
 			switch action {
 			case "segv":
 			case "quit":
@@ -119,11 +121,43 @@ func (gdb *GDB) Close(m *ctx.Message, arg ...string) bool {
 var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
+		"logpid": &ctx.Config{Name: "logpid", Value: "var/run/bench.pid", Help: ""},
 		"signal": &ctx.Config{Name: "signal", Value: map[string]interface{}{
-			"3":  "quit",
-			"10": "restart",
-			"11": "segv",
-			"12": "upgrade",
+			"1":  "HUP",
+			"2":  "INT",
+			"3":  "QUIT",
+			"15": "TERM",
+			"28": "WINCH",
+			"30": "USR1",
+			"31": "USR2",
+
+			// "9":  "KILL",
+			// "10": "BUS",
+			// "11": "SEGV",
+			// "17": "STOP",
+
+			"5":  "TRAP",
+			"6":  "ABRT",
+			"14": "ALRM",
+			"20": "CHLD",
+			"19": "CONT",
+			"18": "TSTP",
+			"21": "TTIN",
+			"22": "TTOUT",
+
+			"13": "PIPE",
+			"16": "URG",
+			"23": "IO",
+
+			"4":  "ILL",
+			"7":  "EMT",
+			"8":  "FPE",
+			"12": "SYS",
+			"24": "XCPU",
+			"25": "XFSZ",
+			"26": "VTALRM",
+			"27": "PROF",
+			"29": "INFO",
 		}, Help: "信号"},
 		"debug": &ctx.Config{Name: "debug", Value: map[string]interface{}{"value": map[string]interface{}{"enable": false},
 			"trace": map[string]interface{}{"value": map[string]interface{}{"enable": true}},

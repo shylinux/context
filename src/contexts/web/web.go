@@ -486,7 +486,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					if arg[2] == "new" {
-						if uri, e := url.Parse(arg[3]); e == nil {
+						if uri, e := url.Parse(arg[3]); e == nil && arg[3] != "" {
 							dir, file := path.Split(uri.EscapedPath())
 							m.Confv("spide", arg[0], map[string]interface{}{
 								"cookie": map[string]interface{}{},
@@ -1154,12 +1154,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/publish/": &ctx.Command{Name: "/publish/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			key = strings.TrimPrefix(key, "/publish/")
 			if strings.HasSuffix(key, "bench") {
-				key = key+"."+m.Option("GOOS")+"."+m.Option("GOARCH")
+				key = key + "." + m.Option("GOOS") + "." + m.Option("GOARCH")
 			}
 
 			p := m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
 			if p == "" {
-				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", strings.Replace(key, ".", "_", -1) }))
+				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", strings.Replace(key, ".", "_", -1)}))
 			}
 
 			m.Log("info", "publish %s %s", kit.Hashs(p), p)

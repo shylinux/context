@@ -136,8 +136,6 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		"_init": &ctx.Command{Name: "_init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Conf("runtime", "node.cert", m.Cmdx("nfs.load", os.Getenv("node_cert")))
 			m.Conf("runtime", "node.key", m.Cmdx("nfs.load", os.Getenv("node_key")))
-			m.Conf("runtime", "user.cert", m.Cmdx("nfs.load", os.Getenv("user_cert")))
-			m.Conf("runtime", "user.key", m.Cmdx("nfs.load", os.Getenv("user_key")))
 			return
 		}},
 		"hash": &ctx.Command{Name: "hash [meta...]", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -794,8 +792,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber:          big.NewInt(1),
-							IsCA:                  true,
+							SerialNumber: big.NewInt(1),
+							IsCA:         true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},

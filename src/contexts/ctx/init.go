@@ -3,7 +3,6 @@ package ctx
 import (
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -22,18 +21,15 @@ func (ctx *CTX) Spawn(m *Message, c *Context, arg ...string) Server {
 	return s
 }
 func (ctx *CTX) Begin(m *Message, arg ...string) Server {
-	m.Sess(m.target.Name, m)
-	m.target.root = m.target
-	m.root = m
-	m.Cap("begin_time", m.Time())
-	m.Cap("goos", runtime.GOOS)
 	m.Option("log.disable", true)
 	m.Option("page.limit", 10)
 	m.Option("page.offset", 0)
 	m.Option("routine", 0)
+
+	m.root = m
+	m.Sess(m.target.Name, m)
 	for _, msg := range m.Search("") {
-		msg.target.root = m.target
-		if msg.target == m.target {
+		if msg.target.root = m.target; msg.target == m.target {
 			continue
 		}
 		msg.target.Begin(msg, arg...)
@@ -46,13 +42,17 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	if m.Optionv("ps_target", Index); len(arg) == 0 {
 		Pulse.Option("log.disable", false)
 		m.Cap("stream", "shy")
+		m.Cmd("log._init")
+		m.Cmd("gdb._init")
+		m.Cmd("yac._init")
+		return false
 		m.Cmd("cli.source", m.Conf("system", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("system", "script.exit"))
 	} else {
 		for _, v := range m.Spawn().Cmd(arg).Meta["result"] {
 			fmt.Printf("%s", v)
 		}
 	}
-	m.Cmd("ctx.exit")
+	m.Cmd("ctx._exit")
 	return true
 }
 func (ctx *CTX) Close(m *Message, arg ...string) bool {
@@ -102,14 +102,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 	},
 	Commands: map[string]*Command{
 		"_init": &Command{Name: "_init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			for _, x := range []string{"cli", "yac", "nfs", "aaa", "log", "ssh", "web", "gdb"} {
+			for _, x := range []string{"cli", "nfs", "aaa", "ssh", "web"} {
 				m.Cmd(x + "._init")
 			}
 			return
 		}},
-		"exit": &Command{Name: "exit", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+		"_exit": &Command{Name: "_exit", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			for _, x := range []string{"cli"} {
-				m.Cmd(x + ".exit")
+				m.Cmd(x + "._exit")
 			}
 			return
 		}},

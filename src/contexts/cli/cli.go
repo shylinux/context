@@ -106,9 +106,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"ctx_box", "ctx_cas", "ctx_dev",
 				"ctx_root", "ctx_home",
 				"web_port", "ssh_port",
-				"HOSTNAME", "USER", "PWD",
 			},
-			"boot":     map[string]interface{}{
+			"boot": map[string]interface{}{
 				"web_port": ":9094",
 				"ssh_port": ":9090",
 			},
@@ -213,7 +212,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Conf("runtime", "boot.username", kit.Select(name, os.Getenv("USER")))
 			}
 			if name, e := os.Getwd(); e == nil {
-				_, file := path.Split(name)
+				_, file := path.Split(kit.Select(name, os.Getenv("PWD")))
 				m.Conf("runtime", "boot.pathname", file)
 			}
 			return
@@ -536,7 +535,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				p := m.Cmdx("nfs.path", m.Conf("compile", "bench"))
 				if m.Cmdy("cli.system", env, "go", "build", "-o", path.Join(m.Conf("publish", "path"), name), p); m.Result(0) == "" {
 					m.Append("bin", name)
-					m.Append("hash",kit.Hashs(p))
+					m.Append("hash", kit.Hashs(p))
 					m.Table()
 				}
 			}
@@ -583,12 +582,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
-		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Confm("daemon", func(key string, info map[string]interface{}) {
-				m.Cmd("cli.system", key, "stop")
-			})
-			return
-		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmd("cli.source", m.Conf("system", "script.exit"))
 			m.Append("directory", "")
@@ -597,6 +590,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.GoFunc(m, func(m *ctx.Message) {
 				time.Sleep(time.Second * 1)
 				os.Exit(kit.Int(kit.Select("0", arg, 0)))
+			})
+			return
+		}},
+		"_exit": &ctx.Command{Name: "_exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Confm("daemon", func(key string, info map[string]interface{}) {
+				m.Cmd("cli.system", key, "stop")
 			})
 			return
 		}},

@@ -865,7 +865,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 	if len(arg) > 0 && arg[0] == "scan" {
 		// 终端用户
-		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.USER")))
+		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.username")))
 
 		// 创建会话
 		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
@@ -918,7 +918,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				msg := m.Backs(m.Spawn(m.Source()).Set(
 					"detail", line).Set(
 					"option", "file_pos", i).Set(
-					"option", "username", m.Conf("runtime", "boot.USER")))
+					"option", "username", m.Conf("runtime", "boot.username")))
 
 				nfs.printf(m.Conf("prompt"), line)
 				nfs.printf(msg.Meta["result"])
@@ -1369,16 +1369,21 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			if len(arg) == 1 && m.Has("data") {
 				arg = append(arg, m.Option("data"))
 			}
-			if p, f, e := open(m, kit.Format(arg[0]), os.O_WRONLY|os.O_CREATE|os.O_TRUNC); m.Assert(e) {
-				defer f.Close()
-				m.Append("directory", p)
-				m.Echo(p)
 
+			dir := path.Dir(arg[0])
+			if _, e = os.Stat(dir); e != nil {
+				m.Assert(os.MkdirAll(dir, 0777))
+			}
+
+			if f, e := os.Create(arg[0]); m.Assert(e) {
+				defer f.Close()
 				for _, v := range arg[1:] {
 					n, e := fmt.Fprint(f, v)
 					m.Assert(e)
-					m.Log("info", "save %s %d", p, n)
+					m.Log("info", "save %s %d", arg[0], n)
 				}
+				m.Append("directory", arg[0])
+				m.Echo(arg[0])
 			}
 			return
 		}},

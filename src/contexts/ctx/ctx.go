@@ -62,15 +62,16 @@ type Context struct {
 }
 
 func (c *Context) Register(s *Context, x Server, args ...interface{}) {
-	if c.contexts == nil {
-		c.contexts = make(map[string]*Context)
-	}
 	force := false
 	if len(args) > 0 {
 		switch arg := args[0].(type) {
 		case bool:
 			force = arg
 		}
+	}
+
+	if c.contexts == nil {
+		c.contexts = make(map[string]*Context)
 	}
 	if x, ok := c.contexts[s.Name]; ok && !force {
 		panic(errors.New(c.Name + "上下文中已存在模块:" + x.Name))
@@ -114,12 +115,12 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	c.exit = make(chan bool, 3)
 
 	/*
-	m.Log("begin", "%d context %v %v", m.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
-	for k, x := range c.Configs {
-		if x.Hand != nil {
-			m.Log("begin", "%s config %v", k, m.Conf(k, x.Value))
+		m.Log("begin", "%d context %v %v", m.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
+		for k, x := range c.Configs {
+			if x.Hand != nil {
+				m.Log("begin", "%s config %v", k, m.Conf(k, x.Value))
+			}
 		}
-	}
 	*/
 
 	if c.Server != nil {
