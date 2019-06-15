@@ -4,8 +4,6 @@ import (
 	"contexts/ctx"
 	"contexts/web"
 	"fmt"
-	"net/http"
-	"os"
 	"path"
 	"plugin"
 	"strconv"
@@ -271,22 +269,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"maps": map[string]interface{}{"baidu": "<a href='baidumap://map/direction?region=&origin=&destination=%s'>%s</a>"},
 		}, Help: "闪存"},
 
-		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
-			"system": []interface{}{"exit_shy", "common_shy", "init_shy", "bench", "boot_sh"},
-			"portal": []interface{}{"code_tmpl", "code_js", "context_js"},
-			"file": map[string]interface{}{
-				"node_sh":    "bin/node.sh",
-				"boot_sh":    "bin/boot.sh",
-				"bench":      "bin/bench.new",
-				"init_shy":   "etc/init.shy",
-				"common_shy": "etc/common.shy",
-				"exit_shy":   "etc/exit.shy",
-
-				"code_tmpl":  "usr/template/code/code.tmpl",
-				"code_js":    "usr/librarys/code.js",
-				"context_js": "usr/librarys/context.js",
-			},
-		}, Help: "日志地址"},
 		"counter": &ctx.Config{Name: "counter", Value: map[string]interface{}{
 			"nopen": "0", "nsave": "0",
 		}, Help: "counter"},
@@ -517,67 +499,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			return
 		}},
 
-		"update": &ctx.Command{Name: "update", Help: "更新代码", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			return
-		}},
-		"/upgrade/": &ctx.Command{Name: "/upgrade/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			p := m.Cmdx("nfs.path", key)
-			if strings.HasSuffix(key, "/bench") {
-				bench := m.Cmdx("nfs.path", key+"."+m.Option("GOOS")+"."+m.Option("GOARCH"))
-				if _, e := os.Stat(bench); e == nil {
-					p = bench
-				}
-			}
-
-			if _, e = os.Stat(p); e != nil {
-				list := strings.Split(key, "/")
-				p = m.Cmdx("nfs.path", m.Conf("upgrade", []string{"file", list[len(list)-1]}))
-			}
-
-			m.Log("info", "upgrade %s %s", p, m.Cmdx("aaa.hash", "file", p))
-			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
-			return
-		}},
-		"upgrade": &ctx.Command{Name: "upgrade system|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				m.Cmdy("ctx.config", "upgrade")
-				return
-			}
-
-			if m.Confs("upgrade", arg[0]) {
-				key, arg = arg[0], arg[1:]
-				m.Confm("upgrade", key, func(index int, value string) {
-					arg = append(arg, value)
-				})
-			}
-
-			restart := false
-			for _, link := range arg {
-				if file := m.Conf("upgrade", []string{"file", link}); file != "" {
-					dir := path.Dir(file)
-					if _, e = os.Stat(dir); e != nil {
-						e = os.Mkdir(dir, 0777)
-						m.Assert(e)
-					}
-					if m.Cmd("web.get", "dev", fmt.Sprintf("code/upgrade/%s", link),
-						"GOOS", m.Conf("runtime", "host.GOOS"), "GOARCH", m.Conf("runtime", "host.GOARCH"),
-						"save", file); strings.HasPrefix(file, "bin/") {
-						if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
-							m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
-							m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
-						}
-					}
-					restart = true
-				} else {
-					m.Cmdy("web.get", "dev", fmt.Sprintf("code/upgrade/script/%s", link), "save", fmt.Sprintf("usr/script/%s", link))
-				}
-			}
-
-			if restart {
-				m.Cmd("cli.quit", 1)
-			}
-			return
-		}},
 		"/counter": &ctx.Command{Name: "/counter", Help: "/counter", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 {
 				m.Option("name", arg[0])

@@ -5,13 +5,13 @@ import (
 	"contexts/ctx"
 	"encoding/csv"
 	"encoding/json"
+	"os/exec"
 	"os/user"
 	"path"
 	"toolkit"
 
 	"fmt"
 	"os"
-	"os/exec"
 	"plugin"
 	"regexp"
 	"runtime"
@@ -100,35 +100,19 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "终端数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
-			"bench": "src/examples/app/bench.go",
-			"env":   []interface{}{"GOPATH", "PATH"},
-		}, Help: "运行环境"},
-		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
-			"list": map[string]interface{}{
-				"boot_sh":    "bin/boot.sh",
-				"node_sh":    "bin/node.sh",
-				"init_shy":   "etc/init.shy",
-				"exit_shy":   "etc/exit.shy",
-				"common_shy": "etc/common.shy",
-			},
-			"path": "usr/publish",
-		}, Help: "运行环境"},
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
-			"init_env": []interface{}{"ctx_cas", "ctx_dev", "ctx_box", "ctx_root", "ctx_home", "web_port", "ssh_port", "USER"},
-			"boot":     map[string]interface{}{"web_port": ":9094", "ssh_port": ":9090"},
+			"init_env": []interface{}{
+				"ctx_log", "ctx_app", "ctx_bin",
+				"ctx_box", "ctx_cas", "ctx_dev",
+				"ctx_root", "ctx_home",
+				"web_port", "ssh_port",
+				"HOSTNAME", "USER", "PWD",
+			},
+			"boot":     map[string]interface{}{
+				"web_port": ":9094",
+				"ssh_port": ":9090",
+			},
 		}, Help: "运行环境"},
-
-		"plugin": &ctx.Config{Name: "plugin", Value: map[string]interface{}{
-			"go": map[string]interface{}{
-				"build": []interface{}{"go", "build", "-buildmode=plugin"},
-				"next":  []interface{}{"so", "load"},
-			},
-			"so": map[string]interface{}{
-				"load": []interface{}{"load"},
-			},
-		}, Help: "免密登录"},
-
 		"system": &ctx.Config{Name: "system", Value: map[string]interface{}{
 			"timeout": "60s",
 			"env":     map[string]interface{}{},
@@ -144,7 +128,48 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"init": "etc/init.shy", "exit": "etc/exit.shy",
 			},
 		}, Help: "系统环境, shell: path, cmd, arg, dir, env, active, daemon; "},
-		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "系统命令超时"},
+		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "守护任务"},
+		"action": &ctx.Config{Name: "action", Value: map[string]interface{}{}, Help: "交互任务"},
+
+		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
+			"bench": "src/examples/app/bench.go",
+			"env":   []interface{}{"GOPATH", "PATH"},
+		}, Help: "运行环境"},
+		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
+			"path": "usr/publish", "list": map[string]interface{}{
+				"boot_sh":    "bin/boot.sh",
+				"node_sh":    "bin/node.sh",
+				"init_shy":   "etc/init.shy",
+				"common_shy": "etc/common.shy",
+				"exit_shy":   "etc/exit.shy",
+			},
+		}, Help: "运行环境"},
+		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
+			"system": []interface{}{"boot_sh", "node_sh", "init_shy", "common_shy", "exit_shy"},
+			"portal": []interface{}{"code_tmpl", "code_js", "context_js"},
+			"list": map[string]interface{}{
+				"bench":      "bin/bench.new",
+				"boot_sh":    "bin/boot.sh",
+				"node_sh":    "bin/node.sh",
+				"init_shy":   "etc/init.shy",
+				"common_shy": "etc/common.shy",
+				"exit_shy":   "etc/exit.shy",
+
+				"code_tmpl":  "usr/template/code/code.tmpl",
+				"code_js":    "usr/librarys/code.js",
+				"context_js": "usr/librarys/context.js",
+			},
+		}, Help: "日志地址"},
+
+		"plugin": &ctx.Config{Name: "plugin", Value: map[string]interface{}{
+			"go": map[string]interface{}{
+				"build": []interface{}{"go", "build", "-buildmode=plugin"},
+				"next":  []interface{}{"so", "load"},
+			},
+			"so": map[string]interface{}{
+				"load": []interface{}{"load"},
+			},
+		}, Help: "免密登录"},
 
 		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
@@ -167,83 +192,33 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}, Help: "启动脚本"},
 	},
 	Commands: map[string]*ctx.Command{
-		"_init": &ctx.Command{Name: "_init", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "环境初始化", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
 			m.Conf("runtime", "host.GOOS", runtime.GOOS)
 			m.Conf("runtime", "host.pid", os.Getpid())
 			runtime.GOMAXPROCS(1)
 
-			if name, e := os.Hostname(); e == nil {
-				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))
-			}
-			if name, e := os.Getwd(); e == nil {
-				_, file := path.Split(name)
-				m.Conf("runtime", "boot.pathname", file)
-			}
-			if user, e := user.Current(); e == nil {
-				ns := strings.Split(user.Username, "\\")
-				m.Conf("runtime", "boot.USER", ns[len(ns)-1])
-				m.Conf("runtime", "boot.username", ns[len(ns)-1])
-			}
 			m.Confm("runtime", "init_env", func(index int, key string) {
 				if value := os.Getenv(key); value != "" {
 					m.Conf("runtime", "boot."+key, kit.Select("", value, value != "-"))
 				}
 			})
-			return
-		}},
-		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 0 && arg[0] == "self" {
-				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
-					m.Cmdy("cli.quit", 1)
-				}
-				return
+
+			if name, e := os.Hostname(); e == nil {
+				m.Conf("runtime", "boot.hostname", kit.Select(name, os.Getenv("HOSTNAME")))
 			}
-
-			if len(arg) > 0 && arg[0] == "all" {
-				m.Cmd("cli.compile", "linux", "386")
-				m.Cmd("cli.compile", "linux", "amd64")
-				m.Cmd("cli.compile", "linux", "arm")
-				m.Cmd("cli.compile", "windows", "386")
-				m.Cmd("cli.compile", "windows", "amd64")
-				m.Cmd("cli.compile", "darwin", "amd64")
-				return
+			if user, e := user.Current(); e == nil {
+				ns := strings.Split(user.Username, "\\")
+				name := ns[len(ns)-1]
+				m.Conf("runtime", "boot.username", kit.Select(name, os.Getenv("USER")))
 			}
-
-			if len(arg) > 0 {
-				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
-				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
-				name := strings.Join([]string{"bench", goos, arch}, ".")
-
-				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch}
-				m.Confm("compile", "env", func(index int, key string) {
-					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
-				})
-
-				if m.Cmdy("cli.system", env, "go", "build", "-o", path.Join(m.Conf("publish", "path"), name),
-					m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
-					m.Echo("bin: %s", name)
-				}
+			if name, e := os.Getwd(); e == nil {
+				_, file := path.Split(name)
+				m.Conf("runtime", "boot.pathname", file)
 			}
 			return
 		}},
-		"publish": &ctx.Command{Name: "publish", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			p := m.Conf("publish", "path")
-			m.Assert(os.MkdirAll(p, 0777))
-
-			m.Confm("publish", "list", func(key string, value string) {
-				m.Cmd("nfs.copy", path.Join(p, key), m.Cmdx("nfs.path", value))
-			})
-			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "template.tar.gz"), "usr/template")
-			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "librarys.tar.gz"), "usr/librarys")
-			return
-		}},
-		"pushhub": &ctx.Command{Name: "pushhub", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.system", "git", "commit", "-am", arg[0])
-			m.Cmd("cli.system", "git", "push")
-			return
-		}},
-		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"runtime": &ctx.Command{Name: "runtime [host|boot|node|user|work [name [value]]]", Help: "运行环境", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "runtime")
 				return
@@ -278,67 +253,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					return
 				}
 				m.Echo(arg[1])
-			}
-			return
-		}},
-		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Confm("daemon", func(key string, info map[string]interface{}) {
-				m.Cmd("cli.system", key, "stop")
-			})
-			return
-		}},
-		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.source", m.Conf("system", "script.exit"))
-			m.Append("directory", "")
-			m.Echo("1s restarting...")
-
-			m.GoFunc(m, func(m *ctx.Message) {
-				time.Sleep(time.Second * 1)
-				os.Exit(kit.Int(kit.Select("0", arg, 0)))
-			})
-			return
-		}},
-
-		"plugin": &ctx.Command{Name: "plugin [action] file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			suffix, action, target := "go", "build", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/examples/app/bench.go")
-			if len(arg) == 0 {
-				arg = append(arg, target)
-			}
-			if cs := strings.Split(arg[0], "."); len(cs) > 1 {
-				suffix = cs[len(cs)-1]
-			} else if cs := strings.Split(arg[1], "."); len(cs) > 1 {
-				suffix, action, arg = cs[len(cs)-1], arg[0], arg[1:]
-			}
-
-			if target = m.Cmdx("nfs.path", arg[0]); target == "" {
-				target = m.Cmdx("nfs.path", path.Join("src/plugin/", arg[0]))
-			}
-
-			for suffix != "" && action != "" {
-				m.Log("info", "%v %v %v", suffix, action, target)
-				cook := m.Confv("plugin", suffix)
-				next := strings.Replace(target, "."+suffix, "."+kit.Chains(cook, "next.0"), -1)
-
-				args := []string{}
-				if suffix == "so" {
-					if p, e := plugin.Open(target); m.Assert(e) {
-						s, e := p.Lookup("Index")
-						m.Assert(e)
-						w := *(s.(**ctx.Context))
-						w.Name = kit.Select(w.Name, arg, 1)
-						c.Register(w, nil)
-						m.Spawn(w).Cmd("_init", arg[1:])
-					}
-				} else {
-					if suffix == "go" {
-						args = append(args, "-o", next)
-					}
-					m.Assert(m.Cmd("cli.system", kit.Chain(cook, action), args, target))
-				}
-
-				suffix = kit.Chains(cook, "next.0")
-				action = kit.Chains(cook, "next.1")
-				target = next
 			}
 			return
 		}},
@@ -585,6 +499,151 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
+
+		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 && arg[0] == "self" {
+				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+					m.Cmdy("cli.quit", 1)
+				}
+				return
+			}
+
+			if len(arg) > 0 && arg[0] == "all" {
+				m.Cmdy("cli.compile", "linux", "386")
+				m.Cmdy("cli.compile", "linux", "amd64")
+				m.Cmdy("cli.compile", "linux", "arm")
+				m.Cmdy("cli.compile", "windows", "386")
+				m.Cmdy("cli.compile", "windows", "amd64")
+				m.Cmdy("cli.compile", "darwin", "amd64")
+				m.Set("result").Table()
+				return
+			}
+
+			if len(arg) > 0 {
+				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
+				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
+				name := strings.Join([]string{"bench", goos, arch}, ".")
+
+				wd, _ := os.Getwd()
+				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch, "cmd_env",
+					"cmd_env", "GOTMPDIR", path.Join(wd, "var/tmp"),
+					"cmd_env", "GOCACHE", path.Join(wd, "var/tmp"),
+				}
+				m.Confm("compile", "env", func(index int, key string) {
+					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
+				})
+
+				p := m.Cmdx("nfs.path", m.Conf("compile", "bench"))
+				if m.Cmdy("cli.system", env, "go", "build", "-o", path.Join(m.Conf("publish", "path"), name), p); m.Result(0) == "" {
+					m.Append("bin", name)
+					m.Append("hash",kit.Hashs(p))
+					m.Table()
+				}
+			}
+			return
+		}},
+		"publish": &ctx.Command{Name: "publish", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			p := m.Conf("publish", "path")
+			m.Assert(os.MkdirAll(p, 0777))
+
+			m.Confm("publish", "list", func(key string, value string) {
+				m.Cmd("nfs.copy", path.Join(p, key), m.Cmdx("nfs.path", value))
+			})
+			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "template.tar.gz"), "usr/template")
+			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "librarys.tar.gz"), "usr/librarys")
+			return
+		}},
+		"upgrade": &ctx.Command{Name: "upgrade bench|system|extend|plugin|portal|client|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmdy("ctx.config", "upgrade")
+				return
+			}
+
+			restart := false
+			for _, link := range kit.View([]string{arg[0]}, m.Confm("upgrade")) {
+				file := kit.Select(link, m.Conf("upgrade", []string{"list", strings.Replace(link, ".", "_", -1)}))
+
+				if m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", link),
+					"GOOS", m.Conf("runtime", "host.GOOS"), "GOARCH", m.Conf("runtime", "host.GOARCH"),
+					"save", file); strings.HasPrefix(file, "bin/") {
+					if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
+						m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
+						m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
+						file = "bin/bench"
+					}
+					restart = true
+				}
+				m.Add("append", "hash", kit.Hashs(file))
+				m.Add("append", "file", file)
+			}
+			m.Table()
+
+			if restart {
+				m.Cmd("cli.quit", 1)
+			}
+			return
+		}},
+		"exit": &ctx.Command{Name: "exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Confm("daemon", func(key string, info map[string]interface{}) {
+				m.Cmd("cli.system", key, "stop")
+			})
+			return
+		}},
+		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("cli.source", m.Conf("system", "script.exit"))
+			m.Append("directory", "")
+			m.Echo("wait 1s, restarting...")
+
+			m.GoFunc(m, func(m *ctx.Message) {
+				time.Sleep(time.Second * 1)
+				os.Exit(kit.Int(kit.Select("0", arg, 0)))
+			})
+			return
+		}},
+
+		"plugin": &ctx.Command{Name: "plugin [action] file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			suffix, action, target := "go", "build", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/examples/app/bench.go")
+			if len(arg) == 0 {
+				arg = append(arg, target)
+			}
+			if cs := strings.Split(arg[0], "."); len(cs) > 1 {
+				suffix = cs[len(cs)-1]
+			} else if cs := strings.Split(arg[1], "."); len(cs) > 1 {
+				suffix, action, arg = cs[len(cs)-1], arg[0], arg[1:]
+			}
+
+			if target = m.Cmdx("nfs.path", arg[0]); target == "" {
+				target = m.Cmdx("nfs.path", path.Join("src/plugin/", arg[0]))
+			}
+
+			for suffix != "" && action != "" {
+				m.Log("info", "%v %v %v", suffix, action, target)
+				cook := m.Confv("plugin", suffix)
+				next := strings.Replace(target, "."+suffix, "."+kit.Chains(cook, "next.0"), -1)
+
+				args := []string{}
+				if suffix == "so" {
+					if p, e := plugin.Open(target); m.Assert(e) {
+						s, e := p.Lookup("Index")
+						m.Assert(e)
+						w := *(s.(**ctx.Context))
+						w.Name = kit.Select(w.Name, arg, 1)
+						c.Register(w, nil)
+						m.Spawn(w).Cmd("_init", arg[1:])
+					}
+				} else {
+					if suffix == "go" {
+						args = append(args, "-o", next)
+					}
+					m.Assert(m.Cmd("cli.system", kit.Chain(cook, action), args, target))
+				}
+
+				suffix = kit.Chains(cook, "next.0")
+				action = kit.Chains(cook, "next.1")
+				target = next
+			}
+			return
+		}},
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("dir", "", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
@@ -618,6 +677,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if !strings.HasPrefix(text, "sess") && m.Options("remote") {
 				text = m.Current(text)
 			}
+			kit.Log("fuck", "what %v", text)
 
 			// 解析代码片段
 			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {

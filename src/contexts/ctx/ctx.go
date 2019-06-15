@@ -113,17 +113,18 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	m.source.sessions = append(m.source.sessions, m)
 	c.exit = make(chan bool, 3)
 
+	/*
 	m.Log("begin", "%d context %v %v", m.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
 	for k, x := range c.Configs {
 		if x.Hand != nil {
 			m.Log("begin", "%s config %v", k, m.Conf(k, x.Value))
 		}
 	}
+	*/
 
 	if c.Server != nil {
 		c.Server.Begin(m, m.Meta["detail"]...)
 	}
-
 	return c
 }
 func (c *Context) Start(m *Message, arg ...string) bool {
@@ -1201,6 +1202,9 @@ func (m *Message) Gdb(arg ...interface{}) interface{} {
 	return nil
 }
 func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
+	if m.Options("log.disable") {
+		return m
+	}
 
 	if l := m.Sess("log", false); l != nil {
 		if log, ok := l.target.Server.(LOGGER); ok {

@@ -1,23 +1,24 @@
 #! /bin/bash
 
-export ctx_dev=${ctx_dev:="https://shylinux.com"}
-export ctx_root="/usr/local/context"
-export ctx_home=~/context
-
-ctx_bin="bench" && [ -e bin/bench ] && ctx_bin=bin/bench
-export ctx_bin
+ctx_log=${ctx_log:="var/log"}
+ctx_app=${ctx_app:="bench"}
+ctx_bin=${ctx_app} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}
+# ctx_box=
+ctx_dev=${ctx_dev:="https://shylinux.com"}
+# ctx_cas=
+ctx_root=${ctx_root:=/usr/local/context}
+ctx_home=${ctx_home:=~/context}
+# web_port=
+# ssh_port=
+# HOSTNAME=
+# USER=
+# PWD=
+export ctx_log ctx_app ctx_bin ctx_dev ctx_root ctx_home
 
 log() {
     echo -e $*
 }
-
-prepare() {
-    mkdir -p bin etc usr
-    mkdir -p var/log var/tmp var/run
-}
-
 install() {
-    [ -n "$1" ] && ctx_dev=$1 && shift
     case `uname -s` in
         "Darwin") GOOS=darwin GOARCH=amd64;;
         *) GOOS=linux GOARCH=386;;
@@ -26,51 +27,32 @@ install() {
         "x86_64") GOARCH=amd64;;
         "armv7l") GOARCH=arm;;
     esac
-    log "ctx_dev: $ctx_dev\nGOOS: $GOOS\nGOARCH: $GOARCH"
-
-    ctx_dev=$ctx_dev/code/upgrade
-    wget -O etc/exit.shy $ctx_dev/exit_shy
-    wget -O etc/init.shy $ctx_dev/init_shy
-    wget -O etc/common.shy $ctx_dev/common_shy
-    wget -O bin/bench.new "$ctx_dev/bench?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x bin/bench.new && mv bin/bench.new bin/bench
-    wget -O bin/boot.sh $ctx_dev/boot_sh && chmod a+x bin/boot.sh
-    wget -O bin/node.sh $ctx_dev/node_sh && chmod a+x bin/node.sh
+    wget -O ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} \
+        && ./${ctx_app} upgrade system && md5sum ${ctx_app} \
+        && mv ${ctx_app} bin/${ctx_app}
 }
-
-state() {
-    md=md5sum && [ `uname -s` = "Darwin" ] && md=md5
-    for file in bin/node.sh bin/boot.sh bin/bench etc/init.shy etc/common.shy etc/exit.shy; do
-        echo `$md $file`
-    done
-}
-
-action() {
-    log "kill" $1 && kill -$1 $pid
-}
-
 main() {
     while true; do
-        cp -r var/log var/log_$(date +%Y%m%d_%H%M%S)
-        $ctx_bin "$@" 2>var/log/boot.log && break
+        ${ctx_bin} "$@" 2>${ctx_log}/boot.log && break
         log "restarting..." && sleep 3
     done
 }
+action() {
+    pid=$(cat var/run/bench.log)
+    log "kill" $1 && kill -$1 ${pid}
+}
 
-dir=$ctx_root
-dir=./
-[ -d "$1" ] && dir=$1 && shift
-[ -d "$dir" ] && cd $dir
-[ -f bin/bench ] && ctx_bin=bin/bench
-pid=`cat var/run/bench.pid`
-log "dev:$ctx_dev\ndir: $dir\nbench: $ctx_bin\npid: $pid"
+
+dir=./ && [ -d "$1" ] && dir=$1 && shift
+[ -d "${dir}" ] && cd ${dir}
+log "dev:$ctx_dev\ndir: $dir\nbin: $ctx_bin\n"
 
 case $1 in
-    install) shift; prepare && install "$@";;
-    create) mkdir -p $2; cd $2 && shift && shift && prepare && main "$@";;
-    start|"") shift; prepare && main "$@";;
-    state) state;;
-    stop) action QUIT;;
-    restart) action USR1;;
+    install) install "$@";;
+    start|"") main "$@";;
+    create) mkdir -p $2; cd $2 && shift && shift && main "$@";;
     upgrade) action USR2;;
+    restart) action USR1;;
+    stop) action QUIT;;
 esac
 

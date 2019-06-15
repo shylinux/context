@@ -743,6 +743,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					*/
 				default:
 					if m.Options("save") {
+						dir := path.Dir(m.Option("save"))
+						if _, e = os.Stat(dir); e != nil {
+							m.Assert(os.MkdirAll(dir, 0777))
+						}
+
 						f, e := os.Create(m.Option("save"))
 						m.Assert(e)
 						defer f.Close()
@@ -1143,6 +1148,22 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 				m.Append("username", m.Option("username"))
 			}
+			return
+		}},
+
+		"/publish/": &ctx.Command{Name: "/publish/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			key = strings.TrimPrefix(key, "/publish/")
+			if strings.HasSuffix(key, "bench") {
+				key = key+"."+m.Option("GOOS")+"."+m.Option("GOARCH")
+			}
+
+			p := m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
+			if p == "" {
+				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", strings.Replace(key, ".", "_", -1) }))
+			}
+
+			m.Log("info", "publish %s %s", kit.Hashs(p), p)
+			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
 			return
 		}},
 	},

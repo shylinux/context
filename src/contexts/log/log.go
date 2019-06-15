@@ -82,15 +82,18 @@ func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
 			for _, v := range []string{kit.Format(l["action"]), "bench"} {
 				for i := len(args); i >= 0; i-- {
 					if value := log.Value(m, append([]string{v}, args[:i]...)); kit.Right(value) && kit.Right(value["file"]) {
-						name := path.Join(m.Conf("logdir"), kit.Format(value["file"]))
-						file, ok := log.file[name]
-						if !ok {
-							if f, e := os.Create(name); e == nil {
-								file, log.file[name] = f, f
-								kit.Log("error", "%s log file %s", "open", name)
-							} else {
-								kit.Log("error", "%s log file %s %s", "open", name, e)
-								continue
+						file, ok := os.Stdout, true
+						if kit.Format(value["file"]) != "stdout" {
+							name := path.Join(m.Conf("logdir"), kit.Format(value["file"]))
+							file, ok = log.file[name]
+							if !ok {
+								if f, e := os.Create(name); e == nil {
+									file, log.file[name] = f, f
+									kit.Log("error", "%s log file %s", "open", name)
+								} else {
+									kit.Log("error", "%s log file %s %s", "open", name, e)
+									continue
+								}
 							}
 						}
 

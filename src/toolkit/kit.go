@@ -16,6 +16,7 @@ import (
 	"time"
 )
 
+var DisableLog = false
 func Errorf(str string, args ...interface{}) {
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "%s\n", str)
@@ -24,6 +25,9 @@ func Errorf(str string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, str, args...)
 }
 func Log(action string, str string, args ...interface{}) {
+	if DisableLog {
+		return
+	}
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "%s", str)
 	} else {
@@ -695,7 +699,7 @@ func Hash(arg ...interface{}) (string, []string) {
 					io.Copy(m, f)
 					h := m.Sum(nil)
 					args = append(args, hex.EncodeToString(h[:]))
-					break
+					return hex.EncodeToString(h[:]), args
 				}
 			}
 			args = append(args, v)

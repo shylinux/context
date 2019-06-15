@@ -27,6 +27,10 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	m.root = m
 	m.Cap("begin_time", m.Time())
 	m.Cap("goos", runtime.GOOS)
+	m.Option("log.disable", true)
+	m.Option("page.limit", 10)
+	m.Option("page.offset", 0)
+	m.Option("routine", 0)
 	for _, msg := range m.Search("") {
 		msg.target.root = m.target
 		if msg.target == m.target {
@@ -40,10 +44,13 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	m.Cmd("ctx._init")
 	if m.Optionv("ps_target", Index); len(arg) == 0 {
+		Pulse.Option("log.disable", false)
 		m.Cap("stream", "shy")
 		m.Cmd("cli.source", m.Conf("system", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("system", "script.exit"))
 	} else {
-		m.Cmd("cli.source", arg)
+		for _, v := range m.Spawn().Cmd(arg).Meta["result"] {
+			fmt.Printf("%s", v)
+		}
 	}
 	m.Cmd("ctx.exit")
 	return true
@@ -202,11 +209,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 								}
 							case string:
 								m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
-							}
-							for k, v := range v.Form {
-								m.Add("append", "arg", k)
-								m.Add("append", "len", v)
-								m.Echo("  option: %s(%d)\n", k, v)
 							}
 							return
 						}
@@ -1411,17 +1413,15 @@ func Start(args ...string) bool {
 	if len(args) == 0 {
 		args = append(args, os.Args[1:]...)
 	}
+
+	kit.DisableLog = true
 	if len(args) > 0 && args[0] == "daemon" {
 		Pulse.Options("daemon", true)
 		args = args[1:]
 	}
 
-	Pulse.Option("routine", 0)
-	Pulse.Option("page.limit", 10)
-	Pulse.Option("page.offset", 0)
 	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
 		return Index.Close(Pulse, args...)
 	}
-
 	return Index.message.Wait()
 }

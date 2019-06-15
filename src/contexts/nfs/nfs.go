@@ -1163,8 +1163,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			return
 		}},
-		"dir": &ctx.Command{Name: "dir path [dir_deep] [dir_type both|file|dir] [dir_reg reg] [dir_sort field order] fields...",
-			Help: "查看目录, path: 路径, dir_deep: 递归查询, dir_type: 文件类型, dir_reg: 正则表达式, dir_sort: 排序, fields: 查询字段",
+		"dir": &ctx.Command{Name: "dir [path [fields...]]", Help: []string{"查看目录, path: 路径, fields...: 查询字段, time|type|full|path|tree|filename|size|line|hash",
+			"dir_deep: 递归查询", "dir_type both|file|dir|all: 文件类型", "dir_reg reg: 正则表达式", "dir_sort field order: 排序"},
 			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if len(arg) == 0 {

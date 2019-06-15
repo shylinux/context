@@ -161,7 +161,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				map[string]interface{}{"componet_name": "post", "componet_help": "post",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "web", "componet_cmd": "post",
-					"componet_args": []interface{}{"content_type", "application/json"}, "inputs": []interface{}{
+					"componet_args": []interface{}{"content_type", "application/json", "parse", "json"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "spide", "imports": "plugin_site"},
 						map[string]interface{}{"type": "text", "name": "url"},
 						map[string]interface{}{"type": "button", "value": "执行"},
@@ -185,7 +185,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "text", "name": "cmd", "value": "gg"},
-						map[string]interface{}{"type": "select", "name": "sub", "values": []interface{}{"deploygo"}},
+						map[string]interface{}{"type": "select", "name": "sub", "values": []interface{}{"deploygo", "deploy"}},
 						map[string]interface{}{"type": "text", "name": "sub", "imports": "plugin_dir"},
 						map[string]interface{}{"type": "text", "name": "sub", "imports": "plugin_branch"},
 						map[string]interface{}{"type": "button", "value": "执行"},
