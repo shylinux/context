@@ -32,6 +32,9 @@ func Log(action string, str string, args ...interface{}) {
 	fmt.Fprintln(os.Stderr)
 }
 
+func Env(key string) {
+	os.Getenv(key)
+}
 func Width(str string, mul int) int {
 	return len([]rune(str)) + (len(str)-len([]rune(str)))/2/mul
 }

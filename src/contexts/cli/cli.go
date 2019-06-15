@@ -102,6 +102,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Configs: map[string]*ctx.Config{
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
 			"bench": "src/examples/app/bench.go",
+			"env":   []interface{}{"GOPATH", "PATH"},
+		}, Help: "运行环境"},
+		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
+			"list": map[string]interface{}{
+				"boot_sh":    "bin/boot.sh",
+				"node_sh":    "bin/node.sh",
+				"init_shy":   "etc/init.shy",
+				"exit_shy":   "etc/exit.shy",
+				"common_shy": "etc/common.shy",
+			},
+			"path": "usr/publish",
 		}, Help: "运行环境"},
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
 			"init_env": []interface{}{"ctx_cas", "ctx_dev", "ctx_box", "ctx_root", "ctx_home", "web_port", "ssh_port", "USER"},
@@ -181,19 +192,55 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			})
 			return
 		}},
-		"compile": &ctx.Command{Name: "compile", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
-				m.Cmdy("cli.quit", 1)
+		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 && arg[0] == "self" {
+				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+					m.Cmdy("cli.quit", 1)
+				}
+				return
+			}
+
+			if len(arg) > 0 && arg[0] == "all" {
+				m.Cmd("cli.compile", "linux", "386")
+				m.Cmd("cli.compile", "linux", "amd64")
+				m.Cmd("cli.compile", "linux", "arm")
+				m.Cmd("cli.compile", "windows", "386")
+				m.Cmd("cli.compile", "windows", "amd64")
+				m.Cmd("cli.compile", "darwin", "amd64")
+				return
+			}
+
+			if len(arg) > 0 {
+				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
+				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
+				name := strings.Join([]string{"bench", goos, arch}, ".")
+
+				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch}
+				m.Confm("compile", "env", func(index int, key string) {
+					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
+				})
+
+				if m.Cmdy("cli.system", env, "go", "build", "-o", path.Join(m.Conf("publish", "path"), name),
+					m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+					m.Echo("bin: %s", name)
+				}
 			}
 			return
 		}},
 		"publish": &ctx.Command{Name: "publish", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if user, e := user.Current(); e == nil {
-				ns := strings.Split(user.Username, "\\")
-				m.Conf("runtime", "boot.username", ns[len(ns)-1])
-				m.Echo("%v--\n", ns)
-				m.Echo("%v--\n", ns[len(ns)-1])
-			}
+			p := m.Conf("publish", "path")
+			m.Assert(os.MkdirAll(p, 0777))
+
+			m.Confm("publish", "list", func(key string, value string) {
+				m.Cmd("nfs.copy", path.Join(p, key), m.Cmdx("nfs.path", value))
+			})
+			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "template.tar.gz"), "usr/template")
+			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "librarys.tar.gz"), "usr/librarys")
+			return
+		}},
+		"pushhub": &ctx.Command{Name: "pushhub", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("cli.system", "git", "commit", "-am", arg[0])
+			m.Cmd("cli.system", "git", "push")
 			return
 		}},
 		"runtime": &ctx.Command{Name: "runtime", Help: "runtime", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
