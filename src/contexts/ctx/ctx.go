@@ -1280,12 +1280,12 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 }
 func (m *Message) GoFunc(msg *Message, hand ...func(msg *Message)) *Message {
 	go func() {
-		ngo := msg.Option("routine", m.Capi("ngo", 1))
-		msg.Log("info", "%v safe go begin", ngo)
-		kit.Log("error", "%s ngo %s start", msg.Format(), ngo)
+		msg.Option("routine", m.Capi("ngo", 1))
+		// msg.Log("info", "%v safe go begin", ngo)
+		// kit.Log("error", "%s ngo %s start", msg.Format(), ngo)
 		m.TryCatch(msg, true, hand...)
-		kit.Log("error", "%s ngo %s end", msg.Format(), ngo)
-		msg.Log("info", "%v safe go end", ngo)
+		// kit.Log("error", "%s ngo %s end", msg.Format(), ngo)
+		// msg.Log("info", "%v safe go end", ngo)
 	}()
 	return m
 }

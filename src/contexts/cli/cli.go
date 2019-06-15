@@ -578,18 +578,29 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Table()
 
 			if restart {
-				m.Cmd("cli.quit", 1)
+				m.Cmd("cli.quit", 2)
 			}
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.source", m.Conf("system", "script.exit"))
-			m.Append("directory", "")
-			m.Echo("wait 1s, restarting...")
+			code := kit.Select("0", arg, 0)
+			switch code {
+			case "0":
+				m.Cmd("cli.source", m.Conf("system", "script.exit"))
+				m.Echo("quit")
 
+			case "1":
+				m.Echo("term")
+
+			case "2":
+				m.Cmd("cli.source", m.Conf("system", "script.exit"))
+				m.Echo("restart")
+			}
+			m.Append("directory", "")
+			m.Echo(", wait 1s")
 			m.GoFunc(m, func(m *ctx.Message) {
 				time.Sleep(time.Second * 1)
-				os.Exit(kit.Int(kit.Select("0", arg, 0)))
+				os.Exit(kit.Int(code))
 			})
 			return
 		}},
@@ -676,7 +687,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if !strings.HasPrefix(text, "sess") && m.Options("remote") {
 				text = m.Current(text)
 			}
-			kit.Log("fuck", "what %v", text)
 
 			// 解析代码片段
 			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {

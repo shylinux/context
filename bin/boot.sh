@@ -19,16 +19,19 @@ log() {
     echo -e $*
 }
 install() {
+    md5=md5sum
     case `uname -s` in
-        "Darwin") GOOS=darwin GOARCH=amd64;;
+        "Darwin") GOOS=darwin GOARCH=amd64 md5=md5;;
         *) GOOS=linux GOARCH=386;;
     esac
     case `uname -m` in
         "x86_64") GOARCH=amd64;;
         "armv7l") GOARCH=arm;;
     esac
+
     wget -O ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} \
-        && ./${ctx_app} upgrade system && md5sum ${ctx_app} \
+        && ./${ctx_app} upgrade system \
+        && ${md5} ${ctx_app} \
         && mv ${ctx_app} bin/${ctx_app}
 }
 main() {
@@ -38,8 +41,8 @@ main() {
     done
 }
 action() {
-    pid=$(cat var/run/bench.log)
-    log "kill" $1 && kill -$1 ${pid}
+    pid=$(cat var/run/bench.pid)
+    log "kill" $1 $pid && kill -$1 ${pid}
 }
 
 
@@ -51,8 +54,9 @@ case $1 in
     install) install "$@";;
     start|"") main "$@";;
     create) mkdir -p $2; cd $2 && shift && shift && main "$@";;
-    upgrade) action USR2;;
-    restart) action USR1;;
-    stop) action QUIT;;
+    restart) action 30;;
+    upgrade) action 31;;
+    quit) action QUIT;;
+    term) action TERM;;
 esac
 

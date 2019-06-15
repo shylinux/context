@@ -2,6 +2,7 @@ package gdb
 
 import (
 	"contexts/ctx"
+	"time"
 	"toolkit"
 
 	"os"
@@ -36,6 +37,9 @@ func (gdb *GDB) Value(m *ctx.Message, arg ...interface{}) bool {
 	return false
 }
 func (gdb *GDB) Wait(msg *ctx.Message, arg ...interface{}) interface{} {
+	if !kit.EnableDebug {
+		return nil
+	}
 	m := gdb.Message()
 	if m.Cap("status") != "start" {
 		return nil
@@ -94,15 +98,24 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 		case sig := <-gdb.goon:
 			action := m.Conf("signal", sig)
 			m.Log("signal", "%v: %v", action, sig)
-			break
 			switch action {
-			case "segv":
-			case "quit":
-				m.Cmd("cli.exit", 0)
+			case "QUIT":
+				m.Cmd("cli.quit", 0)
+			case "TERM":
+				m.Cmd("cli.quit", 1)
 			case "restart":
-				m.Cmd("cli.exit", 1)
+				m.Cmd("cli.quit", 2)
 			case "upgrade":
-				m.Find("web.code").Cmd("upgrade", "system")
+				m.Cmd("cli.upgrade", "bench")
+				m.Cmd("cli.upgrade", "system")
+			case "WINCH":
+				m.Cmd("nfs.term", "init")
+			case "TRAP":
+				kit.EnableDebug = true
+			case "CONT":
+				gdb.wait <- time.Now().Format("2006-01-02 15:04:05")
+			case "TSTP":
+				kit.EnableDebug = false
 			default:
 				// gdb.Goon(nil, "cache", "read", "value")
 			}
@@ -123,31 +136,33 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 	Configs: map[string]*ctx.Config{
 		"logpid": &ctx.Config{Name: "logpid", Value: "var/run/bench.pid", Help: ""},
 		"signal": &ctx.Config{Name: "signal", Value: map[string]interface{}{
-			"1":  "HUP",
-			"2":  "INT",
 			"3":  "QUIT",
 			"15": "TERM",
 			"28": "WINCH",
-			"30": "USR1",
-			"31": "USR2",
+			"30": "restart",
+			"31": "upgrade",
 
+			"1": "HUP",
+			// "2": "INT",
 			// "9":  "KILL",
 			// "10": "BUS",
 			// "11": "SEGV",
 			// "17": "STOP",
+			// "23": "IO",
 
 			"5":  "TRAP",
-			"6":  "ABRT",
+			"18": "TSTP",
+			"19": "CONT",
+
+			"6": "ABRT",
+
 			"14": "ALRM",
 			"20": "CHLD",
-			"19": "CONT",
-			"18": "TSTP",
 			"21": "TTIN",
 			"22": "TTOUT",
 
 			"13": "PIPE",
 			"16": "URG",
-			"23": "IO",
 
 			"4":  "ILL",
 			"7":  "EMT",

@@ -17,6 +17,7 @@ import (
 )
 
 var DisableLog = false
+var EnableDebug = false
 
 func Log(action string, str string, args ...interface{}) {
 	if DisableLog {
