@@ -784,6 +784,10 @@ func (nfs *NFS) printf(arg ...interface{}) *NFS {
 	}
 	return nfs
 }
+func (nfs *NFS) Show(arg ...interface{}) bool {
+	nfs.prompt(arg...)
+	return true
+}
 
 func (nfs *NFS) Recv(line string) (field string, value string) {
 	m := nfs.Context.Message()
@@ -885,6 +889,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		// 终端控制
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
 			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" && !m.Options("daemon") {
+				kit.STDIO = nfs
 				nfs.Term(m, "init")
 				defer nfs.Term(m, "exit")
 			}

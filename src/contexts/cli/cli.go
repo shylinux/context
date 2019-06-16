@@ -130,6 +130,20 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "守护任务"},
 		"action": &ctx.Config{Name: "action", Value: map[string]interface{}{}, Help: "交互任务"},
 
+		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
+			"github": "https://github.com/shylinux/context",
+			"env": map[string]interface{}{
+				"GOPATH": "https://github.com/shylinux/context",
+			},
+			"import": []interface{}{
+				"github.com/nsf/termbox-go",
+				"github.com/skip2/go-qrcode",
+				"github.com/go-sql-driver/mysql",
+				"github.com/gomarkdown/markdown",
+				"github.com/PuerkitoBio/goquery",
+				"github.com/go-cas/cas",
+			},
+		}, Help: "运行环境"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
 			"bench": "src/examples/app/bench.go",
 			"env":   []interface{}{"GOPATH", "PATH"},
@@ -216,6 +230,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if name, e := os.Getwd(); e == nil {
 				_, file := path.Split(kit.Select(name, os.Getenv("PWD")))
 				m.Conf("runtime", "boot.pathname", file)
+				m.Conf("runtime", "boot.ctx_path", name)
 			}
 			return
 		}},
@@ -501,6 +516,28 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 
+		"project": &ctx.Command{Name: "project", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch arg[0] {
+			case "init":
+				m.Cmdp(time.Second, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
+					[]string{"git", "init"},
+					[]string{"git", "remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
+					[]string{"git", "stash"},
+					[]string{"git", "pull"},
+					[]string{"git", "checkout", "-f", "master"},
+					[]string{"git", "stash", "pop"},
+				})
+
+				list := [][]string{}
+				m.Confm("project", "import", func(index int, value string) {
+					list = append(list, []string{value})
+				})
+
+				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
+					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
+			}
+			return
+		}},
 		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 && arg[0] == "self" {
 				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
@@ -510,13 +547,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			if len(arg) > 0 && arg[0] == "all" {
-				m.Cmdy("cli.compile", "linux", "386")
-				m.Cmdy("cli.compile", "linux", "amd64")
-				m.Cmdy("cli.compile", "linux", "arm")
-				m.Cmdy("cli.compile", "windows", "386")
-				m.Cmdy("cli.compile", "windows", "amd64")
-				m.Cmdy("cli.compile", "darwin", "amd64")
-				m.Set("result").Table()
+				m.Cmdp(time.Second, []string{"go build"}, []string{"cli.compile"}, [][]string{
+					[]string{"linux", "386"},
+					[]string{"linux", "amd64"},
+					[]string{"linux", "arm"},
+					[]string{"windows", "386"},
+					[]string{"windows", "amd64"},
+					[]string{"darwin", "amd64"},
+				})
 				return
 			}
 
@@ -547,7 +585,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			dir := m.Conf("publish", "path")
 			m.Assert(os.MkdirAll(dir, 0777))
 
-			m.Confm("publish", "list", func(key string, value string) {
+			if len(arg) == 0 {
+				list := [][]string{}
+				m.Confm("publish", "list", func(key string, value string) {
+					list = append(list, []string{key})
+				})
+				m.Cmdp(time.Second, []string{"copy"}, []string{"cli.publish"}, list)
+				return
+			}
+
+			for _, key := range arg {
+				value := m.Conf("publish", []string{"list", key})
 				p := m.Cmdx("nfs.path", value)
 				if s, e := os.Stat(p); e == nil {
 					if s.IsDir() {
@@ -555,16 +603,22 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					} else {
 						m.Cmd("nfs.copy", path.Join(dir, key), p)
 					}
-					return
 				}
-			})
-			m.Cmdy("nfs.dir", dir, "dir_sort", "time", "time_r")
+			}
+
+			// m.Cmdy("nfs.dir", dir, "dir_sort", "time", "time_r")
 
 			return
 		}},
-		"upgrade": &ctx.Command{Name: "upgrade bench|system|extend|plugin|portal|client|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"upgrade": &ctx.Command{Name: "upgrade bench|system|extend|plugin|portal|client|script|project", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "upgrade")
+				return
+			}
+			if len(arg) > 0 && arg[0] == "project" {
+				m.Cmd("cli.project", "init")
+				m.Cmd("cli.compile", "all")
+				m.Cmd("cli.publish")
 				return
 			}
 

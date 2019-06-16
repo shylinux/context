@@ -5,7 +5,7 @@ ctx = context = {
             option[k] = dataset[k].split(",")
         }
         this.GET("", option, function(msg) {
-            msg = msg && msg[0]
+            msg[0] && (msg = msg[0])
             // msg && (msg.__proto__ = (page || {}))
             msg.Result = msg.result? msg.result.join(""): ""
             msg.Results = function() {

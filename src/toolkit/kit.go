@@ -16,6 +16,12 @@ import (
 	"time"
 )
 
+type TERM interface {
+	Show(...interface{}) bool
+}
+
+var STDIO TERM
+
 var DisableLog = false
 var EnableDebug = false
 

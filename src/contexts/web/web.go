@@ -768,6 +768,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmd("tcp.ifconfig").Table(func(index int, value map[string]string) {
+					m.Append("index", index)
+					m.Append("site", fmt.Sprintf("%s://%s%s", m.Conf("serve", "protocol"), value["ip"], m.Conf("runtime", "boot.web_port")))
+				})
+				m.Table()
+				return
+			}
+
 			switch runtime.GOOS {
 			case "windows":
 				m.Cmd("cli.system", "explorer", arg[0])
@@ -1113,6 +1122,22 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Cmdy("web.get", "which", fields[2], "method", fields[3], strings.Join(fields, "/"))
 			return
 		}},
+
+		"/publish/": &ctx.Command{Name: "/publish/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			key = strings.TrimPrefix(key, "/publish/")
+			if strings.HasSuffix(key, "bench") {
+				key = key + "." + m.Option("GOOS") + "." + m.Option("GOARCH")
+			}
+			key = strings.Replace(key, ".", "_", -1)
+			p := m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
+			if p == "" {
+				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", key}))
+			}
+
+			m.Log("info", "publish %s %s", kit.Hashs(p), p)
+			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
+			return
+		}},
 		"/shadow": &ctx.Command{Name: "/shadow", Help: "暗网", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Confm("runtime", "node.port", func(index int, value string) {
 				m.Add("append", "ports", value)
@@ -1147,22 +1172,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 				m.Append("username", m.Option("username"))
 			}
-			return
-		}},
-
-		"/publish/": &ctx.Command{Name: "/publish/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			key = strings.TrimPrefix(key, "/publish/")
-			if strings.HasSuffix(key, "bench") {
-				key = key + "." + m.Option("GOOS") + "." + m.Option("GOARCH")
-			}
-			key = strings.Replace(key, ".", "_", -1)
-			p := m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
-			if p == "" {
-				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", key}))
-			}
-
-			m.Log("info", "publish %s %s", kit.Hashs(p), p)
-			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
 			return
 		}},
 	},

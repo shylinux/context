@@ -34,8 +34,10 @@ install() {
         "armv7l") GOARCH=arm;;
     esac
 
+    target=system && [ -n "$2" ] && target=$2
+
     wget -O ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} \
-         && ./${ctx_app} upgrade system && ${md5} ${ctx_app} \
+         && ./${ctx_app} upgrade ${target} && ${md5} ${ctx_app} \
          && mv ${ctx_app} bin/${ctx_app}
 }
 main() {

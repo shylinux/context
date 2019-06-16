@@ -2,26 +2,271 @@
 
 context是一种新的应用框架，通过模块化、集群化、自动化，实现软件的快速开发，快速共享，快速使用。
 
-### 下载安装
-在Linux或Mac上，可以直接用脚本下载，在Windows上，可以先安装[GitBash](https://www.git-scm.com/download/)，然后下载。
+## 下载安装
+在Linux或Mac上，可以直接用脚本下载，
+在Windows上，可以先安装[GitBash](https://www.git-scm.com/download/)，然后在GitBash中执行命令下载。
 ```
-$ mkdir context && cd context
-$ curl https://shylinux.com/publish/boot.sh | bash -s install
+$ curl https://shylinux.com/publish/boot.sh | bash -s install context
 ```
 
-### 使用方式
+install后面的参数context，就是指定的下载目录，
+进入下载目录，可以看到的有六个文件。
+
+在bin目录下，就是各种执行文件
+
+- bin/bench，context的执行程序
+- bin/boot.sh，context的启动脚本
+- bin/node.sh，简化版的启动脚本
+
+context内部实现了语法解析，通过自定义的脚本语言，实现功能的灵活控制。
+
+在etc目录下，就是context执行过程中用到的脚本。
+
+- etc/init.shy，启动时加载的脚本
+- etc/exit.shy，结束时运行的脚本
+- etc/common.shy，init.shy调用到的脚本
+
+## 使用方式
 
 context内部实现了很多功能模块，每个模块下有很多命令，每条命令就是一种应用。
 
-#### 命令模式
+context的使用方式有很多种，
+
+- 可以直接调用，像Shell一样，去解析一条命令
+- 可以启动cli服务，像MySQL一样，交互式使用格式化命令
+- 可以启动web服务，像LabView一样，可以自定义各种图形界面
+- 可以自动组网，将任意台设备组合在一起，实现分布式应用
+- 可以自动建群，在群聊场景中，实现多用户、多会话、多任务、多设备的使用
+
+### 命令模式
+如果只是使用一条命令，或是写在脚本文件中，可以使用这种方式。
+
+例如，dir命令就是查看目录，
 ```
 $ bin/bench dir
+time                 size  line  filename
+2019-06-16 10:35:18  324   11    common.shy
+2019-06-16 10:35:18  201   9     exit.shy
+2019-06-16 10:35:18  261   13    init.shy
+```
+
+还可以加更多参数，dir_deep递归查询目录，dir_type文件类型过滤，dir_sort输出表排序。
+```
+$ bin/bench dir ../ dir_deep dir_type file dir_sort line int_r
+time                 size      line   filename
+2019-06-16 10:22:52  13256968  91314  bench
+2019-06-16 11:10:16  1535      66     boot.sh
+2019-06-16 11:10:16  613       31     node.sh
+2019-06-16 11:10:16  261       13     init.shy
+2019-06-16 11:10:16  324       11     common.shy
+2019-06-16 11:10:16  201       9      exit.shy
 
 ```
 
-#### 交互模式
+### 交互模式
 
-#### 集群模式
+启动服务，可以提供更丰富的命令与环境。
+```
+$ bin/bench
+0[11:35:46]ssh> dir
+time                 size  line  filename
+2019-06-16 11:35:06  160   3     log/
+2019-06-16 11:35:06  96    1     run/
+2019-06-16 11:35:44  192   4     tmp/
+1[11:35:46]ssh>
+```
+
+如果集中管理，命令越多，系统只会越复杂，学习成本越高，使用越低效，开发越困难。
+
+所以通过模块化，分而治之，更高效的管理丰富的命令。
+
+context命令就是用来管理模块，没有参数时，直接查看当前模块的信息。
+
+如下，第二行是当前模块，第一行是当前模块的父模块，其它行都是当前模块的子模块。
+
+```
+1[11:39:01]ssh> context
+names  ctx  msg  status  stream         helps
+ctx         0    start   shy            模块中心
+ssh    ctx  10   begin   ctx.nfs.file3  集群中心
+```
+
+context第一个参数，可以指定当前模块，
+如下，切换到nfs模块，然后查看各种IO模块，
+切换到ctx根模块，查看所有模块。
+```
+2[11:43:57]ssh> context nfs
+
+3[11:43:58]nfs> context
+names  ctx  msg   status  stream  helps
+ctx         0     start   shy     模块中心
+nfs    ctx  9     begin           存储中心
+stdio  nfs  1174  start   stdio   scan stdio
+
+4[11:44:22]ssh> context ctx
+
+5[11:45:17]ctx> context
+names    ctx  msg   status  stream    helps
+ctx           0     start   shy       模块中心
+aaa      ctx  3     begin             认证中心
+cli      ctx  4     begin             管理中心
+gdb      ctx  232   start             调试中心
+lex      ctx  6     begin             词法中心
+log      ctx  31    start   bench     日志中心
+mdb      ctx  8     begin             数据中心
+nfs      ctx  9     begin             存储中心
+ssh      ctx  10    begin             集群中心
+tcp      ctx  11    begin             网络中心
+web      ctx  1094  start   :9094     应用中心
+yac      ctx  13    begin   35,14,23  语法中心
+shy      cli  1171  start   engine    shell
+matrix1  lex  34    start   76,28,2   matrix
+stdio    nfs  1174  start   stdio     scan stdio
+chat     web  14    begin             会议中心
+code     web  15    begin             代码中心
+wiki     web  16    begin             文档中心
+engine   yac  1173  start   stdio     parse
+
+```
+
+command命令，就是用来管理当前模块的命令，
+```
+17[11:52:02]nfs> context nfs
+
+17[11:52:02]nfs> command
+key     name
+_init   _init
+action  action cmd
+copy    copy to from
+dir     dir [path [fields...]]
+export  export filename
+git     git sum
+hash    hash filename
+import  import filename [index]
+json    json str
+load    load file [buf_size [pos]]
+open    open file
+path    path filename
+printf  printf arg
+prompt  prompt arg
+pwd     pwd [all] | [[index] path]
+read    read [buf_size [pos]]
+remote  remote listen|dial args...
+save    save file string...
+scan    scan file name
+send    send [file] args...
+temp    temp data
+term    term action args...
+trash   trash file
+write   write string [pos]
+
+```
+
+help子命令，查看命令帮助信息。
+```
+18[11:59:19]nfs> command help dir
+dir: dir [path [fields...]]
+    查看目录, path: 路径, fields...: 查询字段, time|type|full|path|tree|filename|size|line|hash
+    dir_deep: 递归查询
+    dir_type both|file|dir|all: 文件类型
+    dir_reg reg: 正则表达式
+    dir_sort field order: 排序
+```
+
+
+### 集群模式
+
+context提供自动化集群的功能，可以自动组网、自动认证。从而快速实现多台设备的协同工作。
+
+#### 启动服务节点
+```
+$ bin/boot.sh
+0[11:35:12]ssh>
+```
+
+#### 启动工作节点
+
+新打开一个终端，启动工作节点，执行remote命令，查看上级节点，
+```
+$ bin/boot.sh create app/demo
+0[15:15:30]ssh> remote
+key  type    module         create_time
+mac  master  ctx.nfs.file3  2019-06-16 15:15:23
+```
+
+回到服务节点终端，执行remote命令，可以查看到所有远程节点。
+```
+2[15:15:31]ssh> remote
+key   type    module         create_time
+com   master  ctx.nfs.file4  2019-06-16 14:25:10
+demo  worker  ctx.nfs.file7  2019-06-16 15:15:23
+```
+
+默认配置中，子节点信任父，所以父节点可以调用子节点的命令。还有更复杂的认证机制，可以灵活配置。
+
+远程命令和本地命令一样，没有任何区别。如下调用demo节点的pwd命令。还支持更复杂的多节点命令，可以更快速的同时管理多台设备。
+```
+2[15:15:31]ssh> remote demo pwd
+/Users/shaoying/context/app/demo/var
+```
+
+#### 启动分机节点
+
+在服务节点的终端，查看服务地址
+```
+3[15:49:00]ssh> web.brow
+index  site
+0      http://192.168.199.139:9094
+```
+
+同样，在另一台设备上下载context，然后启动服务节点。
+通过环境变量ctx_dev指定上级节点。
+```
+$ ctx_dev="http://192.168.199.139:9094" bin/boot.sh
+0[15:49:00]ssh> remote
+key  type    module         create_time
+mac  master  ctx.nfs.file3  2019-06-16 15:15:23
+```
+
+回到服务节点终端，执行remote命令，可以查看到新添加了一个服务子节点。
+```
+2[15:15:31]ssh> remote
+key   type    module         create_time
+com   master  ctx.nfs.file4  2019-06-16 14:25:10
+demo  worker  ctx.nfs.file7  2019-06-16 15:15:23
+sub   server  ctx.nfs.file8  2019-06-16 16:15:23
+```
+
+同样可以远程调用命令。
+```
+2[15:15:31]ssh> remote sub pwd
+/Users/shaoying/context/app/sub/var
+```
+
+### 开源模式
+
+context是一种通用的应用框架，可以快速开发出各种工具。
+```
+2[15:15:31]ssh> project init
+done
+2[15:15:31]ssh> project init
+```
+
+### 网页模式
+### 工具链
+### 知识库
+### 信息流
+```
+$ bin/bench
+19[11:59:19]nfs> upgrade portal
+hash                              file
+ef1998b38af0888cb56dd5e1448a68ad  usr/template.tar.gz
+6_043a93fa03273744be42c7ab898b2   usr/librarys.tar.gz
+
+19[11:59:19]nfs> upgrade portal
+
+```
+
 
 #### 完整版
 如果对源码有兴趣，使用更丰富的功能，可以直接下载源码，
@@ -108,103 +353,6 @@ time                 size  line  filename    count
 index  name  ip             mask  hard
 5      en0   192.168.0.106  24    c4:b3:01:cf:0b:51
 ```
-
-### 组建集群
-
-context不仅只是一个shell，还可以用来组建集群。
-
-#### 启动服务节点
-
-启动服务节点，使用脚本boot.sh，
-与node.sh不同的是，boot.sh启动的context，
-会启动web模块监听9094端口，会启动ssh模块监听9090端口。
-```
-$ cd context
-$ bin/boot.sh
-0[11:23:03]ssh>
-```
-
-#### 启动工作节点
-启动工作节点，使用脚本node.sh，
-它启动的context，会主动连接本地9090端口，向服务节点注册自己。
-
-如下，新打开一个终端，调用boot.sh，创建并启动服务节点demo。
-```
-$ cd context
-$ bin/node.sh create app/demo
-0[11:23:03]ssh>
-```
-
-如下，再打开一个终端，调用boot.sh，创建并启动服务节点led。
-```
-$ cd context
-$ bin/node.sh create app/led
-0[11:23:03]ssh>
-```
-
-#### 调用远程命令
-如下回到服务节点终端，执行remote命令，可以查看到所有远程节点。
-```
-22[11:35:12]ssh> remote
-key   create_time          module          name   type
-com   2019-05-09 20:57:21  ctx.nfs.file4   com    master
-led   2019-05-09 20:59:28  ctx.nfs.file5   led    worker
-demo  2019-05-09 20:59:28  ctx.nfs.file5   demo   worker
-```
-
-远程命令只需要在命令前加上节点名与冒号即可。
-
-如下，远程调用led节点的命令。
-```
-24[11:41:15]ssh> led:pwd
-/Users/shaoying/context/app/led/var
-```
-
-如下，远程调用demo节点的命令。
-```
-24[11:41:15]ssh> demo:pwd
-/Users/shaoying/context/app/demo/var
-```
-
-如下，远程调用所有子节点的命令。
-```
-29[11:44:09]ssh> *:pwd
-/Users/shaoying/context/app/led/var
-
-/Users/shaoying/context/app/demo/var
-```
-
-#### 启动分机服务
-
-boot.sh不仅可以用来启动本地服务，还可以将不同的主机组建在一起。
-
-在另外一台计算机上，重新下载安装一下context，然后启动服务节点。
-
-其中环境变量ctx_dev，用来指定上级服务节点。
-
-```
-$ cd context
-$ ctx_dev=http://192.168.0.106:9094 boot.sh
-0[11:53:11]ssh>
-```
-
-回到原主机的服务节点终端，
-使用remote命令，可以查看到新加的从机节点。
-```
-30[11:55:38]ssh> remote
-key   create_time          module          name   type
-com   2019-05-09 20:57:21  ctx.nfs.file4   com    master
-mac   2019-05-10 10:53:00  ctx.nfs.file13  mac    server
-led   2019-05-09 20:59:28  ctx.nfs.file5   led    worker
-demo  2019-05-09 20:59:28  ctx.nfs.file5   demo   worker
-```
-
-当然，也可以在本地启动多个服务节点，根据ctx_dev指定不同的上级节点，可以级联，也可以并联。
-```
-$ cd context
-$ ctx_dev=http://localhost:9094 boot.sh create app/sub
-```
-***注意，不指定ctx_dev时，默认连接 https://shylinux.com ，如果不信任此主机，记得设置ctx_dev***
 
 ### 网页服务
 

@@ -1230,6 +1230,14 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 
 	return m
 }
+func (m *Message) Show(args ...interface{}) *Message {
+	if m.Option("cli.modal") == "action" {
+		fmt.Printf(kit.Format(args...))
+	} else if kit.STDIO != nil {
+		kit.STDIO.Show(args...)
+	}
+	return m
+}
 func (m *Message) Assert(e interface{}, msg ...string) bool {
 	switch v := e.(type) {
 	case nil:
@@ -1541,6 +1549,19 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 	return m
 }
 
+func (m *Message) Cmdp(t time.Duration, head []string, prefix []string, suffix [][]string) *Message {
+	if head != nil && len(head) > 0 {
+		m.Show(strings.Join(head, " "), "...\n")
+	}
+
+	for i, v := range suffix {
+		m.Show(fmt.Sprintf("%v/%v %v...\n", i+1, len(suffix), v))
+		m.Cmd(prefix, v)
+		time.Sleep(t)
+	}
+	m.Show("\n")
+	return m
+}
 func (m *Message) Cmdm(args ...interface{}) *Message {
 	m.Log("info", "current: %v", m.Magic("session", "current"))
 

@@ -151,7 +151,9 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 			"search": map[string]interface{}{"value": []interface{}{"debug"}},
 			"call":   map[string]interface{}{"value": []interface{}{"debug"}},
 			"back":   map[string]interface{}{"value": []interface{}{"debug"}},
-			"send":   map[string]interface{}{"value": []interface{}{"debug"}},
+
+			"send": map[string]interface{}{"value": []interface{}{"debug"}},
+			"recv": map[string]interface{}{"value": []interface{}{"debug"}},
 
 			"bench": map[string]interface{}{"value": []interface{}{"bench"}},
 			"begin": map[string]interface{}{"value": []interface{}{"bench", "red"}},
