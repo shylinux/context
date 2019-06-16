@@ -1,15 +1,13 @@
 ~cli
-    config load tmp/runtime.json runtime
+    config load var/tmp/runtime.json runtime
 ~aaa
-    config load tmp/auth.json auth
+    config load var/tmp/auth.json auth
 ~ssh
-    config load tmp/cert.json work flow trust
+    config load var/tmp/cert.json work flow trust
 ~wiki
-    config load tmp/wiki.json wiki_visit
+    config load var/tmp/wiki.json wiki_visit
 source etc/common.shy
 ~ssh
     remote auto
-~cli
-    plugin sort.go sort
 source local.shy
 

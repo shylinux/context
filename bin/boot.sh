@@ -4,8 +4,8 @@ ctx_log=${ctx_log:="var/log"}
 ctx_app=${ctx_app:="bench"}
 ctx_bin=${ctx_app} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}
 # ctx_box=
-ctx_dev=${ctx_dev:="https://shylinux.com"}
 # ctx_cas=
+ctx_dev=${ctx_dev:="https://shylinux.com"}
 ctx_root=${ctx_root:=/usr/local/context}
 ctx_home=${ctx_home:=~/context}
 # web_port=
@@ -13,7 +13,8 @@ ctx_home=${ctx_home:=~/context}
 # HOSTNAME=
 # USER=
 # PWD=
-export ctx_log ctx_app ctx_bin ctx_dev ctx_root ctx_home
+export ctx_log ctx_app ctx_bin ctx_box ctx_cas ctx_dev
+export ctx_root ctx_home web_port ssh_port
 
 log() {
     echo -e $*
@@ -30,9 +31,8 @@ install() {
     esac
 
     wget -O ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} \
-        && ./${ctx_app} upgrade system \
-        && ${md5} ${ctx_app} \
-        && mv ${ctx_app} bin/${ctx_app}
+         && ./${ctx_app} upgrade system && ${md5} ${ctx_app} \
+         && mv ${ctx_app} bin/${ctx_app}
 }
 main() {
     while true; do

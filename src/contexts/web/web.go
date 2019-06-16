@@ -96,7 +96,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	// 	return true
 	// }
 	defer func() {
-		msg.Option("access", msg.Cmdx("aaa.sess", "access"))
+		msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
 	}()
 	if msg.Confs("login", "cas") {
 		if !cas.IsAuthenticated(r) {
@@ -136,12 +136,11 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		return false
 	}
 
-	if msg.Options("sessid") {
-		msg.Log("info", "sessid: %s", msg.Option("sessid"))
-		msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta")))
-		msg.Log("info", "nickname: %s", msg.Option("nickname", msg.Cmdx("aaa.auth", "username", msg.Option("username"), "data", "nickname")))
-		if !msg.Options("nickname") {
-			msg.Option("nickname", msg.Option("username"))
+	if msg.Log("info", "sessid: %s", msg.Option("sessid")); msg.Options("sessid") {
+		if msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta"))); msg.Options("username") {
+			if msg.Log("info", "nickname: %s", msg.Option("nickname", msg.Cmdx("aaa.auth", "username", msg.Option("username"), "data", "nickname"))); !msg.Options("nickname") {
+				msg.Option("nickname", msg.Option("username"))
+			}
 		}
 	}
 
@@ -169,7 +168,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("accept", r.Header.Get("Accept"))
 			msg.Option("method", r.Method)
 			msg.Option("path", r.URL.Path)
-			msg.Optionv("debug", false)
+			msg.Option("sessid", "")
 
 			// 请求环境
 			msg.Option("dir_root", msg.Cap("directory"))
@@ -742,7 +741,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					*/
 				default:
-					if m.Options("save") {
+					if res.StatusCode == http.StatusOK && m.Options("save") {
 						dir := path.Dir(m.Option("save"))
 						if _, e = os.Stat(dir); e != nil {
 							m.Assert(os.MkdirAll(dir, 0777))
@@ -1156,10 +1155,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if strings.HasSuffix(key, "bench") {
 				key = key + "." + m.Option("GOOS") + "." + m.Option("GOARCH")
 			}
-
+			key = strings.Replace(key, ".", "_", -1)
 			p := m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
 			if p == "" {
-				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", strings.Replace(key, ".", "_", -1)}))
+				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", key}))
 			}
 
 			m.Log("info", "publish %s %s", kit.Hashs(p), p)

@@ -110,7 +110,7 @@ var page = Page({
         ])
 
 
-        if (true||kit.isWeiXin) {
+        if (kit.isWeiXin) {
             pane.Run(["weixin"], function(msg) {
                 // if (!ctx.Search("state")) {
                 //     location.href = msg["auth2.0"][0]

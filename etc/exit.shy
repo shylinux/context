@@ -1,9 +1,9 @@
 ~wiki
-    config save tmp/wiki.json wiki_visit
+    config save var/tmp/wiki.json wiki_visit
 ~ssh
-    config save tmp/cert.json work flow trust
+    config save var/tmp/cert.json work flow trust
 ~aaa
-    config save tmp/auth.json auth
+    config save var/tmp/auth.json auth
 ~cli
-    config save tmp/runtime.json runtime
+    config save var/tmp/runtime.json runtime
 

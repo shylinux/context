@@ -40,13 +40,15 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	m.Cmd("ctx._init")
 	if m.Optionv("ps_target", Index); len(arg) == 0 {
-		Pulse.Option("log.disable", false)
+		m.Option("cli.modal", "active")
+		m.Option("log.disable", false)
 		m.Cap("stream", "shy")
 		m.Cmd("log._init")
 		m.Cmd("yac._init")
 		m.Cmd("gdb._init")
 		m.Cmd("cli.source", m.Conf("system", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("system", "script.exit"))
 	} else {
+		m.Option("cli.modal", "action")
 		m.Cmd("yac._init")
 		for _, v := range m.Spawn().Cmd(arg).Meta["result"] {
 			fmt.Printf("%s", v)
@@ -1416,6 +1418,7 @@ func Start(args ...string) bool {
 
 	kit.DisableLog = true
 	if len(args) > 0 && args[0] == "daemon" {
+		Pulse.Options("cli.modal", "daemon")
 		Pulse.Options("daemon", true)
 		args = args[1:]
 	}

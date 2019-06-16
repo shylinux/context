@@ -1,14 +1,27 @@
 ## context
 
-context is not only context
+context是一种新的应用框架，通过模块化、集群化、自动化，实现软件的快速开发，快速共享，快速使用。
 
 ### 下载安装
-#### 简易版
-在Mac或Linux上，可以直接用脚本下载
+在Linux或Mac上，可以直接用脚本下载，在Windows上，可以先安装[GitBash](https://www.git-scm.com/download/)，然后下载。
 ```
 $ mkdir context && cd context
-$ curl https://shylinux.com/code/upgrade/boot_sh | bash -s install
+$ curl https://shylinux.com/publish/boot.sh | bash -s install
 ```
+
+### 使用方式
+
+context内部实现了很多功能模块，每个模块下有很多命令，每条命令就是一种应用。
+
+#### 命令模式
+```
+$ bin/bench dir
+
+```
+
+#### 交互模式
+
+#### 集群模式
 
 #### 完整版
 如果对源码有兴趣，使用更丰富的功能，可以直接下载源码，

@@ -502,7 +502,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 && arg[0] == "self" {
 				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
-					m.Cmdy("cli.quit", 1)
+					m.Cmdy("cli.quit", 2)
 				}
 				return
 			}
@@ -521,7 +521,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if len(arg) > 0 {
 				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
 				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
-				name := strings.Join([]string{"bench", goos, arch}, ".")
+				name := strings.Join([]string{"bench", goos, arch}, "_")
 
 				wd, _ := os.Getwd()
 				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch, "cmd_env",
@@ -593,8 +593,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Echo("term")
 
 			case "2":
-				m.Cmd("cli.source", m.Conf("system", "script.exit"))
-				m.Echo("restart")
+				if m.Option("cli.modal") != "action" {
+					m.Cmd("cli.source", m.Conf("system", "script.exit"))
+					m.Echo("restart")
+				}
 			}
 			m.Append("directory", "")
 			m.Echo(", wait 1s")

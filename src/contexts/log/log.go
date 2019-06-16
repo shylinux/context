@@ -15,8 +15,8 @@ type LOG struct {
 	*ctx.Context
 }
 
-func (log *LOG) Value(msg *ctx.Message, arg ...interface{}) map[string]interface{} {
-	args := append(kit.Trans(arg...), "value")
+func (log *LOG) Value(msg *ctx.Message, arg ...interface{}) []string {
+	args := append(kit.Trans(arg...))
 
 	if value, ok := kit.Chain(log.Configs["output"].Value, args).(map[string]interface{}); ok {
 		if kit.Right(value["source"]) && kit.Format(value["source"]) != msg.Source().Name {
@@ -26,9 +26,7 @@ func (log *LOG) Value(msg *ctx.Message, arg ...interface{}) map[string]interface
 		if kit.Right(value["target"]) && kit.Format(value["target"]) != msg.Target().Name {
 			return nil
 		}
-
-		// kit.Log("error", "value %v %v", kit.Format(args), kit.Format(value))
-		return value
+		return kit.Trans(value["value"])
 	}
 	return nil
 }
@@ -61,10 +59,10 @@ func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
 	kit.Log("error", "make log dir %s", m.Conf("logdir"))
 
 	log.queue = make(chan map[string]interface{}, 1024)
-	for _, v := range []string{"error", "bench", "debug"} {
-		log.Log(m, v, "hello world\n")
-		log.Log(m, v, "hello world")
-	}
+	// for _, v := range []string{"error", "bench", "debug"} {
+	// 	log.Log(m, v, "hello world\n")
+	// 	log.Log(m, v, "hello world")
+	// }
 	m.Cap("stream", m.Conf("output", []string{"bench", "value", "file"}))
 
 	for {
@@ -77,26 +75,37 @@ func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
 		loop:
 			for _, v := range []string{kit.Format(l["action"]), "bench"} {
 				for i := len(args); i >= 0; i-- {
-					if value := log.Value(m, append([]string{v}, args[:i]...)); kit.Right(value) && kit.Right(value["file"]) {
-						file, ok := os.Stdout, true
-						if kit.Format(value["file"]) != "stdout" {
-							name := path.Join(m.Conf("logdir"), kit.Format(value["file"]))
-							file, ok = log.file[name]
-							if !ok {
-								if f, e := os.Create(name); e == nil {
-									file, log.file[name] = f, f
-									kit.Log("error", "%s log file %s", "open", name)
-								} else {
-									kit.Log("error", "%s log file %s %s", "open", name, e)
-									continue
-								}
+					value := log.Value(msg, append([]string{v}, args[:i]...))
+					if !kit.Right(value) {
+						continue
+					}
+					p := kit.Chains(log.Configs["output"].Value, []string{"file", value[0]})
+					if p == "" {
+						continue
+					}
+
+					file, ok := os.Stdout, true
+					if p != "stdout" {
+						name := path.Join(m.Conf("logdir"), p)
+						file, ok = log.file[name]
+						if !ok {
+							if f, e := os.Create(name); e == nil {
+								file, log.file[name] = f, f
+								kit.Log("error", "%s log file %s", "open", name)
+							} else {
+								kit.Log("error", "%s log file %s %s", "open", name, e)
+								continue
 							}
 						}
-
-						fmt.Fprintln(file, fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), msg.Format(value["meta"].([]interface{})...),
-							kit.Format(value["color_begin"]), kit.Format(l["action"]), fmt.Sprintf(kit.Format(l["str"]), l["arg"].([]interface{})...), kit.Format(value["color_end"])))
-						break loop
 					}
+
+					font := m.Conf("output", []string{"font", kit.Select("", value, 1)})
+					meta := msg.Format(m.Confv("output", []string{"meta", kit.Select("short", value, 2)}).([]interface{})...)
+
+					fmt.Fprintln(file, fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), meta, font,
+						kit.Format(l["action"]), fmt.Sprintf(kit.Format(l["str"]), l["arg"].([]interface{})...),
+						kit.Select("", "\033[0m", font != "")))
+					break loop
 				}
 			}
 		}
@@ -119,40 +128,53 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 	Configs: map[string]*ctx.Config{
 		"logdir": &ctx.Config{Name: "logdir", Value: "var/log", Help: ""},
 		"output": &ctx.Config{Name: "output", Value: map[string]interface{}{
-			"error":  map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
-			"trace":  map[string]interface{}{"value": map[string]interface{}{"file": "error.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
-			"debug":  map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
-			"search": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
-			"call":   map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
-			"back":   map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
+			"file": map[string]interface{}{
+				"bench": "bench.log",
+				"debug": "debug.log",
+				"error": "error.log",
+				"right": "right.log",
+			},
+			"font": map[string]interface{}{
+				"red":    "\033[31m",
+				"green":  "\033[32m",
+				"blue":   "\033[34m",
+				"yellow": "\033[33m",
+			},
+			"meta": map[string]interface{}{
+				"short": []interface{}{"time", "ship"},
+				"long":  []interface{}{"time", "ship"},
+			},
 
-			"sync": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
-			"recv": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
-			"send": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}}},
+			"error":  map[string]interface{}{"value": []interface{}{"error", "red"}},
+			"trace":  map[string]interface{}{"value": []interface{}{"error", "red"}},
+			"debug":  map[string]interface{}{"value": []interface{}{"debug"}},
+			"search": map[string]interface{}{"value": []interface{}{"debug"}},
+			"call":   map[string]interface{}{"value": []interface{}{"debug"}},
+			"back":   map[string]interface{}{"value": []interface{}{"debug"}},
+			"send":   map[string]interface{}{"value": []interface{}{"debug"}},
 
-			"bench": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}}},
-			"begin": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
-			"start": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
-			"close": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
-			"warn":  map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[33m", "color_end": "\033[0m"}},
+			"bench": map[string]interface{}{"value": []interface{}{"bench"}},
+			"begin": map[string]interface{}{"value": []interface{}{"bench", "red"}},
+			"start": map[string]interface{}{"value": []interface{}{"bench", "red"}},
+			"close": map[string]interface{}{"value": []interface{}{"bench", "red"}},
+			"warn":  map[string]interface{}{"value": []interface{}{"bench", "yellow"}},
 
-			"right": map[string]interface{}{"value": map[string]interface{}{"file": "right.log", "meta": []interface{}{"time", "ship"}}},
-
-			"cmd": map[string]interface{}{"value": map[string]interface{}{"file": "bench.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"},
-				"lex": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
-				"yac": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[32m", "color_end": "\033[0m"}},
+			"cmd": map[string]interface{}{"value": []interface{}{"bench", "green"},
+				"lex": map[string]interface{}{"value": []interface{}{"debug", "green"}},
+				"yac": map[string]interface{}{"value": []interface{}{"debug", "green"}},
 				"cli": map[string]interface{}{
-					"cmd": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+					"cmd": map[string]interface{}{"value": []interface{}{"debug", "red"}},
 				},
 				"mdb": map[string]interface{}{
-					"note": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+					"note": map[string]interface{}{"value": []interface{}{"debug", "red"}},
 				},
 				"aaa": map[string]interface{}{
-					"auth": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
-					"hash": map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
-					"rsa":  map[string]interface{}{"value": map[string]interface{}{"file": "debug.log", "meta": []interface{}{"time", "ship"}, "color_begin": "\033[31m", "color_end": "\033[0m"}},
+					"auth": map[string]interface{}{"value": []interface{}{"debug", "red"}},
+					"hash": map[string]interface{}{"value": []interface{}{"debug", "red"}},
+					"rsa":  map[string]interface{}{"value": []interface{}{"debug", "red"}},
 				},
 			},
+			"right": map[string]interface{}{"value": []interface{}{"right"}},
 		}, Help: "日志输出配置"},
 	},
 	Commands: map[string]*ctx.Command{
