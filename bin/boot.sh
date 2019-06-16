@@ -20,6 +20,10 @@ log() {
     echo -e $*
 }
 install() {
+    if [ -n "$1" ]; then
+        mkdir $1; cd $1
+    fi
+
     md5=md5sum
     case `uname -s` in
         "Darwin") GOOS=darwin GOARCH=amd64 md5=md5;;
@@ -51,7 +55,7 @@ dir=./ && [ -d "$1" ] && dir=$1 && shift
 log "dev:$ctx_dev\ndir: $dir\nbin: $ctx_bin\n"
 
 case $1 in
-    install) install "$@";;
+    install) shift && install "$@";;
     start|"") main "$@";;
     create) mkdir -p $2; cd $2 && shift && shift && main "$@";;
     restart) action 30;;

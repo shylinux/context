@@ -685,6 +685,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"command": &Command{Name: "command [all] [show]|[list [begin [end]] [prefix] test [key val]...]|[add [list_name name] [list_help help] cmd...]|[delete cmd]",
 			Help: "查看或修改命令, show: 查看命令;\nlist: 查看列表命令, begin: 起始索引, end: 截止索引, prefix: 过滤前缀, test: 执行命令;\nadd: 添加命令, list_name: 命令别名, list_help: 命令帮助;\ndelete: 删除命令",
 			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				if len(arg) > 0 && arg[0] == "help" {
+					m.Cmdy(".help", "command", arg[1:])
+					return
+				}
 				all := false
 				if len(arg) > 0 && arg[0] == "all" {
 					all, arg = true, arg[1:]

@@ -141,11 +141,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
 				"exit_shy":   "etc/exit.shy",
+
+				"template_tar_gz": "usr/template",
+				"librarys_tar_gz": "usr/librarys",
 			},
 		}, Help: "运行环境"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
-			"system": []interface{}{"boot_sh", "node_sh", "init_shy", "common_shy", "exit_shy"},
-			"portal": []interface{}{"code_tmpl", "code_js", "context_js"},
+			"system": []interface{}{"boot.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
+			"portal": []interface{}{"template.tar.gz", "librarys.tar.gz"},
 			"list": map[string]interface{}{
 				"bench":      "bin/bench.new",
 				"boot_sh":    "bin/boot.sh",
@@ -154,9 +157,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"common_shy": "etc/common.shy",
 				"exit_shy":   "etc/exit.shy",
 
-				"code_tmpl":  "usr/template/code/code.tmpl",
-				"code_js":    "usr/librarys/code.js",
-				"context_js": "usr/librarys/context.js",
+				"template_tar_gz": "usr/template.tar.gz",
+				"librarys_tar_gz": "usr/librarys.tar.gz",
 			},
 		}, Help: "日志地址"},
 
@@ -542,14 +544,22 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"publish": &ctx.Command{Name: "publish", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			p := m.Conf("publish", "path")
-			m.Assert(os.MkdirAll(p, 0777))
+			dir := m.Conf("publish", "path")
+			m.Assert(os.MkdirAll(dir, 0777))
 
 			m.Confm("publish", "list", func(key string, value string) {
-				m.Cmd("nfs.copy", path.Join(p, key), m.Cmdx("nfs.path", value))
+				p := m.Cmdx("nfs.path", value)
+				if s, e := os.Stat(p); e == nil {
+					if s.IsDir() {
+						m.Cmd("cli.system", "tar", "-zcf", path.Join(dir, key), "-C", path.Dir(p), path.Base(value))
+					} else {
+						m.Cmd("nfs.copy", path.Join(dir, key), p)
+					}
+					return
+				}
 			})
-			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "template.tar.gz"), "usr/template")
-			m.Cmd("cli.system", "tar", "-zcvf", path.Join(p, "librarys.tar.gz"), "usr/librarys")
+			m.Cmdy("nfs.dir", dir, "dir_sort", "time", "time_r")
+
 			return
 		}},
 		"upgrade": &ctx.Command{Name: "upgrade bench|system|extend|plugin|portal|client|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -572,8 +582,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					}
 					restart = true
 				}
+
 				m.Add("append", "hash", kit.Hashs(file))
 				m.Add("append", "file", file)
+
+				if strings.HasSuffix(link, ".tar.gz") {
+					m.Cmd("cli.system", "tar", "-xvf", file, "-C", path.Dir(file))
+				}
 			}
 			m.Table()
 
