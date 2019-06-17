@@ -368,11 +368,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			args = append(args, arg[1:]...)
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Path = kit.Select(cmd.Path, kit.Format(kit.Chain(conf, "path")))
-			m.Log("info", "cmd %v %v", cmd.Path, cmd.Args)
+			if cmd.Path != "" || len(cmd.Args) > 0 {
+				m.Log("info", "cmd %v %v", cmd.Path, cmd.Args)
+			}
 
 			// 工作目录
 			cmd.Dir = kit.Select(kit.Chains(conf, "dir"), m.Option("cmd_dir"))
-			m.Log("info", "dir %v", cmd.Dir)
+			if cmd.Dir != "" {
+				m.Log("info", "dir %v", cmd.Dir)
+			}
 
 			// 环境变量
 			m.Confm("system", "env", func(key string, value string) {
@@ -384,7 +388,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
 				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
 			}
-			m.Log("info", "env %v", cmd.Env)
+			if len(cmd.Env) > 0 {
+				m.Log("info", "env %v", cmd.Env)
+			}
 
 			// 交互命令
 			if m.Options("cmd_active") || kit.Right(conf["active"]) {
@@ -519,13 +525,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"project": &ctx.Command{Name: "project", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "init":
-				m.Cmdp(time.Second, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
-					[]string{"git", "init"},
-					[]string{"git", "remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
-					[]string{"git", "stash"},
-					[]string{"git", "pull"},
-					[]string{"git", "checkout", "-f", "master"},
-					[]string{"git", "stash", "pop"},
+				if _, e := os.Stat(".git"); e == nil {
+					m.Cmdp(0, []string{"git update"}, []string{"cli.system", "git"}, [][]string{
+						[]string{"git", "stash"},
+						[]string{"git", "pull"},
+						[]string{"git", "stash", "pop"},
+					})
+					return e
+				}
+				m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
+					[]string{"init"},
+					[]string{"remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
+					[]string{"stash"},
+					[]string{"pull"},
+					[]string{"checkout", "-f", "master"},
+					[]string{"stash", "pop"},
 				})
 
 				list := [][]string{}
@@ -547,7 +561,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			if len(arg) > 0 && arg[0] == "all" {
-				m.Cmdp(time.Second, []string{"go build"}, []string{"cli.compile"}, [][]string{
+				m.Cmdp(0, []string{"go build"}, []string{"cli.compile"}, [][]string{
 					[]string{"linux", "386"},
 					[]string{"linux", "amd64"},
 					[]string{"linux", "arm"},
@@ -564,6 +578,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				name := strings.Join([]string{"bench", goos, arch}, "_")
 
 				wd, _ := os.Getwd()
+				os.MkdirAll("var/tmp", 0777)
 				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch, "cmd_env",
 					"cmd_env", "GOTMPDIR", path.Join(wd, "var/tmp"),
 					"cmd_env", "GOCACHE", path.Join(wd, "var/tmp"),
