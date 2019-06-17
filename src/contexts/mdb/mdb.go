@@ -2,10 +2,13 @@ package mdb
 
 import (
 	"contexts/ctx"
+	"net"
+	"time"
 	"toolkit"
 
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/gomodule/redigo/redis"
 
 	"encoding/json"
 	"fmt"
@@ -14,6 +17,7 @@ import (
 
 type MDB struct {
 	*sql.DB
+	conn redis.Conn
 	*ctx.Context
 }
 
@@ -122,6 +126,30 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					kit.Select("数据源", m.Option("dbhelp")), arg...)
 				return
 			}},
+		"redis": &ctx.Command{Name: "redis conn address [protocol]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
+				switch arg[0] {
+				case "conn":
+					c, e := net.Dial(kit.Select("tcp", arg, 2), arg[1])
+					m.Assert(e)
+					mdb.conn = redis.NewConn(c, time.Second*10, time.Second*10)
+				default:
+					args := []interface{}{}
+					for _, v:=range arg[1:] {
+						args = append(args, v)
+					}
+					res, err := mdb.conn.Do(arg[0], args...)
+					m.Assert(err)
+					switch val := res.(type) {
+					case redis.Error:
+						m.Echo("%v", val)
+					default:
+						m.Echo("%v", kit.Format(res))
+					}
+				}
+			}
+			return
+		}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 操作参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
 				which := make([]interface{}, 0, len(arg))

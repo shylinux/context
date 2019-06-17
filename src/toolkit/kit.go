@@ -204,6 +204,8 @@ func Format(arg ...interface{}) string {
 			result = append(result, fmt.Sprintf("%t", val))
 		case string:
 			result = append(result, val)
+		case []byte:
+			result = append(result, string(val))
 		case []rune:
 			result = append(result, string(val))
 		case []string:

@@ -64,4 +64,5 @@ fieldset.Steam div.create pre:hover {
 
 fieldset div.output {
     clear:both;
+    max-height:800px;
 }

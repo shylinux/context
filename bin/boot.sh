@@ -3,8 +3,9 @@
 ctx_log=${ctx_log:="var/log"}
 ctx_app=${ctx_app:="bench"}
 ctx_bin=${ctx_app} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}
-# ctx_box=
 # ctx_cas=
+# ctx_ups=
+# ctx_box=
 ctx_dev=${ctx_dev:="https://shylinux.com"}
 ctx_root=${ctx_root:=/usr/local/context}
 ctx_home=${ctx_home:=~/context}
@@ -54,7 +55,11 @@ action() {
 
 dir=./ && [ -d "$1" ] && dir=$1 && shift
 [ -d "${dir}" ] && cd ${dir}
-log "dev:$ctx_dev\ndir: $dir\nbin: $ctx_bin\n"
+log "ups:$ctx_ups"
+log "box:$ctx_box"
+log "dev:$ctx_dev"
+log "bin:$ctx_bin"
+log "dir:$dir"
 
 case $1 in
     install) shift && install "$@";;

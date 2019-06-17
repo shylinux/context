@@ -71,21 +71,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				},
 			},
 			"project": []interface{}{
-				map[string]interface{}{"componet_name": "compile", "componet_help": "compile",
-					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "compile",
-					"componet_args": []interface{}{}, "inputs": []interface{}{
-						map[string]interface{}{"type": "button", "value": "编译"},
-					},
-					"display": map[string]interface{}{"hide_append": true, "show_result": true},
-				},
-				map[string]interface{}{"componet_name": "runtime", "componet_help": "runtime",
-					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "runtime",
-					"componet_args": []interface{}{"system"}, "inputs": []interface{}{
-						map[string]interface{}{"type": "button", "value": "运行"},
-					},
-				},
 				map[string]interface{}{"componet_name": "context", "componet_help": "context",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "ctx", "componet_cmd": "context",
@@ -174,7 +159,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "text", "name": "cmd", "value": "gg"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "gg", "view": "hide"},
 						map[string]interface{}{"type": "select", "name": "sub", "values": []interface{}{"status", ""}},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
@@ -184,12 +169,70 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "text", "name": "cmd", "value": "gg"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "gg", "view": "hide"},
 						map[string]interface{}{"type": "select", "name": "sub", "values": []interface{}{"deploygo", "deploy"}},
 						map[string]interface{}{"type": "text", "name": "sub", "imports": "plugin_dir"},
 						map[string]interface{}{"type": "text", "name": "sub", "imports": "plugin_branch"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
+				},
+				map[string]interface{}{"componet_name": "php", "componet_help": "php",
+					"componet_tmpl": "componet", "componet_view": "Company", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "php"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "usr/script/test.php"},
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+				},
+				map[string]interface{}{"componet_name": "redis", "componet_help": "redis",
+					"componet_tmpl": "componet", "componet_view": "Company", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "pod"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "context", "view": "hide"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "mdb", "view": "hide"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "redis", "view": "hide"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "get"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": "test"},
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+				},
+			},
+			"context": []interface{}{
+				map[string]interface{}{"componet_name": "runtime", "componet_help": "runtime",
+					"componet_tmpl": "componet", "componet_view": "Runtime", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "runtime",
+					"componet_args": []interface{}{"system"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "运行"},
+					},
+				},
+				map[string]interface{}{"componet_name": "project", "componet_help": "project",
+					"componet_tmpl": "componet", "componet_view": "componet", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "project",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{"import"}},
+						map[string]interface{}{"type": "button", "value": "执行"},
+					},
+				},
+				map[string]interface{}{"componet_name": "compile", "componet_help": "compile",
+					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "compile",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "action"},
+						map[string]interface{}{"type": "button", "value": "编译"},
+					},
+					"display": map[string]interface{}{"hide_append": true, "show_result": true},
+				},
+				map[string]interface{}{"componet_name": "publish", "componet_help": "publish",
+					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
+					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "compile",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "action"},
+						map[string]interface{}{"type": "button", "value": "编译"},
+					},
+					"display": map[string]interface{}{"hide_append": true, "show_result": true},
 				},
 			},
 		}, Help: "组件列表"},
@@ -386,6 +429,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			switch arg[0] {
 			case "auto": // 自动连接
+				m.Log("fuck", "what %v", m.Conf("runtime", "boot.ctx_ups"))
+				if m.Confs("runtime", "boot.ctx_ups") {
+					m.Cmd("ssh.remote", "dial", m.Conf("runtime", "boot.ctx_ups"))
+					break
+				}
 				if m.Cmd("ssh.remote", "dial", "dev", "/shadow"); !m.Confs("runtime", "boot.ctx_box") {
 					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "boot.ssh_port"))
 					m.Cmd("web.serve", "usr", m.Conf("runtime", "boot.web_port"))

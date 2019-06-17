@@ -1128,8 +1128,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if strings.HasSuffix(key, "bench") {
 				key = key + "." + m.Option("GOOS") + "." + m.Option("GOARCH")
 			}
+			p := ""
+			if m.Option("upgrade") == "script" {
+				p = m.Cmdx("nfs.path", path.Join("usr/script", key))
+			}
 			key = strings.Replace(key, ".", "_", -1)
-			p := m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
+			if p == "" {
+				p = m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
+			}
 			if p == "" {
 				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", key}))
 			}

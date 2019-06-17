@@ -15,15 +15,26 @@ fieldset {
 legend {
     margin-left:10px;
 }
-fieldset div.output {
-    padding:6px;
+fieldset form.option div {
+    margin-right:6px;
+    float:left;
+}
+fieldset form.option div.hide {
+    display:none;
+}
+fieldset form.option div input.args {
+    width:80px;
+}
+fieldset form.option div.cmd input.args {
+    color:white;
+    background-color: black;
+    width:160px;
 }
 fieldset form.option label {
     margin-right:6px;
 }
-fieldset form.option div {
-    margin-right:6px;
-    float:left;
+fieldset div.output {
+    padding:6px;
 }
 fieldset div.output div.item:hover {
     background-color:red;
@@ -40,6 +51,7 @@ fieldset div.output div.code {
     padding:10px;
     overflow:auto;
     border:solid 3px green;
+    max-height:640px;
 }
 fieldset div.output div.code span.red {
     color:red;

@@ -494,7 +494,7 @@ function Plugin(field, tool, args, plugin) {
                     item.className = "args"
             }
 
-            var ui = kit.AppendChild(option, [{type: "div", list: [{type: "label", inner: item.label||""}, input]}])
+            var ui = kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])
 
             page.plugin = field
             page.input = ui[name]

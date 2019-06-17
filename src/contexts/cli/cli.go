@@ -103,7 +103,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
 			"init_env": []interface{}{
 				"ctx_log", "ctx_app", "ctx_bin",
-				"ctx_box", "ctx_cas", "ctx_dev",
+				"ctx_ups", "ctx_box", "ctx_dev",
+				"ctx_cas",
 				"ctx_root", "ctx_home",
 				"web_port", "ssh_port",
 			},
@@ -137,9 +138,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 			"import": []interface{}{
 				"github.com/nsf/termbox-go",
-				"github.com/skip2/go-qrcode",
+				"github.com/gomodule/redigo",
 				"github.com/go-sql-driver/mysql",
 				"github.com/gomarkdown/markdown",
+				"github.com/skip2/go-qrcode",
 				"github.com/PuerkitoBio/goquery",
 				"github.com/go-cas/cas",
 			},
@@ -163,6 +165,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
 			"system": []interface{}{"boot.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
 			"portal": []interface{}{"template.tar.gz", "librarys.tar.gz"},
+			"script": []interface{}{"test.php"},
 			"list": map[string]interface{}{
 				"bench":      "bin/bench.new",
 				"boot_sh":    "bin/boot.sh",
@@ -549,6 +552,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
 					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
+
+			case "import":
+				list := [][]string{}
+				m.Confm("project", "import", func(index int, value string) {
+					list = append(list, []string{value})
+				})
+
+				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
+					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
 			}
 			return
 		}},
@@ -569,6 +581,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					[]string{"windows", "amd64"},
 					[]string{"darwin", "amd64"},
 				})
+				m.Echo("done %s", m.Time())
 				return
 			}
 
@@ -588,9 +601,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				})
 
 				p := m.Cmdx("nfs.path", m.Conf("compile", "bench"))
-				if m.Cmdy("cli.system", env, "go", "build", "-o", path.Join(m.Conf("publish", "path"), name), p); m.Result(0) == "" {
+				q := path.Join(m.Conf("publish", "path"), name)
+				if m.Cmdy("cli.system", env, "go", "build", "-o", q, p); m.Result(0) == "" {
+					m.Append("time", m.Time())
 					m.Append("bin", name)
-					m.Append("hash", kit.Hashs(p))
+					m.Append("hash", kit.Hashs(q))
 					m.Table()
 				}
 			}
@@ -625,7 +640,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			return
 		}},
-		"upgrade": &ctx.Command{Name: "upgrade bench|system|extend|plugin|portal|client|script|project", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "upgrade")
 				return
@@ -640,10 +655,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			restart := false
 			for _, link := range kit.View([]string{arg[0]}, m.Confm("upgrade")) {
 				file := kit.Select(link, m.Conf("upgrade", []string{"list", strings.Replace(link, ".", "_", -1)}))
+				if arg[0] == "script" {
+					file = path.Join("usr/script", file)
+				}
 
-				if m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", link),
-					"GOOS", m.Conf("runtime", "host.GOOS"), "GOARCH", m.Conf("runtime", "host.GOARCH"),
-					"save", file); strings.HasPrefix(file, "bin/") {
+				m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", link),
+					"GOARCH", m.Conf("runtime", "host.GOARCH"),
+					"GOOS", m.Conf("runtime", "host.GOOS"),
+					"upgrade", arg[0], "save", file)
+
+				if strings.HasPrefix(file, "bin/") {
 					if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
 						m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
 						m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
@@ -652,8 +673,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					restart = true
 				}
 
-				m.Add("append", "hash", kit.Hashs(file))
+				m.Add("append", "time", m.Time())
 				m.Add("append", "file", file)
+				m.Add("append", "hash", kit.Hashs(file))
 
 				if strings.HasSuffix(link, ".tar.gz") {
 					m.Cmd("cli.system", "tar", "-xvf", file, "-C", path.Dir(file))
@@ -686,6 +708,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Echo(", wait 1s")
 			m.GoFunc(m, func(m *ctx.Message) {
 				time.Sleep(time.Second * 1)
+				m.Cmd("nfs._exit")
 				os.Exit(kit.Int(code))
 			})
 			return
