@@ -891,6 +891,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" && !m.Options("daemon") {
 				kit.STDIO = nfs
 				nfs.Term(m, "init")
+				m.Conf("term", "use", true)
 				defer nfs.Term(m, "exit")
 			}
 			if what := make(chan bool); m.Options("daemon") {
@@ -1047,6 +1048,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"term": &ctx.Config{Name: "term", Value: map[string]interface{}{
+			"use": "false",
 			"mouse": map[string]interface{}{
 				"resize": false,
 			},
@@ -1147,7 +1149,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 		"_exit": &ctx.Command{Name: "_init", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			termbox.Close()
+			if m.Confs("term", "use") {
+				termbox.Close()
+			}
 			return
 		}},
 		"pwd": &ctx.Command{Name: "pwd [all] | [[index] path] ", Help: "工作目录，all: 查看所有, index path: 设置路径, path: 设置当前路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

@@ -694,18 +694,23 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					all, arg = true, arg[1:]
 				}
 
-				action := "show"
+				action := ""
 				if len(arg) > 0 {
 					switch arg[0] {
 					case "show", "list", "add", "delete":
 						action, arg = arg[0], arg[1:]
 					}
+				} else {
+					action = "show"
 				}
 
 				switch action {
 				case "show":
 					c.BackTrace(m, func(m *Message) bool {
 						for k, v := range m.target.Commands {
+							if strings.HasPrefix(k, "_") {
+								continue
+							}
 							if len(arg) > 0 {
 								if k == arg[0] {
 									m.Add("append", "key", k)
@@ -825,6 +830,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						delete(m.target.Commands, arg[0])
 						return !all
 					})
+				default:
+					if len(arg) > 0 {
+						m.Cmdy(arg)
+					}
 				}
 				return
 			}},

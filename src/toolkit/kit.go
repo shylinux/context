@@ -42,6 +42,9 @@ func Debugf(str string, args ...interface{}) {
 	Log("debug", str, args...)
 }
 
+func Key(name string) string {
+	return strings.Replace(name, ".", "_", -1)
+}
 func Env(key string) {
 	os.Getenv(key)
 }

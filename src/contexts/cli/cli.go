@@ -178,6 +178,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"librarys_tar_gz": "usr/librarys.tar.gz",
 			},
 		}, Help: "日志地址"},
+		"missyou": &ctx.Config{Name: "missyou", Value: map[string]interface{}{
+			"path": "usr/work",
+		}, Help: "免密登录"},
 
 		"plugin": &ctx.Config{Name: "plugin", Value: map[string]interface{}{
 			"go": map[string]interface{}{
@@ -545,19 +548,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					[]string{"stash", "pop"},
 				})
 
-				list := [][]string{}
-				m.Confm("project", "import", func(index int, value string) {
-					list = append(list, []string{value})
-				})
-
-				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
-					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
-
 			case "import":
 				list := [][]string{}
 				m.Confm("project", "import", func(index int, value string) {
 					list = append(list, []string{value})
+					m.Add("append", "time", m.Time())
+					m.Add("append", "package", value)
 				})
+				m.Table()
 
 				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
 					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
@@ -625,19 +623,23 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			for _, key := range arg {
+				key = kit.Key(key)
 				value := m.Conf("publish", []string{"list", key})
 				p := m.Cmdx("nfs.path", value)
+				q := path.Join(dir, key)
 				if s, e := os.Stat(p); e == nil {
 					if s.IsDir() {
-						m.Cmd("cli.system", "tar", "-zcf", path.Join(dir, key), "-C", path.Dir(p), path.Base(value))
+						m.Cmd("cli.system", "tar", "-zcf", q, "-C", path.Dir(p), path.Base(value))
 					} else {
-						m.Cmd("nfs.copy", path.Join(dir, key), p)
+						m.Cmd("nfs.copy", q, p)
 					}
+					m.Add("append", "time", m.Time())
+					m.Add("append", "file", q)
+					m.Add("append", "hash", kit.Hashs(p))
 				}
 			}
-
+			m.Table()
 			// m.Cmdy("nfs.dir", dir, "dir_sort", "time", "time_r")
-
 			return
 		}},
 		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -688,6 +690,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
+		"missyou": &ctx.Command{Name: "missyou", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Option("dir_root", "")
+				m.Cmdy("nfs.dir", m.Conf("missyou", "path"))
+				return
+			}
+
+			m.Cmdy("cli.system", "node.sh", "create", path.Join(m.Conf("missyou", "path"), m.Time("20060102-")+arg[0]),
+				"daemon", "cmd_daemon", "true")
+			return
+		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			code := kit.Select("0", arg, 0)
 			switch code {
@@ -704,12 +717,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Echo("restart")
 				}
 			}
-			m.Append("directory", "")
-			m.Echo(", wait 1s")
+			m.Append("time", m.Time())
+			m.Append("code", code)
+			m.Echo(", wait 1s\n")
+			m.Table()
 			m.GoFunc(m, func(m *ctx.Message) {
+				defer func() {
+					os.Exit(kit.Int(code))
+				}()
 				time.Sleep(time.Second * 1)
+				m.Cmd("cli._exit")
 				m.Cmd("nfs._exit")
-				os.Exit(kit.Int(code))
 			})
 			return
 		}},
@@ -781,6 +799,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				default:
 					m.Cmdy("system", m.Conf("system", []string{"script", strings.TrimPrefix(path.Ext(p), ".")}), arg)
 				}
+				m.Append("directory", "")
 				return
 			}
 
@@ -895,7 +914,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 								timer["msg"] = msg.Code()
 
 								if timer["repeat"].(bool) {
-									timer["action_time"] = int64(m.Sess("cli").Cmd("time", timer["action_time"], timer["order"], timer["time"]).Appendi("timestamp"))
+									timer["action_time"] = int64(m.Sess("cli").Cmd("time", msg.Time(), timer["order"], timer["time"]).Appendi("timestamp"))
 								} else {
 									timer["done"] = true
 								}
