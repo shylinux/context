@@ -500,7 +500,8 @@ function Plugin(field, tool, args, plugin) {
             page.input = ui[name]
             index == 0 && ui[name] && ui[name].focus && ui[name].focus()
             item.imports && page.Sync(item.imports).change(function(value, old) {
-                ui[name].value = value
+                ui[name].value = value;
+                (index == total-1 || (index == total-2 && ui[name].parentNode.nextSibling.childNodes[1].type == "button")) && option.Runs(event)
             })
             return ui[name]
         },

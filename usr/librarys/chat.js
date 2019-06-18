@@ -598,6 +598,7 @@ var page = Page({
 
         page.onlayout(null, page.conf.layout)
         kit.isMobile && page.action.Action["最宽"]()
+        page.action.Action["最大"]()
         ctx.Search("layout") && page.action.Action[ctx.Search("layout")]()
 
         page.footer.Order({"text": "", "ip": "", ".": "", ":":""}, ["ip", "text", ":", "."])
