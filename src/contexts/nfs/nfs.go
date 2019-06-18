@@ -1126,6 +1126,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir/both/all)", Value: "both", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
 		"dir_fields": &ctx.Config{Name: "dir_fields(time/type/name/size/line/hash)", Value: "time size line filename", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 
+		"grep": &ctx.Config{Name: "grep", Value: map[string]interface{}{
+			"list": map[string]interface{}{
+			},
+		}, Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 		"git": &ctx.Config{Name: "git", Value: map[string]interface{}{
 			"args":   []interface{}{"-C", "@git_dir"},
 			"info":   map[string]interface{}{"cmds": []interface{}{"log", "status", "branch"}},
@@ -1285,6 +1289,73 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 				m.Cmd("cli.system", "git", args).Echo("\n\n").CopyTo(m)
 			}
+			return
+		}},
+		"grep": &ctx.Command{Name: "grep", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 {
+				switch arg[0]{
+				case "add":
+					m.Confv("grep", []string{"list", arg[1]}, map[string]interface{}{
+						"pos": 0,
+						"offset": 0,
+						"file": arg[2],
+					})
+					return
+
+				case "head":
+					m.Confm("grep", "list", func(key string, value map[string]interface{}) {
+						if len(arg) == 1 || key == arg[1] {
+							value["pos"] = 0
+							value["offset"] = 0
+						}
+					})
+					return
+				case "tail":
+					m.Confm("grep", "list", func(key string, value map[string]interface{}) {
+						if len(arg) == 1 || key == arg[1] {
+							value["pos"] = -1
+							value["offset"] = 0
+						}
+					})
+					return
+				}
+			}
+
+			m.Confm("grep", "list", func(key string, value map[string]interface{}) {
+				f, e := os.Open(kit.Format(value["file"]))
+				m.Assert(e)
+				defer f.Close()
+
+				// s, e := f.Stat()
+				// m.Assert(e)
+
+				begin, e :=  f.Seek(int64(kit.Int(value["pos"])), 0)
+				if kit.Int(value["pos"]) == -1 {
+					begin, e =  f.Seek(0, 2)
+				}
+				m.Assert(e)
+
+				n := 0
+				bio := bufio.NewScanner(f)
+				for i := 0; i < m.Optioni("page.limit") && bio.Scan(); i++ {
+					text := bio.Text()
+					if len(arg) == 0 || strings.Contains(text, arg[0]){
+						m.Add("append", "key", key)
+						// m.Add("append", "pos",begin+int64(n))
+						// m.Add("append", "len",len(text))
+						// m.Add("append", "end",s.Size())
+						m.Add("append", "line", kit.Int(value["offset"]))
+						m.Add("append", "text", text)
+					} else {
+						i--
+					}
+					n+=len(text)+1
+					value["offset"] =  kit.Int(value["offset"]) + 1
+				}
+
+				value["pos"] =  begin + int64(n)
+			})
+			m.Table()
 			return
 		}},
 

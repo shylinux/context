@@ -134,6 +134,14 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					m.Assert(e)
 					mdb.conn = redis.NewConn(c, time.Second*10, time.Second*10)
 				default:
+					if mdb.conn == nil {
+						m.Echo("not open")
+						break
+					}
+					if mdb.conn.Err() != nil {
+						m.Echo("%v", mdb.conn.Err())
+						return
+					}
 					args := []interface{}{}
 					for _, v:=range arg[1:] {
 						args = append(args, v)

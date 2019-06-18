@@ -30,6 +30,9 @@ fieldset form.option div.cmd input.args {
     background-color: black;
     width:160px;
 }
+fieldset form.option div.long input.args {
+    width:320px;
+}
 fieldset form.option label {
     margin-right:6px;
 }
@@ -58,6 +61,10 @@ fieldset div.output div.code span.red {
 }
 fieldset div.output div.code span.green {
     color:green;
+}
+fieldset div.output table td {
+    word-break:break-all;
+    min-width:40px;
 }
 
 fieldset.toast {

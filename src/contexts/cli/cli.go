@@ -478,6 +478,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				// 解析结果
 				switch m.Option("cmd_parse") {
+				case "format":
+					var data interface{}
+					if json.Unmarshal(out.Bytes(), &data) == nil {
+						if b, e := json.MarshalIndent(data, "", "  "); e == nil {
+							m.Echo(string(b))
+							break
+						}
+					}
+					m.Echo(out.String())
 				case "json":
 					var data interface{}
 					if json.Unmarshal(out.Bytes(), &data) == nil {

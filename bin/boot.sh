@@ -41,7 +41,11 @@ install() {
          && ./${ctx_app} upgrade ${target} && ${md5} ${ctx_app} \
          && mv ${ctx_app} bin/${ctx_app}
 }
+hup() {
+    echo "term hup"
+}
 main() {
+    trap HUP hup
     while true; do
         ${ctx_bin} "$@" && break
         log "restarting..." && sleep 3
