@@ -149,6 +149,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "text", "name": "action"},
 						map[string]interface{}{"type": "button", "value": "行动"},
 					},
+					"exports": []interface{}{"you", "filename"},
 				},
 			},
 			"favor": []interface{}{
@@ -209,19 +210,21 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "nfs", "dir"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "button", "value": "回退", "click": "Back"},
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "text", "name": "dir", "value": ""},
+						map[string]interface{}{"type": "text", "name": "dir", "value": "", "view": "long", "imports": []interface{}{"plugin_dir", "plugin_you"}},
 						map[string]interface{}{"type": "button", "value": "查看"},
 					},
 					"display": map[string]interface{}{"hide_result": true},
 					"exports": []interface{}{"dir", "filename", "dir"},
+					"dir_root": []interface{}{"/"},
 				},
 				map[string]interface{}{"componet_name": "status", "componet_help": "git",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "nfs", "git"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "text", "name": "dir", "imports": "plugin_dir"},
+						map[string]interface{}{"type": "text", "name": "dir", "view": "long", "imports": "plugin_dir"},
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{
 							"branch", "status", "diff", "log", "update", "push", "init",
 						}},
@@ -235,7 +238,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "text", "name": "dir", "imports": "plugin_dir"},
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{
-							"commit", "add",
+							"commit", "add", "checkout",
 						}},
 						map[string]interface{}{"type": "text", "name": "commit"},
 						map[string]interface{}{"type": "button", "value": "执行"},
@@ -459,12 +462,17 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 				msg.Cmd(tool["componet_cmd"], args, arg).CopyTo(m)
 
+
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {
 					m.Add("append", "name", value["componet_name"])
 					m.Add("append", "help", value["componet_help"])
 					m.Add("append", "view", value["componet_view"])
-					m.Add("append", "init", m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1))
+					if kit.Right(value["componet_init"]) {
+						m.Add("append", "init", m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1))
+					} else {
+						m.Add("append", "init", "")
+					}
 					m.Add("append", "inputs", kit.Format(value["inputs"]))
 					m.Add("append", "exports", kit.Format(value["exports"]))
 					m.Add("append", "display", kit.Format(value["display"]))
@@ -655,7 +663,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			defer func() { m.Back(m) }()
 
 			if !m.Options("remote_code") { // 本地调用
-				m.Cmdm(arg)
+				m.Cmdy(arg)
 
 			} else if arg[0] == "_check" { // 公有命令
 				m.Cmd(arg)
@@ -1009,7 +1017,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 
 			// 执行命令
-			m.Cmdm(arg)
+			m.Cmdy(arg)
 			return
 		}},
 	},

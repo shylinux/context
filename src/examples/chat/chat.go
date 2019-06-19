@@ -167,6 +167,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				}
 			}
 
+			// if m.Log("info", "nickname: %s", m.Option("nickname", m.Cmdx("aaa.auth", "username", m.Option("username"), "data", "nickname"))); !m.Options("nickname") {
+			//	m.Option("nickname", m.Option("username"))
+			// }
 			m.Append("remote_ip", m.Option("remote_ip"))
 			m.Append("nickname", m.Option("nickname"))
 			m.Echo(m.Option("username"))

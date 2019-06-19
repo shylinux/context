@@ -148,6 +148,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}, Help: "运行环境"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
 			"bench": "src/examples/app/bench.go",
+			"tmp": "var/tmp/go",
 			"env":   []interface{}{"GOPATH", "PATH"},
 		}, Help: "运行环境"},
 		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
@@ -574,7 +575,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 && arg[0] == "self" {
 				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
-					m.Cmdy("cli.quit", 2)
+					m.Cmdy("cli.quit", 1)
 				}
 				return
 			}
@@ -598,10 +599,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				name := strings.Join([]string{"bench", goos, arch}, "_")
 
 				wd, _ := os.Getwd()
-				os.MkdirAll("var/tmp", 0777)
+				os.MkdirAll(m.Conf("compile", "tmp"), 0777)
 				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch, "cmd_env",
-					"cmd_env", "GOTMPDIR", path.Join(wd, "var/tmp"),
-					"cmd_env", "GOCACHE", path.Join(wd, "var/tmp"),
+					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),
+					"cmd_env", "GOCACHE", path.Join(wd, m.Conf("compile", "tmp")),
 				}
 				m.Confm("compile", "env", func(index int, key string) {
 					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
@@ -695,7 +696,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Table()
 
 			if restart {
-				m.Cmd("cli.quit", 2)
+				m.Cmd("cli.quit", 1)
 			}
 			return
 		}},
@@ -706,8 +707,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}
 
-			m.Cmdy("cli.system", "node.sh", "create", path.Join(m.Conf("missyou", "path"), m.Time("20060102-")+arg[0]),
-				"daemon", "cmd_daemon", "true")
+			p := path.Join(m.Conf("missyou", "path"), m.Time("20060102-")+arg[0])
+			m.Cmd("nfs.copy", path.Join(p, "etc/local.shy"), "usr/missyou/job.shy")
+
+			m.Confm("missyou", "local", func(index string, local string) {
+				m.Cmd("nfs.git", "clone", local, path.Join(p, "usr/local", index))
+			})
+			m.Cmdy("cli.system", "node.sh", "create", p, "daemon", "cmd_daemon", "true")
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -718,18 +724,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Echo("quit")
 
 			case "1":
-				m.Echo("term")
-
-			case "2":
 				if m.Option("cli.modal") != "action" {
 					m.Cmd("cli.source", m.Conf("system", "script.exit"))
 					m.Echo("restart")
 				}
+
+			case "2":
+				m.Echo("term")
 			}
+
 			m.Append("time", m.Time())
 			m.Append("code", code)
 			m.Echo(", wait 1s\n")
 			m.Table()
+			fmt.Printf("\n")
+			for _, v:=range m.Meta["result"] {
+				fmt.Printf("%v", v)
+			}
+
 			m.GoFunc(m, func(m *ctx.Message) {
 				defer func() {
 					os.Exit(kit.Int(code))

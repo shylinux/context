@@ -101,9 +101,9 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 			switch action {
 			case "QUIT":
 				m.Cmd("cli.quit", 0)
-			case "TERM":
-				m.Cmd("cli.quit", 1)
 			case "restart":
+				m.Cmd("cli.quit", 1)
+			case "TERM":
 				m.Cmd("cli.quit", 2)
 			case "upgrade":
 				m.Cmd("cli.upgrade", "bench")

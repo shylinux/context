@@ -95,9 +95,9 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	// if msg.Confs("skip_login", msg.Option("path")) {
 	// 	return true
 	// }
-	defer func() {
-		msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
-	}()
+	// defer func() {
+		// msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
+	// }()
 	if msg.Confs("login", "cas") {
 		if !cas.IsAuthenticated(r) {
 			r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
@@ -137,11 +137,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	}
 
 	if msg.Log("info", "sessid: %s", msg.Option("sessid")); msg.Options("sessid") {
-		if msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta"))); msg.Options("username") {
-			if msg.Log("info", "nickname: %s", msg.Option("nickname", msg.Cmdx("aaa.auth", "username", msg.Option("username"), "data", "nickname"))); !msg.Options("nickname") {
-				msg.Option("nickname", msg.Option("username"))
-			}
-		}
+		msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta")))
 	}
 
 	if !msg.Options("username") && msg.Options("relay") {

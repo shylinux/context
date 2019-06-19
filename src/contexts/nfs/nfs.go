@@ -1195,7 +1195,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				rg, e := regexp.Compile(m.Option("dir_reg"))
 
 				m.Confm("paths", func(index int, value string) bool {
-					p := path.Join(value, m.Option("dir_root"), arg[0])
+					// p := path.Join(value, m.Option("dir_root"), arg[0])
+					p := path.Join(value, arg[0])
 					if s, e := os.Stat(p); e == nil {
 						if s.IsDir() {
 							dir(m, p, 0, kit.Right(m.Has("dir_deep")), m.Confx("dir_type"), trip, rg,

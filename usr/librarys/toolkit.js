@@ -140,7 +140,7 @@ kit = toolkit = {
                 for (var k in html) {
                     if (typeof html[k] == "object") {
                         for (var d in html[k]) {
-                            node[k][d] = html[k][d]
+                            node[k] && (node[k][d] = html[k][d])
                         }
                         continue
                     }

@@ -395,7 +395,11 @@ function Plugin(field, tool, args, plugin) {
                 output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value) {
                     if (exports.length > 2) {
-                        value = option[exports[2]].value + "/" + value
+                        if (value.endsWith("/")) {
+                            value = option[exports[2]].value + value
+                        } else {
+                            return
+                        }
                     }
                     page.Sync("plugin_"+exports[0]).set(value)
                 });
@@ -475,7 +479,8 @@ function Plugin(field, tool, args, plugin) {
             switch (item.type) {
                 case "button":
                     item.onclick = function(event) {
-                        plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
+                        action[item.click]? action[item.click](event, item, option, field):
+                            plugin[item.click]? plugin[item.click](event, item, option, field): option.Runs(event)
                     }
                     break
 
@@ -495,15 +500,29 @@ function Plugin(field, tool, args, plugin) {
             }
 
             var ui = kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])
+            var action = ui[name] || {}
 
             page.plugin = field
-            page.input = ui[name]
-            index == 0 && ui[name] && ui[name].focus && ui[name].focus()
-            item.imports && page.Sync(item.imports).change(function(value, old) {
-                ui[name].value = value;
-                (index == total-1 || (index == total-2 && ui[name].parentNode.nextSibling.childNodes[1].type == "button")) && option.Runs(event)
+            page.input = action
+            index == 0 && action && action.focus && action.focus()
+
+            action.History = []
+            action.Goto = function(value) {
+                action.value = value;
+                (index == total-1 || (index == total-2 && action.parentNode.nextSibling.childNodes[1].type == "button")) && option.Runs(event)
+                action.History.push(value)
+                plugin.Back = function() {
+                    action.History.pop()
+                    action.History.length > 0 && action.Goto(action.History.pop())
+                }
+                return value
+            }
+
+            item.imports && typeof item.imports == "object" && item.imports.forEach(function(imports) {
+                page.Sync(imports).change(action.Goto)
             })
-            return ui[name]
+            item.imports && typeof item.imports == "string" && page.Sync(item.imports).change(action.Goto)
+            return action
         },
         Select: function() {
             page.plugin = field
@@ -511,7 +530,7 @@ function Plugin(field, tool, args, plugin) {
         },
     }
 
-    var inputs = JSON.parse(tool.inputs)
+    var inputs = JSON.parse(tool.inputs || "[]")
     inputs.map(function(item, index, inputs) {
         plugin.Append(item)
     })
