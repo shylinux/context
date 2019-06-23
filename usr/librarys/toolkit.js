@@ -29,54 +29,6 @@ kit = toolkit = {
         return args
     },
 
-    Position: function(which) {
-        return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
-    },
-    ScrollPage: function(event, conf) {
-        switch (event.key) {
-            case "h":
-                if (event.ctrlKey) {
-                    window.scrollBy(-conf.scroll_x*10, 0)
-                } else {
-                    window.scrollBy(-conf.scroll_x, 0)
-                }
-                break
-            case "H":
-                window.scrollBy(-document.body.scrollWidth, 0)
-                break
-            case "l":
-                if (event.ctrlKey) {
-                    window.scrollBy(conf.scroll_x*10, 0)
-                } else {
-                    window.scrollBy(conf.scroll_x, 0)
-                }
-                break
-            case "L":
-                window.scrollBy(document.body.scrollWidth, 0)
-                break
-            case "j":
-                if (event.ctrlKey) {
-                    window.scrollBy(0, conf.scroll_y*10)
-                } else {
-                    window.scrollBy(0, conf.scroll_y)
-                }
-                break
-            case "J":
-                window.scrollBy(0, document.body.scrollHeight)
-                break
-            case "k":
-                if (event.ctrlKey) {
-                    window.scrollBy(0, -conf.scroll_y*10)
-                } else {
-                    window.scrollBy(0, -conf.scroll_y)
-                }
-                break
-            case "K":
-                window.scrollBy(0, -document.body.scrollHeight)
-                break
-        }
-        return true
-    },
     ModifyView: function(which, args) {
         var height = document.body.clientHeight-4
         var width = document.body.clientWidth-4
@@ -164,6 +116,7 @@ kit = toolkit = {
         //
         // dataset click
         // button input label img
+        // select
         //
         // 树状结构: tree fork leaf
         // 普通视图: view text code
@@ -190,6 +143,9 @@ kit = toolkit = {
             if (child.inner) {
                 child.data["innerHTML"] = child.inner
             }
+            if (child.className) {
+                child.data["className"] = child.className
+            }
             if (typeof(child.style) == "object") {
                 var str = []
                 for (var k in child.style) {
@@ -212,6 +168,13 @@ kit = toolkit = {
                 child.data["onclick"] = child.button[1]
                 child.data["innerText"] = child.button[0]
                 child.name = child.name || child.button[0]
+
+            } else if (child.select) {
+                child.type = "select"
+                child.list = child.select[0].map(function(value) {
+                    return {type: "option", value: value, inner: value}
+                })
+                child.data["onchange"] = child.select[1]
 
             } else if (child.input) {
                 child.type = "input"
@@ -272,14 +235,14 @@ kit = toolkit = {
                 child.code.length > 2 && (child.data["className"] = child.code[2])
 
             } else if (child.script) {
-                child.data.innerHTML = child.script
                 child.type = "script"
+                child.data.innerHTML = child.script
 
             } else if (child.include) {
+                child.type = "script"
                 child.data["src"] = child.include[0]
                 child.data["type"] = "text/javascript"
                 child.include.length > 1 && (child.data["onload"] = child.include[1])
-                child.type = "script"
 
             } else if (child.require) {
                 child.data["href"] = child.require[0]
@@ -315,6 +278,9 @@ kit = toolkit = {
         })
         return subs
     },
+    AppendChilds: function(parent, children, subs) {
+        return parent.innerHTML = "", this.AppendChild(parent, children, subs)
+    },
     InsertChild: function (parent, position, element, children) {
         var elm = this.CreateNode(element)
         this.AppendChild(elm, children)
@@ -332,6 +298,7 @@ kit = toolkit = {
         })
         data.forEach(function(row, i) {
             var tr = kit.AppendChild(table, "tr", {className: "normal"})
+            tr.Meta = row
             fields.forEach(function(key, j) {
                 var td = kit.AppendChild(tr, "td", row[key])
                 if (typeof cb == "function") {
@@ -403,12 +370,131 @@ kit = toolkit = {
                     kit.RangeTable(table, i, dataset["sort_asc"] == "1")
                     return
                 }
-                if (field && head.childNodes[i].innerText.startsWith(field)) {
-                    typeof cb == "function" && cb(event, item.innerText)
+                var name = head.childNodes[i].innerText
+                if (name.startsWith(field)) {
+                    typeof cb == "function" && cb(event, item.innerText, name,item.parentNode.Meta)
                 }
                 kit.CopyText()
             })
         }
+    },
+
+    OrderCode: function(code) {
+        if (!code) {return}
+
+        var kit = this
+        code.onclick = function(event) {
+            kit.CopyText()
+        }
+    },
+    OrderLink: function(link) {
+        link.target = "_blank"
+    },
+    OrderText: function(pane, text) {
+        text.querySelectorAll("a").forEach(function(value, index, array) {
+            kit.OrderLink(value, pane)
+        })
+        text.querySelectorAll("table").forEach(function(value, index, array) {
+            kit.OrderTable(value)
+        })
+
+        var i = 0, j = 0, k = 0
+        var h0 = [], h2 = [], h3 = []
+        text.querySelectorAll("h2,h3,h4").forEach(function(value, index, array) {
+            var id = ""
+            var text = value.innerText
+            var ratio = parseInt(value.offsetTop/pane.scrollHeight*100)
+            if (value.tagName == "H2") {
+                j=k=0
+                h2 = []
+                id = ++i+"."
+                text = id+" "+text
+                h0.push({"fork": [text+" ("+ratio+"%)", h2, function(event) {
+                    location.hash = id
+                }]})
+            } else if (value.tagName == "H3") {
+                k=0
+                h3 = []
+                id = i+"."+(++j)
+                text = id+" "+text
+                h2.push({"fork": [text+" ("+ratio+"%)", h3, function(event) {
+                    location.hash = id
+                }]})
+            } else if (value.tagName == "H4") {
+                id = i+"."+j+"."+(++k)
+                text = id+" "+text
+                h3.push({"leaf": [text+" ("+ratio+"%)", function(event) {
+                    location.hash = id
+                }]})
+            }
+            value.innerText = text
+            value.id = id
+        })
+        return h0
+
+        text.querySelectorAll("table.wiki_list").forEach(function(value, index, array) {
+            kit.OrderTable(value, "path", function(event) {
+                var text = event.target.innerText
+                ctx.Search({"wiki_class": text})
+            })
+        })
+    },
+
+    CopyText: function(text) {
+        text = window.getSelection().toString()
+        if (text == "") {return}
+        kit.History.add("txt", text)
+        document.execCommand("copy")
+    },
+    DelText: function(target, start, count) {
+        target.value = target.value.substring(0, start)+target.value.substring(start+(count||target.value.length), target.value.length)
+        target.setSelectionRange(start, start)
+    },
+    HitText: function(target, text) {
+        var start = target.selectionStart
+        for (var i = 1; i < text.length+1; i++) {
+            var ch = text[text.length-i]
+            if (target.value[start-i] != ch && kit.History.get("key", -i).data != ch) {
+                return false
+            }
+        }
+        return true
+    },
+
+    Selector: function(obj, item, cb) {
+        var list = []
+        obj.querySelectorAll(item).forEach(function(item, index) {
+            if (typeof cb == "function") {
+                var value = cb(item)
+                value != undefined && list.push(value)
+            } else {
+                list.push(item)
+            }
+        })
+        for (var i = list.length-1; i >= 0; i--) {
+            if (list[i] == "") {
+                list.pop()
+            } else {
+                break
+            }
+        }
+        return list
+    },
+    Position: function(which) {
+        return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
+    },
+
+    alert: function(text) {
+        alert(JSON.stringify(text))
+    },
+    prompt: function(text) {
+        return prompt(text)
+    },
+    confirm: function(text) {
+        return confirm(text)
+    },
+    reload: function() {
+        location.reload()
     },
 
     OrderForm: function(page, field, option, append, result) {
@@ -477,105 +563,16 @@ kit = toolkit = {
             }
         })
     },
-    OrderCode: function(code) {
-        if (!code) {return}
 
-        var kit = this
-        code.onclick = function(event) {
-            kit.CopyText()
-        }
-    },
-    OrderText: function(pane, text) {
-        text.querySelectorAll("a").forEach(function(value, index, array) {
-            kit.OrderLink(value, pane)
-        })
-        text.querySelectorAll("table").forEach(function(value, index, array) {
-            kit.OrderTable(value)
-        })
-
-        var i = 0, j = 0, k = 0
-        var h0 = [], h2 = [], h3 = []
-        text.querySelectorAll("h2,h3,h4").forEach(function(value, index, array) {
-            var id = ""
-            var text = value.innerText
-            var ratio = parseInt(value.offsetTop/pane.scrollHeight*100)
-            if (value.tagName == "H2") {
-                j=k=0
-                h2 = []
-                id = ++i+"."
-                text = id+" "+text
-                h0.push({"fork": [text+" ("+ratio+"%)", h2, function(event) {
-                    location.hash = id
-                }]})
-            } else if (value.tagName == "H3") {
-                k=0
-                h3 = []
-                id = i+"."+(++j)
-                text = id+" "+text
-                h2.push({"fork": [text+" ("+ratio+"%)", h3, function(event) {
-                    location.hash = id
-                }]})
-            } else if (value.tagName == "H4") {
-                id = i+"."+j+"."+(++k)
-                text = id+" "+text
-                h3.push({"leaf": [text+" ("+ratio+"%)", function(event) {
-                    location.hash = id
-                }]})
-            }
-            value.innerText = text
-            value.id = id
-        })
-        return h0
-
-        text.querySelectorAll("table.wiki_list").forEach(function(value, index, array) {
-            kit.OrderTable(value, "path", function(event) {
-                var text = event.target.innerText
-                ctx.Search({"wiki_class": text})
-            })
-        })
-    },
-    OrderLink: function(link) {
-        link.target = "_blank"
-    },
-
-    CopyText: function(text) {
-        text = window.getSelection().toString()
-        if (text == "") {return}
-        kit.History.add("txt", text)
-        document.execCommand("copy")
-    },
-    DelText: function(target, start, count) {
-        target.value = target.value.substring(0, start)+target.value.substring(start+(count||target.value.length), target.value.length)
-        target.setSelectionRange(start, start)
-    },
-    HitText: function(target, text) {
-        var start = target.selectionStart
-        for (var i = 1; i < text.length+1; i++) {
-            var ch = text[text.length-i]
-            if (target.value[start-i] != ch && kit.History.get("key", -i).data != ch) {
-                return false
-            }
-        }
-        return true
-    },
-    Selector: function(obj, item, cb) {
+    List: function(obj, cb) {
         var list = []
-        obj.querySelectorAll(item).forEach(function(item, index) {
-            if (typeof cb == "function") {
-                var value = cb(item)
-                value != undefined && list.push(value)
-            } else {
-                list.push(item)
-            }
-        })
-        for (var i = list.length-1; i >= 0; i--) {
-            if (list[i] == "") {
-                list.pop()
-            } else {
-                break
-            }
+        for (var i = 0; i < obj.length; i++) {
+            list.push(typeof cb == "function"? cb(obj[i]): obj[i])
         }
         return list
+    },
+    Format: function(objs) {
+        return json.stringify(objs)
     },
 }
 

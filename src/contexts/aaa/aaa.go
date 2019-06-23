@@ -689,6 +689,31 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}
 			return
 		}},
+		"location": &ctx.Command{Name: "clip", Help: "授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			h := m.Cmdx("aaa.auth", "username", m.Option("username"))
+
+			if len(arg) < 2 { // 会话列表
+				m.Confm("auth", []string{h, "data", "location"}, func(index int, value map[string]interface{}) {
+					m.Add("append", "create_time", value["create_time"])
+					m.Add("append", "location", value["location"])
+					m.Add("append", "latitude", value["latitude"])
+					m.Add("append", "longitude", value["longitude"])
+				})
+				m.Table()
+				return
+			}
+
+			switch arg[0] {
+			default:
+				m.Conf("auth", []string{h, "data", "location", "-2"}, map[string]interface{}{
+					"create_time": m.Time(),
+					"latitude":    arg[0], "longitude": arg[1],
+					"location": kit.Select("", arg, 2),
+				})
+				m.Echo("%d", len(m.Confv("auth", []string{h, "data", "location"}).([]interface{}))-1)
+			}
+			return
+		}},
 
 		"relay": &ctx.Command{Name: "relay check hash | share role", Help: "授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 { // 会话列表

@@ -1556,10 +1556,11 @@ func (m *Message) Cmdp(t time.Duration, head []string, prefix []string, suffix [
 
 	for i, v := range suffix {
 		m.Show(fmt.Sprintf("%v/%v %v...\n", i+1, len(suffix), v))
-		m.Cmd(prefix, v)
+		m.CopyFuck(m.Cmd(prefix, v), "append")
 		time.Sleep(t)
 	}
 	m.Show("\n")
+	m.Table()
 	return m
 }
 func (m *Message) Cmdm(args ...interface{}) *Message {

@@ -98,6 +98,38 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		}, Help: "数据视图"},
 	},
 	Commands: map[string]*ctx.Command{
+		"redis": &ctx.Command{Name: "redis conn address [protocol]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
+				switch arg[0] {
+				case "conn":
+					c, e := net.Dial(kit.Select("tcp", arg, 2), arg[1])
+					m.Assert(e)
+					mdb.conn = redis.NewConn(c, time.Second*10, time.Second*10)
+				default:
+					if mdb.conn == nil {
+						m.Echo("not open")
+						break
+					}
+					if mdb.conn.Err() != nil {
+						m.Echo("%v", mdb.conn.Err())
+						return
+					}
+					args := []interface{}{}
+					for _, v := range arg[1:] {
+						args = append(args, v)
+					}
+					res, err := mdb.conn.Do(arg[0], args...)
+					m.Assert(err)
+					switch val := res.(type) {
+					case redis.Error:
+						m.Echo("%v", val)
+					default:
+						m.Echo("%v", kit.Format(res))
+					}
+				}
+			}
+			return
+		}},
 		"open": &ctx.Command{Name: "open [database [username [password [address [protocol [driver]]]]]]",
 			Help: "打开数据库, database: 数据库名, username: 用户名, password: 密码, address: 服务地址, protocol: 服务协议, driver: 数据库类型",
 			Form: map[string]int{"dbname": 1, "dbhelp": 1},
@@ -126,38 +158,6 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					kit.Select("数据源", m.Option("dbhelp")), arg...)
 				return
 			}},
-		"redis": &ctx.Command{Name: "redis conn address [protocol]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
-				switch arg[0] {
-				case "conn":
-					c, e := net.Dial(kit.Select("tcp", arg, 2), arg[1])
-					m.Assert(e)
-					mdb.conn = redis.NewConn(c, time.Second*10, time.Second*10)
-				default:
-					if mdb.conn == nil {
-						m.Echo("not open")
-						break
-					}
-					if mdb.conn.Err() != nil {
-						m.Echo("%v", mdb.conn.Err())
-						return
-					}
-					args := []interface{}{}
-					for _, v:=range arg[1:] {
-						args = append(args, v)
-					}
-					res, err := mdb.conn.Do(arg[0], args...)
-					m.Assert(err)
-					switch val := res.(type) {
-					case redis.Error:
-						m.Echo("%v", val)
-					default:
-						m.Echo("%v", kit.Format(res))
-					}
-				}
-			}
-			return
-		}},
 		"exec": &ctx.Command{Name: "exec sql [arg]", Help: "操作数据库, sql: SQL语句, arg: 操作参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) && mdb.DB != nil {
 				which := make([]interface{}, 0, len(arg))

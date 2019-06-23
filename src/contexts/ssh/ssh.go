@@ -176,15 +176,35 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "button", "value": "运行"},
 					},
 				},
+				map[string]interface{}{"componet_name": "location", "componet_help": "地理位置",
+					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
+					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "location",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "content", "view": "long"},
+						map[string]interface{}{"type": "button", "value": "位置", "click": "Location"},
+						map[string]interface{}{"type": "button", "value": "查看"},
+					},
+				},
+				map[string]interface{}{"componet_name": "baidu", "componet_help": "百度地图",
+					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
+					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "location",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "content", "view": "long"},
+						map[string]interface{}{"type": "button", "value": "位置", "click": "Location"},
+						map[string]interface{}{"type": "button", "value": "查看"},
+					},
+					"display": map[string]interface{}{"map": true},
+				},
 			},
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "pod", "componet_help": "pod",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "remote",
-					"componet_args": []interface{}{}, "inputs": []interface{}{
+					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
+					"componet_args": []interface{}{"$$", "context", "ssh", "remote"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
-					"exports": []interface{}{"pod", "key"},
+					"exports": []interface{}{"pod", "key", "pod"},
 				},
 				map[string]interface{}{"componet_name": "ctx", "componet_help": "ctx",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
@@ -210,13 +230,13 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "nfs", "dir"}, "inputs": []interface{}{
-						map[string]interface{}{"type": "button", "value": "回退", "click": "Back"},
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "text", "name": "dir", "value": "", "view": "long", "imports": []interface{}{"plugin_dir", "plugin_you"}},
 						map[string]interface{}{"type": "button", "value": "查看"},
+						map[string]interface{}{"type": "button", "value": "回退", "click": "Back"},
 					},
-					"display": map[string]interface{}{"hide_result": true},
-					"exports": []interface{}{"dir", "filename", "dir"},
+					"display":  map[string]interface{}{"hide_result": true},
+					"exports":  []interface{}{"dir", "filename", "dir"},
 					"dir_root": []interface{}{"/"},
 				},
 				map[string]interface{}{"componet_name": "status", "componet_help": "git",
@@ -461,7 +481,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 				}
 				msg.Cmd(tool["componet_cmd"], args, arg).CopyTo(m)
-
 
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {

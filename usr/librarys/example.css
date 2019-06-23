@@ -66,6 +66,10 @@ fieldset div.output table td {
     word-break:break-all;
     min-width:40px;
 }
+fieldset div.output table td {
+    word-break:keep-all;
+    min-width:40px;
+}
 
 fieldset.toast {
     background-color:#ffffff00;

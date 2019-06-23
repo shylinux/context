@@ -213,6 +213,16 @@ func Format(arg ...interface{}) string {
 			result = append(result, string(val))
 		case []string:
 			result = append(result, val...)
+		// case []interface{}:
+		//
+		// 	result = append(result, "[")
+		// 	for i, value := range val {
+		// 		result = append(result, Format(value))
+		// 		if i < len(val)-1 {
+		// 			result = append(result, ",")
+		// 		}
+		// 	}
+		// 	result = append(result, "]")
 		case time.Time:
 			result = append(result, fmt.Sprintf("%s", val.Format("2006-01-02 15:03:04")))
 		case *os.File:
@@ -318,6 +328,8 @@ func Struct(arg ...interface{}) map[string]interface{} {
 	switch val := arg[0].(type) {
 	case map[string]interface{}:
 		return val
+	case string:
+		json.Unmarshal([]byte(val), value)
 	}
 
 	return value

@@ -148,7 +148,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}, Help: "运行环境"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
 			"bench": "src/examples/app/bench.go",
-			"tmp": "var/tmp/go",
+			"tmp":   "var/tmp/go",
 			"env":   []interface{}{"GOPATH", "PATH"},
 		}, Help: "运行环境"},
 		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
@@ -628,7 +628,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Confm("publish", "list", func(key string, value string) {
 					list = append(list, []string{key})
 				})
-				m.Cmdp(time.Second, []string{"copy"}, []string{"cli.publish"}, list)
+				m.Cmdp(0, []string{"copy"}, []string{"cli.publish"}, list)
 				return
 			}
 
@@ -738,7 +738,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Echo(", wait 1s\n")
 			m.Table()
 			fmt.Printf("\n")
-			for _, v:=range m.Meta["result"] {
+			for _, v := range m.Meta["result"] {
 				fmt.Printf("%v", v)
 			}
 

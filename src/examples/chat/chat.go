@@ -171,7 +171,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			//	m.Option("nickname", m.Option("username"))
 			// }
 			m.Append("remote_ip", m.Option("remote_ip"))
-			m.Append("nickname", m.Option("nickname"))
+			m.Append("nickname", kit.Select(m.Option("username"), m.Option("nickname")))
 			m.Echo(m.Option("username"))
 			return
 		}},

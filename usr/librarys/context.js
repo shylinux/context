@@ -95,7 +95,13 @@ ctx = context = {
 
         var as = []
         for (var k in args) {
-            as.push(k+"="+encodeURIComponent(args[k]));
+            if (typeof args[k] == "object") {
+                for (var i = 0; i < args[k].length; i++) {
+                    as.push(k+"="+encodeURIComponent(args[k][i]));
+                }
+            } else {
+                as.push(k+"="+encodeURIComponent(args[k]));
+            }
         }
         var arg = as.join("&");
         return location.origin+location.pathname+"?"+arg
