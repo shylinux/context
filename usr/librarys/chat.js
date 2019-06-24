@@ -33,6 +33,7 @@ Page({
         kit.History.add("lay", sizes)
     },
     oncontrol: function(event, target, action) {
+        var page = this
         switch (action) {
             case "control":
                 if (event.ctrlKey) {
@@ -58,10 +59,10 @@ Page({
                             page.steam.Pane.Show()
                             break
                         case "i":
-                            page.storm.Next()
+                            page.storm.Pane.Next()
                             break
                         case "o":
-                            page.storm.Prev()
+                            page.storm.Pane.Prev()
                             break
                         case "b":
                             page.action.Action["最大"](event)

@@ -537,6 +537,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
+		"proc": &ctx.Command{Name: "proc", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy("cli.system", "ps", kit.Select("ax", arg, 0))
+			return
+		}},
 
 		"project": &ctx.Command{Name: "project", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
@@ -661,6 +665,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Cmd("cli.project", "init")
 				m.Cmd("cli.compile", "all")
 				m.Cmd("cli.publish")
+				return
+			}
+			if len(arg) > 1 && arg[0] == "script" {
+				m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", arg[1]),
+					"upgrade", arg[0], "save", path.Join("usr/script", arg[1]))
 				return
 			}
 

@@ -123,6 +123,12 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					switch val := res.(type) {
 					case redis.Error:
 						m.Echo("%v", val)
+					case []interface{}:
+						for i, v := range val {
+							m.Add("append", "index", i)
+							m.Add("append", "value", v)
+						}
+						m.Table()
 					default:
 						m.Echo("%v", kit.Format(res))
 					}

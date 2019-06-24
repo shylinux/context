@@ -1135,6 +1135,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if p == "" {
 				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", key}))
 			}
+			if s, e:= os.Stat(p); e != nil || s.IsDir() {
+				return
+			}
 
 			m.Log("info", "publish %s %s", kit.Hashs(p), p)
 			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)

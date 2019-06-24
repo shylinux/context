@@ -356,10 +356,10 @@ function Page(page) {
         window.onresize = function(event) {
             page.onlayout && page.onlayout(event)
         }
+        // document.body.onkeydown = function(event) {
+            // page.onscroll && page.onscroll(event, window, "scroll")
+        // }
         document.body.onkeydown = function(event) {
-            page.onscroll && page.onscroll(event, window, "scroll")
-        }
-        document.body.onkeyup = function(event) {
             page.oncontrol && page.oncontrol(event, document.body, "control")
         }
     }
@@ -516,7 +516,7 @@ function Plugin(page, pane, field) {
             item.onfocus = function(event) {
                 page.pane = pane.Field, page.plugin = field, page.input = event.target
             }
-            item.onkeyup = function(event) {
+            item.onkeydown = function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
                         case "p":
@@ -545,12 +545,13 @@ function Plugin(page, pane, field) {
                             plugin.Append(item).focus()
                             break
                         case "m":
-                            plugin.Clone().Plugin.Select()
+                            plugin.Clone().plugin.Plugin.Select()
                             break
                         default:
                             return false
                     }
                     event.stopPropagation()
+                    event.preventDefault()
                     return true
                 })
                 event.key == "Enter" && plugin.Check(action)
