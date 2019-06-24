@@ -252,7 +252,7 @@ function Page(page) {
         initHeader: function(page, field, option, output) {
             var state = {}, list = [], cb = function(event, item, value) {}
             field.onclick = function(event) {
-                page.pane.scrollTo(0,0)
+                page.pane && page.pane.scrollTo(0,0)
             }
             return {
                 Order: function(value, order, cbs) {
