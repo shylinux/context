@@ -1,9 +1,5 @@
 var page = Page({
-    conf: {
-        border: 4,
-        scroll_x: 50,
-        scroll_y: 50,
-    },
+    conf: {border: 4},
     onlayout: function(event, sizes) {
         var height = document.body.clientHeight-page.conf.border
         var width = document.body.clientWidth-page.conf.border

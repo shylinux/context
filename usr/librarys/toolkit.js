@@ -439,6 +439,9 @@ kit = toolkit = {
             })
         })
     },
+    Position: function(which) {
+        return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
+    },
 
     CopyText: function(text) {
         text = window.getSelection().toString()
@@ -480,10 +483,16 @@ kit = toolkit = {
         }
         return list
     },
-    Position: function(which) {
-        return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
+    Format: function(objs) {
+        return json.stringify(objs)
     },
-
+    List: function(obj, cb) {
+        var list = []
+        for (var i = 0; i < obj.length; i++) {
+            list.push(typeof cb == "function"? cb(obj[i]): obj[i])
+        }
+        return list
+    },
     alert: function(text) {
         alert(JSON.stringify(text))
     },
@@ -497,6 +506,41 @@ kit = toolkit = {
         location.reload()
     },
 
+    right: function(arg) {
+        if (arg == "true") {
+            return true
+        }
+        if (arg == "false") {
+            return false
+        }
+        if (arg) {
+            return true
+        }
+        return false
+    },
+    format_date: function(arg) {
+        var date = arg.getDate()
+        if (date < 10) {
+            date = "0"+date
+        }
+        var month = arg.getMonth()+1
+        if (month < 10) {
+            month = "0"+month
+        }
+        var hour = arg.getHours()
+        if (hour < 10) {
+            hour = "0"+hour
+        }
+        var minute = arg.getMinutes()
+        if (minute < 10) {
+            minute = "0"+minute
+        }
+        var second = arg.getSeconds()
+        if (second < 10) {
+            second = "0"+second
+        }
+        return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
+    },
     OrderForm: function(page, field, option, append, result) {
         if (!option) {return}
         option.ondaemon = option.ondaemon || function(msg) {
@@ -563,52 +607,5 @@ kit = toolkit = {
             }
         })
     },
-
-    List: function(obj, cb) {
-        var list = []
-        for (var i = 0; i < obj.length; i++) {
-            list.push(typeof cb == "function"? cb(obj[i]): obj[i])
-        }
-        return list
-    },
-    Format: function(objs) {
-        return json.stringify(objs)
-    },
-}
-
-function right(arg) {
-    if (arg == "true") {
-        return true
-    }
-    if (arg == "false") {
-        return false
-    }
-    if (arg) {
-        return true
-    }
-    return false
-}
-function format_date(arg) {
-    var date = arg.getDate()
-    if (date < 10) {
-        date = "0"+date
-    }
-    var month = arg.getMonth()+1
-    if (month < 10) {
-        month = "0"+month
-    }
-    var hour = arg.getHours()
-    if (hour < 10) {
-        hour = "0"+hour
-    }
-    var minute = arg.getMinutes()
-    if (minute < 10) {
-        minute = "0"+minute
-    }
-    var second = arg.getSeconds()
-    if (second < 10) {
-        second = "0"+second
-    }
-    return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
 }
 

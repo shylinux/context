@@ -634,10 +634,7 @@ function Plugin(page, pane, field) {
         ondaemon: function(msg) {
             output.innerHTML = ""
             if (display.map) {
-                var id = "map"+page.ID()
-                kit.AppendChild(output, [{type: "view", data: {id: id}}])
-                var mp = new BMap.Map(id);
-                mp.centerAndZoom(new BMap.Point(121.491, 31.233), 11);
+                kit.AppendChild(output, [{img: ["https://gss0.bdstatic.com/8bo_dTSlRMgBo1vgoIiO_jowehsv/tile/?qt=vtile&x=25310&y=9426&z=17&styles=pl&scaler=2&udt=20190622"]}])
                 return
             }
             output.innerHTML = ""
