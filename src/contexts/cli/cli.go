@@ -744,12 +744,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			m.Append("time", m.Time())
 			m.Append("code", code)
-			m.Echo(", wait 1s\n")
-			m.Table()
-			fmt.Printf("\n")
-			for _, v := range m.Meta["result"] {
-				fmt.Printf("%v", v)
-			}
+			m.Echo(", wait 1s\n").Table()
 
 			m.GoFunc(m, func(m *ctx.Message) {
 				defer func() {

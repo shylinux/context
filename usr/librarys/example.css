@@ -8,7 +8,7 @@ html, body {
 fieldset {
     background-color:#d8d8d8;
     padding:0px;
-    min-width:160px;
+    min-width:10px;
     overflow:auto;
     margin:0px;
 }

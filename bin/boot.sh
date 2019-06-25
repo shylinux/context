@@ -47,8 +47,9 @@ hup() {
 main() {
     trap HUP hup
     while true; do
+        date
         ${ctx_bin} "$@" && break
-        log "restarting..." && sleep 3
+        log "\nrestarting..." && sleep 1
     done
 }
 action() {

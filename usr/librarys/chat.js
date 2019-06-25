@@ -1,5 +1,5 @@
 Page({
-    conf: {border: 4, layout: {header:30, river:180, action:180, source:60, storm:180, footer:30}},
+    conf: {refresh: 1000, border: 4, layout: {header:30, river:120, action:180, source:60, storm:100, footer:30}},
     onlayout: function(event, sizes) {
         var page = this
         kit.isWindows && (document.body.style.overflow = "hidden")
@@ -197,8 +197,13 @@ Page({
 
                 var pane = this, foot = page.footer.Pane
                 var cmds = ["brow", river, i||which[river]||0]
-                cmds[2] || (output.innerHTML = ""), pane.Times(1000, cmds, function(line, index, msg) {
-                    pane.Append("", line, ["text"], "index")
+                cmds[2] || (output.innerHTML = ""), pane.Times(page.conf.refresh, cmds, function(line, index, msg) {
+                    pane.Append("", line, ["text"], "index", function(line, index, event, args, cbs) {
+                        var text = JSON.parse(line.text)
+                        page.action.Pane.Run([text.river, text.storm, text.action].concat(args), function(msg) {
+                            typeof cbs == "function" && cbs(msg)
+                        })
+                    })
                     foot.State("text", which[river] = cmds[2] = parseInt(line.index)+1)
                 })
             },
@@ -236,7 +241,6 @@ Page({
     },
     initAction: function(page, field, option, output) {
         var river = "", storm = 0, input = "", share = ""
-        var toggle = true
 
         output.DisplayRaw = true
         return {
@@ -261,16 +265,13 @@ Page({
                 }
 
                 this.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
-                    event.shiftKey? page.target.Send("field", JSON.stringify({
-                        name: line.name, help: line.help, view: line.view, init: line.init,
-                        node: line.node, group: line.group, index: line.index,
-                        inputs: line.inputs, args: args,
-                    })): field.Pane.Run([river, storm, index].concat(args), function(msg) {
-                        event.ctrlKey && (msg.append && msg.append[0]?
-                            page.target.Send("table", JSON.stringify(ctx.Tables(msg))):
-                            page.target.Send("code", msg.result.join("")))
-                        typeof cbs == "function" && cbs(msg)
-                    })
+                    var plugin = event.Plugin
+                    event.shiftKey? page.target.Pane.Send("field", plugin.Format()):
+                        field.Pane.Run([river, storm, index].concat(args), function(msg) {
+                            var text = plugin.Reveal(msg)
+                            event.ctrlKey && page.target.Pane.Send(text[0], text[1])
+                            typeof cbs == "function" && cbs(msg)
+                        })
                 })
             },
             Layout: function(name) {
@@ -282,11 +283,17 @@ Page({
                 "恢复": function(event, value) {
                     page.onlayout(event, page.conf.layout)
                 },
-                "缩小": function(event, value) {
+                "聊天": function(event, value) {
+                    page.onlayout(event, page.conf.layout)
                     page.onlayout(event, {action:60, source:60})
                 },
-                "放大": function(event, value) {
-                    page.onlayout(event, {action:300, source:60})
+                "办公": function(event, value) {
+                    page.onlayout(event, page.conf.layout)
+                    page.onlayout(event, {river: 0, action:300, source:60})
+                },
+                "工作": function(event, value) {
+                    page.onlayout(event, page.conf.layout)
+                    page.onlayout(event, {river:0, action:-1, source:60})
                 },
                 "最高": function(event, value) {
                     page.onlayout(event, {action: -1})
@@ -295,31 +302,51 @@ Page({
                     page.onlayout(event, {river:0, storm:0})
                 },
                 "最大": function(event, value) {
-                    (toggle = !toggle)? page.onlayout(event, page.conf.layout): page.onlayout(event, {river:0, action:-1, source:60})
-                },
-                "全屏": function(event, value) {
                     page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})
                 },
+
+                "刷新": function(event, value) {
+                    output.innerHTML = "", field.Pane.Show()
+                },
+                "清空": function(event, value) {
+                    kit.Selector(output, "fieldset>div.output", function(item) {
+                        item.innerHTML = ""
+                    })
+                },
+                "并行": function(event, value) {
+                    kit.Selector(output, "fieldset", function(item) {
+                        item.Plugin.Runs(event)
+                    })
+                },
+                "串行": function(event, value) {
+                    var list = kit.Selector(output, "fieldset")
+                    function run(list) {
+                        list.length > 0? list[0].Plugin.Runs(event, function() {
+                            field.Pane.Conf("running", true), setTimeout(function() {
+                                run(list.slice(1))
+                            }, 1000)
+                        }): pane.Conf("running", false)
+                    }
+                    run(list)
+                },
+
                 "添加": function(event, value) {
                     page.plugin && page.plugin.Plugin.Clone().Select()
                 },
                 "删除": function(event, value) {
-                    page.plugin && page.plugin.Clear()
+                    page.input && page.plugin.Plugin.Remove()
                 },
                 "加参": function(event, value) {
-                    page.plugin.Append({})
+                    page.plugin && page.plugin.Plugin.Append({})
                 },
                 "去参": function(event, value) {
-                    page.input && page.plugin.Remove(page.input)
-                },
-                "位置": function(event, value) {
-                    page.getLocation(function(res) {
-                        alert(res.latitude)
-                        alert(res.longitude)
-                    })
+                    page.plugin && page.plugin.Plugin.Prepend()
                 },
             },
-            Button: [["layout", "恢复", "缩小", "放大", "最高", "最宽", "最大", "全屏"], "br", "添加", "删除", "加参", "去参", "位置"],
+            Button: [["layout", "恢复", "聊天", "办公", "工作", "最高", "最宽", "最大"], "br",
+                "刷新", "清空", "并行", "串行", "br",
+                "添加", "删除", "加参", "去参", "br",
+            ],
         }
     },
     initStorm: function(page, field, option, output) {
@@ -331,6 +358,7 @@ Page({
                 },
             },
             Show: function(which) {
+                this.which.get("") == which && page.action.Pane.Show()
                 this.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
             },
             Next: function() {
@@ -461,7 +489,7 @@ Page({
     },
     init: function(page) {
         page.onlayout(null, page.conf.layout)
-        page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.isMobile? "最宽": "最大")
+        page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.isMobile? "办公": "工作")
         page.footer.Pane.Order({"site": "", "ip": "", "text": "", ":":""}, kit.isMobile? ["site", "ip", "text"]: ["ip", "text", ":"], function(event, item, value) {})
         page.header.Pane.Order({"logout": "logout", "user": ""}, ["logout", "user"], function(event, item, value) {
             switch (item) {
@@ -480,7 +508,7 @@ Page({
                 default:
             }
         })
-        kit.isWeiXin && page.login.Pane.Run(["weixin"], function(msg) {
+        false && kit.isWeiXin && page.login.Pane.Run(["weixin"], function(msg) {
             page.Include([
                 "https://res.wx.qq.com/open/js/jweixin-1.4.0.js",
                 "/static/librarys/weixin.js",

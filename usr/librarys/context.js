@@ -4,6 +4,7 @@ ctx = context = {
         for (var k in dataset) {
             option[k] = dataset[k].split(",")
         }
+        kit.Log(option)
         this.GET("", option, function(msg) {
             msg[0] && (msg = msg[0])
             // msg && (msg.__proto__ = (page || {}))

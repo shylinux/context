@@ -96,7 +96,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	// 	return true
 	// }
 	// defer func() {
-		// msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
+	// msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
 	// }()
 	if msg.Confs("login", "cas") {
 		if !cas.IsAuthenticated(r) {
@@ -1135,8 +1135,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if p == "" {
 				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", key}))
 			}
-			if s, e:= os.Stat(p); e != nil || s.IsDir() {
-				return
+			if s, e := os.Stat(p); e != nil || s.IsDir() {
+				return e
 			}
 
 			m.Log("info", "publish %s %s", kit.Hashs(p), p)

@@ -373,10 +373,25 @@ function Pane(page, field) {
     var cache = []
     var timer = ""
     var list = [], last = -1
+    var conf = {}, conf_cb = {}
     var name = option.dataset.componet_name
     var pane = (page[field.dataset.init] || function() {
     })(page, field, option, output) || {}; pane.__proto__ = {
         __proto__: page,
+        Conf: function(key, value, cb) {
+            if (key == undefined) {
+                return conf
+            }
+            if (cb != undefined) {
+                conf_cb[key] = cb
+            }
+            if (value != undefined) {
+                var old = conf[key]
+                conf[key] = value
+                conf_cb[key] && conf_cb[key](value, old)
+            }
+            return conf[key]
+        },
         ShowDialog: function(width, height) {
             if (field.style.display != "block") {
                 page.dialog && page.dialog != field && page.dialog.style.display == "block" && page.dialog.Show()
@@ -403,7 +418,7 @@ function Pane(page, field) {
             ctx.Run(page, option.dataset, cmds, cb||this.ondaemon)
         },
         Runs: function(cmds, cb) {
-            ctx.Run(page, option.dataset, cmds, function(msg) {
+            pane.Run(cmds, function(msg) {
                 ctx.Table(msg, function(line, index) {
                     (cb||this.ondaemon)(line, index, msg)
                 })
@@ -594,12 +609,20 @@ function Plugin(page, pane, field) {
             })
             return action
         },
+        Prepend: function() {
+            var list = option.querySelectorAll(".args")
+            list.length > 0 && option.removeChild(list[list.length-1].parentNode)
+        },
         Select: function() {
             option.querySelectorAll("input")[1].focus()
         },
         Format: function() {
-            arguments.length > 0 && (field.Meta.args = kit.List(arguments))
+            field.Meta.args = arguments.length > 0? kit.List(arguments):
+                kit.Selector(option, ".args", function(item) {return item.value})
             return JSON.stringify(field.Meta)
+        },
+        Reveal: function(msg) {
+            return msg.append && msg.append[0]? ["table", JSON.stringify(ctx.Tables(msg))]: ["code", msg.result.join("")]
         },
         Remove: function() {
             field.parentNode.removeChild(field)
@@ -615,10 +638,13 @@ function Plugin(page, pane, field) {
                 item == target && (index == list.length-1? plugin.Runs(event): page.plugin == field && list[index+1].focus())
             })
         },
-        Runs: function(event) {
-            field.Run(event, kit.Selector(option, ".args", function(item, index) {
+        Runs: function(event, cb) {
+            event.Plugin = plugin, field.Run(event, kit.Selector(option, ".args", function(item, index) {
                 return item.value
-            }), plugin.ondaemon)
+            }), function(msg) {
+                typeof cb == "function" && cb(msg)
+                plugin.ondaemon[display.deal||"table"](msg)
+            })
         },
         Location: function(event) {
             output.className = "output long"
@@ -632,20 +658,22 @@ function Plugin(page, pane, field) {
         Clear: function() {
             output.innerHTML = ""
         },
-        ondaemon: function(msg) {
-            output.innerHTML = ""
-            if (display.map) {
-                kit.AppendChild(output, [{img: ["https://gss0.bdstatic.com/8bo_dTSlRMgBo1vgoIiO_jowehsv/tile/?qt=vtile&x=25310&y=9426&z=17&styles=pl&scaler=2&udt=20190622"]}])
-                return
-            }
-            output.innerHTML = ""
-            !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
-                if (line["latitude"]) {
-                    page.openLocation(line.latitude, line.longitude, line.location)
+        ondaemon: {
+            table: function(msg) {
+                output.innerHTML = ""
+                if (display.map) {
+                    kit.AppendChild(output, [{img: ["https://gss0.bdstatic.com/8bo_dTSlRMgBo1vgoIiO_jowehsv/tile/?qt=vtile&x=25310&y=9426&z=17&styles=pl&scaler=2&udt=20190622"]}])
+                    return
                 }
-                page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name))
-            });
-            (display.show_result || !msg.append) && msg.result && kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}])
+                output.innerHTML = ""
+                !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
+                    if (line["latitude"]) {
+                        page.openLocation(line.latitude, line.longitude, line.location)
+                    }
+                    page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name))
+                });
+                (display.show_result || !msg.append) && msg.result && kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}])
+            },
         },
         onexport: {
             "": function(value, name) {
