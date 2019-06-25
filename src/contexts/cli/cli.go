@@ -111,6 +111,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"boot": map[string]interface{}{
 				"web_port": ":9094",
 				"ssh_port": ":9090",
+				"username": "shy",
 			},
 		}, Help: "运行环境"},
 		"system": &ctx.Config{Name: "system", Value: map[string]interface{}{
