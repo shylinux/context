@@ -1,1932 +1,1443 @@
 package ctx
 
 import (
+	"encoding/json"
 	"fmt"
-	"log"
-	"math/rand"
-	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 
-	"errors"
-	"io"
+	"math/rand"
+	"os"
 	"sort"
 	"time"
 	"toolkit"
 )
 
-type Cache struct {
-	Value string
-	Name  string
-	Help  string
-	Hand  func(m *Message, x *Cache, arg ...string) string
-}
-type Config struct {
-	Value interface{}
-	Name  string
-	Help  string
-	Hand  func(m *Message, x *Config, arg ...string) string
-}
-type Command struct {
-	Form map[string]int
-	Name string
-	Help interface{}
-	Auto func(m *Message, c *Context, key string, arg ...string) (ok bool)
-	Hand func(m *Message, c *Context, key string, arg ...string) (e error)
-}
-type Server interface {
-	Spawn(m *Message, c *Context, arg ...string) Server
-	Begin(m *Message, arg ...string) Server
-	Start(m *Message, arg ...string) bool
-	Close(m *Message, arg ...string) bool
-}
-type Context struct {
-	Name string
-	Help string
-
-	Caches   map[string]*Cache
-	Configs  map[string]*Config
-	Commands map[string]*Command
-
-	message  *Message
-	requests []*Message
-	sessions []*Message
-
-	contexts map[string]*Context
-	context  *Context
-	root     *Context
-
-	exit chan bool
-	Server
+type CTX struct {
 }
 
-func (c *Context) Register(s *Context, x Server, args ...interface{}) {
-	force := false
-	if len(args) > 0 {
-		switch arg := args[0].(type) {
-		case bool:
-			force = arg
-		}
-	}
-
-	if c.contexts == nil {
-		c.contexts = make(map[string]*Context)
-	}
-	if x, ok := c.contexts[s.Name]; ok && !force {
-		panic(errors.New(c.Name + "上下文中已存在模块:" + x.Name))
-	}
-
-	c.contexts[s.Name] = s
-	s.context = c
-	s.Server = x
-}
-func (c *Context) Spawn(m *Message, name string, help string) *Context {
-	s := &Context{Name: name, Help: help, root: c.root, context: c, message: m,
-		Caches:   map[string]*Cache{},
-		Configs:  map[string]*Config{},
-		Commands: map[string]*Command{},
-	}
-
-	if m.target = s; c.Server != nil {
-		c.Register(s, c.Server.Spawn(m, s, m.Meta["detail"]...))
-	} else {
-		c.Register(s, nil)
-	}
+func (ctx *CTX) Spawn(m *Message, c *Context, arg ...string) Server {
+	s := new(CTX)
 	return s
 }
-func (c *Context) Begin(m *Message, arg ...string) *Context {
-	if len(arg) > 0 {
-		m.Set("detail", arg)
-	}
+func (ctx *CTX) Begin(m *Message, arg ...string) Server {
+	m.Option("log.disable", true)
+	m.Option("page.limit", 10)
+	m.Option("page.offset", 0)
+	m.Option("routine", 0)
 
-	module := c.Name
-	if c.context != nil && c.context.Caches != nil && c.context.Caches["module"] != nil {
-		module = c.context.Caches["module"].Value + "." + c.Name
-	}
-
-	c.Caches["module"] = &Cache{Name: "module", Value: module, Help: "模块域名"}
-	c.Caches["status"] = &Cache{Name: "status(begin/start/close)", Value: "begin", Help: "模块状态, begin: 初始完成, start: 正在运行, close: 运行结束"}
-	c.Caches["stream"] = &Cache{Name: "stream", Value: "", Help: "模块数据"}
-
-	c.message = m
-	c.requests = append(c.requests, m)
-	m.source.sessions = append(m.source.sessions, m)
-	c.exit = make(chan bool, 3)
-
-	/*
-		m.Log("begin", "%d context %v %v", m.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
-		for k, x := range c.Configs {
-			if x.Hand != nil {
-				m.Log("begin", "%s config %v", k, m.Conf(k, x.Value))
-			}
+	m.root = m
+	m.Sess(m.target.Name, m)
+	for _, msg := range m.Search("") {
+		if msg.target.root = m.target; msg.target == m.target {
+			continue
 		}
-	*/
-
-	if c.Server != nil {
-		c.Server.Begin(m, m.Meta["detail"]...)
+		msg.target.Begin(msg, arg...)
+		m.Sess(msg.target.Name, msg)
 	}
-	return c
+	return ctx
 }
-func (c *Context) Start(m *Message, arg ...string) bool {
-	sync := false
-	if len(arg) > 0 && arg[0] == "sync" {
-		sync, arg = true, arg[1:]
-	}
-	if len(arg) > 0 {
-		m.Set("detail", arg)
-	}
-
-	c.requests = append(c.requests, m)
-	m.source.sessions = append(m.source.sessions, m)
-
-	if m.Hand = true; m.Cap("status") == "start" {
-		return true
-	}
-
-	m.GoFunc(m, func(m *Message) {
-		m.Log(m.Cap("status", "start"), "%d server %v %v", m.Capi("nserver", 1), m.Meta["detail"], m.Meta["option"])
-
-		c.message = m
-		if c.exit <- false; c.Server == nil || c.Server.Start(m, m.Meta["detail"]...) {
-			c.Close(m, m.Meta["detail"]...)
-			c.exit <- true
+func (ctx *CTX) Start(m *Message, arg ...string) bool {
+	m.Cmd("ctx._init")
+	if m.Optionv("ps_target", Index); len(arg) == 0 {
+		m.Option("cli.modal", "active")
+		m.Option("log.disable", false)
+		m.Cap("stream", "shy")
+		m.Cmd("log._init")
+		m.Cmd("yac._init")
+		m.Cmd("gdb._init")
+		m.Cmd("cli.source", m.Conf("system", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("system", "script.exit"))
+	} else {
+		m.Option("cli.modal", "action")
+		m.Cmd("yac._init")
+		for _, v := range m.Spawn().Cmd(arg).Meta["result"] {
+			fmt.Printf("%s", v)
 		}
-	}, func(m *Message) {
-		c.Close(m, m.Meta["detail"]...)
-		c.exit <- true
-	})
-
-	if sync {
-		for !<-c.exit {
-		}
-		return true
 	}
-	return <-c.exit
+	m.Cmd("ctx._exit")
+	return true
 }
-func (c *Context) Close(m *Message, arg ...string) bool {
-	if len(c.requests) == 0 {
-		return true
-	}
-
-	if m.target == c {
-		for i := len(c.requests) - 1; i >= 0; i-- {
-			if msg := c.requests[i]; msg.code == m.code {
-				if c.Server == nil || c.Server.Close(m, arg...) {
-					m.Log("close", "request %d/%d", i, len(c.requests)-1)
-					msg.Free()
-					for j := i; j < len(c.requests)-1; j++ {
-						c.requests[j] = c.requests[j+1]
-					}
-					c.requests = c.requests[:len(c.requests)-1]
-				}
-			}
-		}
-	}
-
-	if len(c.requests) > 0 {
-		return false
-	}
-
-	if m.Cap("status") == "start" {
-		m.Log(m.Cap("status", "close"), "%d server %v", m.root.Capi("nserver", -1), arg)
-		for _, msg := range c.sessions {
-			if msg.Cap("status") != "close" {
-				msg.target.Close(msg, arg...)
-			}
-		}
-	}
-
-	if c.context != nil {
-		m.Log("close", "%d context %v", m.root.Capi("ncontext", -1), arg)
-		delete(c.context.contexts, c.Name)
-		c.exit <- true
-	}
+func (ctx *CTX) Close(m *Message, arg ...string) bool {
 	return true
 }
 
-func (c *Context) Context() *Context {
-	return c.context
-}
-func (c *Context) Message() *Message {
-	return c.message
-}
-func (c *Context) Has(key ...string) bool {
-	switch len(key) {
-	case 2:
-		if _, ok := c.Commands[key[0]]; ok && key[1] == "command" {
-			return true
-		}
-		if _, ok := c.Configs[key[0]]; ok && key[1] == "config" {
-			return true
-		}
-		if _, ok := c.Caches[key[0]]; ok && key[1] == "cache" {
-			return true
-		}
-	case 1:
-		if _, ok := c.Commands[key[0]]; ok {
-			return true
-		}
-		if _, ok := c.Configs[key[0]]; ok {
-			return true
-		}
-		if _, ok := c.Caches[key[0]]; ok {
-			return true
-		}
-	}
-	return false
-}
-func (c *Context) Sub(key string) *Context {
-	return c.contexts[key]
-}
-func (c *Context) Travel(m *Message, hand func(m *Message, n int) (stop bool)) *Context {
-	if c == nil {
-		return nil
-	}
-	target := m.target
+var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
+var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
+	Caches: map[string]*Cache{
+		"begin_time": &Cache{Name: "begin_time", Value: "", Help: "启动时间"},
+		"goos":       &Cache{Name: "goos", Value: "linux", Help: "启动时间"},
+		"ngo":        &Cache{Name: "ngo", Value: "0", Help: "启动时间"},
+		"nserver":    &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
+		"ncontext":   &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
+		"nmessage":   &Cache{Name: "nmessage", Value: "1", Help: "消息数量"},
+	},
+	Configs: map[string]*Config{
+		"chain":       &Config{Name: "chain", Value: map[string]interface{}{}, Help: "调试模式，on:打印，off:不打印)"},
+		"compact_log": &Config{Name: "compact_log(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
+		"auto_make":   &Config{Name: "auto_make(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
+		"debug":       &Config{Name: "debug(on/off)", Value: "on", Help: "调试模式，on:打印，off:不打印)"},
 
-	cs := []*Context{c}
-	for i := 0; i < len(cs); i++ {
-		if m.target = cs[i]; hand(m, i) {
-			return cs[i]
-		}
+		"search": &Config{Name: "search", Value: map[string]interface{}{
+			"context": []interface{}{"nfs", "web.code"},
+		}, Help: "搜索引擎"},
 
-		keys := []string{}
-		for k, _ := range cs[i].contexts {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			cs = append(cs, cs[i].contexts[k])
-		}
-	}
+		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
+		"search_choice": &Config{Name: "search_choice(first/last/rand/magics)", Value: "magics", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magics: 加权选择"},
+		"search_action": &Config{Name: "search_action(list/switch)", Value: "switch", Help: "搜索操作, list: 输出模块列表, switch: 模块切换"},
+		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索起点, true: 根模块, false: 当前模块"},
 
-	m.target = target
-	return target
-}
-func (c *Context) BackTrace(m *Message, hand func(m *Message) (stop bool)) *Context {
-	target := m.target
+		"insert_limit": &Config{Name: "insert_limit(true/false)", Value: "true", Help: "参数的索引"},
+		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
+		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
 
-	for s := m.target; s != nil; s = s.context {
-		if m.target = s; hand(m) {
-			return s
-		}
-	}
+		"list_help":     &Config{Name: "list_help", Value: "list command", Help: "命令列表帮助"},
+		"table_compact": &Config{Name: "table_compact", Value: "false", Help: "命令列表帮助"},
+		"table_col_sep": &Config{Name: "table_col_sep", Value: "  ", Help: "命令列表帮助"},
+		"table_row_sep": &Config{Name: "table_row_sep", Value: "\n", Help: "命令列表帮助"},
+		"table_space":   &Config{Name: "table_space", Value: " ", Help: "命令列表帮助"},
 
-	m.target = target
-	return target
-}
+		"page_offset": &Config{Name: "page_offset", Value: "0", Help: "列表偏移"},
+		"page_limit":  &Config{Name: "page_limit", Value: "10", Help: "列表大小"},
 
-func (c *Context) Plugin(args []string) string {
-	m := &Message{code: 0, time: time.Now(), source: c, target: c, Meta: map[string][]string{}}
-	if len(args) == 0 {
-		m.Echo("%s: %s\n", c.Name, c.Help)
-		for k, v := range c.Commands {
-			m.Echo("%s: %s %v\n", k, v.Name, v.Help)
-		}
-	} else if cs, ok := c.Commands[args[0]]; ok {
-		h := cs.Hand
-		if e := h(m, c, args[0], args[1:]...); e != nil {
-			m.Echo("error: ").Echo("%v\n", e)
-		}
-	} else {
-		m.Echo("error: ").Echo("not found: %v\n", args[0])
-	}
-	return strings.Join(m.Meta["result"], "")
-}
+		"time_format":  &Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
+		"call_timeout": &Config{Name: "call_timeout", Value: "100s", Help: "回调超时"},
+	},
+	Commands: map[string]*Command{
+		"_init": &Command{Name: "_init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			for _, x := range []string{"cli", "nfs", "aaa", "ssh", "web"} {
+				m.Cmd(x + "._init")
+			}
+			return
+		}},
+		"_exit": &Command{Name: "_exit", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			for _, x := range []string{"cli"} {
+				m.Cmd(x + "._exit")
+			}
+			return
+		}},
+		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Echo("usage: help context [module [command|config|cache name]]\n")
+				m.Echo("     : 查看模块信息, module: 模块名, command: 模块命令, config: 模块配置, cache: 模块缓存, name: 模块参数\n")
+				m.Echo("usage: help command [name]\n")
+				m.Echo("     : 查看当前环境下命令, name: 命令名\n")
+				m.Echo("usage: help config [name]\n")
+				m.Echo("     : 查看当前环境下配置, name: 配置名\n")
+				m.Echo("usage: help cache [name]\n")
+				m.Echo("     : 查看当前环境下缓存, name: 缓存名\n")
+				m.Echo("\n")
 
-type DEBUG interface {
-	Wait(*Message, ...interface{}) interface{}
-	Goon(interface{}, ...interface{})
-}
-type LOGGER interface {
-	Log(*Message, string, string, ...interface{})
-}
-type Message struct {
-	time time.Time
-	code int
+				m.Echo("^_^  Welcome to context world  ^_^\n")
+				m.Echo("Version: 1.0 A New Language, A New Framework\n")
+				m.Echo("More: https://github.com/shylinux/context\n")
+				m.Echo("More: https://shylinux.com/\n")
+				return
+			}
 
-	source *Context
-	target *Context
+			switch arg[0] {
+			case "context":
+				switch len(arg) {
+				case 1:
+					keys := []string{}
+					values := map[string]*Context{}
+					m.Target().root.Travel(m, func(m *Message, i int) bool {
+						if _, ok := values[m.Cap("module")]; !ok {
+							keys = append(keys, m.Cap("module"))
+							values[m.Cap("module")] = m.Target()
+						}
+						return false
+					})
 
-	Meta map[string][]string
-	Data map[string]interface{}
+					sort.Strings(keys)
+					for _, k := range keys {
+						m.Echo("%s: %s %s\n", k, values[k].Name, values[k].Help)
+					}
+					break
+				case 2:
+					if msg := m.Find(arg[1]); msg != nil {
+						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
+						m.Echo("commands:\n")
+						for k, v := range msg.Target().Commands {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+						m.Echo("configs:\n")
+						for k, v := range msg.Target().Configs {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+						m.Echo("caches:\n")
+						for k, v := range msg.Target().Caches {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+					}
+				default:
+					if msg := m.Find(arg[1]); msg != nil {
+						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
+						switch arg[2] {
+						case "command":
+							for k, v := range msg.Target().Commands {
+								if k == arg[3] {
+									m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
+								}
+							}
+						case "config":
+							for k, v := range msg.Target().Configs {
+								if k == arg[3] {
+									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+								}
+							}
+						case "cache":
+							for k, v := range msg.Target().Caches {
+								if k == arg[3] {
+									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+								}
+							}
+						}
+					}
+				}
+			case "command":
+				keys := []string{}
+				values := map[string]*Command{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Commands {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							switch help := v.Help.(type) {
+							case []string:
+								m.Echo("%s: %s\n", k, v.Name)
+								for _, v := range help {
+									m.Echo("  %s\n", v)
+								}
+							case string:
+								m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
+							}
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s: %s\n", k, values[k].Name)
+				}
+			case "config":
+				keys := []string{}
+				values := map[string]*Config{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Configs {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
+				}
+			case "cache":
+				keys := []string{}
+				values := map[string]*Cache{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Caches {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
+				}
+			}
 
-	callback func(msg *Message) (sub *Message)
-	freedoms []func(msg *Message) (done bool)
-	Sessions map[string]*Message
+			return
+		}},
 
-	messages []*Message
-	message  *Message
-	root     *Message
+		"message": &Command{Name: "message [code] [cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m
+			if ms := m.Find(m.Cap("ps_target")); ms != nil {
+				msg = ms
+			}
 
-	Remote chan bool
-	Hand   bool
-}
+			if len(arg) > 0 {
+				if code, e := strconv.Atoi(arg[0]); e == nil {
+					if msg = m.root.Tree(code); msg != nil {
+						arg = arg[1:]
+					}
+				}
+			}
 
-func (m *Message) Spawn(arg ...interface{}) *Message {
-	temp := false
-	c := m.target
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case *Context:
-			c = v
-		case *Message:
-			c = v.target
-		case string:
-			temp = kit.Right(v)
-		}
-	}
+			if len(arg) == 0 {
+				m.Format("summary", msg, "deep")
+				msg.CopyTo(m)
+				return
+			}
 
-	msg := &Message{
-		time:    time.Now(),
-		code:    m.Capi("nmessage", 1),
-		source:  m.target,
-		target:  c,
-		message: m,
-		root:    m.root,
-	}
+			switch arg[0] {
+			case "time", "code", "ship", "full", "chain", "stack":
+				m.Echo(msg.Format(arg[0]))
+			case "spawn":
+				sub := msg.Spawn()
+				m.Echo("%d", sub.code)
+			case "call":
+			case "back":
+				msg.Back(m)
+			case "free":
+				msg.Free()
+			default:
+				msg = msg.Spawn().Cmd(arg)
+				m.Copy(msg, "append").Copy(msg, "result")
+			}
+			return
+		}},
+		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m.message
+			if len(arg) == 0 {
+				for i, v := range msg.Meta["detail"] {
+					m.Add("append", "index", i)
+					m.Add("append", "value", v)
+				}
+				m.Table()
+				return
+			}
 
-	if temp {
-		return msg
-	}
+			index := m.Confi("detail_index")
+			if i, e := strconv.Atoi(arg[0]); e == nil {
+				index, arg = i, arg[1:]
+			}
+			m.Echo("%s", msg.Detail(index, arg))
+			return
+		}},
+		"option": &Command{Name: "option [all] [key [index] [value...]]", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				all, arg = true, arg[1:]
+			}
 
-	m.messages = append(m.messages, msg)
-	return msg
-}
-func (m *Message) Time(arg ...interface{}) string {
-	t := m.time
+			index := -100
+			if len(arg) > 1 {
+				if i, e := strconv.Atoi(arg[1]); e == nil {
+					index = i
+					for i := 1; i < len(arg)-1; i++ {
+						arg[i] = arg[i+1]
+					}
+					arg = arg[:len(arg)-1]
+				}
+			}
 
-	if len(arg) > 0 {
-		if d, e := time.ParseDuration(arg[0].(string)); e == nil {
-			arg = arg[1:]
-			t.Add(d)
-		}
-	}
+			msg := m.message
+			keys := map[string]bool{}
+			for msg = msg; msg != nil; msg = msg.message {
+				for _, k := range msg.Meta["option"] {
+					if len(arg) == 0 {
+						if keys[k] {
+							continue
+						}
+						keys[k] = true
+						m.Add("append", "key", k)
+						m.Add("append", "len", len(msg.Meta[k]))
+						m.Add("append", "value", fmt.Sprintf("%v", msg.Meta[k]))
+						continue
+					}
 
-	str := m.Conf("time_format")
-	if len(arg) > 1 {
-		str = fmt.Sprintf(arg[0].(string), arg[1:]...)
-	} else if len(arg) > 0 {
-		str = fmt.Sprintf("%v", arg[0])
-	}
-	if str == "stamp" {
-		return kit.Format(t.Unix())
-	}
-	return t.Format(str)
-}
-func (m *Message) Code() int {
-	return m.code
-}
-func (m *Message) Source() *Context {
-	return m.source
-}
-func (m *Message) Target() *Context {
-	return m.target
-}
-func (m *Message) Message() *Message {
-	return m.message
-}
-func (m *Message) Format(arg ...interface{}) string {
-	if len(arg) == 0 {
-		arg = append(arg, "time", "ship")
-	}
+					if k != arg[0] {
+						continue
+					}
 
-	meta := []string{}
-	for _, v := range arg {
-		switch kit.Format(v) {
-		case "summary":
-			msg := arg[1].(*Message)
-			ms := make([]*Message, 0, 1024)
-			ms = append(ms, msg.message, msg)
+					if len(arg) > 1 {
+						msg.Meta[k] = kit.Array(msg.Meta[k], index, arg[1:])
+						m.Echo("%v", msg.Meta[k])
+						return
+					}
 
-			for i := 0; i < len(ms); i++ {
-				msg := ms[i]
-				if m.Add("append", "index", i); msg == nil {
-					m.Add("append", "message", "")
-					m.Add("append", "time", "")
-					m.Add("append", "code", "")
-					m.Add("append", "source", "")
-					m.Add("append", "target", "")
-					m.Add("append", "details", "")
-					m.Add("append", "options", "")
-					continue
+					if index != -100 {
+						m.Echo(kit.Array(msg.Meta[k], index)[0])
+						return
+					}
+
+					if v, ok := msg.Data[k]; ok {
+						json.MarshalIndent(v, "", "  ")
+						m.Echo(kit.Formats(v))
+						return e
+					}
+					for i, v := range msg.Meta[k] {
+						m.Add("append", "index", i)
+						m.Add("append", "value", v)
+					}
+					m.Table()
+					return
 				}
 
-				if msg.message != nil {
-					m.Add("append", "message", msg.message.code)
-				} else {
-					m.Add("append", "message", "")
+				if !all {
+					break
 				}
-				m.Add("append", "time", msg.time.Format("15:04:05"))
-				m.Add("append", "code", msg.code)
-				m.Add("append", "source", msg.source.Name)
-				m.Add("append", "target", msg.target.Name)
-				m.Add("append", "details", fmt.Sprintf("%v", msg.Meta["detail"]))
-				m.Add("append", "options", fmt.Sprintf("%v", msg.Meta["option"]))
+			}
+			m.Sort("key", "str").Table()
+			return
+		}},
+		"magic": &Command{Name: "magic", Help: "随机组员", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			switch len(arg) {
+			case 0:
+				m.Optionv("magic", m.Magic("bench", ""))
+			case 1:
+				m.Optionv("magic", m.Magic(arg[0], ""))
+			case 2:
+				m.Optionv("magic", m.Magic(arg[0], arg[1]))
+			case 3:
+				m.Optionv("magic", m.Magic(arg[0], arg[1], arg[2]))
+			}
+			m.Cmdy("ctx.trans", "magic")
+			return
+		}},
+		"result": &Command{Name: "result [index] [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m.message
+			if len(arg) == 0 {
+				for i, v := range msg.Meta["result"] {
+					m.Add("append", "index", i)
+					m.Add("append", "value", strings.Replace(v, "\n", "\\n", -1))
+				}
+				m.Table()
+				return
+			}
 
-				if i == 0 {
-					continue
+			index := m.Confi("result_index")
+			if i, e := strconv.Atoi(arg[0]); e == nil {
+				index, arg = i, arg[1:]
+			}
+			m.Echo("%s", msg.Result(index, arg))
+			return
+		}},
+		"append": &Command{Name: "append [all] [key [index] [value...]]", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				all, arg = true, arg[1:]
+			}
+
+			index := -100
+			if len(arg) > 1 {
+				if i, e := strconv.Atoi(arg[1]); e == nil {
+					index = i
+					for i := 1; i < len(arg)-1; i++ {
+						arg[i] = arg[i+1]
+					}
+					arg = arg[:len(arg)-1]
+				}
+			}
+
+			msg := m.message
+			for msg = msg; msg != nil; msg = msg.message {
+				for _, k := range msg.Meta["append"] {
+					if len(arg) == 0 {
+						m.Add("append", "key", k)
+						m.Add("append", "value", fmt.Sprintf("%v", msg.Meta[k]))
+						continue
+					}
+
+					if k != arg[0] {
+						continue
+					}
+
+					if len(arg) > 1 {
+						msg.Meta[k] = kit.Array(msg.Meta[k], index, arg[1:])
+						m.Echo("%v", msg.Meta[k])
+						return
+					}
+
+					if index != -100 {
+						m.Echo(kit.Array(msg.Meta[k], index)[0])
+						return
+					}
+
+					for i, v := range msg.Meta[k] {
+						m.Add("append", "index", i)
+						m.Add("append", "value", v)
+					}
+					m.Table()
+					return
 				}
 
-				if len(ms) < 30 && len(arg) > 2 && arg[2] == "deep" {
-					ms = append(ms, ms[i].messages...)
+				if !all {
+					break
 				}
 			}
 			m.Table()
-		case "time":
-			meta = append(meta, m.Time())
-		case "code":
-			meta = append(meta, kit.Format(m.code))
-		case "ship":
-			meta = append(meta, fmt.Sprintf("%s:%d(%s->%s)", m.Option("routine"), m.code, m.source.Name, m.target.Name))
-		case "source":
-			target := m.target
-			m.target = m.source
-			meta = append(meta, m.Cap("module"))
-			m.target = target
-		case "target":
-			meta = append(meta, m.Cap("module"))
-
-		case "detail":
-			meta = append(meta, fmt.Sprintf("%v", m.Meta["detail"]))
-		case "option":
-			meta = append(meta, fmt.Sprintf("%v", m.Meta["option"]))
-		case "append":
-			meta = append(meta, fmt.Sprintf("%v", m.Meta["append"]))
-		case "result":
-			meta = append(meta, fmt.Sprintf("%v", m.Meta["result"]))
-
-		case "full":
-		case "chain":
-			ms := []*Message{}
-			if v == "full" {
-				ms = append(ms, m)
-			} else {
-				for msg := m; msg != nil; msg = msg.message {
-					ms = append(ms, msg)
-				}
+			return
+		}},
+		"session": &Command{Name: "session [all] [key [module]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				all, arg = true, arg[1:]
 			}
 
-			meta = append(meta, "\n")
-			for i := len(ms) - 1; i >= 0; i-- {
-				msg := ms[i]
-
-				meta = append(meta, fmt.Sprintf("%s\n", msg.Format("time", "ship")))
-				if len(msg.Meta["detail"]) > 0 {
-					meta = append(meta, fmt.Sprintf("  detail: %d %v\n", len(msg.Meta["detail"]), msg.Meta["detail"]))
-				}
-				if len(msg.Meta["option"]) > 0 {
-					meta = append(meta, fmt.Sprintf("  option: %d %v\n", len(msg.Meta["option"]), msg.Meta["option"]))
-					for _, k := range msg.Meta["option"] {
-						if v, ok := msg.Data[k]; ok {
-							meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
-						} else if v, ok := msg.Meta[k]; ok {
-							meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
+			msg := m.message
+			for msg = msg; msg != nil; msg = msg.message {
+				for k, v := range msg.Sessions {
+					if len(arg) > 1 {
+						msg.Sessions[arg[0]] = msg.Find(arg[1])
+						return
+					} else if len(arg) > 0 {
+						if k == arg[0] {
+							m.Echo("%d", v.code)
+							return
 						}
+						continue
 					}
-				}
-				if len(msg.Meta["append"]) > 0 {
-					meta = append(meta, fmt.Sprintf("  append: %d %v\n", len(msg.Meta["append"]), msg.Meta["append"]))
-					for _, k := range msg.Meta["append"] {
-						if v, ok := msg.Data[k]; ok {
-							meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
-						} else if v, ok := msg.Meta[k]; ok {
-							meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
-						}
-					}
-				}
-				if len(msg.Meta["result"]) > 0 {
-					meta = append(meta, fmt.Sprintf("  result: %d %v\n", len(msg.Meta["result"]), msg.Meta["result"]))
-				}
-			}
-		case "stack":
-			pc := make([]uintptr, 100)
-			pc = pc[:runtime.Callers(6, pc)]
-			frames := runtime.CallersFrames(pc)
 
-			for {
-				frame, more := frames.Next()
-				file := strings.Split(frame.File, "/")
-				name := strings.Split(frame.Function, "/")
-				meta = append(meta, fmt.Sprintf("\n%s:%d\t%s", file[len(file)-1], frame.Line, name[len(name)-1]))
-				if !more {
+					m.Add("append", "key", k)
+					m.Add("append", "time", v.time.Format("15:04:05"))
+					m.Add("append", "code", v.code)
+					m.Add("append", "source", v.source.Name)
+					m.Add("append", "target", v.target.Name)
+					m.Add("append", "details", fmt.Sprintf("%v", v.Meta["detail"]))
+					m.Add("append", "options", fmt.Sprintf("%v", v.Meta["option"]))
+				}
+
+				if len(arg) == 0 && !all {
 					break
 				}
 			}
-
-		default:
-			meta = append(meta, kit.FileName(kit.Format(v), "time"))
-		}
-	}
-	return strings.Join(meta, " ")
-}
-func (m *Message) Tree(code int) *Message {
-	ms := []*Message{m}
-	for i := 0; i < len(ms); i++ {
-		if ms[i].Code() == code {
-			return ms[i]
-		}
-		ms = append(ms, ms[i].messages...)
-	}
-	return nil
-}
-
-func (m *Message) Add(meta string, key string, value ...interface{}) *Message {
-	if m.Meta == nil {
-		m.Meta = make(map[string][]string)
-	}
-	if _, ok := m.Meta[meta]; !ok {
-		m.Meta[meta] = make([]string, 0, 3)
-	}
-
-	switch meta {
-	case "detail", "result":
-		m.Meta[meta] = append(m.Meta[meta], key)
-		m.Meta[meta] = append(m.Meta[meta], kit.Trans(value...)...)
-
-	case "option", "append":
-		if _, ok := m.Meta[key]; !ok {
-			m.Meta[key] = make([]string, 0, 3)
-		}
-		m.Meta[key] = append(m.Meta[key], kit.Trans(value...)...)
-
-		for _, v := range m.Meta[meta] {
-			if v == key {
-				return m
+			m.Table()
+			return
+		}},
+		"callback": &Command{Name: "callback", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m.message
+			for msg := msg; msg != nil; msg = msg.message {
+				m.Add("append", "msg", msg.code)
+				m.Add("append", "fun", msg.callback)
 			}
-		}
-		m.Meta[meta] = append(m.Meta[meta], key)
+			m.Table()
+			return
+		}},
 
-	default:
-		m.Log("error", "add meta error %s %s %v", meta, key, value)
-	}
-
-	return m
-}
-func (m *Message) Set(meta string, arg ...interface{}) *Message {
-	switch meta {
-	case "detail", "result":
-		if m != nil && m.Meta != nil {
-			delete(m.Meta, meta)
-		}
-	case "option", "append":
-		if len(arg) > 0 {
-			delete(m.Meta, kit.Format(arg[0]))
-		} else {
-			for _, k := range m.Meta[meta] {
-				delete(m.Data, k)
-				delete(m.Meta, k)
-			}
-			delete(m.Meta, meta)
-		}
-	default:
-		m.Log("error", "set meta error %s %s %v", meta, arg)
-	}
-
-	if args := kit.Trans(arg...); len(args) > 0 {
-		m.Add(meta, args[0], args[1:])
-	}
-	return m
-}
-func (m *Message) Put(meta string, key string, value interface{}) *Message {
-	switch meta {
-	case "option", "append":
-		if m.Set(meta, key); m.Data == nil {
-			m.Data = make(map[string]interface{})
-		}
-		m.Data[key] = value
-
-	default:
-		m.Log("error", "put data error %s %s %v", meta, key, value)
-	}
-	return m
-}
-func (m *Message) Get(key string, arg ...interface{}) string {
-	if meta, ok := m.Meta[key]; ok && len(meta) > 0 {
-		index := 0
-		if len(arg) > 0 {
-			index = kit.Int(arg[0])
-		}
-
-		index = (index+2)%(len(meta)+2) - 2
-		if index >= 0 && index < len(meta) {
-			return meta[index]
-		}
-	}
-	return ""
-}
-func (m *Message) Has(key ...string) bool {
-	switch len(key) {
-	case 1:
-		if _, ok := m.Data[key[0]]; ok {
-			return true
-		}
-		if _, ok := m.Meta[key[0]]; ok {
-			return true
-		}
-	}
-	return false
-}
-func (m *Message) CopyTo(msg *Message, arg ...string) *Message {
-	msg.Copy(m, "append").Copy(m, "result")
-	return m
-}
-func (m *Message) Copy(msg *Message, arg ...string) *Message {
-	if msg == nil || m == msg {
-		return m
-	}
-
-	for i := 0; i < len(arg); i++ {
-		meta := arg[i]
-
-		switch meta {
-		case "target":
-			m.target = msg.target
-		case "callback":
-			m.callback = msg.callback
-		case "detail", "result":
-			if len(msg.Meta[meta]) > 0 {
-				m.Add(meta, msg.Meta[meta][0], msg.Meta[meta][1:])
-			}
-		case "option", "append":
-			if msg.Meta == nil {
-				msg.Meta = map[string][]string{}
-			}
-			if msg.Meta[meta] == nil {
-				break
-			}
-			if i == len(arg)-1 {
-				arg = append(arg, msg.Meta[meta]...)
-			}
-
-			for i++; i < len(arg); i++ {
-				if v, ok := msg.Data[arg[i]]; ok {
-					m.Put(meta, arg[i], v)
-				} else if v, ok := msg.Meta[arg[i]]; ok {
-					m.Set(meta, arg[i], v) // TODO fuck Add
-				}
-			}
-		default:
-			if msg.Hand {
-				meta = "append"
-			} else {
-				meta = "option"
-			}
-
-			if v, ok := msg.Data[arg[i]]; ok {
-				m.Put(meta, arg[i], v)
-			}
-			if v, ok := msg.Meta[arg[i]]; ok {
-				m.Add(meta, arg[i], v)
-			}
-		}
-	}
-
-	return m
-}
-func (m *Message) CopyFuck(msg *Message, arg ...string) *Message {
-	if m == msg {
-		return m
-	}
-
-	for i := 0; i < len(arg); i++ {
-		meta := arg[i]
-
-		switch meta {
-		case "target":
-			m.target = msg.target
-		case "callback":
-			m.callback = msg.callback
-		case "detail", "result":
-			if len(msg.Meta[meta]) > 0 {
-				m.Add(meta, msg.Meta[meta][0], msg.Meta[meta][1:])
-			}
-		case "option", "append":
-			if msg.Meta == nil {
-				msg.Meta = map[string][]string{}
-			}
-			if msg.Meta[meta] == nil {
-				break
-			}
-			if i == len(arg)-1 {
-				arg = append(arg, msg.Meta[meta]...)
-			}
-
-			for i++; i < len(arg); i++ {
-				if v, ok := msg.Data[arg[i]]; ok {
-					m.Put(meta, arg[i], v)
-				} else if v, ok := msg.Meta[arg[i]]; ok {
-					m.Add(meta, arg[i], v) // TODO fuck Add
-				}
-			}
-		default:
-			if msg.Hand {
-				meta = "append"
-			} else {
-				meta = "option"
-			}
-
-			if v, ok := msg.Data[arg[i]]; ok {
-				m.Put(meta, arg[i], v)
-			}
-			if v, ok := msg.Meta[arg[i]]; ok {
-				m.Add(meta, arg[i], v)
-			}
-		}
-	}
-
-	return m
-}
-func (m *Message) Echo(str string, arg ...interface{}) *Message {
-	if len(arg) > 0 {
-		return m.Add("result", fmt.Sprintf(str, arg...))
-	}
-	return m.Add("result", str)
-}
-func (m *Message) Auto(arg ...string) *Message {
-	for i := 0; i < len(arg); i += 3 {
-		m.Add("append", "value", arg[i])
-		m.Add("append", "name", arg[i+1])
-		m.Add("append", "help", arg[i+2])
-	}
-	return m
-}
-
-func (m *Message) Insert(meta string, index int, arg ...interface{}) string {
-	if m.Meta == nil {
-		m.Meta = make(map[string][]string)
-	}
-	m.Meta[meta] = kit.Array(m.Meta[meta], index, arg)
-
-	if -1 < index && index < len(m.Meta[meta]) {
-		return m.Meta[meta][index]
-	}
-	return ""
-}
-func (m *Message) Detail(arg ...interface{}) string {
-	noset, index := true, 0
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case int:
-			noset, index, arg = false, v, arg[1:]
-		}
-	}
-	if noset && len(arg) > 0 {
-		index = -2
-	}
-
-	return m.Insert("detail", index, arg...)
-}
-func (m *Message) Detaili(arg ...interface{}) int {
-	return kit.Int(m.Detail(arg...))
-}
-func (m *Message) Details(arg ...interface{}) bool {
-	return kit.Right(m.Detail(arg...))
-}
-func (m *Message) Result(arg ...interface{}) string {
-	noset, index := true, 0
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case int:
-			noset, index, arg = false, v, arg[1:]
-		}
-	}
-	if noset && len(arg) > 0 {
-		index = -2
-	}
-
-	return m.Insert("result", index, arg...)
-}
-func (m *Message) Resulti(arg ...interface{}) int {
-	return kit.Int(m.Result(arg...))
-}
-func (m *Message) Results(arg ...interface{}) bool {
-	return kit.Right(m.Result(arg...))
-}
-func (m *Message) Option(key string, arg ...interface{}) string {
-	if len(arg) > 0 {
-		m.Insert(key, 0, arg...)
-		if _, ok := m.Meta[key]; ok {
-			m.Add("option", key)
-		}
-	}
-
-	for msg := m; msg != nil; msg = msg.message {
-		if !msg.Has(key) {
-			continue
-		}
-		for _, k := range msg.Meta["option"] {
-			if k == key {
-				return msg.Get(key)
-			}
-		}
-	}
-	return ""
-}
-func (m *Message) Optioni(key string, arg ...interface{}) int {
-	return kit.Int(m.Option(key, arg...))
-
-}
-func (m *Message) Options(key string, arg ...interface{}) bool {
-	return kit.Right(m.Option(key, arg...))
-}
-func (m *Message) Optionv(key string, arg ...interface{}) interface{} {
-	if len(arg) > 0 {
-		switch arg[0].(type) {
-		case nil:
-		// case []string:
-		// 	m.Option(key, v...)
-		// case string:
-		// 	m.Option(key, v)
-		default:
-			m.Put("option", key, arg[0])
-		}
-	}
-
-	for msg := m; msg != nil; msg = msg.message {
-		if msg.Meta == nil || !msg.Has(key) {
-			continue
-		}
-		for _, k := range msg.Meta["option"] {
-			if k == key {
-				if v, ok := msg.Data[key]; ok {
-					return v
-				}
-				return msg.Meta[key]
-			}
-		}
-	}
-	return nil
-}
-func (m *Message) Optionx(key string, arg ...string) interface{} {
-	value := m.Conf(key)
-	if value == "" {
-		value = m.Option(key)
-	}
-
-	if len(arg) > 0 {
-		value = fmt.Sprintf(arg[0], value)
-	}
-	return value
-}
-func (m *Message) Magic(begin string, chain interface{}, args ...interface{}) interface{} {
-	auth := []string{"bench", "session", "user", "role", "componet", "command"}
-	key := []string{"bench", "sessid", "username", "role", "componet", "command"}
-	aaa := m.Sess("aaa", false)
-	for i, v := range auth {
-		if v == begin {
-			h := m.Option(key[i])
-			if v == "user" {
-				h, _ = kit.Hash("username", m.Option("username"))
-			}
-
-			data := aaa.Confv("auth", []string{h, "data"})
-
-			if kit.Format(chain) == "" {
-				return data
-			}
-
-			if len(args) > 0 {
-				value := kit.Chain(data, chain, args[0])
-				aaa.Conf("auth", []string{m.Option(key[i]), "data"}, value)
-				return value
-			}
-
-			value := kit.Chain(data, chain)
-			if value != nil {
-				return value
-			}
-
-			if i < len(auth)-1 {
-				begin = auth[i+1]
-			}
-		}
-	}
-	return nil
-}
-func (m *Message) Current(text string) string {
-	cs := []string{}
-	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
-		cs = append(cs, "context", "ssh", "remote", "'"+pod+"'")
-	}
-	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
-		cs = append(cs, "context", ctx)
-	}
-	if cmd := kit.Format(m.Magic("session", "current.cmd")); cmd != "" {
-		cs = append(cs, cmd)
-	}
-	m.Log("info", "%s %s current %v", m.Option("username"), m.Option("sessid"), cs)
-	cs = append(cs, text)
-	return strings.Join(cs, " ")
-}
-func (m *Message) Append(key string, arg ...interface{}) string {
-	if len(arg) > 0 {
-		m.Insert(key, 0, arg...)
-		if _, ok := m.Meta[key]; ok {
-			m.Add("append", key)
-		}
-	}
-
-	ms := []*Message{m}
-	for i := 0; i < len(ms); i++ {
-		ms = append(ms, ms[i].messages...)
-		if !ms[i].Has(key) {
-			continue
-		}
-		for _, k := range ms[i].Meta["append"] {
-			if k == key {
-				return ms[i].Get(key)
-			}
-		}
-	}
-	return ""
-}
-func (m *Message) Appendi(key string, arg ...interface{}) int64 {
-	i, _ := strconv.ParseInt(m.Append(key, arg...), 10, 64)
-	return i
-}
-func (m *Message) Appends(key string, arg ...interface{}) bool {
-	return kit.Right(m.Append(key, arg...))
-}
-func (m *Message) Appendv(key string, arg ...interface{}) interface{} {
-	if len(arg) > 0 {
-		m.Put("append", key, arg[0])
-	}
-
-	ms := []*Message{m}
-	for i := 0; i < len(ms); i++ {
-		ms = append(ms, ms[i].messages...)
-		if !ms[i].Has(key) {
-			continue
-		}
-		for _, k := range ms[i].Meta["append"] {
-			if k == key {
-				if v, ok := ms[i].Data[key]; ok {
-					return v
-				}
-				return ms[i].Meta[key]
-			}
-		}
-	}
-	return nil
-}
-func (m *Message) Table(cbs ...interface{}) *Message {
-	if len(m.Meta["append"]) == 0 {
-		return m
-	}
-
-	// 遍历函数
-	if len(cbs) > 0 {
-		switch cb := cbs[0].(type) {
-		case func(map[string]string) bool:
-			nrow := len(m.Meta[m.Meta["append"][0]])
-			line := map[string]string{}
-			for i := 0; i < nrow; i++ {
-				for _, k := range m.Meta["append"] {
-					line[k] = m.Meta[k][i]
-				}
-				if !cb(line) {
-					break
-				}
-			}
-			return m
-		case func(map[string]string):
-			nrow := len(m.Meta[m.Meta["append"][0]])
-			for i := 0; i < nrow; i++ {
-				line := map[string]string{}
-				for _, k := range m.Meta["append"] {
-					line[k] = m.Meta[k][i]
-				}
-				cb(line)
-			}
-			return m
-		case func(int, map[string]string):
-			nrow := len(m.Meta[m.Meta["append"][0]])
-			for i := 0; i < nrow; i++ {
-				line := map[string]string{}
-				for _, k := range m.Meta["append"] {
-					line[k] = m.Meta[k][i]
-				}
-				cb(i, line)
-			}
-			return m
-		}
-	}
-
-	//计算列宽
-	space := m.Confx("table_space")
-	depth, width := 0, map[string]int{}
-	for _, k := range m.Meta["append"] {
-		if len(m.Meta[k]) > depth {
-			depth = len(m.Meta[k])
-		}
-		width[k] = kit.Width(k, len(space))
-		for _, v := range m.Meta[k] {
-			if kit.Width(v, len(space)) > width[k] {
-				width[k] = kit.Width(v, len(space))
-			}
-		}
-	}
-
-	// 回调函数
-	var cb func(maps map[string]string, list []string, line int) (goon bool)
-	if len(cbs) > 0 {
-		cb = cbs[0].(func(maps map[string]string, list []string, line int) (goon bool))
-	} else {
-		row := m.Confx("table_row_sep")
-		col := m.Confx("table_col_sep")
-		compact := kit.Right(m.Confx("table_compact"))
-		cb = func(maps map[string]string, lists []string, line int) bool {
-			for i, v := range lists {
-				if k := m.Meta["append"][i]; compact {
-					v = maps[k]
+		"context": &Command{Name: "context [find|search] [root|back|home] [first|last|rand|magic] [module] [cmd|switch|list|spawn|start|close]",
+			Help: "查找并操作模块;\n查找方法, find: 精确查找, search: 模糊搜索;\n查找起点, root: 根模块, back: 父模块, home: 本模块;\n过滤结果, first: 取第一个, last: 取最后一个, rand: 随机选择, magics: 智能选择;\n操作方法, cmd: 执行命令, switch: 切换为当前, list: 查看所有子模块, spwan: 创建子模块并初始化, start: 启动模块, close: 结束模块",
+			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				if len(arg) == 1 && arg[0] == "~" && m.target.context != nil {
+					m.target = m.target.context
+					return
 				}
 
-				if m.Echo(v); i < len(lists)-1 {
-					m.Echo(col)
+				action := "switch"
+				if len(arg) == 0 {
+					action = "list"
 				}
-			}
-			m.Echo(row)
-			return true
-		}
-	}
 
-	// 输出表头
-	row := map[string]string{}
-	wor := []string{}
-	for _, k := range m.Meta["append"] {
-		row[k], wor = k, append(wor, k+strings.Repeat(space, width[k]-kit.Width(k, len(space))))
-	}
-	if !cb(row, wor, -1) {
-		return m
-	}
-
-	// 输出数据
-	for i := 0; i < depth; i++ {
-		row := map[string]string{}
-		wor := []string{}
-		for _, k := range m.Meta["append"] {
-			data := ""
-			if i < len(m.Meta[k]) {
-				data = m.Meta[k][i]
-			}
-
-			row[k], wor = data, append(wor, data+strings.Repeat(space, width[k]-kit.Width(data, len(space))))
-		}
-		if !cb(row, wor, i) {
-			break
-		}
-	}
-
-	return m
-}
-func (m *Message) Sort(key string, arg ...string) *Message {
-	cmp := "str"
-	if len(arg) > 0 {
-		cmp = arg[0]
-	}
-
-	number := map[int]int{}
-	table := []map[string]string{}
-	m.Table(func(line map[string]string, lists []string, index int) bool {
-		if index != -1 {
-			table = append(table, line)
-			switch cmp {
-			case "int":
-				number[index] = kit.Int(line[key])
-			case "int_r":
-				number[index] = -kit.Int(line[key])
-			case "time":
-				number[index] = kit.Time(line[key])
-			case "time_r":
-				number[index] = -kit.Time(line[key])
-			}
-		}
-		return true
-	})
-
-	for i := 0; i < len(table)-1; i++ {
-		for j := i + 1; j < len(table); j++ {
-			result := false
-			switch cmp {
-			case "str":
-				if table[i][key] > table[j][key] {
-					result = true
+				method := "search"
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "find", "search":
+						method, arg = arg[0], arg[1:]
+					}
 				}
-			case "str_r":
-				if table[i][key] < table[j][key] {
-					result = true
+
+				root := true
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "root":
+						root, arg = true, arg[1:]
+					case "home":
+						root, arg = false, arg[1:]
+					case "back":
+						root, arg = false, arg[1:]
+						if m.target.context != nil {
+							m.target = m.target.context
+						}
+					}
 				}
-			default:
-				if number[i] > number[j] {
-					result = true
-				}
-			}
 
-			if result {
-				table[i], table[j] = table[j], table[i]
-				number[i], number[j] = number[j], number[i]
-			}
-		}
-	}
-
-	for _, k := range m.Meta["append"] {
-		delete(m.Meta, k)
-	}
-
-	for _, v := range table {
-		for _, k := range m.Meta["append"] {
-			m.Add("append", k, v[k])
-		}
-	}
-	return m
-}
-func (m *Message) Parse(arg interface{}) string {
-	switch str := arg.(type) {
-	case string:
-		if len(str) > 1 && str[0] == '$' {
-			return m.Cap(str[1:])
-		}
-		if len(str) > 1 && str[0] == '@' {
-			if v := m.Option(str[1:]); v != "" {
-				return v
-			}
-			if v := kit.Format(m.Magic("bench", str[1:])); v != "" {
-				return v
-			}
-			v := m.Conf(str[1:])
-			return v
-		}
-		return str
-	}
-	return ""
-}
-func (m *Message) ToHTML(style string) string {
-	cmd := strings.Join(m.Meta["detail"], " ")
-	result := []string{}
-	if len(m.Meta["append"]) > 0 {
-		result = append(result, fmt.Sprintf("<table class='%s'>", style))
-		result = append(result, "<caption>", cmd, "</caption>")
-		m.Table(func(maps map[string]string, list []string, line int) bool {
-			if line == -1 {
-				result = append(result, "<tr>")
-				for _, v := range list {
-					result = append(result, "<th>", v, "</th>")
-				}
-				result = append(result, "</tr>")
-				return true
-			}
-			result = append(result, "<tr>")
-			for _, v := range list {
-				result = append(result, "<td>", v, "</td>")
-			}
-			result = append(result, "</tr>")
-			return true
-		})
-		result = append(result, "</table>")
-	} else {
-		result = append(result, "<pre><code>")
-		result = append(result, fmt.Sprintf("%s", m.Find("shy", false).Conf("prompt")), cmd, "\n")
-		result = append(result, m.Meta["result"]...)
-		result = append(result, "</code></pre>")
-	}
-	return strings.Join(result, "")
-}
-
-func (m *Message) Gdb(arg ...interface{}) interface{} {
-	if g := m.Sess("gdb", false); g != nil {
-		if gdb, ok := g.target.Server.(DEBUG); ok {
-			return gdb.Wait(m, arg...)
-		}
-	}
-	return nil
-}
-func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
-	if m.Options("log.disable") {
-		return m
-	}
-
-	if l := m.Sess("log", false); l != nil {
-		if log, ok := l.target.Server.(LOGGER); ok {
-			if action == "error" {
-				log.Log(m, "error", "chain: %s", m.Format("chain"))
-			}
-			log.Log(m, action, str, arg...)
-			if action == "error" {
-				log.Log(m, "error", "stack: %s", m.Format("stack"))
-			}
-			return m
-		}
-	} else {
-		log.Printf(str, arg...)
-	}
-
-	if action == "error" {
-		kit.Log("error", fmt.Sprintf("chain: %s", m.Format("chain")))
-		kit.Log("error", fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
-		kit.Log("error", fmt.Sprintf("stack: %s", m.Format("stack")))
-	}
-
-	return m
-}
-func (m *Message) Show(args ...interface{}) *Message {
-	if m.Option("cli.modal") == "action" {
-		fmt.Printf(kit.Format(args...))
-	} else if kit.STDIO != nil {
-		kit.STDIO.Show(args...)
-	}
-	return m
-}
-func (m *Message) Assert(e interface{}, msg ...string) bool {
-	switch v := e.(type) {
-	case nil:
-		return true
-	case *Message:
-		if v.Result(0) != "error: " {
-			return true
-		}
-		e = v.Result(1)
-		e = errors.New(v.Result(1))
-	default:
-		if kit.Right(v) {
-			return true
-		}
-	}
-
-	switch e.(type) {
-	case error:
-	default:
-		e = errors.New(kit.Format(msg))
-	}
-
-	m.Log("error", "%v", e)
-	panic(e)
-}
-func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message {
-	defer func() {
-		switch e := recover(); e {
-		case io.EOF:
-		case nil:
-		default:
-			m.Log("bench", "chain: %s", msg.Format("chain"))
-			m.Log("bench", "catch: %s", e)
-			m.Log("bench", "stack: %s", msg.Format("stack"))
-
-			if m.Log("error", "catch: %s", e); len(hand) > 1 {
-				m.TryCatch(msg, safe, hand[1:]...)
-			} else if !safe {
-				msg.Assert(e)
-			}
-		}
-	}()
-
-	if len(hand) > 0 {
-		hand[0](msg)
-	}
-	return m
-}
-func (m *Message) GoFunc(msg *Message, hand ...func(msg *Message)) *Message {
-	go func() {
-		msg.Option("routine", m.Capi("ngo", 1))
-		// msg.Log("info", "%v safe go begin", ngo)
-		// kit.Log("error", "%s ngo %s start", msg.Format(), ngo)
-		m.TryCatch(msg, true, hand...)
-		// kit.Log("error", "%s ngo %s end", msg.Format(), ngo)
-		// msg.Log("info", "%v safe go end", ngo)
-	}()
-	return m
-}
-func (m *Message) GoLoop(msg *Message, hand ...func(msg *Message)) *Message {
-	m.GoFunc(msg, func(msg *Message) {
-		for {
-			hand[0](msg)
-		}
-	})
-	return m
-}
-func (m *Message) Start(name string, help string, arg ...string) bool {
-	return m.Set("detail", arg).target.Spawn(m, name, help).Begin(m).Start(m)
-}
-func (m *Message) Close(arg ...string) bool {
-	return m.Target().Close(m, arg...)
-}
-func (m *Message) Wait() bool {
-	if m.target.exit != nil {
-		return <-m.target.exit
-	}
-	return true
-}
-
-func (m *Message) Find(name string, root ...bool) *Message {
-	if name == "" {
-		return m.Spawn()
-	}
-	target := m.target.root
-	if len(root) > 0 && !root[0] {
-		target = m.target
-	}
-
-	cs := target.contexts
-	for _, v := range strings.Split(name, ".") {
-		if x, ok := cs[v]; ok {
-			target, cs = x, x.contexts
-		} else if target.Name == v {
-			continue
-		} else {
-			m.Log("error", "context not find %s", name)
-			return nil
-		}
-	}
-
-	if len(root) > 1 && root[1] {
-		m.target = target
-		return m
-	}
-
-	return m.Spawn(target)
-}
-func (m *Message) Search(key string, root ...bool) []*Message {
-	reg, e := regexp.Compile(key)
-	m.Assert(e)
-
-	target := m.target
-	if target == nil {
-		return []*Message{nil}
-	}
-	if len(root) > 0 && root[0] {
-		target = m.target.root
-	}
-
-	cs := make([]*Context, 0, 3)
-	target.Travel(m, func(m *Message, i int) bool {
-		if reg.MatchString(m.target.Name) || reg.FindString(m.target.Help) != "" {
-			m.Log("search", "%d %s match [%s]", len(cs), m.target.Name, key)
-			cs = append(cs, m.target)
-		}
-		return false
-	})
-
-	ms := make([]*Message, len(cs))
-	for i := 0; i < len(cs); i++ {
-		ms[i] = m.Spawn(cs[i])
-	}
-	if len(ms) == 0 {
-		ms = append(ms, nil)
-	}
-
-	return ms
-}
-func (m *Message) Sess(key string, arg ...interface{}) *Message {
-	if key == "" {
-		return m.Spawn()
-	}
-
-	spawn := true
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case bool:
-			spawn, arg = v, arg[1:]
-		}
-	}
-
-	if len(arg) > 0 {
-		if m.Sessions == nil {
-			m.Sessions = make(map[string]*Message)
-		}
-
-		switch value := arg[0].(type) {
-		case *Message:
-			m.Sessions[key] = value
-			return m.Sessions[key]
-		case *Context:
-			m.Sessions[key] = m.Spawn(value)
-			return m.Sessions[key]
-		case string:
-			root := len(arg) < 3 || kit.Right(arg[2])
-
-			method := "find"
-			if len(arg) > 1 {
-				method = kit.Format(arg[1])
-			}
-
-			switch method {
-			case "find":
-				m.Sessions[key] = m.Find(value, root)
-			case "search":
-				m.Sessions[key] = m.Search(value, root)[0]
-			}
-			return m.Sessions[key]
-		case nil:
-			delete(m.Sessions, key)
-			return nil
-		}
-	}
-
-	for msg := m; msg != nil; msg = msg.message {
-		if x, ok := msg.Sessions[key]; ok {
-			if spawn {
-				x = m.Spawn(x.target)
-				x.callback = func(sub *Message) *Message { return sub }
-			}
-			return x
-		}
-	}
-
-	return nil
-}
-func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context, c *Context, key string) bool) *Message {
-	if m == nil {
-		return m
-	}
-
-	context := []*Context{m.target}
-	for _, v := range []string{"aaa", "ssh", "cli", "nfs"} {
-		if msg := m.Sess(v, false); msg != nil && msg.target != nil {
-			context = append(context, msg.target)
-		}
-	}
-	// if m.target.root != nil && m.target.root.Configs != nil && m.target.root.Configs["search"] != nil && m.target.root.Configs["search"].Value != nil {
-	// 	target := m.target
-	// 	for _, v := range kit.Trans(kit.Chain(m.target.root.Configs["search"].Value, "context")) {
-	// 		if t := m.Find(v, true, true); t != nil {
-	// 			kit.Log("error", "%v", t)
-	// 			// 		// 	context = append(context, t.target)
-	// 		}
-	// 	}
-	// 	m.target = target
-	// }
-
-	context = append(context, m.source)
-
-	for _, s := range context {
-		for c := s; c != nil; c = c.context {
-			if hand(m, s, c, key) {
-				return m
-			}
-		}
-	}
-	return m
-}
-func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
-	if m == nil {
-		return m
-	}
-	if m.callback = cb; len(arg) > 0 || len(m.Meta["detail"]) > 0 {
-		m.Log("call", m.Format("detail", "option"))
-		m.Cmd(arg...)
-	}
-	return m
-}
-func (m *Message) Back(ms ...*Message) *Message {
-	if m.callback == nil {
-		return m
-	}
-
-	if len(ms) == 0 {
-		ms = append(ms, m.Spawn(m.source).Copy(m, "append").Copy(m, "result"))
-	}
-
-	ns := []*Message{}
-
-	for _, msg := range ms {
-		if msg.Hand {
-			m.Log("back", msg.Format("ship", "result", "append"))
-		} else {
-			m.Log("back", msg.Format("ship", "detail", "option"))
-		}
-
-		if sub := m.callback(msg); sub != nil && m.message != nil && m.message != m {
-			ns = append(ns, sub)
-		}
-	}
-
-	if len(ns) > 0 {
-		m.message.Back(ns...)
-	}
-	return m
-}
-func (m *Message) Backs(msg *Message) *Message {
-	m.Back(msg)
-	return msg
-}
-func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
-	if !sync {
-		return m.Call(cb, arg...)
-	}
-
-	wait := make(chan *Message, 10)
-	// m.GoFunc(m, func(m *Message) {
-	m.Call(func(sub *Message) *Message {
-		msg := cb(sub)
-		m.Log("sync", m.Format("done", "result", "append"))
-		wait <- m
-		return msg
-	}, arg...)
-	// })
-
-	m.Log("sync", m.Format("wait", "result", "append"))
-	select {
-	case <-time.After(kit.Duration(m.Conf("call_timeout"))):
-		m.Log("sync", m.Format("timeout", "result", "append"))
-	case <-wait:
-	}
-	return m
-}
-func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
-	if len(cbs) == 0 {
-		for i := len(m.freedoms) - 1; i >= 0; i-- {
-			m.Log("free", "%d/%d", i, len(m.freedoms)-1)
-			if !m.freedoms[i](m) {
-				break
-			}
-			m.freedoms = m.freedoms[:i]
-		}
-		return m
-	}
-
-	m.freedoms = append(m.freedoms, cbs...)
-	return m
-}
-
-func (m *Message) Cmdp(t time.Duration, head []string, prefix []string, suffix [][]string) *Message {
-	if head != nil && len(head) > 0 {
-		m.Show(strings.Join(head, " "), "...\n")
-	}
-
-	for i, v := range suffix {
-		m.Show(fmt.Sprintf("%v/%v %v...\n", i+1, len(suffix), v))
-		m.CopyFuck(m.Cmd(prefix, v), "append")
-		time.Sleep(t)
-	}
-	m.Show("\n")
-	m.Table()
-	return m
-}
-func (m *Message) Cmdm(args ...interface{}) *Message {
-	m.Log("info", "current: %v", m.Magic("session", "current"))
-
-	arg := []string{}
-	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
-		arg = append(arg, "context", "ssh", "remote", pod)
-	}
-	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
-		arg = append(arg, "context", ctx)
-	}
-	arg = append(arg, kit.Trans(args...)...)
-
-	// 执行命令
-	m.Spawn().Cmd(arg).CopyTo(m)
-	// m.Magic("session", "current.ctx", msg.target.Name)
-	return m
-}
-func (m *Message) Cmdy(args ...interface{}) *Message {
-	m.Cmd(args...).CopyTo(m)
-	return m
-}
-func (m *Message) Cmdx(args ...interface{}) string {
-	msg := m.Cmd(args...)
-	if msg.Result(0) == "error: " {
-		return msg.Result(1)
-	}
-	return msg.Result(0)
-}
-func (m *Message) Cmds(args ...interface{}) bool {
-	return m.Cmd(args...).Results(0)
-}
-func (m *Message) Cmd(args ...interface{}) *Message {
-	if m == nil {
-		return m
-	}
-
-	if len(args) > 0 {
-		m.Set("detail", kit.Trans(args...))
-	}
-	key, arg := m.Meta["detail"][0], m.Meta["detail"][1:]
-
-	msg := m
-	if strings.Contains(key, ":") {
-		ps := strings.Split(key, ":")
-		msg, key, arg = msg.Sess("ssh"), "_route", append([]string{"sync", ps[0], ps[1]}, arg...)
-		defer func() { m.Copy(msg, "append").Copy(msg, "result") }()
-		m.Hand = true
-
-	} else if strings.Contains(key, ".") {
-		arg := strings.Split(key, ".")
-		msg, key = msg.Sess(arg[0]), arg[1]
-		msg.Option("remote_code", "")
-	}
-	if msg == nil {
-		return msg
-	}
-
-	msg = msg.Match(key, true, func(msg *Message, s *Context, c *Context, key string) bool {
-		msg.Hand = false
-		if x, ok := c.Commands[key]; ok && x.Hand != nil {
-			msg.TryCatch(msg, true, func(msg *Message) {
-				msg.Log("cmd", "%s %s %v %v", c.Name, key, arg, msg.Meta["option"])
-
-				for _, form := range []map[string]int{map[string]int{"page.limit": 1, "page.offset": 1}, x.Form} {
-
-					if args := []string{}; form != nil {
-						for i := 0; i < len(arg); i++ {
-							if n, ok := form[arg[i]]; ok {
-								if n < 0 {
-									n += len(arg) - i
+				ms := []*Message{}
+				if len(arg) > 0 {
+					switch method {
+					case "find":
+						if msg := m.Find(arg[0], root); msg != nil {
+							ms, arg = append(ms, msg), arg[1:]
+						}
+					case "search":
+						msg := m.Search(arg[0], root)
+						if len(msg) > 1 || msg[0] != nil {
+							if len(arg) > 1 {
+								switch arg[1] {
+								case "first":
+									ms, arg = append(ms, msg[0]), arg[2:]
+								case "last":
+									ms, arg = append(ms, msg[len(msg)-1]), arg[2:]
+								case "rand":
+									ms, arg = append(ms, msg[rand.Intn(len(msg))]), arg[2:]
+								case "magics":
+									ms, arg = append(ms, msg...), arg[2:]
+								default:
+									ms, arg = append(ms, msg[0]), arg[1:]
 								}
-								for j := i + 1; j <= i+n && j < len(arg); j++ {
-									if _, ok := form[arg[j]]; ok {
-										n = j - i - 1
-									}
-								}
-								if i+1+n > len(arg) {
-									msg.Add("option", arg[i], arg[i+1:])
-								} else {
-									msg.Add("option", arg[i], arg[i+1:i+1+n])
-								}
-								i += n
 							} else {
-								args = append(args, arg[i])
+								ms, arg = append(ms, msg[0]), arg[1:]
 							}
 						}
-						arg = args
+
 					}
 				}
 
-				target := msg.target
-				msg.target = s
+				if len(ms) == 0 {
+					ms = append(ms, m)
+				}
 
-				msg.Hand = true
-				switch v := msg.Gdb("command", key, arg).(type) {
-				case string:
-					msg.Echo(v)
-				case nil:
-					if msg.Options("auto_cmd") {
-						if x.Auto != nil {
-							x.Auto(msg, c, key, arg...)
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "switch", "list", "spawn", "start", "close":
+						action, arg = arg[0], arg[1:]
+					default:
+						action = "cmd"
+					}
+				}
+
+				for _, msg := range ms {
+					if msg == nil {
+						continue
+					}
+
+					switch action {
+					case "cmd":
+						componet := "source"
+						if m.Options("bench") && m.Options("username") && !m.Cmds("aaa.work", "right", componet, arg[0]) {
+							m.Log("info", "%s no right [%v: %v]", m.Option("username"), componet, arg[0])
+							m.Echo("error: ").Echo("no right [%s: %s]", componet, arg[0])
+							break
+						}
+
+						if msg.Cmd(arg); !msg.Hand {
+							msg = msg.Sess("cli").Cmd("cmd", arg)
+						}
+						msg.CopyTo(m)
+
+					case "switch":
+						m.target = msg.target
+
+					case "list":
+						cs := []*Context{}
+						if msg.target.Name != "ctx" {
+							cs = append(cs, msg.target.context)
+						}
+						msg.Target().Travel(msg, func(msg *Message, n int) bool {
+							cs = append(cs, msg.target)
+							return false
+						})
+
+						for _, v := range cs {
+							if msg.target = v; v == nil {
+								m.Add("append", "names", "")
+								m.Add("append", "ctx", "")
+								m.Add("append", "msg", "")
+								m.Add("append", "status", "")
+								m.Add("append", "stream", "")
+								m.Add("append", "helps", "")
+								continue
+							}
+
+							m.Add("append", "names", msg.target.Name)
+							if msg.target.context != nil {
+								m.Add("append", "ctx", msg.target.context.Name)
+							} else {
+								m.Add("append", "ctx", "")
+							}
+							if msg.target.message != nil {
+								m.Add("append", "msg", msg.target.message.code)
+							} else {
+								m.Add("append", "msg", "")
+							}
+							m.Add("append", "status", msg.Cap("status"))
+							m.Add("append", "stream", msg.Cap("stream"))
+							m.Add("append", "helps", msg.target.Help)
+						}
+
+					case "spawn":
+						msg.target.Spawn(msg, arg[0], arg[1]).Begin(msg, arg[2:]...)
+						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+
+					case "start":
+						msg.target.Start(msg, arg...)
+						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+
+					case "close":
+						msg := m.Spawn()
+						m.target = msg.target.context
+						msg.target.Close(msg.target.message, arg...)
+					}
+				}
+
+				if action == "list" {
+					m.Table()
+				}
+				return
+			}},
+		"command": &Command{Name: "command [all] [show]|[list [begin [end]] [prefix] test [key val]...]|[add [list_name name] [list_help help] cmd...]|[delete cmd]",
+			Help: "查看或修改命令, show: 查看命令;\nlist: 查看列表命令, begin: 起始索引, end: 截止索引, prefix: 过滤前缀, test: 执行命令;\nadd: 添加命令, list_name: 命令别名, list_help: 命令帮助;\ndelete: 删除命令",
+			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				if len(arg) > 0 && arg[0] == "help" {
+					m.Cmdy(".help", "command", arg[1:])
+					return
+				}
+				all := false
+				if len(arg) > 0 && arg[0] == "all" {
+					all, arg = true, arg[1:]
+				}
+
+				action := ""
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "show", "list", "add", "delete":
+						action, arg = arg[0], arg[1:]
+					}
+				} else {
+					action = "show"
+				}
+
+				switch action {
+				case "show":
+					c.BackTrace(m, func(m *Message) bool {
+						for k, v := range m.target.Commands {
+							if strings.HasPrefix(k, "_") {
+								continue
+							}
+							if len(arg) > 0 {
+								if k == arg[0] {
+									m.Add("append", "key", k)
+									m.Add("append", "name", v.Name)
+									m.Add("append", "help", v.Name)
+								}
+							} else {
+								m.Add("append", "key", k)
+								m.Add("append", "name", v.Name)
+							}
+						}
+
+						return !all
+					})
+					m.Sort("key").Table()
+				case "list":
+					if m.Cap("list_count") == "" {
+						break
+					}
+					begin, end := 0, m.Capi("list_count")
+					if len(arg) > 0 {
+						if n, e := strconv.Atoi(arg[0]); e == nil {
+							begin, arg = n, arg[1:]
+						}
+					}
+					if len(arg) > 0 {
+						if n, e := strconv.Atoi(arg[0]); e == nil {
+							end, arg = n, arg[1:]
+						}
+					}
+					prefix := ""
+					if len(arg) > 0 && arg[0] != "test" {
+						prefix, arg = arg[0], arg[1:]
+					}
+
+					test := false
+					if len(arg) > 0 && arg[0] == "test" {
+						test, arg = true, arg[1:]
+						for i := 0; i < len(arg)-1; i += 2 {
+							m.Add("option", arg[i], arg[i+1])
+						}
+					}
+
+					for i := begin; i < end; i++ {
+						index := fmt.Sprintf("%d", i)
+						if c, ok := m.target.Commands[index]; ok {
+							if prefix != "" && !strings.HasPrefix(c.Help.(string), prefix) {
+								continue
+							}
+
+							if test {
+								msg := m.Spawn().Cmd(index)
+								m.Add("append", "index", i)
+								m.Add("append", "help", c.Help)
+								m.Add("append", "msg", msg.messages[0].code)
+								m.Add("append", "res", msg.Result(0))
+							} else {
+								m.Add("append", "index", i)
+								m.Add("append", "help", fmt.Sprintf("%s", c.Help))
+								m.Add("append", "command", fmt.Sprintf("%s", strings.Replace(c.Name, "\n", "\\n", -1)))
+							}
+						}
+					}
+					m.Table()
+				case "add":
+					if m.target.Caches == nil {
+						m.target.Caches = map[string]*Cache{}
+					}
+					if _, ok := m.target.Caches["list_count"]; !ok {
+						m.target.Caches["list_count"] = &Cache{Name: "list_count", Value: "0", Help: "list_count"}
+					}
+					if m.target.Commands == nil {
+						m.target.Commands = map[string]*Command{}
+					}
+
+					list_name, list_help := "", "list_cmd"
+					if len(arg) > 1 && arg[0] == "list_name" {
+						list_name, arg = arg[1], arg[2:]
+					}
+					if len(arg) > 1 && arg[0] == "list_help" {
+						list_help, arg = arg[1], arg[2:]
+					}
+
+					m.target.Commands[m.Cap("list_count")] = &Command{Name: strings.Join(arg, " "), Help: list_help, Hand: func(cmd *Message, c *Context, key string, args ...string) (e error) {
+						list := []string{}
+						for _, v := range arg {
+							if v == "__" {
+								if len(args) > 0 {
+									v, args = args[0], args[1:]
+								} else {
+									continue
+								}
+							} else if strings.HasPrefix(v, "_") {
+								if len(args) > 0 {
+									v, args = args[0], args[1:]
+								} else if len(v) > 1 {
+									v = v[1:]
+								} else {
+									v = "''"
+								}
+							}
+							list = append(list, v)
+						}
+						list = append(list, args...)
+
+						msg := cmd.Sess("cli").Set("option", "current_ctx", m.target.Name).Cmd("source", strings.Join(list, " "))
+						cmd.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+						return
+					}}
+
+					if list_name != "" {
+						m.target.Commands[list_name] = m.target.Commands[m.Cap("list_count")]
+					}
+					m.Capi("list_count", 1)
+				case "delete":
+					c.BackTrace(m, func(m *Message) bool {
+						delete(m.target.Commands, arg[0])
+						return !all
+					})
+				default:
+					if len(arg) > 0 {
+						m.Cmdy(arg)
+					}
+				}
+				return
+			}},
+		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [list|map arg...] [create map|list|string key name help] [delete key]",
+			Help: "配置管理, export: 导出配置, save: 保存配置到文件, load: 从文件加载配置, create: 创建配置, delete: 删除配置",
+			Form: map[string]int{"format": 1, "fields": -1},
+			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				if len(arg) > 2 && arg[2] == "list" {
+					chain := strings.Split(arg[1], ".")
+					chain = append(chain, "-2")
+
+					for _, val := range arg[3:] {
+						m.Confv(arg[0], chain, val)
+					}
+					return
+				}
+				if len(arg) > 2 && arg[2] == "map" {
+					chain := strings.Split(arg[1], ".")
+
+					for i := 3; i < len(arg)-1; i += 2 {
+						m.Confv(arg[0], append(chain, arg[i]), arg[i+1])
+					}
+					return
+				}
+				if len(arg) > 1 && arg[1] == "map" {
+					for i := 2; i < len(arg)-1; i += 2 {
+						m.Confv(arg[0], arg[i], arg[i+1])
+					}
+					return
+				}
+
+				all := false
+				if len(arg) > 0 && arg[0] == "all" {
+					arg, all = arg[1:], true
+				}
+
+				action, which := "", "-1"
+				have := map[string]bool{}
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "export":
+						action, arg = arg[0], arg[1:]
+						for _, v := range arg {
+							have[v] = true
+						}
+					case "save", "load":
+						action, which, arg = arg[0], arg[1], arg[2:]
+						for _, v := range arg {
+							have[v] = true
+						}
+					case "create", "delete":
+						action, arg = arg[0], arg[1:]
+					}
+				}
+
+				if len(arg) == 0 || action != "" {
+					save := map[string]interface{}{}
+					if action == "load" {
+						f, e := os.Open(m.Sess("nfs").Cmd("path", which).Result(0))
+						if e != nil {
+							return e
+						}
+						defer f.Close()
+
+						de := json.NewDecoder(f)
+						if e = de.Decode(&save); e != nil {
+							m.Log("info", "e: %v", e)
+						}
+					}
+
+					c.BackTrace(m, func(m *Message) bool {
+						for k, v := range m.target.Configs {
+							switch action {
+							case "export", "save":
+								if len(have) == 0 || have[k] {
+									save[k] = v.Value
+								}
+							case "load":
+								if x, ok := save[k]; ok && (len(have) == 0 || have[k]) {
+									v.Value = x
+								}
+							case "create":
+								m.Assert(k != arg[1], "%s exists", arg[1])
+							case "delete":
+								if k == arg[0] {
+									delete(m.target.Configs, k)
+								}
+								fallthrough
+							default:
+								m.Add("append", "key", k)
+								m.Add("append", "value", strings.Replace(strings.Replace(m.Conf(k), "\n", "\\n", -1), "\t", "\\t", -1))
+								m.Add("append", "name", v.Name)
+							}
+						}
+						switch action {
+						case "create":
+							var value interface{}
+							switch arg[0] {
+							case "map":
+								value = map[string]interface{}{}
+							case "list":
+								value = []interface{}{}
+							default:
+								value = ""
+							}
+							m.target.Configs[arg[1]] = &Config{Name: arg[2], Value: value, Help: arg[3]}
+						}
+						return !all
+					})
+					m.Sort("key", "str").Table()
+
+					switch action {
+					case "save":
+						buf, e := json.MarshalIndent(save, "", "  ")
+						m.Assert(e)
+						m.Sess("nfs").Add("option", "data", string(buf)).Cmd("save", which)
+					case "export":
+						buf, e := json.MarshalIndent(save, "", "  ")
+						m.Assert(e)
+						m.Echo("%s", string(buf))
+					}
+					return
+				}
+
+				var value interface{}
+				if len(arg) > 2 {
+					value = m.Confv(arg[0], arg[1], arg[2])
+				} else if len(arg) > 1 {
+					value = m.Confv(arg[0], arg[1])
+				} else {
+					value = m.Confv(arg[0])
+				}
+
+				msg := m.Spawn().Put("option", "_cache", value).Cmd("trans", "_cache")
+				m.Copy(msg, "append").Copy(msg, "result")
+				return
+			}},
+		"cache": &Command{Name: "cache [all] |key [value]|key = value|key name value help|delete key]",
+			Help: "查看、读写、赋值、新建、删除缓存变量",
+			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				all := false
+				if len(arg) > 0 && arg[0] == "all" {
+					arg, all = arg[1:], true
+				}
+
+				switch len(arg) {
+				case 0:
+					c.BackTrace(m, func(m *Message) bool {
+						for k, v := range m.target.Caches {
+							m.Add("append", "key", k)
+							m.Add("append", "value", m.Cap(k))
+							m.Add("append", "name", v.Name)
+						}
+						return !all
+					})
+					m.Sort("key", "str").Table()
+					return
+				case 1:
+					m.Echo(m.Cap(arg[0]))
+				case 2:
+					if arg[0] == "delete" {
+						delete(m.target.Caches, arg[1])
+						return
+					}
+					m.Cap(arg[0], arg[1])
+				case 3:
+					m.Cap(arg[0], arg[0], arg[2], arg[0])
+				default:
+					m.Echo(m.Cap(arg[0], arg[1:]))
+					return
+				}
+				return
+			}},
+
+		"trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换",
+			Form: map[string]int{"format": 1, "fields": -1},
+			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				value, arg := m.Optionv(arg[0]), arg[1:]
+				if v, ok := value.(string); ok {
+					json.Unmarshal([]byte(v), &value)
+				}
+
+				view := "data"
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "type", "data", "json":
+						view, arg = arg[0], arg[1:]
+					}
+				}
+
+				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
+				if len(arg) > 0 && arg[0] == "limit" {
+					limit, arg = kit.Int(arg[1]), arg[2:]
+				}
+
+				chain := strings.Join(arg, ".")
+				if chain != "" {
+					value = kit.Chain(value, chain)
+				}
+
+				switch view {
+				case "type": // 查看数据类型
+					switch value := value.(type) {
+					case map[string]interface{}:
+						for k, v := range value {
+							m.Add("append", "key", k)
+							m.Add("append", "type", fmt.Sprintf("%T", v))
+						}
+						m.Sort("key", "str").Table()
+					case []interface{}:
+						for k, v := range value {
+							m.Add("append", "key", k)
+							m.Add("append", "type", fmt.Sprintf("%T", v))
+						}
+						m.Sort("key", "int").Table()
+					case nil:
+					default:
+						m.Add("append", "key", chain)
+						m.Add("append", "type", fmt.Sprintf("%T", value))
+						m.Sort("key", "str").Table()
+					}
+					return
+				case "data":
+				case "json": // 查看文本数据
+					b, e := json.MarshalIndent(value, "", " ")
+					m.Assert(e)
+					m.Echo(string(b))
+					return nil
+				}
+
+				switch val := value.(type) {
+				case map[string]interface{}:
+					if m.Option("format") == "table" {
+						fields := []string{}
+						has := map[string]bool{}
+						if m.Options("fields") {
+							fields = m.Optionv("fields").([]string)
+						} else {
+							i := 0
+							for _, v := range val {
+								if i++; i > kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))) {
+									break
+								}
+								if line, ok := v.(map[string]interface{}); ok {
+									for k, _ := range line {
+										if h, ok := has[k]; ok && h {
+											continue
+										}
+										has[k], fields = true, append(fields, k)
+									}
+								}
+							}
+							sort.Strings(fields)
+						}
+
+						i := 0
+						for k, v := range val {
+							if i++; i > kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))) {
+								break
+							}
+							if line, ok := v.(map[string]interface{}); ok {
+								m.Add("append", "key", k)
+								for _, field := range fields {
+									m.Add("append", field, kit.Format(line[field]))
+								}
+							}
+						}
+						m.Table()
+						break
+					}
+
+					for k, v := range val {
+						if m.Option("format") == "object" {
+							m.Add("append", k, v)
+							continue
+						}
+
+						m.Add("append", "key", k)
+						switch val := v.(type) {
+						case nil:
+							m.Add("append", "value", "")
+						case string:
+							m.Add("append", "value", val)
+						case float64:
+							m.Add("append", "value", fmt.Sprintf("%d", int(val)))
+						default:
+							b, _ := json.Marshal(val)
+							m.Add("append", "value", fmt.Sprintf("%s", string(b)))
+						}
+					}
+					if m.Option("format") != "object" {
+						m.Sort("key", "str")
+					}
+					m.Table()
+				case map[string]string:
+					for k, v := range val {
+						m.Add("append", "key", k)
+						m.Add("append", "value", v)
+					}
+					m.Sort("key", "str").Table()
+				case []interface{}:
+					fields := map[string]int{}
+					for i, v := range val {
+						if i >= limit {
+							break
+						}
+						switch val := v.(type) {
+						case map[string]interface{}:
+							for k, _ := range val {
+								fields[k]++
+							}
+						}
+					}
+
+					if len(fields) > 0 {
+						for i, v := range val {
+							if i >= limit {
+								break
+							}
+							switch val := v.(type) {
+							case map[string]interface{}:
+								for k, _ := range fields {
+									switch value := val[k].(type) {
+									case nil:
+										m.Add("append", k, "")
+									case string:
+										m.Add("append", k, value)
+									case float64:
+										m.Add("append", k, fmt.Sprintf("%d", int(value)))
+									default:
+										b, _ := json.Marshal(value)
+										m.Add("append", k, fmt.Sprintf("%v", string(b)))
+									}
+								}
+							}
 						}
 					} else {
-						x.Hand(msg, c, key, arg...)
+						for i, v := range val {
+							switch val := v.(type) {
+							case nil:
+								m.Add("append", "index", i)
+								m.Add("append", "value", "")
+							case string:
+								m.Add("append", "index", i)
+								m.Add("append", "value", val)
+							case float64:
+								m.Add("append", "index", i)
+								m.Add("append", "value", fmt.Sprintf("%v", int(val)))
+							default:
+								m.Add("append", "index", i)
+								b, _ := json.Marshal(val)
+								m.Add("append", "value", fmt.Sprintf("%v", string(b)))
+							}
+						}
+					}
+					m.Table()
+				case []string:
+					for i, v := range val {
+						m.Add("append", "index", i)
+						m.Add("append", "value", v)
+					}
+					m.Table()
+				case string:
+					m.Echo("%s", val)
+				case float64:
+					m.Echo("%d", int(val))
+				case nil:
+				default:
+					b, _ := json.Marshal(val)
+					m.Echo("%s", string(b))
+				}
+				return
+			}},
+		"select": &Command{Name: "select key value field",
+			Form: map[string]int{"eq": 2, "expand": 2, "hide": -1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
+			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				msg := m.Set("result").Spawn()
+
+				// 解析
+				if len(m.Meta["append"]) == 0 {
+					return
+				}
+				nrow := len(m.Meta[m.Meta["append"][0]])
+				keys := []string{}
+				for i := 0; i < nrow; i++ {
+					for j := 0; j < len(m.Meta["expand"]); j += 2 {
+						var value interface{}
+						json.Unmarshal([]byte(m.Meta[m.Meta["expand"][j]][i]), &value)
+						if m.Meta["expand"][j+1] != "" {
+							value = kit.Chain(value, m.Meta["expand"][j+1])
+						}
+
+						switch val := value.(type) {
+						case map[string]interface{}:
+							for k, _ := range val {
+								keys = append(keys, k)
+							}
+						default:
+							keys = append(keys, m.Meta["expand"][j+1])
+						}
 					}
 				}
-				if msg.target == s {
-					msg.target = target
-				}
-			})
-		}
-		return msg.Hand
-	})
-
-	if !msg.Hand {
-		msg.Log("error", "cmd run error %s", msg.Format())
-	}
-	return msg
-}
-
-func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} {
-	random := ""
-	var chain interface{}
-	if len(args) > 0 {
-		switch arg := args[0].(type) {
-		case []interface{}:
-			chain, args = arg, args[1:]
-		case []string:
-			chain, args = arg, args[1:]
-		case string:
-			switch arg {
-			case "%", "*":
-				random, args = arg, args[1:]
-			default:
-				chain, args = arg, args[1:]
-			}
-		}
-	}
-
-	var v interface{}
-	if chain == nil {
-		v = m.Confv(key)
-	} else {
-		v = m.Confv(key, chain)
-	}
-
-	table, _ := v.([]interface{})
-	value, _ := v.(map[string]interface{})
-	if len(args) == 0 {
-		return value
-	}
-
-	switch fun := args[0].(type) {
-	case func(int, string):
-		for i, v := range table {
-			fun(i, kit.Format(v))
-		}
-	case func(int, string) bool:
-		for i, v := range table {
-			if fun(i, kit.Format(v)) {
-				break
-			}
-		}
-	case func(string, string):
-		for k, v := range value {
-			fun(k, kit.Format(v))
-		}
-	case func(string, string) bool:
-		for k, v := range value {
-			if fun(k, kit.Format(v)) {
-				break
-			}
-		}
-	case func(map[string]interface{}):
-		if len(value) == 0 {
-			return nil
-		}
-		fun(value)
-	case func(string, map[string]interface{}):
-		switch random {
-		case "%":
-			n, i := rand.Intn(len(value)), 0
-			for k, v := range value {
-				if val, ok := v.(map[string]interface{}); i == n && ok {
-					fun(k, val)
-					break
-				}
-				i++
-			}
-		case "*":
-			fallthrough
-		default:
-			for k, v := range value {
-				if val, ok := v.(map[string]interface{}); ok {
-					fun(k, val)
-				}
-			}
-		}
-	case func(string, int, map[string]interface{}):
-		for k, v := range value {
-			if val, ok := v.([]interface{}); ok {
-				for i, v := range val {
-					if val, ok := v.(map[string]interface{}); ok {
-						fun(k, i, val)
+				for i := 0; i < nrow; i++ {
+					for _, k := range keys {
+						m.Add("append", k, "")
 					}
 				}
-			}
-		}
+				for i := 0; i < nrow; i++ {
+					for j := 0; j < len(m.Meta["expand"]); j += 2 {
+						var value interface{}
+						json.Unmarshal([]byte(m.Meta[m.Meta["expand"][j]][i]), &value)
+						if m.Meta["expand"][j+1] != "" {
+							value = kit.Chain(value, m.Meta["expand"][j+1])
+						}
 
-	case func(string, map[string]interface{}) bool:
-		for k, v := range value {
-			if val, ok := v.(map[string]interface{}); ok {
-				if fun(k, val) {
-					break
+						switch val := value.(type) {
+						case map[string]interface{}:
+							for k, v := range val {
+								switch val := v.(type) {
+								case string:
+									m.Meta[k][i] = val
+								case float64:
+									m.Meta[k][i] = fmt.Sprintf("%d", int(val))
+								default:
+									b, _ := json.Marshal(val)
+									m.Meta[k][i] = string(b)
+								}
+							}
+						case string:
+							m.Meta[m.Meta["expand"][j+1]][i] = val
+						default:
+							m.Meta[m.Meta["expand"][j+1]][i] = kit.Format(val)
+						}
+					}
 				}
-			}
-		}
-	case func(int, map[string]interface{}):
-		for i := m.Optioni("page.begin"); i < len(table); i++ {
-			if val, ok := table[i].(map[string]interface{}); ok {
-				fun(i, val)
-			}
-		}
-	}
-	return value
+
+				// 隐藏列
+				hides := map[string]bool{}
+				for _, k := range m.Meta["hide"] {
+					hides[k] = true
+				}
+				if len(arg) == 0 {
+					arg = append(arg, m.Meta["append"]...)
+				}
+				for i := 0; i < nrow; i++ {
+					// if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
+					if m.Has("eq") {
+						if m.Meta[m.Meta["eq"][0]][i] != m.Meta["eq"][1] {
+							continue
+						}
+					}
+					for _, k := range arg {
+						if hides[k] {
+							continue
+						}
+						msg.Add("append", k, kit.Select("", m.Meta[k], i))
+					}
+				}
+				if len(msg.Meta["append"]) == 0 {
+					return
+				}
+				if len(msg.Meta[msg.Meta["append"][0]]) == 0 {
+					return
+				}
+
+				// 聚合
+				if m.Set("append"); m.Has("group") {
+					group := m.Option("group")
+					nrow := len(msg.Meta[msg.Meta["append"][0]])
+
+					for i := 0; i < nrow; i++ {
+						count := 1
+
+						if group != "" && msg.Meta[group][i] == "" {
+							msg.Add("append", "count", 0)
+							continue
+						}
+
+						for j := i + 1; j < nrow; j++ {
+							if group == "" || msg.Meta[group][i] == msg.Meta[group][j] {
+								count++
+								for _, k := range msg.Meta["append"] {
+									if k == "count" {
+										continue
+									}
+									if k == group {
+										continue
+									}
+									m, e := strconv.Atoi(msg.Meta[k][i])
+									if e != nil {
+										continue
+									}
+									n, e := strconv.Atoi(msg.Meta[k][j])
+									if e != nil {
+										continue
+									}
+									msg.Meta[k][i] = fmt.Sprintf("%d", m+n)
+
+								}
+
+								if group != "" {
+									msg.Meta[group][j] = ""
+								}
+							}
+						}
+
+						msg.Add("append", "count", count)
+						for _, k := range msg.Meta["append"] {
+							m.Add("append", k, msg.Meta[k][i])
+						}
+						if group == "" {
+							break
+						}
+					}
+				} else {
+					m.Copy(msg, "append")
+				}
+
+				// 排序
+				if m.Has("order") {
+					m.Sort(m.Option("order"), kit.Select("str", m.Meta["order"], 1))
+				}
+
+				// 分页
+				offset := kit.Int(kit.Select("0", m.Option("offset")))
+				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
+
+				nrow = len(m.Meta[m.Meta["append"][0]])
+				if offset > nrow {
+					offset = nrow
+				}
+				if limit+offset > nrow {
+					limit = nrow - offset
+				}
+				for _, k := range m.Meta["append"] {
+					m.Meta[k] = m.Meta[k][offset : offset+limit]
+				}
+
+				// 值转换
+				for i := 0; i < len(m.Meta["trans_map"]); i += 3 {
+					trans := m.Meta["trans_map"][i:]
+					for j := 0; j < len(m.Meta[trans[0]]); j++ {
+						if m.Meta[trans[0]][j] == trans[1] {
+							m.Meta[trans[0]][j] = trans[2]
+						}
+					}
+				}
+
+				// 格式化
+				for i := 0; i < len(m.Meta["format"])-1; i += 2 {
+					format := m.Meta["format"]
+					for j, v := range m.Meta[format[i]] {
+						if v != "" {
+							m.Meta[format[i]][j] = fmt.Sprintf(format[i+1], v)
+						}
+					}
+				}
+
+				// 变换列
+				if m.Has("vertical") {
+					msg := m.Spawn()
+					nrow := len(m.Meta[m.Meta["append"][0]])
+					sort.Strings(m.Meta["append"])
+					msg.Add("append", "field", "")
+					msg.Add("append", "value", "")
+					for i := 0; i < nrow; i++ {
+						for _, k := range m.Meta["append"] {
+							msg.Add("append", "field", k)
+							msg.Add("append", "value", m.Meta[k][i])
+						}
+						msg.Add("append", "field", "")
+						msg.Add("append", "value", "")
+					}
+					m.Set("append").Copy(msg, "append")
+				}
+
+				// 取单值
+				// if len(arg) > 2 {
+				// 	if len(m.Meta[arg[2]]) > 0 {
+				// 		m.Echo(m.Meta[arg[2]][0])
+				// 	}
+				// 	return
+				// }
+
+				m.Set("result").Table()
+				return
+			}},
+	},
 }
-func (m *Message) Confx(key string, args ...interface{}) string {
-	value := kit.Select(m.Conf(key), m.Option(key))
+
+func Start(args ...string) bool {
 	if len(args) == 0 {
-		return value
+		args = append(args, os.Args[1:]...)
 	}
 
-	switch arg := args[0].(type) {
-	case []string:
-		if len(args) > 1 {
-			value = kit.Select(value, arg, args[1])
-		} else {
-			value = kit.Select(value, arg)
-		}
+	kit.DisableLog = true
+	if len(args) > 0 && args[0] == "daemon" {
+		Pulse.Options("cli.modal", "daemon")
+		Pulse.Options("daemon", true)
 		args = args[1:]
-	case map[string]interface{}:
-		value = kit.Select(value, kit.Format(arg[key]))
-	case string:
-		value = kit.Select(value, arg)
-	case nil:
-	default:
-		value = kit.Select(value, args[0])
 	}
 
-	format := "%s"
-	if args = args[1:]; len(args) > 0 {
-		format, args = kit.Format(args[0]), args[1:]
+	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
+		return Index.Close(Pulse, args...)
 	}
-	arg := []interface{}{format, value}
-	for _, v := range args {
-		arg = append(arg, v)
-	}
-
-	return kit.Format(arg...)
-}
-func (m *Message) Confs(key string, arg ...interface{}) bool {
-	return kit.Right(m.Confv(key, arg...))
-}
-func (m *Message) Confi(key string, arg ...interface{}) int {
-	return kit.Int(m.Confv(key, arg...))
-}
-func (m *Message) Confv(key string, args ...interface{}) interface{} {
-	if strings.Contains(key, ".") {
-		target := m.target
-		defer func() { m.target = target }()
-
-		ps := strings.Split(key, ".")
-		if msg := m.Sess(ps[0], false); msg != nil {
-			m.target, key = msg.target, ps[1]
-		}
-	}
-
-	var config *Config
-	m.Match(key, false, func(m *Message, s *Context, c *Context, key string) bool {
-		if x, ok := c.Configs[key]; ok {
-			config = x
-			return true
-		}
-		return false
-	})
-
-	if len(args) == 0 {
-		if config == nil {
-			return nil
-		}
-		return config.Value
-	}
-
-	if config == nil {
-		config = &Config{}
-		m.target.Configs[key] = config
-	}
-
-	switch config.Value.(type) {
-	case string:
-		config.Value = kit.Format(args...)
-	case bool:
-		config.Value = kit.Right(args...)
-	case int:
-		config.Value = kit.Int(args...)
-	case nil:
-		config.Value = args[0]
-	default:
-		for i := 0; i < len(args); i += 2 {
-			if i < len(args)-1 {
-				config.Value = kit.Chain(config.Value, args[i], args[i+1])
-			} else {
-				return kit.Chain(config.Value, args[i])
-			}
-		}
-	}
-
-	return config.Value
-}
-func (m *Message) Conf(key string, args ...interface{}) string {
-	return kit.Format(m.Confv(key, args...))
-}
-func (m *Message) Caps(key string, arg ...interface{}) bool {
-	if len(arg) > 0 {
-		return kit.Right(m.Cap(key, arg...))
-	}
-	return kit.Right(m.Cap(key))
-}
-func (m *Message) Capi(key string, arg ...interface{}) int {
-	n := kit.Int(m.Cap(key))
-	if len(arg) > 0 {
-		return kit.Int(m.Cap(key, n+kit.Int(arg...)))
-	}
-	return n
-}
-func (m *Message) Cap(key string, arg ...interface{}) string {
-	var cache *Cache
-	m.Match(key, false, func(m *Message, s *Context, c *Context, key string) bool {
-		if x, ok := c.Caches[key]; ok {
-			cache = x
-			return true
-		}
-		return false
-	})
-
-	if len(arg) == 0 {
-		if cache == nil {
-			return ""
-		}
-		if cache.Hand != nil {
-			return cache.Hand(m, cache)
-		}
-		return cache.Value
-	}
-
-	if cache == nil {
-		cache = &Cache{}
-		m.target.Caches[key] = cache
-	}
-
-	if cache.Hand != nil {
-		cache.Value = cache.Hand(m, cache, kit.Format(arg...))
-	} else {
-		cache.Value = kit.Format(arg...)
-	}
-	return cache.Value
+	return Index.message.Wait()
 }

@@ -1,4 +1,4 @@
-Page({
+page = Page({
     conf: {refresh: 1000, border: 4, layout: {header:30, river:120, action:180, source:60, storm:100, footer:30}},
     onlayout: function(event, sizes) {
         var page = this
@@ -280,12 +280,8 @@ Page({
                 return layout.value
             },
             Action: {
-                "恢复": function(event, value) {
-                    page.onlayout(event, page.conf.layout)
-                },
                 "聊天": function(event, value) {
                     page.onlayout(event, page.conf.layout)
-                    page.onlayout(event, {action:60, source:60})
                 },
                 "办公": function(event, value) {
                     page.onlayout(event, page.conf.layout)
@@ -325,7 +321,7 @@ Page({
                             field.Pane.Conf("running", true), setTimeout(function() {
                                 run(list.slice(1))
                             }, 1000)
-                        }): pane.Conf("running", false)
+                        }): field.Pane.Conf("running", false)
                     }
                     run(list)
                 },
@@ -334,18 +330,18 @@ Page({
                     page.plugin && page.plugin.Plugin.Clone().Select()
                 },
                 "删除": function(event, value) {
-                    page.input && page.plugin.Plugin.Remove()
+                    page.input && page.plugin.Plugin.Delete()
                 },
                 "加参": function(event, value) {
                     page.plugin && page.plugin.Plugin.Append({})
                 },
-                "去参": function(event, value) {
-                    page.plugin && page.plugin.Plugin.Prepend()
+                "减参": function(event, value) {
+                    page.plugin && page.plugin.Plugin.Remove()
                 },
             },
-            Button: [["layout", "恢复", "聊天", "办公", "工作", "最高", "最宽", "最大"], "br",
-                "刷新", "清空", "并行", "串行", "br",
-                "添加", "删除", "加参", "去参", "br",
+            Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"], "",
+                "刷新", "清空", "并行", "串行", "",
+                "添加", "删除", "加参", "减参", "",
             ],
         }
     },

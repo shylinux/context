@@ -15,37 +15,46 @@ fieldset {
 legend {
     margin-left:10px;
 }
-fieldset form.option div {
+fieldset>form.option div {
     margin-right:6px;
     float:left;
 }
-fieldset form.option div.hide {
+fieldset>form.option div.hide {
     display:none;
 }
-fieldset form.option div input.args {
+fieldset>form.option div input.args {
     width:80px;
 }
-fieldset form.option div.cmd input.args {
+fieldset>form.option div.cmd input.args {
     color:white;
     background-color: black;
     width:160px;
 }
-fieldset form.option div.long input.args {
+fieldset>form.option div.long input.args {
     width:320px;
 }
-fieldset form.option label {
+fieldset>form.option label {
     margin-right:6px;
 }
-fieldset div.output {
+fieldset>div.action {
     padding:6px;
 }
-fieldset div.output div.item:hover {
+fieldset>div.action>div.space {
+    display:inline-block;
+    width:10px;
+}
+fieldset>div.output {
+    clear:both;
+    max-height:800px;
+    padding:6px;
+}
+fieldset>div.output div.item:hover {
     background-color:red;
 }
-fieldset div.output div.item.select {
+fieldset>div.output div.item.select {
     background-color:red;
 }
-fieldset div.output div.code {
+fieldset>div.output div.code {
     color:white;
     font-size:14px;
     font-family:monospace;
@@ -56,17 +65,17 @@ fieldset div.output div.code {
     border:solid 3px green;
     max-height:640px;
 }
-fieldset div.output div.code span.red {
+fieldset>div.output div.code span.red {
     color:red;
 }
-fieldset div.output div.code span.green {
+fieldset>div.output div.code span.green {
     color:green;
 }
-fieldset div.output table td {
+fieldset>div.output table td {
     word-break:break-all;
     min-width:40px;
 }
-fieldset div.output table td {
+fieldset>div.output table td {
     word-break:keep-all;
     min-width:40px;
 }
@@ -76,10 +85,10 @@ fieldset.toast {
     position:absolute;
     display:none;
 }
-fieldset.toast div.output {
+fieldset.toast>div.output {
     padding:0 10px;
 }
-fieldset.toast div.output pre {
+fieldset.toast>div.output pre {
     word-break:break-word;
     white-space:pre-wrap;
     text-align:center;
@@ -91,45 +100,62 @@ fieldset.dialog {
     display:none;
     position:absolute;
 }
-fieldset.dialog div.output {
+fieldset.dialog>div.output {
     padding:10px;
     float:left;
 }
-fieldset.dialog div.output table th {
+fieldset.dialog>div.output table th {
     min-width:130px;
 }
-fieldset.dialog div.output table td {
+fieldset.dialog>div.output table td {
     min-width:100px;
 }
-fieldset.dialog div.create {
+fieldset.dialog>div.create {
     padding:10px;
     border:solid 1px red;
     margin-left:10px;
     float:left;
 }
-fieldset.Header div.output div.title {
+
+fieldset.Header {
+    height:32px;
+    clear:both;
+}
+fieldset.Header>div.output div.title {
     float:left;
 }
-fieldset.Header div.output div.state {
+fieldset.Header>div.output div.state {
     float:right;
 }
-fieldset.Header div.output div.state div {
+fieldset.Header>div.output div.state div {
     margin-left:5px;
     float:right;
     cursor:pointer;
 }
 fieldset.Footer {
     clear:both;
+    height:32px;
 }
-fieldset.Footer div.output div.title {
+fieldset.Footer>div.output div.title {
     float:left;
 }
-fieldset.Footer div.output div.state {
+fieldset.Footer>div.output div.state {
     float:right;
 }
-fieldset.Footer div.output div.state div {
+fieldset.Footer>div.output div.state div {
     margin-left:5px;
     float:right;
+}
+fieldset.Login {
+    font-size:28px;
+}
+fieldset.Login>form.option input {
+    font-size:18px;
+    height:28px;
+}
+fieldset.Login>form.option button {
+    font-size:18px;
+    height:28px;
 }
 
 .hidden {
@@ -172,7 +198,6 @@ fieldset table td.clip {
 fieldset table td:hover {
     background-color:red;
 }
-
 fieldset pre code, fieldset code pre {
     color:white;
     font-size:14px;
@@ -184,15 +209,3 @@ fieldset pre code, fieldset code pre {
     display:block;
 }
 
-fieldset.Banner>ul {
-    margin:0;
-    padding:0;
-}
-fieldset.Banner>ul>li {
-    display:inline;
-    padding:5px;
-    margin:0;
-}
-fieldset.Banner>ul>li:hover {
-    background-color:red;
-}

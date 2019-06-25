@@ -145,6 +145,17 @@ function Page(page) {
             args.duration !=- 1 && setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
             page.toast = toast
         },
+        ondebug: function() {
+            if (!this.debug) {
+                var pane = Pane(page)
+                pane.Field.style.position = "absolute"
+                pane.Field.style["background-color"] = "#ffffff00"
+                pane.Field.style["color"] = "red"
+                pane.ShowDialog(400, 400)
+                this.debug = pane
+            }
+            kit.AppendChild(this.debug.Field, [{text: [JSON.stringify(arguments.length==1? arguments[0]: arguments)]}])
+        },
         oninput: function(event, local) {
             var target = event.target
             kit.History.add("key", (event.ctrlKey? "Control+": "")+(event.shiftKey? "Shift+": "")+event.key)
@@ -366,6 +377,7 @@ function Page(page) {
     return page
 }
 function Pane(page, field) {
+    field = field || kit.AppendChild(document.body, [{type: "fieldset", list: [{view: ["option", "form"]}, {view: ["output"]}]}]).last
     var option = field.querySelector("form.option")
     var action = field.querySelector("div.action")
     var output = field.querySelector("div.output")
@@ -504,14 +516,14 @@ function Pane(page, field) {
     for (var k in pane.Listen) {
         page.Sync(k).change(pane.Listen[k])
     }
-    kit.InsertChild(field, output, "div", pane.Button.map(function(value) {
+    pane.Button && pane.Button.length > 0 && (kit.InsertChild(field, output, "div", pane.Button.map(function(value) {
         return typeof value == "object"? {className: value[0], select: [value.slice(1), function(event) {
             value = event.target.value
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
-        }]}: value == "br"? {"type": "br"}: {"button": [value, function(event) {
+        }]}: value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, function(event) {
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
         }]}
-    })).className="action "+name
+    })).className="action "+name)
     option.onsubmit = function(event) {
         event.preventDefault()
     };
@@ -609,7 +621,7 @@ function Plugin(page, pane, field) {
             })
             return action
         },
-        Prepend: function() {
+        Remove: function() {
             var list = option.querySelectorAll(".args")
             list.length > 0 && option.removeChild(list[list.length-1].parentNode)
         },
@@ -622,9 +634,10 @@ function Plugin(page, pane, field) {
             return JSON.stringify(field.Meta)
         },
         Reveal: function(msg) {
-            return msg.append && msg.append[0]? ["table", JSON.stringify(ctx.Tables(msg))]: ["code", msg.result.join("")]
+            return msg.append && msg.append[0]? ["table", JSON.stringify(ctx.Tables(msg))]: ["code", msg.result? msg.result.join(""): ""]
         },
-        Remove: function() {
+        Delete: function() {
+            page.plugin = field.previousSibling
             field.parentNode.removeChild(field)
         },
         Clone: function() {
@@ -646,15 +659,6 @@ function Plugin(page, pane, field) {
                 plugin.ondaemon[display.deal||"table"](msg)
             })
         },
-        Location: function(event) {
-            output.className = "output long"
-            page.getLocation(function(res) {
-                field.Run(event, [parseInt(res.latitude*1000000+1400)/1000000.0, parseInt(res.longitude*1000000+6250)/1000000.0].concat(
-                    kit.Selector(option, ".args", function(item) {return item.value}))
-                , plugin.ondaemon)
-            })
-        },
-
         Clear: function() {
             output.innerHTML = ""
         },
@@ -690,6 +694,15 @@ function Plugin(page, pane, field) {
                     return option[exports[0]] + value
                 }
             },
+        },
+
+        Location: function(event) {
+            output.className = "output long"
+            page.getLocation(function(res) {
+                field.Run(event, [parseInt(res.latitude*1000000+1400)/1000000.0, parseInt(res.longitude*1000000+6250)/1000000.0].concat(
+                    kit.Selector(option, ".args", function(item) {return item.value}))
+                , plugin.ondaemon)
+            })
         },
         init: function() {},
     }
