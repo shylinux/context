@@ -64,12 +64,10 @@ func (ctx *CTX) Close(m *Message, arg ...string) bool {
 var Pulse = &Message{code: 0, time: time.Now(), source: Index, target: Index, Meta: map[string][]string{}}
 var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 	Caches: map[string]*Cache{
-		"begin_time": &Cache{Name: "begin_time", Value: "", Help: "启动时间"},
-		"goos":       &Cache{Name: "goos", Value: "linux", Help: "启动时间"},
-		"ngo":        &Cache{Name: "ngo", Value: "0", Help: "启动时间"},
-		"nserver":    &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
-		"ncontext":   &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
-		"nmessage":   &Cache{Name: "nmessage", Value: "1", Help: "消息数量"},
+		"ngo":      &Cache{Name: "ngo", Value: "0", Help: "协程数量"},
+		"nserver":  &Cache{Name: "nserver", Value: "0", Help: "服务数量"},
+		"ncontext": &Cache{Name: "ncontext", Value: "0", Help: "模块数量"},
+		"nmessage": &Cache{Name: "nmessage", Value: "1", Help: "消息数量"},
 	},
 	Configs: map[string]*Config{
 		"chain":       &Config{Name: "chain", Value: map[string]interface{}{}, Help: "调试模式，on:打印，off:不打印)"},
@@ -109,12 +107,303 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}
 			return
 		}},
-		"_exit": &Command{Name: "_exit", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+		"_exit": &Command{Name: "_exit", Help: "退出", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			for _, x := range []string{"cli"} {
 				m.Cmd(x + "._exit")
 			}
 			return
 		}},
+		"command": &Command{Name: "command", Help: []string{"查看或操作命令",
+			"brow [all|cmd]: 查看命令",
+			"help cmd: 查看帮助",
+			"cmd...: 执行命令",
+			"list [begin [end]] [prefix] [test [key value]...]: 命令列表",
+			"add [list_name name] [list_help help] [cmd|__|_|_val]...: 添加命令, __: 可选参数, _: 必选参数, _val: 默认参数",
+		}, Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				arg = append(arg, "brow")
+			}
+
+			switch arg[0] {
+			case "brow":
+				c.BackTrace(m, func(m *Message) bool {
+					for k, v := range m.target.Commands {
+						if strings.HasPrefix(k, "_") {
+							continue
+						}
+						if len(arg) == 1 || arg[1] == "all" {
+							m.Add("append", "key", k)
+							m.Add("append", "name", v.Name)
+						} else if arg[1] == k {
+							m.Add("append", "key", k)
+							m.Add("append", "name", v.Name)
+							m.Add("append", "help", v.Name)
+						}
+					}
+					return len(arg) == 1 || arg[1] != "all"
+				})
+				m.Sort("key").Table()
+
+			case "help":
+				m.Cmdy("ctx.help", "command", arg[1:])
+
+			case "list":
+				arg = arg[1:]
+				if m.Cap("list_count") == "" {
+					break
+				}
+				begin, end := 0, m.Capi("list_count")
+				if len(arg) > 0 {
+					if n, e := strconv.Atoi(arg[0]); e == nil {
+						begin, arg = n, arg[1:]
+					}
+				}
+				if len(arg) > 0 {
+					if n, e := strconv.Atoi(arg[0]); e == nil {
+						end, arg = n, arg[1:]
+					}
+				}
+				prefix := ""
+				if len(arg) > 0 && arg[0] != "test" {
+					prefix, arg = arg[0], arg[1:]
+				}
+
+				test := false
+				if len(arg) > 0 && arg[0] == "test" {
+					test, arg = true, arg[1:]
+					for i := 0; i < len(arg)-1; i += 2 {
+						m.Add("option", arg[i], arg[i+1])
+					}
+				}
+
+				for i := begin; i < end; i++ {
+					index := fmt.Sprintf("%d", i)
+					if c, ok := m.target.Commands[index]; ok {
+						if prefix != "" && !strings.HasPrefix(c.Help.(string), prefix) {
+							continue
+						}
+
+						if test {
+							msg := m.Spawn().Cmd(index)
+							m.Add("append", "index", i)
+							m.Add("append", "help", c.Help)
+							m.Add("append", "msg", msg.messages[0].code)
+							m.Add("append", "res", msg.Result(0))
+						} else {
+							m.Add("append", "index", i)
+							m.Add("append", "help", c.Help)
+							m.Add("append", "command", fmt.Sprintf("%s", strings.Replace(c.Name, "\n", "\\n", -1)))
+						}
+					}
+				}
+				m.Table()
+
+			case "add":
+				if m.target.Caches == nil {
+					m.target.Caches = map[string]*Cache{}
+				}
+				if _, ok := m.target.Caches["list_count"]; !ok {
+					m.target.Caches["list_count"] = &Cache{Name: "list_count", Value: "0", Help: "list_count"}
+				}
+				if m.target.Commands == nil {
+					m.target.Commands = map[string]*Command{}
+				}
+
+				arg = arg[1:]
+				list_name, list_help := "", "list_cmd"
+				if len(arg) > 1 && arg[0] == "list_name" {
+					list_name, arg = arg[1], arg[2:]
+				}
+				if len(arg) > 1 && arg[0] == "list_help" {
+					list_help, arg = arg[1], arg[2:]
+				}
+
+				m.target.Commands[m.Cap("list_count")] = &Command{Name: strings.Join(arg, " "), Help: list_help, Hand: func(cmd *Message, c *Context, key string, args ...string) (e error) {
+					list := []string{}
+					for _, v := range arg {
+						if v == "__" {
+							if len(args) > 0 {
+								v, args = args[0], args[1:]
+							} else {
+								continue
+							}
+						} else if strings.HasPrefix(v, "_") {
+							if len(args) > 0 {
+								v, args = args[0], args[1:]
+							} else if len(v) > 1 {
+								v = v[1:]
+							} else {
+								v = "''"
+							}
+						}
+						list = append(list, v)
+					}
+					list = append(list, args...)
+
+					msg := cmd.Sess("cli").Set("option", "current_ctx", m.target.Name).Cmd("source", strings.Join(list, " "))
+					cmd.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+					return
+				}}
+
+				if list_name != "" {
+					m.target.Commands[list_name] = m.target.Commands[m.Cap("list_count")]
+				}
+				m.Capi("list_count", 1)
+
+			default:
+				m.Cmdy(arg)
+			}
+			return
+		}},
+		"context": &Command{Name: "context [find|search] [root|back|home] [first|last|rand|magic] [module] [cmd...|switch|list|spawn|start|close]",
+			Help: []string{"查找并操作模块",
+				"查找方法, find: 精确查找, search: 模糊搜索",
+				"查找起点, root: 根模块, back: 父模块, home: 本模块",
+				"过滤结果, first: 取第一个, last: 取最后一个, rand: 随机选择, magics: 智能选择",
+				"操作方法, cmd...: 执行命令, switch: 切换为当前, list: 查看所有子模块, spwan: 创建子模块并初始化, start: 启动模块, close: 结束模块",
+			}, Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+				action := "switch"
+				if len(arg) == 0 {
+					action = "list"
+				}
+
+				method := "search"
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "find", "search":
+						method, arg = arg[0], arg[1:]
+					}
+				}
+
+				root := true
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "root":
+						root, arg = true, arg[1:]
+					case "home":
+						root, arg = false, arg[1:]
+					case "back":
+						root, arg = false, arg[1:]
+						if m.target.context != nil {
+							m.target = m.target.context
+						}
+					}
+				}
+
+				ms := []*Message{}
+				if len(arg) > 0 {
+					switch method {
+					case "find":
+						if msg := m.Find(arg[0], root); msg != nil {
+							ms, arg = append(ms, msg), arg[1:]
+						}
+					case "search":
+						msg := m.Search(arg[0], root)
+						if len(msg) > 1 || msg[0] != nil {
+							if len(arg) > 1 {
+								switch arg[1] {
+								case "first":
+									ms, arg = append(ms, msg[0]), arg[2:]
+								case "last":
+									ms, arg = append(ms, msg[len(msg)-1]), arg[2:]
+								case "rand":
+									ms, arg = append(ms, msg[rand.Intn(len(msg))]), arg[2:]
+								case "magics":
+									ms, arg = append(ms, msg...), arg[2:]
+								default:
+									ms, arg = append(ms, msg[0]), arg[1:]
+								}
+							} else {
+								ms, arg = append(ms, msg[0]), arg[1:]
+							}
+						}
+
+					}
+				}
+
+				if len(ms) == 0 {
+					ms = append(ms, m)
+				}
+
+				if len(arg) > 0 {
+					switch arg[0] {
+					case "switch", "list", "spawn", "start", "close":
+						action, arg = arg[0], arg[1:]
+					default:
+						action = "cmd"
+					}
+				}
+
+				for _, msg := range ms {
+					if msg == nil {
+						continue
+					}
+
+					switch action {
+					case "cmd":
+						if msg.Cmd(arg); !msg.Hand {
+							msg = msg.Cmd("cli.cmd", arg)
+						}
+						msg.CopyTo(m)
+
+					case "switch":
+						m.target = msg.target
+
+					case "list":
+						cs := []*Context{}
+						if msg.target.Name != "ctx" {
+							cs = append(cs, msg.target.context)
+						}
+						msg.target.Travel(msg, func(msg *Message, n int) bool {
+							cs = append(cs, msg.target)
+							return false
+						})
+
+						for _, v := range cs {
+							if msg.target = v; v == nil {
+								m.Add("append", "names", "")
+								m.Add("append", "ctx", "")
+								m.Add("append", "msg", "")
+								m.Add("append", "status", "")
+								m.Add("append", "stream", "")
+								m.Add("append", "helps", "")
+								continue
+							}
+
+							m.Add("append", "names", msg.target.Name)
+							if msg.target.context != nil {
+								m.Add("append", "ctx", msg.target.context.Name)
+							} else {
+								m.Add("append", "ctx", "")
+							}
+							if msg.target.message != nil {
+								m.Add("append", "msg", msg.target.message.code)
+							} else {
+								m.Add("append", "msg", "")
+							}
+							m.Add("append", "status", msg.Cap("status"))
+							m.Add("append", "stream", msg.Cap("stream"))
+							m.Add("append", "helps", msg.target.Help)
+						}
+						m.Table()
+
+					case "spawn":
+						msg.target.Spawn(msg, arg[0], arg[1]).Begin(msg, arg[2:]...)
+						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+
+					case "start":
+						msg.target.Start(msg, arg...)
+						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
+
+					case "close":
+						msg := m.Spawn()
+						m.target = msg.target.context
+						msg.target.Close(msg.target.message, arg...)
+					}
+				}
+				return
+			}},
+
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Echo("usage: help context [module [command|config|cache name]]\n")
@@ -523,320 +812,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			return
 		}},
 
-		"context": &Command{Name: "context [find|search] [root|back|home] [first|last|rand|magic] [module] [cmd|switch|list|spawn|start|close]",
-			Help: "查找并操作模块;\n查找方法, find: 精确查找, search: 模糊搜索;\n查找起点, root: 根模块, back: 父模块, home: 本模块;\n过滤结果, first: 取第一个, last: 取最后一个, rand: 随机选择, magics: 智能选择;\n操作方法, cmd: 执行命令, switch: 切换为当前, list: 查看所有子模块, spwan: 创建子模块并初始化, start: 启动模块, close: 结束模块",
-			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-				if len(arg) == 1 && arg[0] == "~" && m.target.context != nil {
-					m.target = m.target.context
-					return
-				}
-
-				action := "switch"
-				if len(arg) == 0 {
-					action = "list"
-				}
-
-				method := "search"
-				if len(arg) > 0 {
-					switch arg[0] {
-					case "find", "search":
-						method, arg = arg[0], arg[1:]
-					}
-				}
-
-				root := true
-				if len(arg) > 0 {
-					switch arg[0] {
-					case "root":
-						root, arg = true, arg[1:]
-					case "home":
-						root, arg = false, arg[1:]
-					case "back":
-						root, arg = false, arg[1:]
-						if m.target.context != nil {
-							m.target = m.target.context
-						}
-					}
-				}
-
-				ms := []*Message{}
-				if len(arg) > 0 {
-					switch method {
-					case "find":
-						if msg := m.Find(arg[0], root); msg != nil {
-							ms, arg = append(ms, msg), arg[1:]
-						}
-					case "search":
-						msg := m.Search(arg[0], root)
-						if len(msg) > 1 || msg[0] != nil {
-							if len(arg) > 1 {
-								switch arg[1] {
-								case "first":
-									ms, arg = append(ms, msg[0]), arg[2:]
-								case "last":
-									ms, arg = append(ms, msg[len(msg)-1]), arg[2:]
-								case "rand":
-									ms, arg = append(ms, msg[rand.Intn(len(msg))]), arg[2:]
-								case "magics":
-									ms, arg = append(ms, msg...), arg[2:]
-								default:
-									ms, arg = append(ms, msg[0]), arg[1:]
-								}
-							} else {
-								ms, arg = append(ms, msg[0]), arg[1:]
-							}
-						}
-
-					}
-				}
-
-				if len(ms) == 0 {
-					ms = append(ms, m)
-				}
-
-				if len(arg) > 0 {
-					switch arg[0] {
-					case "switch", "list", "spawn", "start", "close":
-						action, arg = arg[0], arg[1:]
-					default:
-						action = "cmd"
-					}
-				}
-
-				for _, msg := range ms {
-					if msg == nil {
-						continue
-					}
-
-					switch action {
-					case "cmd":
-						componet := "source"
-						if m.Options("bench") && m.Options("username") && !m.Cmds("aaa.work", "right", componet, arg[0]) {
-							m.Log("info", "%s no right [%v: %v]", m.Option("username"), componet, arg[0])
-							m.Echo("error: ").Echo("no right [%s: %s]", componet, arg[0])
-							break
-						}
-
-						if msg.Cmd(arg); !msg.Hand {
-							msg = msg.Sess("cli").Cmd("cmd", arg)
-						}
-						msg.CopyTo(m)
-
-					case "switch":
-						m.target = msg.target
-
-					case "list":
-						cs := []*Context{}
-						if msg.target.Name != "ctx" {
-							cs = append(cs, msg.target.context)
-						}
-						msg.Target().Travel(msg, func(msg *Message, n int) bool {
-							cs = append(cs, msg.target)
-							return false
-						})
-
-						for _, v := range cs {
-							if msg.target = v; v == nil {
-								m.Add("append", "names", "")
-								m.Add("append", "ctx", "")
-								m.Add("append", "msg", "")
-								m.Add("append", "status", "")
-								m.Add("append", "stream", "")
-								m.Add("append", "helps", "")
-								continue
-							}
-
-							m.Add("append", "names", msg.target.Name)
-							if msg.target.context != nil {
-								m.Add("append", "ctx", msg.target.context.Name)
-							} else {
-								m.Add("append", "ctx", "")
-							}
-							if msg.target.message != nil {
-								m.Add("append", "msg", msg.target.message.code)
-							} else {
-								m.Add("append", "msg", "")
-							}
-							m.Add("append", "status", msg.Cap("status"))
-							m.Add("append", "stream", msg.Cap("stream"))
-							m.Add("append", "helps", msg.target.Help)
-						}
-
-					case "spawn":
-						msg.target.Spawn(msg, arg[0], arg[1]).Begin(msg, arg[2:]...)
-						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
-
-					case "start":
-						msg.target.Start(msg, arg...)
-						m.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
-
-					case "close":
-						msg := m.Spawn()
-						m.target = msg.target.context
-						msg.target.Close(msg.target.message, arg...)
-					}
-				}
-
-				if action == "list" {
-					m.Table()
-				}
-				return
-			}},
-		"command": &Command{Name: "command [all] [show]|[list [begin [end]] [prefix] test [key val]...]|[add [list_name name] [list_help help] cmd...]|[delete cmd]",
-			Help: "查看或修改命令, show: 查看命令;\nlist: 查看列表命令, begin: 起始索引, end: 截止索引, prefix: 过滤前缀, test: 执行命令;\nadd: 添加命令, list_name: 命令别名, list_help: 命令帮助;\ndelete: 删除命令",
-			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-				if len(arg) > 0 && arg[0] == "help" {
-					m.Cmdy(".help", "command", arg[1:])
-					return
-				}
-				all := false
-				if len(arg) > 0 && arg[0] == "all" {
-					all, arg = true, arg[1:]
-				}
-
-				action := ""
-				if len(arg) > 0 {
-					switch arg[0] {
-					case "show", "list", "add", "delete":
-						action, arg = arg[0], arg[1:]
-					}
-				} else {
-					action = "show"
-				}
-
-				switch action {
-				case "show":
-					c.BackTrace(m, func(m *Message) bool {
-						for k, v := range m.target.Commands {
-							if strings.HasPrefix(k, "_") {
-								continue
-							}
-							if len(arg) > 0 {
-								if k == arg[0] {
-									m.Add("append", "key", k)
-									m.Add("append", "name", v.Name)
-									m.Add("append", "help", v.Name)
-								}
-							} else {
-								m.Add("append", "key", k)
-								m.Add("append", "name", v.Name)
-							}
-						}
-
-						return !all
-					})
-					m.Sort("key").Table()
-				case "list":
-					if m.Cap("list_count") == "" {
-						break
-					}
-					begin, end := 0, m.Capi("list_count")
-					if len(arg) > 0 {
-						if n, e := strconv.Atoi(arg[0]); e == nil {
-							begin, arg = n, arg[1:]
-						}
-					}
-					if len(arg) > 0 {
-						if n, e := strconv.Atoi(arg[0]); e == nil {
-							end, arg = n, arg[1:]
-						}
-					}
-					prefix := ""
-					if len(arg) > 0 && arg[0] != "test" {
-						prefix, arg = arg[0], arg[1:]
-					}
-
-					test := false
-					if len(arg) > 0 && arg[0] == "test" {
-						test, arg = true, arg[1:]
-						for i := 0; i < len(arg)-1; i += 2 {
-							m.Add("option", arg[i], arg[i+1])
-						}
-					}
-
-					for i := begin; i < end; i++ {
-						index := fmt.Sprintf("%d", i)
-						if c, ok := m.target.Commands[index]; ok {
-							if prefix != "" && !strings.HasPrefix(c.Help.(string), prefix) {
-								continue
-							}
-
-							if test {
-								msg := m.Spawn().Cmd(index)
-								m.Add("append", "index", i)
-								m.Add("append", "help", c.Help)
-								m.Add("append", "msg", msg.messages[0].code)
-								m.Add("append", "res", msg.Result(0))
-							} else {
-								m.Add("append", "index", i)
-								m.Add("append", "help", fmt.Sprintf("%s", c.Help))
-								m.Add("append", "command", fmt.Sprintf("%s", strings.Replace(c.Name, "\n", "\\n", -1)))
-							}
-						}
-					}
-					m.Table()
-				case "add":
-					if m.target.Caches == nil {
-						m.target.Caches = map[string]*Cache{}
-					}
-					if _, ok := m.target.Caches["list_count"]; !ok {
-						m.target.Caches["list_count"] = &Cache{Name: "list_count", Value: "0", Help: "list_count"}
-					}
-					if m.target.Commands == nil {
-						m.target.Commands = map[string]*Command{}
-					}
-
-					list_name, list_help := "", "list_cmd"
-					if len(arg) > 1 && arg[0] == "list_name" {
-						list_name, arg = arg[1], arg[2:]
-					}
-					if len(arg) > 1 && arg[0] == "list_help" {
-						list_help, arg = arg[1], arg[2:]
-					}
-
-					m.target.Commands[m.Cap("list_count")] = &Command{Name: strings.Join(arg, " "), Help: list_help, Hand: func(cmd *Message, c *Context, key string, args ...string) (e error) {
-						list := []string{}
-						for _, v := range arg {
-							if v == "__" {
-								if len(args) > 0 {
-									v, args = args[0], args[1:]
-								} else {
-									continue
-								}
-							} else if strings.HasPrefix(v, "_") {
-								if len(args) > 0 {
-									v, args = args[0], args[1:]
-								} else if len(v) > 1 {
-									v = v[1:]
-								} else {
-									v = "''"
-								}
-							}
-							list = append(list, v)
-						}
-						list = append(list, args...)
-
-						msg := cmd.Sess("cli").Set("option", "current_ctx", m.target.Name).Cmd("source", strings.Join(list, " "))
-						cmd.Copy(msg, "append").Copy(msg, "result").Copy(msg, "target")
-						return
-					}}
-
-					if list_name != "" {
-						m.target.Commands[list_name] = m.target.Commands[m.Cap("list_count")]
-					}
-					m.Capi("list_count", 1)
-				case "delete":
-					c.BackTrace(m, func(m *Message) bool {
-						delete(m.target.Commands, arg[0])
-						return !all
-					})
-				default:
-					if len(arg) > 0 {
-						m.Cmdy(arg)
-					}
-				}
-				return
-			}},
 		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [list|map arg...] [create map|list|string key name help] [delete key]",
 			Help: "配置管理, export: 导出配置, save: 保存配置到文件, load: 从文件加载配置, create: 创建配置, delete: 删除配置",
 			Form: map[string]int{"format": 1, "fields": -1},
