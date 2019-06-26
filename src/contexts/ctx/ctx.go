@@ -113,6 +113,329 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}
 			return
 		}},
+
+		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Echo("usage: help context [module [command|config|cache name]]\n")
+				m.Echo("     : 查看模块信息, module: 模块名, command: 模块命令, config: 模块配置, cache: 模块缓存, name: 模块参数\n")
+				m.Echo("usage: help command [name]\n")
+				m.Echo("     : 查看当前环境下命令, name: 命令名\n")
+				m.Echo("usage: help config [name]\n")
+				m.Echo("     : 查看当前环境下配置, name: 配置名\n")
+				m.Echo("usage: help cache [name]\n")
+				m.Echo("     : 查看当前环境下缓存, name: 缓存名\n")
+				m.Echo("\n")
+
+				m.Echo("^_^  Welcome to context world  ^_^\n")
+				m.Echo("Version: 1.0 A New Language, A New Framework\n")
+				m.Echo("More: https://github.com/shylinux/context\n")
+				m.Echo("More: https://shylinux.com/\n")
+				return
+			}
+
+			switch arg[0] {
+			case "context":
+				switch len(arg) {
+				case 1:
+					keys := []string{}
+					values := map[string]*Context{}
+					m.Target().root.Travel(m, func(m *Message, i int) bool {
+						if _, ok := values[m.Cap("module")]; !ok {
+							keys = append(keys, m.Cap("module"))
+							values[m.Cap("module")] = m.Target()
+						}
+						return false
+					})
+
+					sort.Strings(keys)
+					for _, k := range keys {
+						m.Echo("%s: %s %s\n", k, values[k].Name, values[k].Help)
+					}
+					break
+				case 2:
+					if msg := m.Find(arg[1]); msg != nil {
+						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
+						m.Echo("commands:\n")
+						for k, v := range msg.Target().Commands {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+						m.Echo("configs:\n")
+						for k, v := range msg.Target().Configs {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+						m.Echo("caches:\n")
+						for k, v := range msg.Target().Caches {
+							m.Echo("  %s: %s\n", k, v.Name)
+						}
+					}
+				default:
+					if msg := m.Find(arg[1]); msg != nil {
+						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
+						switch arg[2] {
+						case "command":
+							for k, v := range msg.Target().Commands {
+								if k == arg[3] {
+									m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
+								}
+							}
+						case "config":
+							for k, v := range msg.Target().Configs {
+								if k == arg[3] {
+									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+								}
+							}
+						case "cache":
+							for k, v := range msg.Target().Caches {
+								if k == arg[3] {
+									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
+								}
+							}
+						}
+					}
+				}
+			case "command":
+				keys := []string{}
+				values := map[string]*Command{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Commands {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							switch help := v.Help.(type) {
+							case []string:
+								m.Echo("%s: %s\n", k, v.Name)
+								for _, v := range help {
+									m.Echo("  %s\n", v)
+								}
+							case string:
+								m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
+							}
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s: %s\n", k, values[k].Name)
+				}
+			case "config":
+				keys := []string{}
+				values := map[string]*Config{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Configs {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
+				}
+			case "cache":
+				keys := []string{}
+				values := map[string]*Cache{}
+				for s := m.Target(); s != nil; s = s.context {
+					for k, v := range s.Caches {
+						if _, ok := values[k]; ok {
+							continue
+						}
+						if len(arg) > 1 && k == arg[1] {
+							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
+							return
+						}
+						keys = append(keys, k)
+						values[k] = v
+					}
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
+				}
+			}
+
+			return
+		}},
+		"cache": &Command{Name: "cache [all] |key [value]|key = value|key name value help|delete key]", Help: "查看、读写、赋值、新建、删除缓存变量", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				arg, all = arg[1:], true
+			}
+
+			switch len(arg) {
+			case 0:
+				c.BackTrace(m, func(m *Message) bool {
+					for k, v := range m.target.Caches {
+						m.Add("append", "key", k)
+						m.Add("append", "value", m.Cap(k))
+						m.Add("append", "name", v.Name)
+					}
+					return !all
+				})
+				m.Sort("key", "str").Table()
+				return
+			case 1:
+				m.Echo(m.Cap(arg[0]))
+			case 2:
+				if arg[0] == "delete" {
+					delete(m.target.Caches, arg[1])
+					return
+				}
+				m.Cap(arg[0], arg[1])
+			case 3:
+				m.Cap(arg[0], arg[0], arg[2], arg[0])
+			default:
+				m.Echo(m.Cap(arg[0], arg[1:]))
+				return
+			}
+			return
+		}},
+		"config": &Command{Name: "config [all]", Help: []string{"配置管理",
+			"brow: 配置列表",
+			"key [chain [value]]: 读写配置",
+			"export key...: 导出配置",
+			"save|load file key...: 保存、加载配置",
+			"create map|list|string key name help: 创建配置",
+			"delete key: 删除配置",
+		}, Form: map[string]int{"format": 1, "fields": -1}, Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				arg, all = arg[1:], true
+			}
+			if len(arg) == 0 {
+				arg = append(arg, "brow")
+			}
+
+			action, which := "", "-1"
+			have := map[string]bool{}
+			switch arg[0] {
+			case "brow":
+			case "export":
+				action, arg = arg[0], arg[1:]
+				for _, v := range arg {
+					have[v] = true
+				}
+			case "save", "load":
+				action, which, arg = arg[0], arg[1], arg[2:]
+				for _, v := range arg {
+					have[v] = true
+				}
+			case "create", "delete":
+				action, arg = arg[0], arg[1:]
+
+			default:
+				var value interface{}
+				if len(arg) > 2 && arg[2] == "map" {
+					for i := 3; i < len(arg)-1; i += 2 {
+						m.Confv(arg[0], []interface{}{arg[1], arg[i]}, arg[i+1])
+					}
+					value = m.Confv(arg[0], arg[1])
+				} else if len(arg) > 2 && arg[2] == "list" {
+					for i := 3; i < len(arg)-1; i += 1 {
+						m.Confv(arg[0], []interface{}{arg[1], -2}, arg[i])
+					}
+					value = m.Confv(arg[0], arg[1])
+				} else if len(arg) > 1 && arg[1] == "list" {
+					for i := 2; i < len(arg)-1; i += 1 {
+						m.Confv(arg[0], -2, arg[i])
+					}
+					value = m.Confv(arg[0])
+				} else if len(arg) > 1 && arg[1] == "map" {
+					for i := 2; i < len(arg)-1; i += 2 {
+						m.Confv(arg[0], arg[i], arg[i+1])
+					}
+					value = m.Confv(arg[0])
+				} else if len(arg) > 2 {
+					value = m.Confv(arg[0], arg[1], arg[2])
+				} else if len(arg) > 1 {
+					value = m.Confv(arg[0], arg[1])
+				} else {
+					value = m.Confv(arg[0])
+				}
+
+				msg := m.Spawn().Put("option", "_cache", value).Cmd("trans", "_cache")
+				m.Copy(msg, "append").Copy(msg, "result")
+				return
+			}
+
+			save := map[string]interface{}{}
+			if action == "load" {
+				f, e := os.Open(m.Cmdx("nfs.path", which))
+				if e != nil {
+					return e
+				}
+				defer f.Close()
+
+				de := json.NewDecoder(f)
+				if e = de.Decode(&save); e != nil {
+					m.Log("info", "e: %v", e)
+				}
+			}
+
+			c.BackTrace(m, func(m *Message) bool {
+				for k, v := range m.target.Configs {
+					switch action {
+					case "export", "save":
+						if len(have) == 0 || have[k] {
+							save[k] = v.Value
+						}
+					case "load":
+						if x, ok := save[k]; ok && (len(have) == 0 || have[k]) {
+							v.Value = x
+						}
+					case "create":
+						m.Assert(k != arg[1], "%s exists", arg[1])
+					case "delete":
+						if k == arg[0] {
+							m.Echo(kit.Formats(v.Value))
+							delete(m.target.Configs, k)
+						}
+					default:
+						m.Add("append", "key", k)
+						m.Add("append", "value", strings.Replace(strings.Replace(m.Conf(k), "\n", "\\n", -1), "\t", "\\t", -1))
+						m.Add("append", "name", v.Name)
+					}
+				}
+				switch action {
+				case "create":
+					var value interface{}
+					switch arg[0] {
+					case "map":
+						value = map[string]interface{}{}
+					case "list":
+						value = []interface{}{}
+					default:
+						value = ""
+					}
+					m.target.Configs[arg[1]] = &Config{Name: arg[2], Value: value, Help: arg[3]}
+					m.Echo(arg[1])
+					return true
+				}
+				return !all
+			})
+			m.Sort("key", "str").Table()
+
+			switch action {
+			case "save":
+				buf, e := json.MarshalIndent(save, "", "  ")
+				m.Assert(e)
+				m.Sess("nfs").Add("option", "data", string(buf)).Cmd("save", which)
+			case "export":
+				buf, e := json.MarshalIndent(save, "", "  ")
+				m.Assert(e)
+				m.Echo("%s", string(buf))
+			}
+			return
+		}},
 		"command": &Command{Name: "command", Help: []string{"查看或操作命令",
 			"brow [all|cmd]: 查看命令",
 			"help cmd: 查看帮助",
@@ -404,158 +727,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				return
 			}},
 
-		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				m.Echo("usage: help context [module [command|config|cache name]]\n")
-				m.Echo("     : 查看模块信息, module: 模块名, command: 模块命令, config: 模块配置, cache: 模块缓存, name: 模块参数\n")
-				m.Echo("usage: help command [name]\n")
-				m.Echo("     : 查看当前环境下命令, name: 命令名\n")
-				m.Echo("usage: help config [name]\n")
-				m.Echo("     : 查看当前环境下配置, name: 配置名\n")
-				m.Echo("usage: help cache [name]\n")
-				m.Echo("     : 查看当前环境下缓存, name: 缓存名\n")
-				m.Echo("\n")
-
-				m.Echo("^_^  Welcome to context world  ^_^\n")
-				m.Echo("Version: 1.0 A New Language, A New Framework\n")
-				m.Echo("More: https://github.com/shylinux/context\n")
-				m.Echo("More: https://shylinux.com/\n")
-				return
-			}
-
-			switch arg[0] {
-			case "context":
-				switch len(arg) {
-				case 1:
-					keys := []string{}
-					values := map[string]*Context{}
-					m.Target().root.Travel(m, func(m *Message, i int) bool {
-						if _, ok := values[m.Cap("module")]; !ok {
-							keys = append(keys, m.Cap("module"))
-							values[m.Cap("module")] = m.Target()
-						}
-						return false
-					})
-
-					sort.Strings(keys)
-					for _, k := range keys {
-						m.Echo("%s: %s %s\n", k, values[k].Name, values[k].Help)
-					}
-					break
-				case 2:
-					if msg := m.Find(arg[1]); msg != nil {
-						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
-						m.Echo("commands:\n")
-						for k, v := range msg.Target().Commands {
-							m.Echo("  %s: %s\n", k, v.Name)
-						}
-						m.Echo("configs:\n")
-						for k, v := range msg.Target().Configs {
-							m.Echo("  %s: %s\n", k, v.Name)
-						}
-						m.Echo("caches:\n")
-						for k, v := range msg.Target().Caches {
-							m.Echo("  %s: %s\n", k, v.Name)
-						}
-					}
-				default:
-					if msg := m.Find(arg[1]); msg != nil {
-						m.Echo("%s: %s %s\n", arg[1], msg.Target().Name, msg.Target().Help)
-						switch arg[2] {
-						case "command":
-							for k, v := range msg.Target().Commands {
-								if k == arg[3] {
-									m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
-								}
-							}
-						case "config":
-							for k, v := range msg.Target().Configs {
-								if k == arg[3] {
-									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
-								}
-							}
-						case "cache":
-							for k, v := range msg.Target().Caches {
-								if k == arg[3] {
-									m.Echo("%s: %s\n  %s\n", k, v.Name, v.Help)
-								}
-							}
-						}
-					}
-				}
-			case "command":
-				keys := []string{}
-				values := map[string]*Command{}
-				for s := m.Target(); s != nil; s = s.context {
-					for k, v := range s.Commands {
-						if _, ok := values[k]; ok {
-							continue
-						}
-						if len(arg) > 1 && k == arg[1] {
-							switch help := v.Help.(type) {
-							case []string:
-								m.Echo("%s: %s\n", k, v.Name)
-								for _, v := range help {
-									m.Echo("  %s\n", v)
-								}
-							case string:
-								m.Echo("%s: %s\n%s\n", k, v.Name, v.Help)
-							}
-							return
-						}
-						keys = append(keys, k)
-						values[k] = v
-					}
-				}
-				sort.Strings(keys)
-				for _, k := range keys {
-					m.Echo("%s: %s\n", k, values[k].Name)
-				}
-			case "config":
-				keys := []string{}
-				values := map[string]*Config{}
-				for s := m.Target(); s != nil; s = s.context {
-					for k, v := range s.Configs {
-						if _, ok := values[k]; ok {
-							continue
-						}
-						if len(arg) > 1 && k == arg[1] {
-							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
-							return
-						}
-						keys = append(keys, k)
-						values[k] = v
-					}
-				}
-				sort.Strings(keys)
-				for _, k := range keys {
-					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
-				}
-			case "cache":
-				keys := []string{}
-				values := map[string]*Cache{}
-				for s := m.Target(); s != nil; s = s.context {
-					for k, v := range s.Caches {
-						if _, ok := values[k]; ok {
-							continue
-						}
-						if len(arg) > 1 && k == arg[1] {
-							m.Echo("%s(%s): %s %s\n", k, v.Value, v.Name, v.Help)
-							return
-						}
-						keys = append(keys, k)
-						values[k] = v
-					}
-				}
-				sort.Strings(keys)
-				for _, k := range keys {
-					m.Echo("%s(%s): %s\n", k, values[k].Value, values[k].Name)
-				}
-			}
-
-			return
-		}},
-
 		"message": &Command{Name: "message [code] [cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			msg := m
 			if ms := m.Find(m.Cap("ps_target")); ms != nil {
@@ -811,177 +982,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			m.Table()
 			return
 		}},
-
-		"config": &Command{Name: "config [all] [export key..] [save|load file key...] [list|map arg...] [create map|list|string key name help] [delete key]",
-			Help: "配置管理, export: 导出配置, save: 保存配置到文件, load: 从文件加载配置, create: 创建配置, delete: 删除配置",
-			Form: map[string]int{"format": 1, "fields": -1},
-			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-				if len(arg) > 2 && arg[2] == "list" {
-					chain := strings.Split(arg[1], ".")
-					chain = append(chain, "-2")
-
-					for _, val := range arg[3:] {
-						m.Confv(arg[0], chain, val)
-					}
-					return
-				}
-				if len(arg) > 2 && arg[2] == "map" {
-					chain := strings.Split(arg[1], ".")
-
-					for i := 3; i < len(arg)-1; i += 2 {
-						m.Confv(arg[0], append(chain, arg[i]), arg[i+1])
-					}
-					return
-				}
-				if len(arg) > 1 && arg[1] == "map" {
-					for i := 2; i < len(arg)-1; i += 2 {
-						m.Confv(arg[0], arg[i], arg[i+1])
-					}
-					return
-				}
-
-				all := false
-				if len(arg) > 0 && arg[0] == "all" {
-					arg, all = arg[1:], true
-				}
-
-				action, which := "", "-1"
-				have := map[string]bool{}
-				if len(arg) > 0 {
-					switch arg[0] {
-					case "export":
-						action, arg = arg[0], arg[1:]
-						for _, v := range arg {
-							have[v] = true
-						}
-					case "save", "load":
-						action, which, arg = arg[0], arg[1], arg[2:]
-						for _, v := range arg {
-							have[v] = true
-						}
-					case "create", "delete":
-						action, arg = arg[0], arg[1:]
-					}
-				}
-
-				if len(arg) == 0 || action != "" {
-					save := map[string]interface{}{}
-					if action == "load" {
-						f, e := os.Open(m.Sess("nfs").Cmd("path", which).Result(0))
-						if e != nil {
-							return e
-						}
-						defer f.Close()
-
-						de := json.NewDecoder(f)
-						if e = de.Decode(&save); e != nil {
-							m.Log("info", "e: %v", e)
-						}
-					}
-
-					c.BackTrace(m, func(m *Message) bool {
-						for k, v := range m.target.Configs {
-							switch action {
-							case "export", "save":
-								if len(have) == 0 || have[k] {
-									save[k] = v.Value
-								}
-							case "load":
-								if x, ok := save[k]; ok && (len(have) == 0 || have[k]) {
-									v.Value = x
-								}
-							case "create":
-								m.Assert(k != arg[1], "%s exists", arg[1])
-							case "delete":
-								if k == arg[0] {
-									delete(m.target.Configs, k)
-								}
-								fallthrough
-							default:
-								m.Add("append", "key", k)
-								m.Add("append", "value", strings.Replace(strings.Replace(m.Conf(k), "\n", "\\n", -1), "\t", "\\t", -1))
-								m.Add("append", "name", v.Name)
-							}
-						}
-						switch action {
-						case "create":
-							var value interface{}
-							switch arg[0] {
-							case "map":
-								value = map[string]interface{}{}
-							case "list":
-								value = []interface{}{}
-							default:
-								value = ""
-							}
-							m.target.Configs[arg[1]] = &Config{Name: arg[2], Value: value, Help: arg[3]}
-						}
-						return !all
-					})
-					m.Sort("key", "str").Table()
-
-					switch action {
-					case "save":
-						buf, e := json.MarshalIndent(save, "", "  ")
-						m.Assert(e)
-						m.Sess("nfs").Add("option", "data", string(buf)).Cmd("save", which)
-					case "export":
-						buf, e := json.MarshalIndent(save, "", "  ")
-						m.Assert(e)
-						m.Echo("%s", string(buf))
-					}
-					return
-				}
-
-				var value interface{}
-				if len(arg) > 2 {
-					value = m.Confv(arg[0], arg[1], arg[2])
-				} else if len(arg) > 1 {
-					value = m.Confv(arg[0], arg[1])
-				} else {
-					value = m.Confv(arg[0])
-				}
-
-				msg := m.Spawn().Put("option", "_cache", value).Cmd("trans", "_cache")
-				m.Copy(msg, "append").Copy(msg, "result")
-				return
-			}},
-		"cache": &Command{Name: "cache [all] |key [value]|key = value|key name value help|delete key]",
-			Help: "查看、读写、赋值、新建、删除缓存变量",
-			Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-				all := false
-				if len(arg) > 0 && arg[0] == "all" {
-					arg, all = arg[1:], true
-				}
-
-				switch len(arg) {
-				case 0:
-					c.BackTrace(m, func(m *Message) bool {
-						for k, v := range m.target.Caches {
-							m.Add("append", "key", k)
-							m.Add("append", "value", m.Cap(k))
-							m.Add("append", "name", v.Name)
-						}
-						return !all
-					})
-					m.Sort("key", "str").Table()
-					return
-				case 1:
-					m.Echo(m.Cap(arg[0]))
-				case 2:
-					if arg[0] == "delete" {
-						delete(m.target.Caches, arg[1])
-						return
-					}
-					m.Cap(arg[0], arg[1])
-				case 3:
-					m.Cap(arg[0], arg[0], arg[2], arg[0])
-				default:
-					m.Echo(m.Cap(arg[0], arg[1:]))
-					return
-				}
-				return
-			}},
 
 		"trans": &Command{Name: "trans option [type|data|json] limit 10 [index...]", Help: "数据转换",
 			Form: map[string]int{"format": 1, "fields": -1},

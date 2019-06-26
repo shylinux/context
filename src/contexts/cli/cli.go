@@ -723,7 +723,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Confm("missyou", "local", func(index string, local string) {
 				m.Cmd("nfs.git", "clone", local, path.Join(p, "usr/local", index))
 			})
-			m.Cmdy("cli.system", "node.sh", "create", p, "daemon", "cmd_daemon", "true")
+			m.Cmdy("cli.system", "node.sh", "create", p, "cmd_daemon", "true")
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

@@ -300,7 +300,7 @@ kit = toolkit = {
             var tr = kit.AppendChild(table, "tr", {className: "normal"})
             tr.Meta = row
             fields.forEach(function(key, j) {
-                var td = kit.AppendChild(tr, "td", row[key])
+                var td = kit.AppendChild(tr, "td", kit.Color(row[key]))
                 if (typeof cb == "function") {
                     td.onclick = function(event) {
                         cb(row[key], key, row, i, tr, event)
@@ -441,6 +441,15 @@ kit = toolkit = {
     },
     Position: function(which) {
         return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
+    },
+    Color: function(s) {
+        s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
+        s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
+        s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
+        s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
+        s = s.replace(/\033\[0m/g, "</span>")
+        s = s.replace(/\033\[m/g, "</span>")
+        return s
     },
 
     CopyText: function(text) {

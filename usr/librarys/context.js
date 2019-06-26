@@ -13,11 +13,7 @@ ctx = context = {
                 var s = msg.Result
                 s = s.replace(/</g, "&lt;")
                 s = s.replace(/>/g, "&gt;")
-                s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
-                s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
-                s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
-                s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
-                s = s.replace(/\033\[m/g, "</span>")
+                s = kit.Color(s)
                 return s
             }
             typeof cb == "function" && cb(msg || {})
