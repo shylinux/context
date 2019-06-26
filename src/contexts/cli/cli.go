@@ -578,6 +578,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("cli.version", "create")
 			if len(arg) > 0 && arg[0] == "self" {
 				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
 					m.Cmdy("cli.quit", 1)
@@ -597,7 +598,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Echo("done %s", m.Time())
 				return
 			}
-
 			if len(arg) > 0 {
 				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
 				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
@@ -655,6 +655,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			m.Table()
 			// m.Cmdy("nfs.dir", dir, "dir_sort", "time", "time_r")
+			return
+		}},
+		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) {
+				m.Append("time", version.time)
+				m.Append("host", version.host)
+				m.Table()
+				return
+			}
+			m.Cmd("nfs.save", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/contexts/cli/version.go"), fmt.Sprintf(`package cli
+var version = struct {
+	time string
+	host string
+}{
+	"%s", "%s",
+}
+`, m.Time(), m.Conf("runtime", "node.route")))
+
 			return
 		}},
 		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -723,7 +741,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Confm("missyou", "local", func(index string, local string) {
 				m.Cmd("nfs.git", "clone", local, path.Join(p, "usr/local", index))
 			})
-			m.Cmdy("cli.system", "node.sh", "create", p, "cmd_daemon", "true")
+			m.Cmdy("cli.system", "node.sh", "create", p, "daemon", "cmd_daemon", "true")
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
