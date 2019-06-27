@@ -659,10 +659,13 @@ function Plugin(page, pane, field) {
             })
         },
         Runs: function(event, cb) {
-            this.Clear(), event.Plugin = plugin, field.Run(event, kit.Selector(option, ".args", function(item, index) {
+            if (wait) {
+                return
+            }
+            wait = true, event.Plugin = plugin, this.Clear(), field.Run(event, kit.Selector(option, ".args", function(item, index) {
                 return item.value
             }), function(msg) {
-                typeof cb == "function" && cb(msg)
+                wait = false, typeof cb == "function" && cb(msg)
                 plugin.ondaemon[display.deal||"table"](msg)
             })
         },
