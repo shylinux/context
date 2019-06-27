@@ -487,6 +487,11 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 
 	switch action {
 	case "init":
+		defer func() {
+			if e := recover(); e != nil {
+				m.Log("warn", "term init %s", e)
+			}
+		}()
 		termbox.Init()
 		termbox.SetInputMode(termbox.InputEsc)
 		termbox.SetInputMode(termbox.InputMouse)
@@ -1127,8 +1132,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"dir_fields": &ctx.Config{Name: "dir_fields(time/type/name/size/line/hash)", Value: "time size line filename", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 
 		"grep": &ctx.Config{Name: "grep", Value: map[string]interface{}{
-			"list": map[string]interface{}{
-			},
+			"list": []interface{}{},
 		}, Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 		"git": &ctx.Config{Name: "git", Value: map[string]interface{}{
 			"args":   []interface{}{"-C", "@git_dir"},
@@ -1294,26 +1298,24 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 		"grep": &ctx.Command{Name: "grep", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 {
-				switch arg[0]{
+				switch arg[0] {
 				case "add":
-					m.Confv("grep", []string{"list", arg[1]}, map[string]interface{}{
-						"pos": 0,
-						"offset": 0,
-						"file": arg[2],
+					m.Confv("grep", "list.-2", map[string]interface{}{
+						"pos": 0, "offset": 0, "file": arg[1],
 					})
 					return
 
 				case "head":
-					m.Confm("grep", "list", func(key string, value map[string]interface{}) {
-						if len(arg) == 1 || key == arg[1] {
-							value["pos"] = 0
+					m.Confm("grep", "list", func(index int, value map[string]interface{}) {
+						if len(arg) == 1 {
 							value["offset"] = 0
+							value["pos"] = 0
 						}
 					})
 					return
 				case "tail":
-					m.Confm("grep", "list", func(key string, value map[string]interface{}) {
-						if len(arg) == 1 || key == arg[1] {
+					m.Confm("grep", "list", func(index int, value map[string]interface{}) {
+						if len(arg) == 1 {
 							value["pos"] = -1
 							value["offset"] = 0
 						}
@@ -1322,7 +1324,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 			}
 
-			m.Confm("grep", "list", func(key string, value map[string]interface{}) {
+			m.Confm("grep", "list", func(index int, value map[string]interface{}) {
 				f, e := os.Open(kit.Format(value["file"]))
 				m.Assert(e)
 				defer f.Close()
@@ -1330,9 +1332,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				// s, e := f.Stat()
 				// m.Assert(e)
 
-				begin, e :=  f.Seek(int64(kit.Int(value["pos"])), 0)
+				begin, e := f.Seek(int64(kit.Int(value["pos"])), 0)
 				if kit.Int(value["pos"]) == -1 {
-					begin, e =  f.Seek(0, 2)
+					begin, e = f.Seek(0, 2)
 				}
 				m.Assert(e)
 
@@ -1340,8 +1342,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				bio := bufio.NewScanner(f)
 				for i := 0; i < m.Optioni("page.limit") && bio.Scan(); i++ {
 					text := bio.Text()
-					if len(arg) == 0 || strings.Contains(text, arg[0]){
-						m.Add("append", "key", key)
+					if len(arg) == 0 || strings.Contains(text, arg[0]) {
+						m.Add("append", "index", index)
+						m.Add("append", "file", path.Base(kit.Format(value["file"])))
 						// m.Add("append", "pos",begin+int64(n))
 						// m.Add("append", "len",len(text))
 						// m.Add("append", "end",s.Size())
@@ -1350,11 +1353,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					} else {
 						i--
 					}
-					n+=len(text)+1
-					value["offset"] =  kit.Int(value["offset"]) + 1
+					n += len(text) + 1
+					value["offset"] = kit.Int(value["offset"]) + 1
 				}
 
-				value["pos"] =  begin + int64(n)
+				value["pos"] = begin + int64(n)
 			})
 			m.Table()
 			return

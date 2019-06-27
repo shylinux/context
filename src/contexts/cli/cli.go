@@ -683,6 +683,7 @@ var version = struct {
 }
 `, m.Time(), m.Conf("runtime", "node.route"), version.self+1))
 
+			m.Append("directory", "")
 			return
 		}},
 		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

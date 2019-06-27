@@ -2,7 +2,6 @@ package mdb
 
 import (
 	"contexts/ctx"
-	"net"
 	"time"
 	"toolkit"
 
@@ -102,9 +101,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 				switch arg[0] {
 				case "conn":
-					c, e := net.Dial(kit.Select("tcp", arg, 2), arg[1])
-					m.Assert(e)
-					mdb.conn = redis.NewConn(c, time.Second*10, time.Second*10)
+					mdb.conn, e = redis.Dial(kit.Select("tcp", arg, 2), arg[1], redis.DialKeepAlive(time.Second*10))
 				default:
 					if mdb.conn == nil {
 						m.Echo("not open")

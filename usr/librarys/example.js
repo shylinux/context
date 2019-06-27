@@ -601,6 +601,13 @@ function Plugin(page, pane, field) {
                     }
 
                 default:
+                    if (item.type == "text") {
+                        item.onclick = function(event) {
+                            if (event.ctrlKey) {
+                                action.value = kit.History.get("txt", -1).data
+                            }
+                        }
+                    }
                     args && count < args.length && (item.value = args[count++]||item.value||"")
                     item.className = "args"
             }
@@ -652,7 +659,7 @@ function Plugin(page, pane, field) {
             })
         },
         Runs: function(event, cb) {
-            event.Plugin = plugin, field.Run(event, kit.Selector(option, ".args", function(item, index) {
+            this.Clear(), event.Plugin = plugin, field.Run(event, kit.Selector(option, ".args", function(item, index) {
                 return item.value
             }), function(msg) {
                 typeof cb == "function" && cb(msg)
