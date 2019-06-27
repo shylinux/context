@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path"
+	"reflect"
 	"toolkit"
 
 	"fmt"
@@ -658,9 +659,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) {
-				m.Append("time", version.time)
-				m.Append("host", version.host)
+			if len(arg) == 0 {
+				types := reflect.TypeOf(version)
+				value := reflect.ValueOf(version)
+				for i := 0; i < types.NumField(); i++ {
+					key := types.Field(i)
+					val := value.Field(i)
+					m.Add("append", "name", key.Name)
+					m.Add("append", "type", key.Type.Name())
+					m.Add("append", "value", fmt.Sprintf("%v", val))
+				}
+
 				m.Table()
 				return
 			}
@@ -668,10 +677,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 var version = struct {
 	time string
 	host string
+	self int
 }{
-	"%s", "%s",
+	"%s", "%s", %d,
 }
-`, m.Time(), m.Conf("runtime", "node.route")))
+`, m.Time(), m.Conf("runtime", "node.route"), version.self+1))
 
 			return
 		}},
