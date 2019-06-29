@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"contexts/ctx"
 	"encoding/csv"
 	"encoding/json"
+	"io"
+	"net/http"
 	"os/exec"
 	"os/user"
 	"path"
@@ -784,6 +787,54 @@ var version = struct {
 				m.Cmd("cli._exit")
 				m.Cmd("nfs._exit")
 			})
+			return
+		}},
+		"test": &ctx.Command{Name: "test file server", Help: "test", Hand: func(m *ctx.Message, c *ctx.Context, key string, args ...string) (e error) {
+			prefix0 := len("uri[")
+			prefix1 := len("request_param[")
+
+			if e = os.Mkdir("tmp", 0777); e != nil {
+				return
+			}
+
+			begin := time.Now()
+            f, e := os.Open(args[0])
+            defer f.Close()
+            bio := bufio.NewScanner(f)
+			output := map[string]*os.File{}
+			nreq := 0
+
+            for bio.Scan() {
+            	word := strings.Split(bio.Text(), " ")
+            	if len(word) != 2 {
+            		continue
+				}
+            	uri := word[0][prefix0:len(word[0])-1]
+				arg := word[1][prefix1:len(word[1])-1]
+            	if output[uri] == nil {
+            		output[uri], e = os.Create(path.Join("tmp", strings.Replace(uri, "/", "_", -1)+".txt"))
+            		defer output[uri].Close()
+				}
+				nreq++
+            	br := bytes.NewReader([]byte(arg))
+				res, e := http.Post(args[1]+uri, "application/json", br)
+				fmt.Fprintf(output[uri], uri)
+				fmt.Fprintf(output[uri], " ")
+				fmt.Fprintf(output[uri], arg)
+				fmt.Fprintf(output[uri], " ")
+				if e != nil {
+					fmt.Fprintf(output[uri], "%v", e)
+				} else if res.StatusCode != http.StatusOK {
+					fmt.Fprintf(output[uri], res.Status)
+				} else {
+					io.Copy(output[uri], res.Body)
+				}
+				fmt.Fprintf(output[uri], "\n")
+			}
+			m.Append("nuri", len(output))
+			m.Append("nreq", nreq)
+			m.Append("time", fmt.Sprintf("%s", time.Since(begin)))
+			m.Table()
 			return
 		}},
 		"_exit": &ctx.Command{Name: "_exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

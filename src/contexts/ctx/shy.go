@@ -233,6 +233,7 @@ func (c *Context) BackTrace(m *Message, hand func(m *Message) (stop bool)) *Cont
 }
 
 func (c *Context) Plugin(args []string) string {
+	Index.Register(c, nil)
 	m := &Message{code: 0, time: time.Now(), source: c, target: c, Meta: map[string][]string{}}
 	if len(args) == 0 {
 		m.Echo("%s: %s\n", c.Name, c.Help)
