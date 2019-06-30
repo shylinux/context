@@ -452,16 +452,13 @@ func (nfs *NFS) Auto(what []rune, trigger string, index int) (change bool, frame
 	}
 
 	table = []map[string]string{}
-	m.Spawn(auto_target).Cmd(cmd...).Table(func(maps map[string]string, list []string, line int) bool {
-		if line >= 0 {
-			fields := []interface{}{}
-			for _, v := range auto["fields"].([]interface{}) {
-				fields = append(fields, maps[kit.Format(v)])
-			}
-			maps["format"] = fmt.Sprintf(kit.Format(auto["format"]), fields...)
-			table = append(table, maps)
+	m.Spawn(auto_target).Cmd(cmd...).Table(func(line int, maps map[string]string) {
+		fields := []interface{}{}
+		for _, v := range auto["fields"].([]interface{}) {
+			fields = append(fields, maps[kit.Format(v)])
 		}
-		return true
+		maps["format"] = fmt.Sprintf(kit.Format(auto["format"]), fields...)
+		table = append(table, maps)
 	})
 	m.Conf("term", []interface{}{"help_table", auto["table"]}, table)
 
@@ -996,14 +993,14 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				if head == "detail" { // 接收请求
 					msg.Detail(-1, "_route")
 					msg.Option("remote_code", code)
-					m.GoFunc(msg, func(msg *ctx.Message) {
+					m.Gos(msg, func(msg *ctx.Message) {
 						msg.Call(func(msg *ctx.Message) *ctx.Message {
 							nfs.echo <- msg
 							return nil
 						})
 					})
 				} else { // 接收响应
-					m.Set("option", "code", code).GoFunc(msg, func(msg *ctx.Message) {
+					m.Set("option", "code", code).Gos(msg, func(msg *ctx.Message) {
 						if h, ok := nfs.hand[kit.Int(m.Option("code"))]; ok {
 							h.CopyFuck(msg, "result").CopyFuck(msg, "append").Back(h)
 						}
@@ -1405,7 +1402,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 			for _, from := range arg[1:] {
 				f, e := os.Open(from)
-				m.Assert(e)
+				if e != nil {
+					continue
+				}
 				defer f.Close()
 
 				n, e := io.Copy(to, f)

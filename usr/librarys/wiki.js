@@ -123,6 +123,8 @@ var page = Page({
                     page.onlayout()
                 })
 
+                ctx.Search("layout") == "max" && (page.Conf("tree.display", "none"), page.Conf("menu.display", "none"))
+
                 ctx.Runs(page, form, function(msg) {
                     ui.menu.innerHTML = "", ui.text.innerHTML = msg.result? msg.result.join(""): ""
                     kit.AppendChild(ui.menu, [{"tree": kit.OrderText(field, ui.text)}])
@@ -144,6 +146,10 @@ var page = Page({
                 case "tree":
                     page.tree.Pane.Tree()
                     break
+                case "title":
+                    ctx.Search("layout", ctx.Search("layout")? "": "max")
+                    break
+
                 default:
                     page.confirm("logout?") && page.login.Pane.Exit()
             }

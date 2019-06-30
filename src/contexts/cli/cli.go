@@ -152,7 +152,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "运行环境"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
-			"bench": "src/examples/app/bench.go",
+			"bench": "src/extend/bench.go",
 			"tmp":   "var/tmp/go",
 			"env":   []interface{}{"GOPATH", "PATH"},
 		}, Help: "运行环境"},
@@ -444,7 +444,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Echo(h)
 
 				// 执行命令
-				m.GoFunc(m, func(m *ctx.Message) {
+				m.Gos(m, func(m *ctx.Message) {
 					if e := cmd.Start(); e != nil {
 						m.Echo("error: ").Echo("%s\n", e)
 					} else if e := cmd.Wait(); e != nil {
@@ -457,7 +457,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			// 管道命令
 			wait := make(chan bool, 1)
-			m.GoFunc(m, func(m *ctx.Message) {
+			m.Gos(m, func(m *ctx.Message) {
 				defer func() { wait <- true }()
 
 				out := bytes.NewBuffer(make([]byte, 0, 1024))
@@ -745,17 +745,30 @@ var version = struct {
 		"missyou": &ctx.Command{Name: "missyou", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Option("dir_root", "")
-				m.Cmdy("nfs.dir", m.Conf("missyou", "path"))
+				m.Cmd("nfs.dir", m.Conf("missyou", "path")).Table(func() {
+				})
 				return
 			}
 
-			p := path.Join(m.Conf("missyou", "path"), m.Time("20060102-")+arg[0])
-			m.Cmd("nfs.copy", path.Join(p, "etc/local.shy"), "usr/missyou/job.shy")
+			if !strings.Contains(arg[0], "-") {
+				arg[0] = m.Time("20060102-") + arg[0]
+			}
 
+			if m.Confs("ssh.node", arg[0]) {
+				m.Echo(arg[0])
+				return
+			}
+
+			p := path.Join(m.Conf("missyou", "path"), arg[0])
+			if s, e := os.Stat(p); e == nil && s.IsDir() {
+				m.Cmdy("cli.system", "node.sh", "create", p, "daemon", "cmd_daemon", "true")
+				return e
+			}
+
+			m.Cmdy("nfs.copy", path.Join(p, "etc/local.shy"), "usr/missyou/job.shy")
 			m.Confm("missyou", "local", func(index string, local string) {
 				m.Cmd("nfs.git", "clone", local, path.Join(p, "usr/local", index))
 			})
-			m.Cmdy("cli.system", "node.sh", "create", p, "daemon", "cmd_daemon", "true")
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -779,7 +792,7 @@ var version = struct {
 			m.Append("code", code)
 			m.Echo(", wait 1s\n").Table()
 
-			m.GoFunc(m, func(m *ctx.Message) {
+			m.Gos(m, func(m *ctx.Message) {
 				defer func() {
 					os.Exit(kit.Int(code))
 				}()
@@ -798,25 +811,25 @@ var version = struct {
 			}
 
 			begin := time.Now()
-            f, e := os.Open(args[0])
-            defer f.Close()
-            bio := bufio.NewScanner(f)
+			f, e := os.Open(args[0])
+			defer f.Close()
+			bio := bufio.NewScanner(f)
 			output := map[string]*os.File{}
 			nreq := 0
 
-            for bio.Scan() {
-            	word := strings.Split(bio.Text(), " ")
-            	if len(word) != 2 {
-            		continue
+			for bio.Scan() {
+				word := strings.Split(bio.Text(), " ")
+				if len(word) != 2 {
+					continue
 				}
-            	uri := word[0][prefix0:len(word[0])-1]
-				arg := word[1][prefix1:len(word[1])-1]
-            	if output[uri] == nil {
-            		output[uri], e = os.Create(path.Join("tmp", strings.Replace(uri, "/", "_", -1)+".txt"))
-            		defer output[uri].Close()
+				uri := word[0][prefix0 : len(word[0])-1]
+				arg := word[1][prefix1 : len(word[1])-1]
+				if output[uri] == nil {
+					output[uri], e = os.Create(path.Join("tmp", strings.Replace(uri, "/", "_", -1)+".txt"))
+					defer output[uri].Close()
 				}
 				nreq++
-            	br := bytes.NewReader([]byte(arg))
+				br := bytes.NewReader([]byte(arg))
 				res, e := http.Post(args[1]+uri, "application/json", br)
 				fmt.Fprintf(output[uri], uri)
 				fmt.Fprintf(output[uri], " ")

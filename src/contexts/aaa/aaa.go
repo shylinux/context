@@ -36,13 +36,10 @@ type AAA struct {
 
 func Auto(m *ctx.Message, arg ...string) {
 	msg := m.Spawn().Add("option", "auto_cmd", "").Cmd("auth", arg)
-	msg.Table(func(maps map[string]string, list []string, line int) bool {
-		if line >= 0 {
-			m.Add("append", "value", maps["key"])
-			m.Add("append", "name", fmt.Sprintf("%s: %s", maps["type"], maps["meta"]))
-			m.Add("append", "help", fmt.Sprintf("%s", maps["create_time"]))
-		}
-		return true
+	msg.Table(func(line int, maps map[string]string) {
+		m.Add("append", "value", maps["key"])
+		m.Add("append", "name", fmt.Sprintf("%s: %s", maps["type"], maps["meta"]))
+		m.Add("append", "help", fmt.Sprintf("%s", maps["create_time"]))
 	})
 }
 

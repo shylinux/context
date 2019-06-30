@@ -1,5 +1,5 @@
 
-BENCH=src/examples/app/bench.go
+BENCH=src/extend/bench.go
 upgrade=usr/upgrade/
 
 install:

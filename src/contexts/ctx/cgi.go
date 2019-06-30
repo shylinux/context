@@ -554,21 +554,19 @@ var CGI = template.FuncMap{
 		if len(cli.Meta["append"]) > 0 {
 			result = append(result, "<table>")
 			result = append(result, "<caption>", cmd, "</caption>")
-			cli.Table(func(maps map[string]string, list []string, line int) bool {
-				if line == -1 {
+			cli.Table(func(line int, maps map[string]string) {
+				if line == 0 {
 					result = append(result, "<tr>")
-					for _, v := range list {
+					for _, v := range cli.Meta["append"] {
 						result = append(result, "<th>", v, "</th>")
 					}
 					result = append(result, "</tr>")
-					return true
 				}
 				result = append(result, "<tr>")
-				for _, v := range list {
-					result = append(result, "<td>", v, "</td>")
+				for _, k := range cli.Meta["append"] {
+					result = append(result, "<td>", maps[k], "</td>")
 				}
 				result = append(result, "</tr>")
-				return true
 			})
 			result = append(result, "</table>")
 		} else {

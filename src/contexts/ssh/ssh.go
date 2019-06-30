@@ -164,9 +164,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			"favor": []interface{}{
 				map[string]interface{}{"componet_name": "clip", "componet_help": "粘贴板",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
-					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "clip",
-					"componet_args": []interface{}{}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "content", "view": "long"},
+					"componet_type": "public", "componet_ctx": "ssh", "componet_cmd": "_route",
+					"componet_args": []interface{}{"$$", "context", "aaa", "clip"}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "you", "imports": "plugin_you"},
+						map[string]interface{}{"type": "text", "name": "txt", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "运行"},
 					},
 				},

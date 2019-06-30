@@ -153,11 +153,10 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			m.Sort(sort_field, sort_order).Table()
 
 			m.Target().Configs["wiki_list"].Value = []interface{}{}
-			m.Table(func(maps map[string]string, list []string, line int) bool {
-				if line > 0 {
+			m.Table(func(line int, maps map[string]string) {
+				if line > 1 {
 					m.Confv("wiki_list", -2, maps)
 				}
-				return true
 			})
 			return
 		}},

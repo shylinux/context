@@ -25,7 +25,7 @@ func (tcp *TCP) Fuck(address []string, action func(address string) (net.Conn, er
 	for i := 0; i < m.Confi("retry", "counts"); i++ {
 		for _, p := range address {
 			m.Cap("address", p)
-			m.GoFunc(m, func(m *ctx.Message) {
+			m.Gos(m, func(m *ctx.Message) {
 				p := m.Cap("address")
 				if c, e := action(p); e == nil {
 					tcp.Conn = c
