@@ -93,7 +93,8 @@ func (m *Message) Time(arg ...interface{}) string {
 	if len(arg) > 0 {
 		if d, e := time.ParseDuration(arg[0].(string)); e == nil {
 			arg = arg[1:]
-			t.Add(d)
+			t = t.Add(d)
+		} else {
 		}
 	}
 
@@ -485,6 +486,9 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 	}
 
 	return m
+}
+func (m *Message) Push(str string, arg ...interface{}) *Message {
+	return m.Add("append", str, arg...)
 }
 func (m *Message) Echo(str string, arg ...interface{}) *Message {
 	if len(arg) > 0 {

@@ -95,8 +95,37 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			"base":    []interface{}{"key", "create_time", "type", "name", "model", "value"},
 			"full":    []interface{}{"key", "create_time", "access_time", "type", "name", "model", "value", "view", "data", "ship"},
 		}, Help: "数据视图"},
+
+		"ktv": &ctx.Config{Name: "ktv", Value: map[string]interface{}{
+			"conf": map[string]interface{}{"expire": "24h"}, "data": map[string]interface{}{},
+		}, Help: "缓存数据"},
 	},
 	Commands: map[string]*ctx.Command{
+		"ktv": &ctx.Command{Name: "ktv", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				now := kit.Int(m.Time("stamp"))
+				m.Confm("ktv", "data", func(key string, value map[string]interface{}) {
+					m.Push("key", key)
+					m.Push("expire", kit.Int(value["expire"])-now)
+					m.Push("value", value["value"])
+				})
+				m.Table()
+				return
+			}
+			if len(arg) == 1 {
+				if m.Confi("ktv", []string{"data", arg[0], "expire"}) < kit.Int(m.Time("stamp")) {
+					m.Conf("ktv", []string{"data", arg[0]}, "")
+				}
+				m.Echo(m.Conf("ktv", []string{"data", arg[0], "value"}))
+				return
+			}
+			m.Confv("ktv", []string{"data", arg[0]}, map[string]interface{}{
+				"expire": m.Time(kit.Select(m.Conf("ktv", "conf.expire"), arg, 2), "stamp"),
+				"value":  arg[1],
+			})
+			m.Echo(arg[1])
+			return
+		}},
 		"redis": &ctx.Command{Name: "redis conn address [protocol]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 				switch arg[0] {

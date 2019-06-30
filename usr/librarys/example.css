@@ -94,6 +94,10 @@ fieldset.toast>div.output pre {
     white-space:pre-wrap;
     text-align:center;
     margin:0px;
+    font-size:16px;
+}
+fieldset.toast>div.output div.tick {
+    font-size:12px;
 }
 fieldset.dialog {
     background-color:lightgray;

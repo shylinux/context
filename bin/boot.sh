@@ -68,7 +68,7 @@ log "dir:$dir"
 
 case $1 in
     install) shift && install "$@";;
-    start|"") main "$@";;
+    start|"") shift && main "$@";;
     create) mkdir -p $2; cd $2 && shift && shift && main "$@";;
     restart) action 30;;
     upgrade) action 31;;

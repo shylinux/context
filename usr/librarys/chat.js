@@ -268,8 +268,8 @@ page = Page({
                     var plugin = event.Plugin
                     event.shiftKey? page.target.Pane.Send("field", plugin.Format()):
                         field.Pane.Run([river, storm, index].concat(args), function(msg) {
-                            var text = plugin.Reveal(msg)
-                            event.ctrlKey && page.target.Pane.Send(text[0], text[1])
+                            var text = plugin? plugin.Reveal(msg): ""
+                            text && event.ctrlKey && page.target.Pane.Send(text[0], text[1])
                             typeof cbs == "function" && cbs(msg)
                         })
                 })

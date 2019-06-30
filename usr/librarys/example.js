@@ -108,7 +108,7 @@ function Page(page) {
         ontoast: function(text, title, duration) {
             var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
             var toast = kit.ModifyView("fieldset.toast", {
-                display: "block", dialog: [args.width||200, args.height||40], padding: 10,
+                display: "block", dialog: [args.width||300, args.height||50], padding: 10,
             })
             if (!text) {
                 toast.style.display = "none"
@@ -143,10 +143,18 @@ function Page(page) {
                     toast.style.display = "none"
                 }})
             })
+            list.push({view: ["tick"], name: "tick"})
 
             kit.ModifyNode(toast.querySelector("legend"), args.title||"tips")
             var ui = kit.AppendChild(kit.ModifyNode(toast.querySelector("div.output"), ""), list)
-            args.duration !=- 1 && setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
+            var tick = 1
+            var begin = kit.time(0,"%H:%M:%S")
+            var timer = args.duration ==- 1? setTimeout(function() {
+                function ticker() {
+                    toast.style.display != "none" && (ui.tick.innerText = begin+" ... "+(tick++)+"s") && setTimeout(ticker, 1000)
+                }
+                ticker()
+            }, 10): setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
             page.toast = toast
             return true
         },
@@ -633,7 +641,10 @@ function Plugin(page, pane, field) {
                     (action.value = value) && item.action == "auto" && plugin.Runs(window.event)
                 })
             })
-            item.type == "button" && item.action == "auto" && plugin.Runs(window.event)
+            item.type == "button" && item.action == "auto" && plugin.Runs(window.event, function() {
+                var td = output.querySelector("td")
+                td && td.click()
+            })
             return action
         },
         Remove: function() {
@@ -667,18 +678,21 @@ function Plugin(page, pane, field) {
             })
         },
         Runs: function(event, cb) {
-            if (wait) {
-                return
-            }
-            wait = true, event.Plugin = plugin, this.Clear(), field.Run(event, kit.Selector(option, ".args", function(item, index) {
+            var args = kit.Selector(option, ".args", function(item, index) {
                 return item.value
-            }), function(msg) {
-                wait = false, typeof cb == "function" && cb(msg)
+            })
+            var show = true
+            setTimeout(function() {
+                show && page.ontoast(kit.Format(args||["running..."]), meta.name, -1)
+            }, 1000)
+            wait = true, event.Plugin = plugin, field.Run(event, args, function(msg) {
+                show = false, page.ontoast("")
                 plugin.ondaemon[display.deal||"table"](msg)
+                wait = false, typeof cb == "function" && cb(msg)
             })
         },
         Delay: function(time, event, text) {
-            page.ontoast(text, "run", -1)
+            page.ontoast(text, "", -1)
             setTimeout(function() {
                 plugin.Runs(event)
                 page.ontoast("")
@@ -711,18 +725,18 @@ function Plugin(page, pane, field) {
             },
             you: function(value, name, line) {
                 window.event.Plugin = plugin
-                name == "status" && (line.status == "start"? function() {
-                    plugin.Delay(2000, window.event, line.you+" stop...") && field.Run(window.event, [line.you, "stop"])
+                line.you && name == "status" && (line.status == "start"? function() {
+                    plugin.Delay(3000, window.event, line.you+" stop...") && field.Run(window.event, [line.you, "stop"])
                 }(): field.Run(window.event, [line.you], function(msg) {
-                    plugin.Delay(1000, window.event, line.you+" start...") && plugin.Runs(window.event)
+                    plugin.Delay(3000, window.event, line.you+" start...")
                 }))
-                return name == "you"? value: undefined
+                return name == "status" || line.status == "stop" ? undefined: line.you
             },
-            pod: function(value, name) {
+            pod: function(value, name, line) {
                 if (option[exports[0]].value) {
-                    return option[exports[0]].value+"."+value
+                    return option[exports[0]].value+"."+line.pod
                 }
-                return value
+                return line.pod
             },
             dir: function(value, name) {
                 if (value.endsWith("/")) {

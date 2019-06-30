@@ -759,7 +759,7 @@ var version = struct {
 						m.Add("append", "status", "stop")
 					}
 				})
-				m.Table()
+				m.Sort("status").Table()
 				return
 			}
 
@@ -794,6 +794,7 @@ var version = struct {
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("runtime", "boot.count", m.Confi("runtime", "boot.count")+1)
 			code := kit.Select("0", arg, 0)
 			switch code {
 			case "0":

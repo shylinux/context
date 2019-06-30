@@ -1,6 +1,6 @@
 {init: function(page, pane, field, option, output) {
     this.Runs = function(event) {
-        var value = option.content.value
+        var value = option.txt.value
         var url = page.login.Pane.Share({cmds: ["qrcode", value]})
         kit.AppendChilds(output, [{img: [url]}])
         event.ctrlKey && page.target.Pane.Send("icon", url)
