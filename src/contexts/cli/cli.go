@@ -578,6 +578,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
 					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
+			case "stat":
+				m.Cmd("nfs.dir", "src", "dir_deep", "dir_type", "file").CopyTo(m, "append")
+				m.Cmd("nfs.dir", "usr/librarys", "dir_deep", "dir_type", "file").CopyTo(m, "append")
+				m.Set("result").Table()
 			}
 			return
 		}},
@@ -745,8 +749,17 @@ var version = struct {
 		"missyou": &ctx.Command{Name: "missyou", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Option("dir_root", "")
-				m.Cmd("nfs.dir", m.Conf("missyou", "path")).Table(func() {
+				m.Cmd("nfs.dir", m.Conf("missyou", "path")).Table(func(value map[string]string) {
+					name := strings.TrimSuffix(value["filename"], "/")
+					m.Add("append", "create_time", value["time"])
+					m.Add("append", "you", name)
+					if m.Confs("nfs.node", name) {
+						m.Add("append", "status", "start")
+					} else {
+						m.Add("append", "status", "stop")
+					}
 				})
+				m.Table()
 				return
 			}
 
@@ -755,20 +768,29 @@ var version = struct {
 			}
 
 			if m.Confs("ssh.node", arg[0]) {
-				m.Echo(arg[0])
+				switch kit.Select("", arg, 1) {
+				case "stop":
+					m.Cmdy("ssh._route", arg[0], "context", "cli", "quit", 0)
+				default:
+					m.Echo(arg[0])
+				}
 				return
 			}
 
 			p := path.Join(m.Conf("missyou", "path"), arg[0])
-			if s, e := os.Stat(p); e == nil && s.IsDir() {
-				m.Cmdy("cli.system", "node.sh", "create", p, "daemon", "cmd_daemon", "true")
-				return e
+			if _, e := os.Stat(p); e != nil {
+				m.Cmd("nfs.copy", path.Join(p, "etc/local.shy"), "usr/missyou/job.shy")
+				m.Confm("missyou", "local", func(index string, local string) {
+					m.Cmd("nfs.git", "clone", local, path.Join(p, "usr/local", index))
+				})
 			}
 
-			m.Cmdy("nfs.copy", path.Join(p, "etc/local.shy"), "usr/missyou/job.shy")
-			m.Confm("missyou", "local", func(index string, local string) {
-				m.Cmd("nfs.git", "clone", local, path.Join(p, "usr/local", index))
-			})
+			m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), "daemon",
+				"cmd_dir", p,
+				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
+				"cmd_env", "ctx_box", fmt.Sprintf("http://localhost%s", m.Conf("runtime", "boot.web_port")),
+				"cmd_daemon", "true",
+			)
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

@@ -23,7 +23,7 @@ fieldset>form.option div.hide {
     display:none;
 }
 fieldset>form.option div input.args {
-    width:80px;
+    width:100px;
 }
 fieldset>form.option div.cmd input.args {
     color:white;
@@ -81,7 +81,8 @@ fieldset>div.output table td {
 }
 
 fieldset.toast {
-    background-color:#ffffff00;
+    border:solid 2px red;
+    background-color:#ffffff;
     position:absolute;
     display:none;
 }

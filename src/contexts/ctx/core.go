@@ -360,16 +360,14 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 	// m.Gos(m, func(m *Message) {
 	m.Call(func(sub *Message) *Message {
 		msg := cb(sub)
-		m.Log("sync", m.Format("done", "result", "append"))
 		wait <- m
 		return msg
 	}, arg...)
 	// })
 
-	m.Log("sync", m.Format("wait", "result", "append"))
 	select {
 	case <-time.After(kit.Duration(m.Conf("call_timeout"))):
-		m.Log("sync", m.Format("timeout", "result", "append"))
+		m.Log("sync", m.Format("timeout", "detail", "option"))
 	case <-wait:
 	}
 	return m

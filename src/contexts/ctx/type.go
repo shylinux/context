@@ -368,7 +368,6 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 
 			row[k], wor = data, append(wor, data+strings.Repeat(space, width[k]-kit.Width(data, len(space))))
 		}
-		m.Log("fuck", "waht %v", row)
 		if !cb(row, wor, i) {
 			break
 		}

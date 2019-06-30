@@ -140,7 +140,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				case "weixin":
 					m.Cmdy(".js_token")
 				case "qrcode":
-					m.Append("qrcode", arg[1])
+					m.Append("qrcode", kit.Select(m.Option("index_url"), arg, 1))
 				case "rename":
 				default:
 					if m.Cmds("ssh.work", "share", arg[0]) {
@@ -211,6 +211,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					"tool": map[string]interface{}{},
 				})
 				m.Echo(h)
+				return
 
 				m.Option("username", m.Conf("runtime", "user.name"))
 				m.Confm("flow", []string{h, "user"}, func(key string, value map[string]interface{}) {

@@ -320,7 +320,7 @@ page = Page({
                         list.length > 0? list[0].Plugin.Runs(event, function() {
                             field.Pane.Conf("running", true), setTimeout(function() {
                                 run(list.slice(1))
-                            }, 1000)
+                            }, 100)
                         }): field.Pane.Conf("running", false)
                     }
                     run(list)

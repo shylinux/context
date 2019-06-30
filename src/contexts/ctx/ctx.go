@@ -39,6 +39,7 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	m.Cmd("ctx._init")
+	kit.Log("fuck", "what")
 	if m.Optionv("ps_target", Index); len(arg) == 0 {
 		m.Option("cli.modal", "active")
 		m.Option("log.disable", false)
@@ -46,10 +47,12 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 		m.Cmd("log._init")
 		m.Cmd("yac._init")
 		m.Cmd("gdb._init")
+		m.Log("fuck", "what")
 		m.Cmd("cli.source", m.Conf("system", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("system", "script.exit"))
 	} else {
 		m.Option("cli.modal", "action")
 		m.Cmd("yac._init")
+		m.Log("fuck", "what")
 		for _, v := range m.Spawn().Cmd(arg).Meta["result"] {
 			fmt.Printf("%s", v)
 		}

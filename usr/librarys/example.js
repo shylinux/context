@@ -110,6 +110,10 @@ function Page(page) {
             var toast = kit.ModifyView("fieldset.toast", {
                 display: "block", dialog: [args.width||200, args.height||40], padding: 10,
             })
+            if (!text) {
+                toast.style.display = "none"
+                return
+            }
 
             var list = [{text: [args.text||""]}]
             args.inputs && args.inputs.forEach(function(input) {
@@ -144,6 +148,7 @@ function Page(page) {
             var ui = kit.AppendChild(kit.ModifyNode(toast.querySelector("div.output"), ""), list)
             args.duration !=- 1 && setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
             page.toast = toast
+            return true
         },
         ondebug: function() {
             if (!this.debug) {
@@ -624,8 +629,11 @@ function Plugin(page, pane, field) {
             };
 
             (typeof item.imports == "object"? item.imports: typeof item.imports == "string"? [item.imports]: []).forEach(function(imports) {
-                page.Sync(imports).change(action.Goto)
+                page.Sync(imports).change(function(value) {
+                    (action.value = value) && item.action == "auto" && plugin.Runs(window.event)
+                })
             })
+            item.type == "button" && item.action == "auto" && plugin.Runs(window.event)
             return action
         },
         Remove: function() {
@@ -669,6 +677,14 @@ function Plugin(page, pane, field) {
                 plugin.ondaemon[display.deal||"table"](msg)
             })
         },
+        Delay: function(time, event, text) {
+            page.ontoast(text, "run", -1)
+            setTimeout(function() {
+                plugin.Runs(event)
+                page.ontoast("")
+            }, time)
+            return time
+        },
         Clear: function() {
             output.innerHTML = ""
         },
@@ -684,7 +700,7 @@ function Plugin(page, pane, field) {
                     if (line["latitude"]) {
                         page.openLocation(line.latitude, line.longitude, line.location)
                     }
-                    page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name))
+                    page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
                 });
                 (display.show_result || !msg.append) && msg.result && kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}])
             },
@@ -693,13 +709,22 @@ function Plugin(page, pane, field) {
             "": function(value, name) {
                 return value
             },
-            "pod": function(value, name) {
+            you: function(value, name, line) {
+                window.event.Plugin = plugin
+                name == "status" && (line.status == "start"? function() {
+                    plugin.Delay(2000, window.event, line.you+" stop...") && field.Run(window.event, [line.you, "stop"])
+                }(): field.Run(window.event, [line.you], function(msg) {
+                    plugin.Delay(1000, window.event, line.you+" start...") && plugin.Runs(window.event)
+                }))
+                return name == "you"? value: undefined
+            },
+            pod: function(value, name) {
                 if (option[exports[0]].value) {
                     return option[exports[0]].value+"."+value
                 }
                 return value
             },
-            "dir": function(value, name) {
+            dir: function(value, name) {
                 if (value.endsWith("/")) {
                     return option[exports[0]] + value
                 }
