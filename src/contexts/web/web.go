@@ -634,7 +634,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				kit.Structm(m.Magic("user", []string{"cookie", which}), func(key string, value string) {
 					req.AddCookie(&http.Cookie{Name: key, Value: value})
 					m.Log("info", "set-cookie %s: %v", key, value)
-
 				})
 
 				if web.Client == nil {

@@ -788,7 +788,7 @@ var version = struct {
 			m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), "daemon",
 				"cmd_dir", p,
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
-				"cmd_env", "ctx_box", fmt.Sprintf("http://localhost%s", m.Conf("runtime", "boot.web_port")),
+				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
 				"cmd_daemon", "true",
 			)
 			return

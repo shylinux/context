@@ -972,7 +972,9 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 	// 消息接收队列
 	msg, code, head, body := m, "0", "result", "append"
-	for bio := bufio.NewScanner(nfs.io); bio.Scan(); {
+	bio := bufio.NewScanner(nfs.io)
+	bio.Buffer(make([]byte, m.Confi("buf_size")), m.Confi("buf_size"))
+	for ; bio.Scan(); {
 
 		m.TryCatch(m, true, func(m *ctx.Message) {
 			switch field, value := nfs.Recv(bio.Text()); field {
@@ -1124,7 +1126,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			},
 		}, Help: "读取文件的缓存区的大小"},
 
-		"buf_size":   &ctx.Config{Name: "buf_size", Value: "1024", Help: "读取文件的缓存区的大小"},
+		"buf_size":   &ctx.Config{Name: "buf_size", Value: "81920", Help: "读取文件的缓存区的大小"},
 		"dir_type":   &ctx.Config{Name: "dir_type(file/dir/both/all)", Value: "both", Help: "dir命令输出的文件类型, file: 只输出普通文件, dir: 只输出目录文件, 否则输出所有文件"},
 		"dir_fields": &ctx.Config{Name: "dir_fields(time/type/name/size/line/hash)", Value: "time size line filename", Help: "dir命令输出文件名的类型, name: 文件名, tree: 带缩进的文件名, path: 相对路径, full: 绝对路径"},
 

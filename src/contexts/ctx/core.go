@@ -31,18 +31,19 @@ func (c *Context) Register(s *Context, x Server, args ...interface{}) {
 func (c *Context) Plugin(args []string) string {
 	Index.Register(c, nil)
 	m := &Message{code: 0, time: time.Now(), source: c, target: c, Meta: map[string][]string{}}
+	m.Option("log.disable", true)
 	if len(args) == 0 {
-		m.Echo("%s: %s\n", c.Name, c.Help)
+		m.Echo("%s: %s\n\n", c.Name, c.Help)
+		m.Echo("命令列表:\n")
 		for k, v := range c.Commands {
-			m.Echo("%s: %s %v\n", k, v.Name, v.Help)
+			m.Echo("  %s: %s\n    %v\n\n", k, v.Name, v.Help)
 		}
-	} else if cs, ok := c.Commands[args[0]]; ok {
-		h := cs.Hand
-		if e := h(m, c, args[0], args[1:]...); e != nil {
-			m.Echo("error: ").Echo("%v\n", e)
+		m.Echo("配置列表:\n")
+		for k, v := range c.Configs {
+			m.Echo("  %s(%v): %s\n", k, v.Value, v.Help)
 		}
 	} else {
-		m.Echo("error: ").Echo("not found: %v\n", args[0])
+		m.Cmd(args)
 	}
 	return strings.Join(m.Meta["result"], "")
 }

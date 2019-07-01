@@ -2,8 +2,10 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"sync/atomic"
 	"contexts/ctx"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -14,20 +16,23 @@ import (
 	kit "toolkit"
 )
 
-var Index = &ctx.Context{Name: "test", Help: "test",
+var Index = &ctx.Context{Name: "test", Help: "接口测试工具",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"nread": {Name: "nread", Value: 1},
-		"nwork": {Name: "nwork", Value: 10},
-		"nskip": {Name: "nwork", Value: 100},
-		"nwrite":{Name: "nwrite", Value: 1},
-		"outdir": {Name: "outdir", Value: "tmp"},
-		"prefix0": {Name: "prefix0", Value: "uri["},
-		"prefix1": {Name: "prefix1", Value: "request_param["},
-		"timeout": {Name: "timeout", Value: "10s"},
+		"nread": {Name: "nread", Help: "读取Channel长度", Value: 1},
+		"nwork": {Name: "nwork", Help: "协程数量", Value: 20},
+		"limit":{Name: "limit", Help: "请求数量", Value: 100},
+		"nskip": {Name: "nskip", Help: "请求限长", Value: 100},
+		"nwrite":{Name: "nwrite", Help: "输出Channel长度", Value: 1},
+		"outdir": {Name: "outdir", Help: "输出目录", Value: "tmp"},
+		"prefix0": {Name: "prefix0", Help: "请求前缀", Value: "uri["},
+		"prefix1": {Name: "prefix1", Help: "参数前缀", Value: "request_param["},
+		"timeout": {Name: "timeout", Help: "请求超时", Value: "10s"},
 	},
 	Commands: map[string]*ctx.Command{
-		"diff": {Name: "diff", Help:"diff", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"diff": {Name: "diff file server1 server2", Help:"接口对比工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			os.MkdirAll(m.Conf("outdir"), 0777)
+
 			f, e := os.Open(arg[0])
 			m.Assert(e)
 			defer f.Close()
@@ -42,7 +47,7 @@ var Index = &ctx.Context{Name: "test", Help: "test",
 
 			mu := sync.Mutex{}
 			wg := sync.WaitGroup{}
-			all, skip, diff, same, error := 0, 0, 0, 0, 0
+			var all, skip, diff, same, error int32 = 0, 0, 0, 0, 0
 
 			begin := time.Now()
 			api := map[string]int{}
@@ -96,20 +101,14 @@ var Index = &ctx.Context{Name: "test", Help: "test",
 
 						size1, size2 := 0, 0
 						result := "error"
-						mu.Lock()
-						all++
-						mu.Unlock()
+						atomic.AddInt32(&all, 1)
 						var t3, t4 time.Duration
 						if e1 != nil || e2 != nil {
-							mu.Lock()
-							error++
-							mu.Unlock()
+							atomic.AddInt32(&error, 1)
 							fmt.Printf("%d%% %d cost: %v/%v error: %v %v\n", int(count*100.0/total), error, t1, t2, e1, e2)
 
 						} else if res1.StatusCode != http.StatusOK || res2.StatusCode != http.StatusOK {
-							mu.Lock()
-							error++
-							mu.Unlock()
+							atomic.AddInt32(&error, 1)
 							fmt.Printf("%d%% %d %s %s cost: %v/%v error: %v %v\n", int(count*100.0/total), error, "error", uri, t1, t2, res1.StatusCode, res2.StatusCode)
 						} else {
 
@@ -119,18 +118,14 @@ var Index = &ctx.Context{Name: "test", Help: "test",
 							t3 = time.Since(begin)
 
 							begin = time.Now()
-							num := 0
+							var num int32
 							if bytes.Compare(b1, b2) == 0 {
-								mu.Lock()
-								same++
-								mu.Unlock()
+								atomic.AddInt32(&same, 1)
 								num = same
 								result = "same"
 
 							} else {
-								mu.Lock()
-								diff++
-								mu.Unlock()
+								atomic.AddInt32(&diff, 1)
 								num = diff
 								result = "diff"
 
@@ -196,7 +191,104 @@ var Index = &ctx.Context{Name: "test", Help: "test",
 			m.Sort("time1", "int").Table()
 			return
 		}},
-		"output": {Name: "output", Help:"output", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"cost": {Name: "cost file server nroute", Help:"接口耗时测试",
+			Form: map[string]int{"nwork": 1, "limit": 1},
+			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			os.MkdirAll(m.Conf("outdir"), 0777)
+
+			f, e := os.Open(arg[0])
+			m.Assert(e)
+			defer f.Close()
+
+			input := make(chan []string, kit.Int(m.Confx("nread")))
+			output := make(chan []string, kit.Int(m.Confx("nwrite")))
+
+			count, nline := 0, 0
+
+			wg := sync.WaitGroup{}
+			limit := kit.Int(m.Confx("limit"))
+
+			var skip, success int32 = 0, 0
+			begin := time.Now()
+			api := map[string]int{}
+			go func() {
+				for bio := bufio.NewScanner(f); bio.Scan() && nline < limit; {
+					text := bio.Text()
+					count += len(text)+1
+
+					word := strings.Split(text, " ")
+					if len(word) != 2 {
+						continue
+					}
+					uri := word[0][len(m.Conf("prefix0")) : len(word[0])-1]
+					arg := word[1][len(m.Conf("prefix1")) : len(word[1])-1]
+					if len(arg) > m.Confi("nskip") {
+						skip++
+						continue
+					}
+
+					// fmt.Printf("line: %d %d%% %v\n", nline, int(nline/limit), uri)
+					nline++
+					input <- []string{uri, arg, fmt.Sprintf("%d", nline)}
+					api[uri]++
+				}
+				close(input)
+				wg.Wait()
+				close(output)
+			}()
+
+			var times time.Duration
+			for i := 0; i < kit.Int(m.Confx("nwork")); i++ {
+				go func(msg *ctx.Message) {
+					wg.Add(1)
+					defer func() {
+						wg.Done()
+					}()
+					client := http.Client{Timeout:kit.Duration(m.Conf("timeout"))}
+
+					for {
+						word, ok := <-input
+						if !ok {
+							break
+						}
+						uri, args, key := word[0], word[1], word[2]
+
+						fmt.Printf("%v/%v\tpost: %v\t%v\n", key, limit, arg[1]+uri, args)
+						begin := time.Now()
+						res, err := client.Post(arg[1]+uri, "application/json", bytes.NewReader([]byte(args)))
+						if res.StatusCode == http.StatusOK {
+							io.Copy(ioutil.Discard, res.Body)
+							atomic.AddInt32(&success, 1)
+						} else {
+							fmt.Printf("%v/%v\terror: %v\n", key, limit, err)
+						}
+						times += time.Since(begin)
+					}
+				}(m.Spawn())
+			}
+
+			files := map[string]*os.File{}
+			for {
+				data, ok := <-output
+				if !ok {
+					break
+				}
+
+				uri := data[1]
+				if files[uri] == nil {
+					f, _ := os.Create(path.Join(m.Conf("outdir"), strings.Replace(uri, "/", "_", -1)+".txt"))
+					defer f.Close()
+					files[uri] = f
+				}
+				for _, v:= range data {
+					fmt.Fprintf(files[uri], v)
+				}
+			}
+			m.Echo("\n\nnclient: %v skip: %v nreq: %v success: %v time: %v average: %vms",
+				m.Confx("nwork"), skip, nline, success, time.Since(begin), int(times)/nline/1000000)
+			return
+		}},
+		"cmd": {Name: "cmd file", Help:"生成测试命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			f, e := os.Open(arg[0])
 			m.Assert(e)
 			defer f.Close()
@@ -219,5 +311,6 @@ var Index = &ctx.Context{Name: "test", Help: "test",
 	},
 }
 func main() {
+	kit.DisableLog = true
 	fmt.Print(Index.Plugin(os.Args[1:]))
 }
