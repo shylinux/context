@@ -146,6 +146,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"github.com/gomodule/redigo",
 				"github.com/go-sql-driver/mysql",
 				"github.com/gomarkdown/markdown",
+				"github.com/gopkg.in/gomail.v2",
 				"github.com/skip2/go-qrcode",
 				"github.com/PuerkitoBio/goquery",
 				"github.com/go-cas/cas",
@@ -762,7 +763,7 @@ var version = struct {
 						m.Add("append", "status", "stop")
 					}
 				})
-				m.Sort("status").Table()
+				m.Sort("you", "str_r").Sort("status").Table()
 				return
 			}
 

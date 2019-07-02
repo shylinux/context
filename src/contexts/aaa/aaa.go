@@ -1,6 +1,7 @@
 package aaa
 
 import (
+	"gopkg.in/gomail.v2"
 	"contexts/ctx"
 	"crypto"
 	"crypto/aes"
@@ -128,6 +129,11 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 		}, Help: "散列"},
 
 		"expire": &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
+		"email": &ctx.Config{Name: "email", Value: map[string]interface{}{
+            "self": "shylinux@163.com",
+            "smtp": "smtp.163.com",
+            "port": "25",
+        }, Help: "会话超时"},
 	},
 	Commands: map[string]*ctx.Command{
 		"_init": &ctx.Command{Name: "_init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -708,6 +714,21 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					"location": kit.Select("", arg, 2),
 				})
 				m.Echo("%d", len(m.Confv("auth", []string{h, "data", "location"}).([]interface{}))-1)
+			}
+			return
+		}},
+
+		"email": &ctx.Command{Name: "email", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			msg := gomail.NewMessage()
+			msg.SetHeader("From", m.Conf("email", "self"))
+			msg.SetHeader("To", arg[0])
+			msg.SetHeader("Subject", arg[1])
+            msg.SetBody("text/html", strings.Join(arg[2:], ""))
+			d := gomail.NewDialer(m.Conf("email", "smtp"), kit.Int(m.Conf("email", "port")), m.Conf("email", "self"), m.Conf("email", "code"))
+			if e := d.DialAndSend(msg); e != nil {
+				m.Echo("%v", e)
+			} else {
+				m.Echo("success")
 			}
 			return
 		}},

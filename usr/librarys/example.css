@@ -167,6 +167,10 @@ fieldset.Login>form.option button {
     height:28px;
 }
 
+fieldset.item>div.output {
+    overflow:auto;
+}
+
 .hidden {
     display:none;
 }

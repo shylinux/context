@@ -652,6 +652,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				res, e := web.Client.Do(req)
 				if e != nil {
 					m.Log("warn", "%v", e)
+                    m.Echo("%v", e)
 					return e
 				}
 
