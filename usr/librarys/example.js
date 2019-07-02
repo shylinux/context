@@ -593,7 +593,7 @@ function Plugin(page, pane, field) {
                     event.preventDefault()
                     return true
                 })
-                event.key == "Enter" && plugin.Check(action)
+                item.type != "textarea" && event.key == "Enter" && plugin.Check(action)
             }
 
             var input = {type: "input", name: name, data: item}
@@ -615,7 +615,7 @@ function Plugin(page, pane, field) {
                 case "textarea":
                     if (item.type == "textarea") {
                         input.type = "textarea"
-                        item.style = "width:600px;height:300px"
+                        item.style = "height:300px;"+"width:"+(option.clientWidth-20)+"px"
                     }
 
                 default:

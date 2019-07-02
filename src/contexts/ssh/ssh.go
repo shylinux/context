@@ -210,7 +210,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "email",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
-                        map[string]interface{}{"label": "收件人", "type": "text", "name": "to", "view": "long"},
+                        map[string]interface{}{"label": "收件人", "type": "text", "name": "to", "value": "shylinux@163.com","view": "long"},
                         map[string]interface{}{"label": "主题", "type": "text", "name": "title", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "发送", "view": "clear"},
                         map[string]interface{}{"type": "textarea", "name": "content", "view": "clear"},
