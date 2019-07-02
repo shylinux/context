@@ -486,7 +486,7 @@ page = Page({
     init: function(page) {
         page.onlayout(null, page.conf.layout)
         page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.isMobile? "办公": "工作")
-        page.footer.Pane.Order({"site": "", "ip": "", "text": "", ":":""}, kit.isMobile? ["site", "ip", "text"]: ["ip", "text", ":"], function(event, item, value) {})
+        page.footer.Pane.Order({"ncmd": "", "text": "", ":":""}, kit.isMobile? ["ncmd", "text"]: ["ncmd", "text", ":"], function(event, item, value) {})
         page.header.Pane.Order({"logout": "logout", "user": ""}, ["logout", "user"], function(event, item, value) {
             switch (item) {
                 case "title":

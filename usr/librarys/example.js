@@ -108,14 +108,14 @@ function Page(page) {
         ontoast: function(text, title, duration) {
             var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
             var toast = kit.ModifyView("fieldset.toast", {
-                display: "block", dialog: [args.width||300, args.height||50], padding: 10,
+                display: "block", dialog: [args.width||text.length*10+100, args.height||60], padding: 10,
             })
             if (!text) {
                 toast.style.display = "none"
                 return
             }
 
-            var list = [{text: [args.text||""]}]
+            var list = [{text: [title||"", "div", "title"]}, {text: [args.text||"", "div", "content"]}]
             args.inputs && args.inputs.forEach(function(input) {
                 if (typeof input == "string") {
                     list.push({inner: input, type: "label", style: {"margin-right": "5px"}})
@@ -145,7 +145,7 @@ function Page(page) {
             })
             list.push({view: ["tick"], name: "tick"})
 
-            kit.ModifyNode(toast.querySelector("legend"), args.title||"tips")
+            // kit.ModifyNode(toast.querySelector("legend"), args.title||"tips")
             var ui = kit.AppendChild(kit.ModifyNode(toast.querySelector("div.output"), ""), list)
             var tick = 1
             var begin = kit.time(0,"%H:%M:%S")
@@ -547,7 +547,6 @@ function Plugin(page, pane, field) {
     var output = field.querySelector("div.output")
 
     var count = 0
-    var wait = false
     var plugin = field.Script || {}; plugin.__proto__ = {
         __proto__: pane,
         Append: function(item, name) {
@@ -678,6 +677,7 @@ function Plugin(page, pane, field) {
             })
         },
         Runs: function(event, cb) {
+            page.footer.Pane.State("ncmd", kit.History.get("cmd").length)
             var args = kit.Selector(option, ".args", function(item, index) {
                 return item.value
             })
@@ -685,10 +685,10 @@ function Plugin(page, pane, field) {
             setTimeout(function() {
                 show && page.ontoast(kit.Format(args||["running..."]), meta.name, -1)
             }, 1000)
-            wait = true, event.Plugin = plugin, field.Run(event, args, function(msg) {
+            event.Plugin = plugin, field.Run(event, args, function(msg) {
                 show = false, page.ontoast("")
                 plugin.ondaemon[display.deal||"table"](msg)
-                wait = false, typeof cb == "function" && cb(msg)
+                typeof cb == "function" && cb(msg)
             })
         },
         Delay: function(time, event, text) {

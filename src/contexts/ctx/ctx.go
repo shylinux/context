@@ -1408,6 +1408,9 @@ func Start(args ...string) bool {
 	}
 
 	kit.DisableLog = true
+	if len(args) > 0 && args[0] == "start" {
+		args = args[1:]
+	}
 	if len(args) > 0 && args[0] == "daemon" {
 		Pulse.Options("cli.modal", "daemon")
 		Pulse.Options("daemon", true)

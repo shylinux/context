@@ -89,14 +89,18 @@ fieldset.toast {
 fieldset.toast>div.output {
     padding:0 10px;
 }
-fieldset.toast>div.output pre {
+fieldset.toast>div.output>div.title {
+    font-size:12px;
+}
+fieldset.toast>div.output>div.content  {
     word-break:break-word;
     white-space:pre-wrap;
     text-align:center;
     margin:0px;
+    padding:2px;
     font-size:16px;
 }
-fieldset.toast>div.output div.tick {
+fieldset.toast>div.output>div.tick {
     font-size:12px;
 }
 fieldset.dialog {

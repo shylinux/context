@@ -28,6 +28,8 @@ kit = toolkit = {
         console.log(arguments.length == 1? args[0]: args)
         return args
     },
+    Delay: function(time, cb) {
+    },
 
     ModifyView: function(which, args) {
         var height = document.body.clientHeight-4

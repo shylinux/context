@@ -241,7 +241,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			if name, e := os.Getwd(); e == nil {
 				_, file := path.Split(kit.Select(name, os.Getenv("PWD")))
-				m.Conf("runtime", "boot.pathname", file)
+				ns := strings.Split(file, "\\")
+				m.Conf("runtime", "boot.pathname", ns[len(ns)-1])
 				m.Conf("runtime", "boot.ctx_path", name)
 			}
 			return
@@ -447,8 +448,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Gos(m, func(m *ctx.Message) {
 					if e := cmd.Start(); e != nil {
 						m.Echo("error: ").Echo("%s\n", e)
+                        m.Log("fuck", "%v", e)
 					} else if e := cmd.Wait(); e != nil {
 						m.Echo("error: ").Echo("%s\n", e)
+                        m.Log("fuck", "%v", e)
 					}
 					m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))
 				})
@@ -785,6 +788,15 @@ var version = struct {
 				})
 			}
 
+			m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "create", arg[0],
+				"cmd_env", "PATH", os.Getenv("path"),
+				"cmd_dir", m.Conf("missyou", "path"),
+				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
+				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
+				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
+				"cmd_daemon", "true",
+			)
+            return
 			m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), "daemon",
 				"cmd_dir", p,
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),

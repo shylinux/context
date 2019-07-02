@@ -816,7 +816,23 @@ func (nfs *NFS) Send(meta string, arg ...interface{}) *NFS {
 
 	line := "\n"
 	if meta != "" {
-		line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(arg[0])))
+        if text, ok := arg[0].(string); ok && meta == "result" && len(text) > 1024 {
+            text := arg[0].(string)
+            for i := 0; i < len(text); i += 1024 {
+                j := i + 1024
+                if j >= len(text) {
+                    j = len(text)
+                }
+                line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(text[i:j])))
+                n, e := fmt.Fprint(nfs.io, line)
+                m.Assert(e)
+                m.Capi("nwrite", n)
+                m.Log("send", "%d [%s]", len(line), line)
+            }
+            return nfs
+        } else {
+            line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(arg[0])))
+        }
 	}
 
 	n, e := fmt.Fprint(nfs.io, line)

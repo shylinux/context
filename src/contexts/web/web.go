@@ -650,7 +650,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				// 发送请求
 				res, e := web.Client.Do(req)
-				m.Log("info", "%s %s", req, e)
 				if e != nil {
 					m.Log("warn", "%v", e)
 					return e
