@@ -9,7 +9,7 @@ install:
 	@go get github.com/gomarkdown/markdown
 	@go get github.com/PuerkitoBio/goquery
 	@go get github.com/go-cas/cas
-	@go get github.com/gopkg.in/gomail.v2
+	@go get gopkg.in/gomail.v2
 	GOPATH=$(PWD):$(GOPATH) go install $(BENCH)
 	@date
 	# bench web.code.counter nmake 1

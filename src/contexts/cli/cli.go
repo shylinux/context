@@ -146,7 +146,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"github.com/gomodule/redigo",
 				"github.com/go-sql-driver/mysql",
 				"github.com/gomarkdown/markdown",
-				"github.com/gopkg.in/gomail.v2",
+				"gopkg.in/gomail.v2",
 				"github.com/skip2/go-qrcode",
 				"github.com/PuerkitoBio/goquery",
 				"github.com/go-cas/cas",
@@ -449,10 +449,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Gos(m, func(m *ctx.Message) {
 					if e := cmd.Start(); e != nil {
 						m.Echo("error: ").Echo("%s\n", e)
-                        m.Log("fuck", "%v", e)
 					} else if e := cmd.Wait(); e != nil {
 						m.Echo("error: ").Echo("%s\n", e)
-                        m.Log("fuck", "%v", e)
 					}
 					m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))
 				})
@@ -797,7 +795,7 @@ var version = struct {
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
 				"cmd_daemon", "true",
 			)
-            return
+			return
 			m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), "daemon",
 				"cmd_dir", p,
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
