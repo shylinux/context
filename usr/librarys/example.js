@@ -612,6 +612,12 @@ function Plugin(page, pane, field) {
                         plugin.Check(action)
                     }
 
+                case "textarea":
+                    if (item.type == "textarea") {
+                        input.type = "textarea"
+                        item.style = "width:600px;height:300px"
+                    }
+
                 default:
                     if (item.type == "text") {
                         item.onclick = function(event) {
