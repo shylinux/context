@@ -1126,7 +1126,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			p := ""
 			if m.Option("upgrade") == "script" {
-				p = m.Cmdx("nfs.path", path.Join("usr/script", key))
+                if m.Options("missyou") {
+                    p = m.Cmdx("nfs.path", path.Join(m.Conf("missyou", "path"), m.Option("missyou"), "usr/script", key))
+                } else {
+                    p = m.Cmdx("nfs.path", path.Join("usr/script", key))
+                }
 			}
 			key = strings.Replace(key, ".", "_", -1)
 			if p == "" {

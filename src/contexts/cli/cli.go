@@ -707,8 +707,16 @@ var version = struct {
 				return
 			}
 			if len(arg) > 1 && arg[0] == "script" {
-				m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", arg[1]),
-					"upgrade", arg[0], "save", path.Join("usr/script", arg[1]))
+                miss := ""
+                if len(arg) > 2 {
+                    miss, arg = arg[1], arg[2:]
+                } else {
+                    arg = arg[1:]
+                }
+                for _, v := range arg {
+                    m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", v),
+                        "upgrade", "script", "missyou", miss, "save", path.Join("usr/script", v))
+                }
 				return
 			}
 

@@ -69,20 +69,28 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 						} else {
 							m.Add("append", "type", "file")
 						}
-					case "full":
-						m.Add("append", "full", path.Join(back, name, f.Name()))
-					case "path":
-						m.Add("append", "path", path.Join(back, name, f.Name())[trip:])
-					case "tree":
-						if level == 0 {
-							m.Add("append", "tree", f.Name())
-						} else {
-							m.Add("append", "tree", strings.Repeat("| ", level-1)+"|-"+f.Name())
-						}
-					case "filename":
-						if f.IsDir() {
-							m.Add("append", "filename", f.Name()+"/")
-						} else {
+                    case "full":
+                        if f.IsDir() {
+                            m.Add("append", "full", path.Join(back, name, f.Name())+"/")
+                        } else {
+                            m.Add("append", "full", path.Join(back, name, f.Name()))
+                        }
+                    case "path":
+                        if f.IsDir() {
+                            m.Add("append", "path", path.Join(back, name, f.Name())[trip:]+"/")
+                        } else {
+                            m.Add("append", "path", path.Join(back, name, f.Name())[trip:])
+                        }
+                    case "tree":
+                        if level == 0 {
+                            m.Add("append", "tree", f.Name())
+                        } else {
+                            m.Add("append", "tree", strings.Repeat("| ", level-1)+"|-"+f.Name())
+                        }
+                    case "filename":
+                        if f.IsDir() {
+                            m.Add("append", "filename", f.Name()+"/")
+                        } else {
 							m.Add("append", "filename", f.Name())
 						}
 					case "size":

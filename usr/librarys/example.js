@@ -550,7 +550,7 @@ function Plugin(page, pane, field) {
     var plugin = field.Script || {}; plugin.__proto__ = {
         __proto__: pane,
         Append: function(item, name) {
-            name = name || item.name
+            name = item.name || ""
 
             item.onfocus = function(event) {
                 page.pane = pane.Field, page.plugin = field, page.input = event.target
@@ -633,9 +633,9 @@ function Plugin(page, pane, field) {
             var ui = kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])
             var action = ui[name] || {}
 
-            action.History = [""], action.Goto = function(value) {
+            action.History = [""], action.Goto = function(value, cb) {
                 action.History.push(action.value = value)
-                plugin.Check(action)
+                plugin.Check(action, cb)
                 return value
             }, action.Back = function() {
                 action.History.pop(), action.History.length > 0 && action.Goto(action.History.pop())
@@ -677,9 +677,9 @@ function Plugin(page, pane, field) {
             })
             return pane.View(field.parentNode, "plugin", field.Meta, [], field.Run).field.Plugin
         },
-        Check: function(target) {
+        Check: function(target, cb) {
             option.querySelectorAll(".args").forEach(function(item, index, list) {
-                item == target && (index == list.length-1? plugin.Runs(event): page.plugin == field && list[index+1].focus())
+                item == target && (index == list.length-1? plugin.Runs(event, cb): page.plugin == field && list[index+1].focus())
             })
         },
         Runs: function(event, cb) {
@@ -709,6 +709,7 @@ function Plugin(page, pane, field) {
             output.innerHTML = ""
         },
         ondaemon: {
+            void: function(msg) {},
             table: function(msg) {
                 output.innerHTML = ""
                 if (display.map) {
@@ -717,9 +718,9 @@ function Plugin(page, pane, field) {
                 }
                 output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
-                    if (line["latitude"]) {
-                        page.openLocation(line.latitude, line.longitude, line.location)
-                    }
+                    // if (line["latitude"]) {
+                    //     page.openLocation(line.latitude, line.longitude, line.location)
+                    // }
                     page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
                 });
                 (display.show_result || !msg.append) && msg.result && kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}])
@@ -744,10 +745,23 @@ function Plugin(page, pane, field) {
                 }
                 return line.pod
             },
-            dir: function(value, name) {
-                if (value.endsWith("/")) {
-                    return option[exports[0]] + value
+            dir: function(value, name, line) {
+                if (name != "path") {
+                    value = line.path
                 }
+                if (value.endsWith("/")) {
+                    option.dir.Goto(value)
+                    return value
+                }
+
+                var deal = display.deal
+                var back = option.dir.value
+                display.deal = "void"
+                option.dir.value = value
+                plugin.Runs(window.event, function() {
+                    display.deal = deal
+                    option.dir.value = back
+                })
             },
         },
 
