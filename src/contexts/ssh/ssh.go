@@ -277,7 +277,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "dir", "imports": "plugin_dir", "view": "long"},
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{
-							"add", "commit", "checkout", "merge", "push", "init",
+							"add", "commit", "checkout", "merge", "init",
 						}},
 						map[string]interface{}{"type": "text", "name": "commit", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "执行"},
@@ -289,7 +289,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "dir", "view": "long", "imports": "plugin_dir"},
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{
-							"branch", "status", "diff", "log", "update",
+							"branch", "status", "diff", "log", "push", "update",
 						}},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
