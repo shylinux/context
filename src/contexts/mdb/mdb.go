@@ -57,6 +57,7 @@ func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool {
 var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 	Caches: map[string]*ctx.Cache{
 		"nsource": &ctx.Cache{Name: "nsource", Value: "0", Help: "已打开数据库的数量"},
+		"redis": &ctx.Cache{Name: "redis", Value: "", Help: "服务地址"},
 	},
 	Configs: map[string]*ctx.Config{
 		"database": &ctx.Config{Name: "database", Value: "demo", Help: "默认数据库"},
@@ -130,15 +131,14 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 				switch arg[0] {
 				case "conn":
-					mdb.conn, e = redis.Dial(kit.Select("tcp", arg, 2), arg[1], redis.DialKeepAlive(time.Second*10))
+					mdb.conn, e = redis.Dial("tcp", m.Cap("redis", arg[1]), redis.DialKeepAlive(time.Second*10))
 				default:
 					if mdb.conn == nil {
 						m.Echo("not open")
 						break
 					}
 					if mdb.conn.Err() != nil {
-						m.Echo("%v", mdb.conn.Err())
-						return
+                        mdb.conn, e = redis.Dial("tcp", m.Cap("redis"), redis.DialKeepAlive(time.Second*10))
 					}
 					args := []interface{}{}
 					for _, v := range arg[1:] {
@@ -156,7 +156,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						}
 						m.Table()
 					default:
-						m.Echo("%v", kit.Format(res))
+                        str := kit.Format(res)
+                        var data interface{}
+                        if json.Unmarshal([]byte(str), &data) == nil {
+                            m.Echo(kit.Formats(data))
+                        } else {
+                            m.Echo(str)
+                        }
 					}
 				}
 			}

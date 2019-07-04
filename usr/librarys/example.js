@@ -68,7 +68,7 @@ function Page(page) {
                     break
 
                 case "code":
-                    list.push({view: ["code", key.length>1? line[key[0]]+"("+line[key[1]]+")":
+                    list.push({view: ["code", "div", key.length>1? line[key[0]]+"("+line[key[1]]+")":
                         (key.length>0? line[key[0]]: "null")], click: cb})
                     break
 
@@ -94,8 +94,12 @@ function Page(page) {
                     break
             }
 
-            parent.DisplayUser && (list = [{view: ["user", "div", line.create_nick||line.create_user]}, {view: ["text"], list:list}])
-            !parent.DisplayRaw && (list = [{view: ["item"], list:list}])
+            var item = []
+            parent.DisplayUser && item.push({view: ["user", "div", line.create_nick||line.create_user]})
+            parent.DisplayTime && (item.push({text: [line.create_time, "div", "time"]}))
+            item.push({view: ["text"], list:list})
+
+            !parent.DisplayRaw && (list = [{view: ["item"], list:item}])
             ui = kit.AppendChild(parent, list)
             ui.field && (ui.field.Meta = text)
             return ui
@@ -555,9 +559,24 @@ function Plugin(page, pane, field) {
             item.onfocus = function(event) {
                 page.pane = pane.Field, page.plugin = field, page.input = event.target
             }
+            item.onkeyup = function(event) {
+                page.oninput(event, function(event) {
+                    switch (event.key) {
+                        case "w":
+                            break
+                        default:
+                            return false
+                    }
+                    event.stopPropagation()
+                    event.preventDefault()
+                    return true
+                })
+            }
             item.onkeydown = function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
+                        case "w":
+                            break
                         case "p":
                             action.Back()
                             break
@@ -622,8 +641,11 @@ function Plugin(page, pane, field) {
                     if (item.type == "text") {
                         item.onclick = function(event) {
                             if (event.ctrlKey) {
-                                action.value = kit.History.get("txt", -1).data
+                                action.value = kit.History.get("txt", -1).data.trim()
                             }
+                        }
+                        item.ondblclick = function(event) {
+                            action.value = kit.History.get("txt", -1).data.trim()
                         }
                     }
                     args && count < args.length && (item.value = args[count++]||item.value||"")
@@ -723,7 +745,7 @@ function Plugin(page, pane, field) {
                     // }
                     page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
                 });
-                (display.show_result || !msg.append) && msg.result && kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}])
+                (display.show_result || !msg.append) && msg.result && kit.OrderCode(kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}]).first)
             },
         },
         onexport: {

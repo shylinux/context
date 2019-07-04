@@ -1,5 +1,6 @@
 package main
 import (
+	"encoding/json"
 	"bufio"
 	"bytes"
 	"sync/atomic"
@@ -28,9 +29,12 @@ var Index = &ctx.Context{Name: "test", Help: "接口测试工具",
 		"prefix0": {Name: "prefix0", Help: "请求前缀", Value: "uri["},
 		"prefix1": {Name: "prefix1", Help: "参数前缀", Value: "request_param["},
 		"timeout": {Name: "timeout", Help: "请求超时", Value: "10s"},
+		"nsleep": {Name: "nsleep", Help: "阻塞时长", Value: "10000"},
 	},
 	Commands: map[string]*ctx.Command{
-		"diff": {Name: "diff file server1 server2", Help:"接口对比工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"diff": {Name: "diff file server1 server2",
+        Form: map[string]int{"nsleep": 1},
+        Help:"接口对比工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			os.MkdirAll(m.Conf("outdir"), 0777)
 
 			f, e := os.Open(arg[0])
@@ -71,6 +75,10 @@ var Index = &ctx.Context{Name: "test", Help: "接口测试工具",
 					nline++
 					input <- []string{uri, arg, fmt.Sprintf("%d", nline)}
 					api[uri]++
+                    if nline % kit.Int(m.Confx("nsleep")) == 0 {
+                        time.Sleep(time.Second)
+                        fmt.Printf("sleep 1s...\n")
+                    }
 				}
 				close(input)
 				wg.Wait()
@@ -118,8 +126,14 @@ var Index = &ctx.Context{Name: "test", Help: "接口测试工具",
 							t3 = time.Since(begin)
 
 							begin = time.Now()
+ 
+							var d1, d2 interface{}
+							json.Unmarshal(b1, &d1)
+							json.Unmarshal(b2, &d2)
+							s1, _ := json.Marshal(d1)
+							s2, _ := json.Marshal(d2)
 							var num int32
-							if bytes.Compare(b1, b2) == 0 {
+							if bytes.Compare(s1, s2) == 0 {
 								atomic.AddInt32(&same, 1)
 								num = same
 								result = "same"

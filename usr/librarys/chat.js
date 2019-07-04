@@ -182,6 +182,7 @@ page = Page({
         var river = ""
         var which = {}
         output.DisplayUser = true
+        output.DisplayTime = true
         return {
             Listen: {
                 river: function(value, old) {
@@ -265,9 +266,10 @@ page = Page({
                 }
 
                 this.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
-                    var plugin = event.Plugin
+                    var plugin = event.Plugin || {}
+                    var meta = plugin && plugin.Field && plugin.Field.Meta || {}
                     event.shiftKey? page.target.Pane.Send("field", plugin.Format()):
-                        field.Pane.Run([river, storm, index].concat(args), function(msg) {
+                        field.Pane.Run([meta.river||river, meta.storm||storm, meta.action||index].concat(args), function(msg) {
                             var text = plugin? plugin.Reveal(msg): ""
                             text && event.ctrlKey && page.target.Pane.Send(text[0], text[1])
                             typeof cbs == "function" && cbs(msg)

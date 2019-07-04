@@ -65,6 +65,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "text", "name": "sub", "imports": "plugin_branch", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
+                    "options": map[string]interface{}{"call_timeout": "180s"},
 				},
 				map[string]interface{}{"componet_name": "script", "componet_help": "脚本",
 					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
@@ -145,11 +146,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "cli", "upgrade"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "select", "name": "action", "values": []interface{}{"script", "portal", "system", "bench"}},
+						map[string]interface{}{"type": "select", "name": "action", "values": []interface{}{"script", "portal", "system", "plugin", "bench"}},
 						map[string]interface{}{"type": "text", "name": "action"},
 						map[string]interface{}{"type": "button", "value": "升级"},
 					},
 					"display": map[string]interface{}{"hide_append": true, "show_result": true},
+                    "options": map[string]interface{}{"call_timeout": "180s"},
 				},
 				map[string]interface{}{"componet_name": "missyou", "componet_help": "任务",
 					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
@@ -275,7 +277,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "nfs", "componet_cmd": "git",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "dir", "imports": "plugin_dir", "view": "long"},
+						map[string]interface{}{"type": "text", "name": "dir", "view": "long"},
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{
 							"add", "commit", "checkout", "merge", "init",
 						}},
@@ -287,7 +289,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "nfs", "componet_cmd": "git",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "dir", "view": "long", "imports": "plugin_dir"},
+						map[string]interface{}{"type": "text", "name": "dir", "view": "long"},
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{
 							"branch", "status", "diff", "log", "push", "update",
 						}},
@@ -509,6 +511,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				msg := m.Find(kit.Format(tool["componet_ctx"]))
+                if option, ok := tool["options"].(map[string]interface{}); ok {
+                    for k, v := range option {
+                        msg.Option(k, v)
+                    }
+                }
 
 				arg = arg[4:]
 				args := []string{}

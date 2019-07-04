@@ -101,7 +101,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"page_limit":  &Config{Name: "page_limit", Value: "10", Help: "列表大小"},
 
 		"time_format":  &Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
-		"call_timeout": &Config{Name: "call_timeout", Value: "100s", Help: "回调超时"},
+		"call_timeout": &Config{Name: "call_timeout", Value: "10s", Help: "回调超时"},
 	},
 	Commands: map[string]*Command{
 		"_init": &Command{Name: "_init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {

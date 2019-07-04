@@ -1125,6 +1125,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				key = key + "." + m.Option("GOOS") + "." + m.Option("GOARCH")
 			}
 			p := ""
+			if m.Option("upgrade") == "plugin" {
+                if !strings.HasSuffix(key, ".so") {
+                    key += ".so"
+                }
+                p = m.Cmdx("nfs.path", path.Join("src/plugin", key))
+			}
 			if m.Option("upgrade") == "script" {
                 if m.Options("missyou") {
                     p = m.Cmdx("nfs.path", path.Join(m.Conf("missyou", "path"), m.Option("missyou"), "usr/script", key))

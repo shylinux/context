@@ -303,6 +303,10 @@ kit = toolkit = {
             tr.Meta = row
             fields.forEach(function(key, j) {
                 var td = kit.AppendChild(tr, "td", kit.Color(row[key]))
+                if (row[key].startsWith("http")) {
+                    td.innerHTML = "<a href='"+row[key]+"' target='_blank'>"+row[key]+"</a>"
+                }
+
                 if (typeof cb == "function") {
                     td.onclick = function(event) {
                         cb(row[key], key, row, i, tr, event)

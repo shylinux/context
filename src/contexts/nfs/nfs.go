@@ -1349,7 +1349,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 			m.Confm("grep", "list", func(index int, value map[string]interface{}) {
 				f, e := os.Open(kit.Format(value["file"]))
-				m.Assert(e)
+                if e != nil {
+                    m.Log("warn", "%v", e)
+                    return
+                }
 				defer f.Close()
 
 				// s, e := f.Stat()

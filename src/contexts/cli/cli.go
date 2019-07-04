@@ -1,13 +1,10 @@
 package cli
 
 import (
-	"bufio"
 	"bytes"
 	"contexts/ctx"
 	"encoding/csv"
 	"encoding/json"
-	"io"
-	"net/http"
 	"os/exec"
 	"os/user"
 	"path"
@@ -133,6 +130,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"init": "etc/init.shy", "exit": "etc/exit.shy",
 			},
 		}, Help: "系统环境, shell: path, cmd, arg, dir, env, active, daemon; "},
+		"plugin": &ctx.Config{Name: "plugin", Value: map[string]interface{}{
+			"go": map[string]interface{}{
+				"build": []interface{}{"go", "build", "-buildmode=plugin"},
+				"next":  []interface{}{"so", "load"},
+			},
+			"so": map[string]interface{}{
+				"load": []interface{}{"load"},
+			},
+		}, Help: "免密登录"},
 		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "守护任务"},
 		"action": &ctx.Config{Name: "action", Value: map[string]interface{}{}, Help: "交互任务"},
 
@@ -189,15 +195,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"path": "usr/work",
 		}, Help: "免密登录"},
 
-		"plugin": &ctx.Config{Name: "plugin", Value: map[string]interface{}{
-			"go": map[string]interface{}{
-				"build": []interface{}{"go", "build", "-buildmode=plugin"},
-				"next":  []interface{}{"so", "load"},
-			},
-			"so": map[string]interface{}{
-				"load": []interface{}{"load"},
-			},
-		}, Help: "免密登录"},
 
 		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
@@ -544,8 +541,89 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
+		"plugin": &ctx.Command{Name: "plugin [action] file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			suffix, action, target := "go", "build", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/examples/app/bench.go")
+			if len(arg) == 0 {
+				arg = append(arg, target)
+			}
+			if cs := strings.Split(arg[0], "."); len(cs) > 1 {
+				suffix = cs[len(cs)-1]
+			} else if cs := strings.Split(arg[1], "."); len(cs) > 1 {
+				suffix, action, arg = cs[len(cs)-1], arg[0], arg[1:]
+			}
+
+			if target = m.Cmdx("nfs.path", arg[0]); target == "" {
+				target = m.Cmdx("nfs.path", path.Join("src/plugin/", arg[0]))
+			}
+
+			for suffix != "" && action != "" {
+				m.Log("info", "%v %v %v", suffix, action, target)
+				cook := m.Confv("plugin", suffix)
+				next := strings.Replace(target, "."+suffix, "."+kit.Chains(cook, "next.0"), -1)
+
+				args := []string{}
+				if suffix == "so" {
+					if p, e := plugin.Open(target); m.Assert(e) {
+						s, e := p.Lookup("Index")
+						m.Assert(e)
+						w := *(s.(**ctx.Context))
+						w.Name = kit.Select(w.Name, arg, 1)
+						c.Register(w, nil)
+						m.Spawn(w).Cmd("_init", arg[1:])
+					}
+				} else {
+					if suffix == "go" {
+						args = append(args, "-o", next)
+					}
+					m.Assert(m.Cmd("cli.system", kit.Chain(cook, action), args, target))
+				}
+
+				suffix = kit.Chains(cook, "next.0")
+				action = kit.Chains(cook, "next.1")
+				target = next
+			}
+			return
+		}},
 		"proc": &ctx.Command{Name: "proc", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmdy("cli.system", "ps", kit.Select("ax", arg, 0))
+			return
+		}},
+		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Conf("runtime", "boot.count", m.Confi("runtime", "boot.count")+1)
+			code := kit.Select("0", arg, 0)
+			switch code {
+			case "0":
+				m.Cmd("cli.source", m.Conf("system", "script.exit"))
+				m.Echo("quit")
+
+			case "1":
+				if m.Option("cli.modal") != "action" {
+					m.Cmd("cli.source", m.Conf("system", "script.exit"))
+					m.Echo("restart")
+				}
+
+			case "2":
+				m.Echo("term")
+			}
+
+			m.Append("time", m.Time())
+			m.Append("code", code)
+			m.Echo(", wait 1s\n").Table()
+
+			m.Gos(m, func(m *ctx.Message) {
+				defer func() {
+					os.Exit(kit.Int(code))
+				}()
+				time.Sleep(time.Second * 1)
+				m.Cmd("cli._exit")
+				m.Cmd("nfs._exit")
+			})
+			return
+		}},
+		"_exit": &ctx.Command{Name: "_exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Confm("daemon", func(key string, info map[string]interface{}) {
+				m.Cmd("cli.system", key, "stop")
+			})
 			return
 		}},
 
@@ -695,7 +773,7 @@ var version = struct {
 			m.Append("directory", "")
 			return
 		}},
-		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|plugin|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "upgrade")
 				return
@@ -704,6 +782,12 @@ var version = struct {
 				m.Cmd("cli.project", "init")
 				m.Cmd("cli.compile", "all")
 				m.Cmd("cli.publish")
+				return
+			}
+			if len(arg) > 0 && arg[0] == "plugin" {
+                m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", arg[1]),
+                    "upgrade", "plugin", "save", path.Join("src/plugin", arg[1]))
+                m.Cmdy("cli.plugin", "test.so")
 				return
 			}
 			if len(arg) > 1 && arg[0] == "script" {
@@ -812,136 +896,7 @@ var version = struct {
 			)
 			return
 		}},
-		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Conf("runtime", "boot.count", m.Confi("runtime", "boot.count")+1)
-			code := kit.Select("0", arg, 0)
-			switch code {
-			case "0":
-				m.Cmd("cli.source", m.Conf("system", "script.exit"))
-				m.Echo("quit")
 
-			case "1":
-				if m.Option("cli.modal") != "action" {
-					m.Cmd("cli.source", m.Conf("system", "script.exit"))
-					m.Echo("restart")
-				}
-
-			case "2":
-				m.Echo("term")
-			}
-
-			m.Append("time", m.Time())
-			m.Append("code", code)
-			m.Echo(", wait 1s\n").Table()
-
-			m.Gos(m, func(m *ctx.Message) {
-				defer func() {
-					os.Exit(kit.Int(code))
-				}()
-				time.Sleep(time.Second * 1)
-				m.Cmd("cli._exit")
-				m.Cmd("nfs._exit")
-			})
-			return
-		}},
-		"test": &ctx.Command{Name: "test file server", Help: "test", Hand: func(m *ctx.Message, c *ctx.Context, key string, args ...string) (e error) {
-			prefix0 := len("uri[")
-			prefix1 := len("request_param[")
-
-			if e = os.Mkdir("tmp", 0777); e != nil {
-				return
-			}
-
-			begin := time.Now()
-			f, e := os.Open(args[0])
-			defer f.Close()
-			bio := bufio.NewScanner(f)
-			output := map[string]*os.File{}
-			nreq := 0
-
-			for bio.Scan() {
-				word := strings.Split(bio.Text(), " ")
-				if len(word) != 2 {
-					continue
-				}
-				uri := word[0][prefix0 : len(word[0])-1]
-				arg := word[1][prefix1 : len(word[1])-1]
-				if output[uri] == nil {
-					output[uri], e = os.Create(path.Join("tmp", strings.Replace(uri, "/", "_", -1)+".txt"))
-					defer output[uri].Close()
-				}
-				nreq++
-				br := bytes.NewReader([]byte(arg))
-				res, e := http.Post(args[1]+uri, "application/json", br)
-				fmt.Fprintf(output[uri], uri)
-				fmt.Fprintf(output[uri], " ")
-				fmt.Fprintf(output[uri], arg)
-				fmt.Fprintf(output[uri], " ")
-				if e != nil {
-					fmt.Fprintf(output[uri], "%v", e)
-				} else if res.StatusCode != http.StatusOK {
-					fmt.Fprintf(output[uri], res.Status)
-				} else {
-					io.Copy(output[uri], res.Body)
-				}
-				fmt.Fprintf(output[uri], "\n")
-			}
-			m.Append("nuri", len(output))
-			m.Append("nreq", nreq)
-			m.Append("time", fmt.Sprintf("%s", time.Since(begin)))
-			m.Table()
-			return
-		}},
-		"_exit": &ctx.Command{Name: "_exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Confm("daemon", func(key string, info map[string]interface{}) {
-				m.Cmd("cli.system", key, "stop")
-			})
-			return
-		}},
-
-		"plugin": &ctx.Command{Name: "plugin [action] file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			suffix, action, target := "go", "build", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/examples/app/bench.go")
-			if len(arg) == 0 {
-				arg = append(arg, target)
-			}
-			if cs := strings.Split(arg[0], "."); len(cs) > 1 {
-				suffix = cs[len(cs)-1]
-			} else if cs := strings.Split(arg[1], "."); len(cs) > 1 {
-				suffix, action, arg = cs[len(cs)-1], arg[0], arg[1:]
-			}
-
-			if target = m.Cmdx("nfs.path", arg[0]); target == "" {
-				target = m.Cmdx("nfs.path", path.Join("src/plugin/", arg[0]))
-			}
-
-			for suffix != "" && action != "" {
-				m.Log("info", "%v %v %v", suffix, action, target)
-				cook := m.Confv("plugin", suffix)
-				next := strings.Replace(target, "."+suffix, "."+kit.Chains(cook, "next.0"), -1)
-
-				args := []string{}
-				if suffix == "so" {
-					if p, e := plugin.Open(target); m.Assert(e) {
-						s, e := p.Lookup("Index")
-						m.Assert(e)
-						w := *(s.(**ctx.Context))
-						w.Name = kit.Select(w.Name, arg, 1)
-						c.Register(w, nil)
-						m.Spawn(w).Cmd("_init", arg[1:])
-					}
-				} else {
-					if suffix == "go" {
-						args = append(args, "-o", next)
-					}
-					m.Assert(m.Cmd("cli.system", kit.Chain(cook, action), args, target))
-				}
-
-				suffix = kit.Chains(cook, "next.0")
-				action = kit.Chains(cook, "next.1")
-				target = next
-			}
-			return
-		}},
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("dir", "", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
