@@ -195,7 +195,6 @@ page = Page({
             },
             Show: function(i) {
                 field.Pane.Back(river, output)
-
                 var pane = this, foot = page.footer.Pane
                 var cmds = ["brow", river, i||which[river]||0]
                 cmds[2] || (output.innerHTML = ""), pane.Times(page.conf.refresh, cmds, function(line, index, msg) {
