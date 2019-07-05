@@ -69,28 +69,28 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 						} else {
 							m.Add("append", "type", "file")
 						}
-                    case "full":
-                        if f.IsDir() {
-                            m.Add("append", "full", path.Join(back, name, f.Name())+"/")
-                        } else {
-                            m.Add("append", "full", path.Join(back, name, f.Name()))
-                        }
-                    case "path":
-                        if f.IsDir() {
-                            m.Add("append", "path", path.Join(back, name, f.Name())[trip:]+"/")
-                        } else {
-                            m.Add("append", "path", path.Join(back, name, f.Name())[trip:])
-                        }
-                    case "tree":
-                        if level == 0 {
-                            m.Add("append", "tree", f.Name())
-                        } else {
-                            m.Add("append", "tree", strings.Repeat("| ", level-1)+"|-"+f.Name())
-                        }
-                    case "filename":
-                        if f.IsDir() {
-                            m.Add("append", "filename", f.Name()+"/")
-                        } else {
+					case "full":
+						if f.IsDir() {
+							m.Add("append", "full", path.Join(back, name, f.Name())+"/")
+						} else {
+							m.Add("append", "full", path.Join(back, name, f.Name()))
+						}
+					case "path":
+						if f.IsDir() {
+							m.Add("append", "path", path.Join(back, name, f.Name())[trip:]+"/")
+						} else {
+							m.Add("append", "path", path.Join(back, name, f.Name())[trip:])
+						}
+					case "tree":
+						if level == 0 {
+							m.Add("append", "tree", f.Name())
+						} else {
+							m.Add("append", "tree", strings.Repeat("| ", level-1)+"|-"+f.Name())
+						}
+					case "filename":
+						if f.IsDir() {
+							m.Add("append", "filename", f.Name()+"/")
+						} else {
 							m.Add("append", "filename", f.Name())
 						}
 					case "size":
@@ -824,23 +824,23 @@ func (nfs *NFS) Send(meta string, arg ...interface{}) *NFS {
 
 	line := "\n"
 	if meta != "" {
-        if text, ok := arg[0].(string); ok && meta == "result" && len(text) > 1024 {
-            text := arg[0].(string)
-            for i := 0; i < len(text); i += 1024 {
-                j := i + 1024
-                if j >= len(text) {
-                    j = len(text)
-                }
-                line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(text[i:j])))
-                n, e := fmt.Fprint(nfs.io, line)
-                m.Assert(e)
-                m.Capi("nwrite", n)
-                m.Log("send", "%d [%s]", len(line), line)
-            }
-            return nfs
-        } else {
-            line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(arg[0])))
-        }
+		if text, ok := arg[0].(string); ok && meta == "result" && len(text) > 1024 {
+			text := arg[0].(string)
+			for i := 0; i < len(text); i += 1024 {
+				j := i + 1024
+				if j >= len(text) {
+					j = len(text)
+				}
+				line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(text[i:j])))
+				n, e := fmt.Fprint(nfs.io, line)
+				m.Assert(e)
+				m.Capi("nwrite", n)
+				m.Log("send", "%d [%s]", len(line), line)
+			}
+			return nfs
+		} else {
+			line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(arg[0])))
+		}
 	}
 
 	n, e := fmt.Fprint(nfs.io, line)
@@ -998,7 +998,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 	msg, code, head, body := m, "0", "result", "append"
 	bio := bufio.NewScanner(nfs.io)
 	bio.Buffer(make([]byte, m.Confi("buf_size")), m.Confi("buf_size"))
-	for ; bio.Scan(); {
+	for bio.Scan() {
 
 		m.TryCatch(m, true, func(m *ctx.Message) {
 			switch field, value := nfs.Recv(bio.Text()); field {
@@ -1349,10 +1349,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 			m.Confm("grep", "list", func(index int, value map[string]interface{}) {
 				f, e := os.Open(kit.Format(value["file"]))
-                if e != nil {
-                    m.Log("warn", "%v", e)
-                    return
-                }
+				if e != nil {
+					m.Log("warn", "%v", e)
+					return
+				}
 				defer f.Close()
 
 				// s, e := f.Stat()
@@ -1386,6 +1386,41 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				value["pos"] = begin + int64(n)
 			})
 			m.Table()
+			return
+		}},
+
+		"draw": &ctx.Command{Name: "draw", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			for len(arg) > 0 {
+				switch arg[0] {
+				case "trend":
+					m.Add("append", "type", arg[0])
+					m.Add("append", "meta", kit.Formats(arg[1:]))
+					arg = arg[:0]
+
+				case "begin":
+					m.Add("append", "type", arg[0])
+					m.Add("append", "meta", "{}")
+					arg = arg[1:]
+
+				case "circle":
+					m.Add("append", "type", arg[0])
+					m.Add("append", "meta", kit.Format(map[string]string{
+						"x": arg[1], "y": arg[2], "r": arg[3],
+					}))
+					arg = arg[4:]
+
+				case "stroke":
+					m.Add("append", "type", arg[0])
+					m.Add("append", "meta", kit.Format(map[string]string{
+						"width": arg[1],
+						"color": arg[2],
+					}))
+					arg = arg[3:]
+
+				default:
+					arg = arg[1:]
+				}
+			}
 			return
 		}},
 

@@ -195,7 +195,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"path": "usr/work",
 		}, Help: "免密登录"},
 
-
 		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
 		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
@@ -669,6 +668,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Cmd("cli.version", "create")
 			if len(arg) > 0 && arg[0] == "self" {
 				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+					m.Echo("version %v ", version.self)
 					m.Cmdy("cli.quit", 1)
 				}
 				return
@@ -785,22 +785,22 @@ var version = struct {
 				return
 			}
 			if len(arg) > 0 && arg[0] == "plugin" {
-                m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", arg[1]),
-                    "upgrade", "plugin", "save", path.Join("src/plugin", arg[1]))
-                m.Cmdy("cli.plugin", "test.so")
+				m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", arg[1]),
+					"upgrade", "plugin", "save", path.Join("src/plugin", arg[1]))
+				m.Cmdy("cli.plugin", "test.so")
 				return
 			}
 			if len(arg) > 1 && arg[0] == "script" {
-                miss := ""
-                if len(arg) > 2 {
-                    miss, arg = arg[1], arg[2:]
-                } else {
-                    arg = arg[1:]
-                }
-                for _, v := range arg {
-                    m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", v),
-                        "upgrade", "script", "missyou", miss, "save", path.Join("usr/script", v))
-                }
+				miss := ""
+				if len(arg) > 2 {
+					miss, arg = arg[1], arg[2:]
+				} else {
+					arg = arg[1:]
+				}
+				for _, v := range arg {
+					m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", v),
+						"upgrade", "script", "missyou", miss, "save", path.Join("usr/script", v))
+				}
 				return
 			}
 

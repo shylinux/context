@@ -65,7 +65,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "text", "name": "sub", "imports": "plugin_branch", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
-                    "options": map[string]interface{}{"call_timeout": "180s"},
+					"options": map[string]interface{}{"call_timeout": "180s"},
 				},
 				map[string]interface{}{"componet_name": "script", "componet_help": "脚本",
 					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
@@ -151,7 +151,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "button", "value": "升级"},
 					},
 					"display": map[string]interface{}{"hide_append": true, "show_result": true},
-                    "options": map[string]interface{}{"call_timeout": "180s"},
+					"options": map[string]interface{}{"call_timeout": "180s"},
 				},
 				map[string]interface{}{"componet_name": "missyou", "componet_help": "任务",
 					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
@@ -179,7 +179,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_args": []interface{}{"$$", "context", "aaa", "clip"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "you", "imports": "plugin_you", "action": "auto"},
 						map[string]interface{}{"type": "text", "name": "txt", "view": "long"},
-                        map[string]interface{}{"type": "button", "value": "存储", "action": "auto"},
+						map[string]interface{}{"type": "button", "value": "存储", "action": "auto"},
 					},
 				},
 				map[string]interface{}{"componet_name": "qrcode", "componet_help": "二维码",
@@ -199,6 +199,16 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "button", "value": "计算"},
 					},
 				},
+				map[string]interface{}{"componet_name": "email", "componet_help": "电子邮件",
+					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
+					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "email",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"label": "收件人", "type": "text", "name": "to", "value": "shylinux@163.com", "view": "long"},
+						map[string]interface{}{"label": "主题", "type": "text", "name": "title", "view": "long"},
+						map[string]interface{}{"type": "button", "value": "发送", "view": "clear"},
+						map[string]interface{}{"type": "textarea", "name": "content", "view": "clear"},
+					},
+				},
 				map[string]interface{}{"componet_name": "location", "componet_help": "地理位置",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "location",
@@ -208,17 +218,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "button", "value": "查看"},
 					},
 				},
-				map[string]interface{}{"componet_name": "email", "componet_help": "电子邮件",
-					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
-					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "email",
-					"componet_args": []interface{}{}, "inputs": []interface{}{
-                        map[string]interface{}{"label": "收件人", "type": "text", "name": "to", "value": "shylinux@163.com","view": "long"},
-                        map[string]interface{}{"label": "主题", "type": "text", "name": "title", "view": "long"},
-						map[string]interface{}{"type": "button", "value": "发送", "view": "clear"},
-                        map[string]interface{}{"type": "textarea", "name": "content", "view": "clear"},
-					},
-					"display": map[string]interface{}{"map": true},
-				},
 				map[string]interface{}{"componet_name": "baidu", "componet_help": "百度地图",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
 					"componet_type": "public", "componet_ctx": "aaa", "componet_cmd": "location",
@@ -227,7 +226,16 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "button", "value": "位置", "click": "Location"},
 						map[string]interface{}{"type": "button", "value": "查看"},
 					},
-					"display": map[string]interface{}{"map": true},
+					"display": map[string]interface{}{"deal": "map"},
+				},
+				map[string]interface{}{"componet_name": "draw", "componet_help": "绘图",
+					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
+					"componet_type": "public", "componet_ctx": "nfs", "componet_cmd": "draw",
+					"componet_args": []interface{}{}, "inputs": []interface{}{
+						map[string]interface{}{"type": "text", "name": "type"},
+						map[string]interface{}{"type": "button", "value": "查看"},
+					},
+					"display": map[string]interface{}{"deal": "point"},
 				},
 			},
 			"index": []interface{}{
@@ -255,7 +263,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "$$", "command"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-                        map[string]interface{}{"type": "text", "name": "ctx", "value": "nfs", "imports": "plugin_ctx"},
+						map[string]interface{}{"type": "text", "name": "ctx", "value": "nfs", "imports": "plugin_ctx"},
 						map[string]interface{}{"type": "text", "name": "cmd", "value": "pwd"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
@@ -265,8 +273,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "nfs", "dir", "$$", "time", "size", "line", "path"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": []interface{}{"plugin_you", "plugin_pod"}},
-                        map[string]interface{}{"type": "text", "name": "dir", "value": "", "view": "long", "imports": "plugin_dir", "action": "auto"},
-                        map[string]interface{}{"type": "button", "value": "查看", "action": "auto"},
+						map[string]interface{}{"type": "text", "name": "dir", "value": "", "view": "long", "imports": "plugin_dir", "action": "auto"},
+						map[string]interface{}{"type": "button", "value": "查看", "action": "auto"},
 						map[string]interface{}{"type": "button", "value": "回退", "click": "Back"},
 					},
 					"display":  map[string]interface{}{"hide_result": true},
@@ -511,11 +519,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 
 				msg := m.Find(kit.Format(tool["componet_ctx"]))
-                if option, ok := tool["options"].(map[string]interface{}); ok {
-                    for k, v := range option {
-                        msg.Option(k, v)
-                    }
-                }
+				if option, ok := tool["options"].(map[string]interface{}); ok {
+					for k, v := range option {
+						msg.Option(k, v)
+					}
+				}
 
 				arg = arg[4:]
 				args := []string{}

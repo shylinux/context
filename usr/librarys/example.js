@@ -715,6 +715,7 @@ function Plugin(page, pane, field) {
             }, 1000)
             event.Plugin = plugin, field.Run(event, args, function(msg) {
                 show = false, page.ontoast("")
+                output.innerHTML = ""
                 plugin.ondaemon[display.deal||"table"](msg)
                 typeof cb == "function" && cb(msg)
             })
@@ -733,19 +734,35 @@ function Plugin(page, pane, field) {
         ondaemon: {
             void: function(msg) {},
             table: function(msg) {
-                output.innerHTML = ""
-                if (display.map) {
-                    kit.AppendChild(output, [{img: ["https://gss0.bdstatic.com/8bo_dTSlRMgBo1vgoIiO_jowehsv/tile/?qt=vtile&x=25310&y=9426&z=17&styles=pl&scaler=2&udt=20190622"]}])
-                    return
-                }
-                output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
-                    // if (line["latitude"]) {
-                    //     page.openLocation(line.latitude, line.longitude, line.location)
-                    // }
                     page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
                 });
                 (display.show_result || !msg.append) && msg.result && kit.OrderCode(kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}]).first)
+            },
+            point: function(msg) {
+                var id = "canvas"+page.ID()
+                var canvas = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {id: id, width: output.clientWidth-15}}]).last.getContext("2d")
+                ctx.Table(msg, function(line) {
+                    var meta = JSON.parse(line.meta||"{}")
+                    switch (line.type) {
+                        case "begin":
+                            canvas.beginPath()
+                            break
+
+                        case "circle":
+                            canvas.arc(parseInt(meta.x), parseInt(meta.y), parseInt(meta.r), 0, Math.PI*2, true)
+                            break
+
+                        case "stroke":
+                            canvas.strokeStyle = meta.color
+                            canvas.lineWidth = parseInt(meta.width)
+                            canvas.stroke()
+                            break
+                    }
+                })
+            },
+            map: function(msg) {
+                kit.AppendChild(output, [{img: ["https://gss0.bdstatic.com/8bo_dTSlRMgBo1vgoIiO_jowehsv/tile/?qt=vtile&x=25310&y=9426&z=17&styles=pl&scaler=2&udt=20190622"]}])
             },
         },
         onexport: {
