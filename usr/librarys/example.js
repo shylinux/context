@@ -739,6 +739,26 @@ function Plugin(page, pane, field) {
                 });
                 (display.show_result || !msg.append) && msg.result && kit.OrderCode(kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}]).first)
             },
+            trend: function(msg) {
+                var id = "canvas"+page.ID()
+                var width = output.clientWidth-40, height = 230, space = 10
+                var action = kit.AppendChild(output, [{view: ["action"]}]).last
+
+                var item = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {id: id, width: width+20, height: height+20}}]).last
+                var point = kit.AppendChild(output, [{text: ["point"]}]).last
+                canvas = item.getContext("2d")
+
+                cc = Canvas(canvas, width, height, space, msg).drawData()
+                for (var k in cc.button) {
+                    kit.AppendChild(action, [{button: [k, cc.button[k]]}])
+                }
+                item.onclick = function(event) {
+                    cc.pushPoint(point, event.offsetX-space, height-event.offsetY+space, event.clientX, event.clientY)
+                }
+                item.onmousemove = function(event) {
+                    cc.movePoint(point, event.offsetX-space, height-event.offsetY+space, event.clientX, event.clientY)
+                }
+            },
             point: function(msg) {
                 var id = "canvas"+page.ID()
                 var canvas = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {id: id, width: output.clientWidth-15}}]).last.getContext("2d")
@@ -823,4 +843,238 @@ function Plugin(page, pane, field) {
 
     plugin.init(page, pane, field, option, output)
     return page[field.id] = pane[field.id] = plugin.Field = field, field.Plugin = plugin
+}
+function Canvas(canvas, width, height, space, msg) {
+    var type = "weight"
+    var shape = "drawLine"
+    var what = {
+        reset: function() {
+            canvas.resetTransform()
+            canvas.clearRect(0, 0, width+20*space, height+20*space)
+        },
+        drawAxies: function(space, style) {
+            this.reset()
+            canvas.setTransform(1, 0, 0, -1, space, height)
+
+            canvas.beginPath()
+            canvas.moveTo(-10, 0)
+            canvas.lineTo(width+space, 0)
+            canvas.moveTo(0, -10)
+            canvas.lineTo(0, height+space)
+            canvas.strokeStyle = style||"gray"
+            canvas.lineWidth = 2
+            canvas.stroke()
+            return this
+        },
+        drawXLabel: function(step) {
+            canvas.beginPath()
+            for (var pos = step; pos < width; pos += step) {
+                canvas.moveTo(pos, 0)
+                canvas.lineTo(pos, -5)
+            }
+            canvas.strokeStyle = "red"
+            canvas.lineWidth = 2
+            canvas.stroke()
+            return this
+        },
+        drawYGrid: function(step) {
+            canvas.beginPath()
+            for (var pos = step; pos < height; pos += step) {
+                canvas.moveTo(-5, pos)
+                canvas.lineTo(width, pos)
+            }
+            canvas.strokeStyle = "#999"
+            canvas.lineWidth = 1
+            canvas.stroke()
+            return this
+        },
+        drawData: function() {
+            var col = msg.append.length
+            var row = msg[msg.append[0]].length
+            var step = width / (row - 1)
+
+            switch (type) {
+                case "trend":
+                    this.drawAxies(10).drawXLabel(step)
+                    canvas.beginPath()
+                    msg.append.forEach(function(key) {
+                        var max = 0
+                        msg[key].forEach(function(value, index, array) {
+                            parseInt(value) > max && (max = parseInt(value))
+                        })
+                        msg[key].forEach(function(value, index, array) {
+                            if (index == 0) {
+                                canvas.moveTo(0, value/max*height)
+                            } else {
+                                canvas.lineTo(step*index, value/max*height)
+                            }
+                        })
+                    })
+                    canvas.strokeStyle = "black"
+                    canvas.lineWidth = 1
+                    canvas.stroke()
+                    break
+
+                case "weight":
+                    this.reset()
+
+                    var nline = 0
+                    msg.append.forEach(function(key, index) {
+                        !isNaN(parseInt(msg[key][0])) && nline++
+                    })
+                    var space = width / (nline+1)
+
+                    var order = 0
+                    msg.append.forEach(function(key, index) {
+                        if (isNaN(parseInt(msg[key][0]))) {
+                            return
+                        }
+                        order++
+
+                        canvas.resetTransform()
+                        canvas.setTransform(1, 0, 0, -1, space*order, height/2)
+
+                        var total = 0
+                        msg[key].forEach(function(value, index, array) {
+                            total += parseInt(value)/1
+                        })
+                        var sum = 0
+
+                        msg[key].forEach(function(value, index, array) {
+                            value = parseInt(parseInt(value)/1)
+                            if ((value)/total < 0.01) {
+                                return
+                            }
+                            canvas.beginPath()
+                            canvas.moveTo(0, 0)
+                            var a = sum/total*Math.PI*2
+                            var b = (sum+value)/total*Math.PI*2
+                            kit.Log(a, b)
+                            canvas.arc(0, 0, (space/2)-20, a, b, false)
+                            canvas.closePath()
+                            canvas.strokeStyle = "black"
+                            canvas.lineWidth = 1
+                            canvas.stroke()
+                            sum+=value
+                        })
+                    })
+                    break
+            }
+            return this
+        },
+        view: [],
+        drawView: function() {
+            var that = this
+            this.view.forEach(function(view) {
+                that[view.type](view.meta)
+            })
+        },
+        drawPoint: function(meta) {
+            canvas.save()
+            canvas.translate(meta.x0, meta.y0)
+            canvas.beginPath()
+            canvas.moveTo(-10, 0)
+            canvas.lineTo(10, 0)
+            canvas.moveTo(0, -10)
+            canvas.lineTo(0, 10)
+            canvas.strokeStyle = meta.style
+            canvas.stroke()
+            canvas.restore()
+            return meta
+        },
+        drawLine: function(meta) {
+            canvas.save()
+            canvas.beginPath()
+            canvas.moveTo(meta.x0, meta.y0)
+            canvas.lineTo(meta.x1, meta.y1)
+            canvas.strokeStyle = meta.style
+            canvas.stroke()
+            canvas.restore()
+            return meta
+        },
+        drawRect: function(meta) {
+            canvas.save()
+            canvas.strokeStyle = meta.style
+            canvas.strokeRect(meta.x0, meta.y0, meta.x1-meta.x0, meta.y1-meta.y0)
+            canvas.restore()
+            return meta
+        },
+        drawCircle: function(meta) {
+            var r = Math.sqrt((meta.x1-meta.x0)*(meta.x1-meta.x0)+(meta.y1-meta.y0)*(meta.y1-meta.y0))
+            canvas.save()
+            canvas.beginPath()
+            canvas.arc(meta.x0, meta.y0, r, 0, Math.PI*2, true)
+            canvas.strokeStyle = meta.style
+            canvas.stroke()
+            canvas.restore()
+            return meta
+        },
+        drawEllipse: function(meta) {
+            var r0 = Math.abs(meta.x1-meta.x0)
+            var r1 = Math.abs(meta.y1-meta.y0)
+
+            canvas.save()
+            canvas.beginPath()
+            canvas.translate(meta.x0, meta.y0)
+
+            if (r1 > r0) {
+                canvas.scale(1, r1/r0)
+                canvas.arc(0, 0, r1, 0, Math.PI*2, true)
+                //
+                // canvas.scale((meta.x1-meta.x0)/(meta.y1-meta.y0), (meta.y1-meta.y0)/(meta.x1-meta.x0))
+                // canvas.arc(0, 0, Math.sqrt((meta.y1-meta.y0)*(meta.x1-meta.x0)), 0, Math.PI*2, true)
+            } else {
+                canvas.scale(r0/r1, 1)
+                canvas.arc(0, 0, r0, 0, Math.PI*2, true)
+            }
+
+            canvas.strokeStyle = meta.style
+            canvas.stroke()
+            canvas.restore()
+            return meta
+        },
+        shape: "drawLine",
+        movePoint: function(point, x, y) {
+            if (this.begin) {
+                this.drawData()
+                this.drawView()
+                this[shape]({x0: this.begin.x, y0: this.begin.y, x1: x, y1: y})
+                // this.drawRect({x0: this.begin.x, y0: this.begin.y, x1: x, y1: y, style: "red"})
+            }
+            point.innerHTML = x+","+y
+        },
+        pushPoint: function(point, x, y) {
+            if (this.begin) {
+                this.view.push({type: "drawPoint", meta: this["drawPoint"]({x0: x, y0: y, style: "red"})})
+                this.view.push({type: shape, meta: this[shape]({x0: this.begin.x, y0: this.begin.y, x1: x, y1: y})})
+                delete(this.begin)
+            } else {
+                this.view.push({type: "drawPoint", meta: this["drawPoint"]({x0: x, y0: y, style: "red"})})
+                this.begin = {x: x, y:y}
+            }
+        },
+        button: {
+            "trend": function() {
+                type = "trend"
+                what.drawData()
+            },
+            "weight": function() {
+                type = "weight"
+                what.drawData()
+            },
+            "line": function() {
+                shape = "drawLine"
+            },
+            "rect": function() {
+                shape = "drawRect"
+            },
+            "circle": function() {
+                shape = "drawCircle"
+            },
+            "ellipse": function() {
+                shape = "drawEllipse"
+            },
+        },
+    }
+    return what
 }

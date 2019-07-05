@@ -173,6 +173,9 @@ fieldset.Login>form.option button {
 fieldset.item>div.output {
     overflow:auto;
 }
+fieldset.item>div.output>canvas {
+    background-color:#8dd09e;
+}
 
 .hidden {
     display:none;

@@ -1390,6 +1390,16 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"draw": &ctx.Command{Name: "draw", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+            m.Add("append", "data", 10)
+            m.Add("append", "data", 40)
+            m.Add("append", "data", 30)
+            m.Add("append", "data", 20)
+
+            m.Add("append", "seed", 30)
+            m.Add("append", "seed", 20)
+            m.Add("append", "seed", 30)
+            m.Add("append", "seed", 40)
+            return
 			for len(arg) > 0 {
 				switch arg[0] {
 				case "trend":
