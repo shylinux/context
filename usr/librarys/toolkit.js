@@ -29,6 +29,7 @@ kit = toolkit = {
         return args
     },
     Delay: function(time, cb) {
+        return setTimeout(cb, time)
     },
 
     ModifyView: function(which, args) {
@@ -114,11 +115,13 @@ kit = toolkit = {
             return elm
         }
 
-        // 基本属性: name value inner style
+        // 基本属性: name value inner
+        // 基本样式: style className
+        // 基本事件: dataset click
         //
-        // dataset click
-        // button input label img
-        // select
+        // 按键: button select
+        // 输入: input password
+        // 输出: label img
         //
         // 树状结构: tree fork leaf
         // 普通视图: view text code
@@ -145,9 +148,6 @@ kit = toolkit = {
             if (child.inner) {
                 child.data["innerHTML"] = child.inner
             }
-            if (child.className) {
-                child.data["className"] = child.className
-            }
             if (typeof(child.style) == "object") {
                 var str = []
                 for (var k in child.style) {
@@ -158,6 +158,9 @@ kit = toolkit = {
                 }
                 child.data["style"] = str.join("")
             }
+            if (child.className) {
+                child.data["className"] = child.className
+            }
             if (child.dataset) {
                 child.data["dataset"] = child.dataset
             }
@@ -167,21 +170,27 @@ kit = toolkit = {
 
             if (child.button) {
                 child.type = "button"
-                child.data["onclick"] = child.button[1]
+                child.data["onclick"] = function(event) {
+                    child.button[1](child.button[0], event)
+                }
                 child.data["innerText"] = child.button[0]
                 child.name = child.name || child.button[0]
 
             } else if (child.select) {
                 child.type = "select"
+                child.name = child.select[0][0]
                 child.list = child.select[0].map(function(value) {
                     return {type: "option", value: value, inner: value}
                 })
-                child.data["onchange"] = child.select[1]
+                child.data["onchange"] = function(event) {
+                    child.select[1](event.target.value, event)
+                }
 
             } else if (child.input) {
                 child.type = "input"
-                child.data["onkeyup"] = child.input[1]
                 child.data["name"] = child.input[0]
+                child.data["onkeyup"] = child.input[1]
+                child.data["onkeydown"] = child.input[1]
                 child.name = child.name || child.input[0]
 
             } else if (child.password) {
@@ -289,6 +298,36 @@ kit = toolkit = {
         return parent.insertBefore(elm, position || parent.firstElementChild)
     },
 
+    AppendAction: function(parent, list, cb) {
+        var result = []
+        list.forEach(function(item, index) {
+            if (item == "") {
+                result.push({view: ["space"]})
+            } else if (typeof item == "string") {
+                result.push({button: [item, cb]})
+            } else if (item.forEach) {
+                result.push({select: [item, cb]})
+            } else {
+                result.push(item)
+            }
+        })
+        return kit.AppendChild(parent, result)
+    },
+    AppendStatus: function(parent, list, cb) {
+        var result = []
+        list.forEach(function(item, index) {
+            if (item == "") {
+                result.push({view: ["space"]})
+            } else if (typeof item == "string") {
+                result.push({button: [item, cb]})
+            } else if (item.forEach) {
+                result.push({select: [item, cb]})
+            } else {
+                result.push(item)
+            }
+        })
+        return kit.AppendChild(parent, result)
+    },
     AppendTable: function(table, data, fields, cb) {
         if (!data || !fields) {
             return
@@ -647,6 +686,9 @@ kit = toolkit = {
                     }
             }
         })
+    },
+    distance: function(x0, y0, x1, y1) {
+        return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))
     },
 }
 

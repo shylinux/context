@@ -668,7 +668,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Cmd("cli.version", "create")
 			if len(arg) > 0 && arg[0] == "self" {
 				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
-					m.Echo("version %v ", version.self)
+					m.Echo("%v: %v ", version.host, version.self)
 					m.Cmdy("cli.quit", 1)
 				}
 				return

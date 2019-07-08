@@ -3,6 +3,7 @@ package nfs
 import (
 	"contexts/ctx"
 	"crypto/md5"
+	"math/rand"
 	"toolkit"
 
 	"crypto/sha1"
@@ -1390,46 +1391,41 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"draw": &ctx.Command{Name: "draw", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-            m.Add("append", "data", 10)
-            m.Add("append", "data", 40)
-            m.Add("append", "data", 30)
-            m.Add("append", "data", 20)
+			if len(arg) == 0 {
+				m.Cmdy("nfs.dir", "src", "filename", "line", "size", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
+				return
+			}
 
-            m.Add("append", "seed", 30)
-            m.Add("append", "seed", 20)
-            m.Add("append", "seed", 30)
-            m.Add("append", "seed", 40)
-            return
-			for len(arg) > 0 {
-				switch arg[0] {
-				case "trend":
-					m.Add("append", "type", arg[0])
-					m.Add("append", "meta", kit.Formats(arg[1:]))
-					arg = arg[:0]
-
-				case "begin":
-					m.Add("append", "type", arg[0])
-					m.Add("append", "meta", "{}")
-					arg = arg[1:]
-
-				case "circle":
-					m.Add("append", "type", arg[0])
-					m.Add("append", "meta", kit.Format(map[string]string{
-						"x": arg[1], "y": arg[2], "r": arg[3],
-					}))
-					arg = arg[4:]
-
-				case "stroke":
-					m.Add("append", "type", arg[0])
-					m.Add("append", "meta", kit.Format(map[string]string{
-						"width": arg[1],
-						"color": arg[2],
-					}))
-					arg = arg[3:]
-
-				default:
-					arg = arg[1:]
-				}
+			m.Append("text", m.Time())
+			m.Append("style", map[int]string{
+				0: "black",
+				1: "red",
+				2: "green",
+				3: "yellow",
+				4: "blue",
+				5: "purple",
+				6: "cyan",
+				7: "white",
+			}[rand.Intn(8)])
+			switch arg[2] {
+			case "drawText":
+				x, y := rand.Intn(400), rand.Intn(300)
+				m.Append("ps", kit.Format([]interface{}{
+					map[string]int{"x": x, "y": y},
+					map[string]int{"x": x + 200, "y": y},
+				}))
+			case "drawRect":
+				x, y, l := rand.Intn(400), rand.Intn(300), rand.Intn(100)
+				m.Append("ps", kit.Format([]interface{}{
+					map[string]int{"x": x, "y": y},
+					map[string]int{"x": x + l + l, "y": y + l},
+				}))
+			case "drawCircle":
+				x, y, l := rand.Intn(400), rand.Intn(300), rand.Intn(100)
+				m.Append("ps", kit.Format([]interface{}{
+					map[string]int{"x": x, "y": y},
+					map[string]int{"x": x + l, "y": y},
+				}))
 			}
 			return
 		}},

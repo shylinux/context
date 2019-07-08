@@ -183,7 +183,21 @@ function Page(page) {
                     event.preventDefault()
                     return true
                 }
+                var his = target.History
+                var pos = target.Current
                 switch (event.key) {
+                    case "p":
+                        if (!his) { break }
+                        pos = (pos-1+his.length+1) % (his.length+1)
+                        target.value = pos < his.length? his[pos]: ""
+                        target.Current = pos
+                        break
+                    case "n":
+                        if (!his) { break }
+                        pos = (pos+1) % (his.length+1)
+                        target.value = pos < his.length? his[pos]: ""
+                        target.Current = pos
+                        break
                     case "a":
                     case "e":
                     case "f":
@@ -388,6 +402,9 @@ function Page(page) {
             // page.onscroll && page.onscroll(event, window, "scroll")
         // }
         document.body.onkeydown = function(event) {
+            if (page.localMap && page.localMap(event)) {
+                return
+            }
             page.oncontrol && page.oncontrol(event, document.body, "control")
         }
     }
@@ -704,21 +721,22 @@ function Plugin(page, pane, field) {
                 item == target && (index == list.length-1? plugin.Runs(event, cb): page.plugin == field && list[index+1].focus())
             })
         },
-        Runs: function(event, cb) {
-            page.footer.Pane.State("ncmd", kit.History.get("cmd").length)
-            var args = kit.Selector(option, ".args", function(item, index) {
-                return item.value
-            })
+        Run: function(event, args, cb) {
             var show = true
             setTimeout(function() {
                 show && page.ontoast(kit.Format(args||["running..."]), meta.name, -1)
             }, 1000)
             event.Plugin = plugin, field.Run(event, args, function(msg) {
                 show = false, page.ontoast("")
-                output.innerHTML = ""
-                plugin.ondaemon[display.deal||"table"](msg)
-                typeof cb == "function" && cb(msg)
+                plugin.ondaemon[display.deal||"table"](msg, cb)
             })
+        },
+        Runs: function(event, cb) {
+            page.footer.Pane.State("ncmd", kit.History.get("cmd").length)
+            var args = kit.Selector(option, ".args", function(item, index) {
+                return item.value
+            })
+            this.Run(event, args, cb)
         },
         Delay: function(time, event, text) {
             page.ontoast(text, "", -1)
@@ -732,32 +750,16 @@ function Plugin(page, pane, field) {
             output.innerHTML = ""
         },
         ondaemon: {
-            void: function(msg) {},
-            table: function(msg) {
+            table: function(msg, cb) {
+                output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
                     page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
                 });
                 (display.show_result || !msg.append) && msg.result && kit.OrderCode(kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}]).first)
+                typeof cb == "function" && cb(msg)
             },
-            trend: function(msg) {
-                var id = "canvas"+page.ID()
-                var width = output.clientWidth-40, height = 230, space = 10
-                var action = kit.AppendChild(output, [{view: ["action"]}]).last
-
-                var item = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {id: id, width: width+20, height: height+20}}]).last
-                var point = kit.AppendChild(output, [{text: ["point"]}]).last
-                canvas = item.getContext("2d")
-
-                cc = Canvas(canvas, width, height, space, msg).drawData()
-                for (var k in cc.button) {
-                    kit.AppendChild(action, [{button: [k, cc.button[k]]}])
-                }
-                item.onclick = function(event) {
-                    cc.pushPoint(point, event.offsetX-space, height-event.offsetY+space, event.clientX, event.clientY)
-                }
-                item.onmousemove = function(event) {
-                    cc.movePoint(point, event.offsetX-space, height-event.offsetY+space, event.clientX, event.clientY)
-                }
+            trend: function(msg, cb) {
+                typeof cb == "function" && !cb(msg) || Canvas(plugin, output, output.clientWidth-40, 400, 10, msg)
             },
             point: function(msg) {
                 var id = "canvas"+page.ID()
@@ -844,58 +846,191 @@ function Plugin(page, pane, field) {
     plugin.init(page, pane, field, option, output)
     return page[field.id] = pane[field.id] = plugin.Field = field, field.Plugin = plugin
 }
-function Canvas(canvas, width, height, space, msg) {
-    var type = "weight"
-    var shape = "drawLine"
-    var what = {
-        reset: function() {
-            canvas.resetTransform()
-            canvas.clearRect(0, 0, width+20*space, height+20*space)
-        },
-        drawAxies: function(space, style) {
-            this.reset()
-            canvas.setTransform(1, 0, 0, -1, space, height)
+function Canvas(plugin, output, width, height, space, msg) {
+    var view = [], ps = [], point = [], index = 0, now = {}
+    var trap = false, label = false
 
+    var conf = {
+        font: "monospace", text: "hi", tool: "stroke", style: "black",
+        type: "trend", shape: "drawText", means: "drawPoint",
+        limits: {scale: 3, drawPoint: 1, drawPoly: 3},
+        axies: {style: "black", width: 2},
+        xlabel: {style: "red", width: 2, height: 5},
+        play: 500,
+        mpoint: 10,
+    }
+    var what = {
+        reset: function(x, y) {
+            canvas.resetTransform()
+            canvas.setTransform(1, 0, 0, -1, space+(x||0), height+space-(y||0))
+            return what
+        },
+        clear: function() {
+            var p0 = what.transform({x:-width, y:-height})
+            var p1 = what.transform({x:2*width, y:2*height})
+            canvas.clearRect(p0.x, p0.y, p1.x-p0.x, p1.y-p0.y)
+            return what
+        },
+
+        move: function(meta) {
+            var p0 = meta.ps[0] || {x:0, y:0}
+            var p1 = meta.ps[1] || now
+            canvas.save(), what.clear().drawLine(meta)
+            canvas.translate(p1.x-p0.x, p1.y-p0.y)
+            what.drawData().drawView()
+            meta.ps.length < 2 && canvas.restore()
+        },
+        scale: function(meta) {
+            var ps = meta.ps
+            var p0 = ps[0] || {x:0, y:0}
+            var p1 = ps[1] || now
+            var p2 = ps[2] || now
+
+            if (ps.length > 1) {
+                canvas.save(), what.clear()
+                what.drawLine({ps: [p0, {x: p1.x, y: p0.y}]})
+                what.drawLine({ps: [{x: p1.x, y: p0.y}, p1]})
+                what.drawLine({ps: [p0, {x: p2.x, y: p0.y}]})
+                what.drawLine({ps: [{x: p2.x, y: p0.y}, p2]})
+                canvas.scale((p2.x-p0.x)/(p1.x-p0.x), (p2.y-p0.y)/(p1.y-p0.y))
+                what.drawData().drawView()
+                meta.ps.length < 3 && canvas.restore()
+            }
+        },
+        rotate: function(meta) {
+            var p0 = meta.ps[0] || {x:0, y:0}
+            var p1 = meta.ps[1] || now
+            canvas.save(), what.clear().drawLine(meta)
+            canvas.rotate(Math.atan2(p1.y-p0.y, p1.x-p0.x))
+            what.drawData().drawView()
+            meta.ps.length < 2 && canvas.restore()
+        },
+
+        draw: function(meta) {
+            canvas.strokeStyle = meta.style || conf.style
+            canvas.fillStyle = meta.style || conf.style
+            canvas[meta.tool||conf.tool]()
+            return meta
+        },
+        drawText: function(meta) {
+            var p0 = meta.ps[0] || {x:0, y:0}
+            var p1 = meta.ps[1] || now
+            var t = meta.text||status.cmd.value||conf.text
+
+            canvas.save()
+            canvas.translate(p0.x, p0.y)
+            canvas.scale(1, -1)
+            canvas.rotate(-Math.atan2(p1.y-p0.y, p1.x-p0.x))
+            what.draw(meta)
+            canvas.font=kit.distance(p0.x, p0.y, p1.x, p1.y)/t.length*2+"px "+conf.font
+            canvas[(meta.tool||conf.tool)+"Text"](t, 0, 0)
+            canvas.restore()
+            return meta
+        },
+        drawPoint: function(meta) {
+            meta.ps.concat(now).forEach(function(p) {
+                canvas.save()
+                canvas.translate(p.x, p.y)
+                canvas.beginPath()
+                canvas.moveTo(-conf.mpoint, 0)
+                canvas.lineTo(conf.mpoint, 0)
+                canvas.moveTo(0, -conf.mpoint)
+                canvas.lineTo(0, conf.mpoint)
+                what.draw(meta)
+                canvas.restore()
+            })
+            return meta
+        },
+        drawLine: function(meta) {
+            var p0 = meta.ps[0] || {x:0, y:0}
+            var p1 = meta.ps[1] || now
+            canvas.save()
             canvas.beginPath()
-            canvas.moveTo(-10, 0)
+            canvas.moveTo(p0.x, p0.y)
+            canvas.lineTo(p1.x, p1.y)
+            what.draw(meta)
+            canvas.restore()
+            return meta
+        },
+        drawPoly: function(meta) {
+            var ps = meta.ps
+            canvas.save()
+            canvas.beginPath()
+            canvas.moveTo(ps[0].x, ps[0].y)
+            for (var i = 1; i < ps.length; i++) {
+                canvas.lineTo(ps[i].x, ps[i].y)
+            }
+            ps.length < conf.limits.drawPoly && canvas.lineTo(now.x, now.y)
+            what.draw(meta)
+            canvas.restore()
+            return meta
+        },
+        drawRect: function(meta) {
+            var p0 = meta.ps[0] || {x:0, y:0}
+            var p1 = meta.ps[1] || now
+            canvas.save()
+            what.draw(meta)
+            canvas[(meta.tool||conf.tool)+"Rect"](p0.x, p0.y, p1.x-p0.x, p1.y-p0.y)
+            canvas.restore()
+            return meta
+        },
+        drawCircle: function(meta) {
+            var p0 = meta.ps[0] || {x:0, y:0}
+            var p1 = meta.ps[1] || now
+            canvas.save()
+            canvas.beginPath()
+            canvas.arc(p0.x, p0.y, kit.distance(p0.x, p0.y, p1.x, p1.y), 0, Math.PI*2, true)
+            what.draw(meta)
+            canvas.restore()
+            return meta
+        },
+        drawEllipse: function(meta) {
+            var p0 = meta.ps[0] || {x:0, y:0}
+            var p1 = meta.ps[1] || now
+            var r0 = Math.abs(p1.x-p0.x)
+            var r1 = Math.abs(p1.y-p0.y)
+
+            canvas.save()
+            canvas.beginPath()
+            canvas.translate(p0.x, p0.y)
+            r1 > r0? (canvas.scale(r0/r1, 1), r0 = r1): canvas.scale(1, r1/r0)
+            canvas.arc(0, 0, r0, 0, Math.PI*2, true)
+            what.draw(meta)
+            canvas.restore()
+            return meta
+        },
+
+        drawAxies: function(space, style) {
+            canvas.beginPath()
+            canvas.moveTo(-space, 0)
             canvas.lineTo(width+space, 0)
-            canvas.moveTo(0, -10)
+            canvas.moveTo(0, -space)
             canvas.lineTo(0, height+space)
-            canvas.strokeStyle = style||"gray"
-            canvas.lineWidth = 2
+            canvas.strokeStyle = conf.axies.style
+            canvas.lineWidth = conf.axies.width
             canvas.stroke()
-            return this
+            return what
         },
         drawXLabel: function(step) {
             canvas.beginPath()
             for (var pos = step; pos < width; pos += step) {
                 canvas.moveTo(pos, 0)
-                canvas.lineTo(pos, -5)
+                canvas.lineTo(pos, -conf.xlabel.height)
             }
-            canvas.strokeStyle = "red"
-            canvas.lineWidth = 2
+            canvas.strokeStyle = conf.xlabel.style
+            canvas.lineWidth = conf.xlabel.width
             canvas.stroke()
-            return this
+            return what
         },
-        drawYGrid: function(step) {
-            canvas.beginPath()
-            for (var pos = step; pos < height; pos += step) {
-                canvas.moveTo(-5, pos)
-                canvas.lineTo(width, pos)
-            }
-            canvas.strokeStyle = "#999"
-            canvas.lineWidth = 1
-            canvas.stroke()
-            return this
-        },
+
         drawData: function() {
             var col = msg.append.length
             var row = msg[msg.append[0]].length
             var step = width / (row - 1)
 
-            switch (type) {
+            switch (conf.type) {
                 case "trend":
-                    this.drawAxies(10).drawXLabel(step)
+                    what.drawAxies(10).drawXLabel(step)
                     canvas.beginPath()
                     msg.append.forEach(function(key) {
                         var max = 0
@@ -916,8 +1051,7 @@ function Canvas(canvas, width, height, space, msg) {
                     break
 
                 case "weight":
-                    this.reset()
-
+                    what.reset(0, height/2)
                     var nline = 0
                     msg.append.forEach(function(key, index) {
                         !isNaN(parseInt(msg[key][0])) && nline++
@@ -925,22 +1059,21 @@ function Canvas(canvas, width, height, space, msg) {
                     var space = width / (nline+1)
 
                     var order = 0
-                    msg.append.forEach(function(key, index) {
+                    msg.append.forEach(function(key, i) {
                         if (isNaN(parseInt(msg[key][0]))) {
                             return
                         }
                         order++
 
-                        canvas.resetTransform()
-                        canvas.setTransform(1, 0, 0, -1, space*order, height/2)
+                        canvas.translate(space, 0)
 
                         var total = 0
-                        msg[key].forEach(function(value, index, array) {
+                        msg[key].forEach(function(value, i, array) {
                             total += parseInt(value)/1
                         })
                         var sum = 0
 
-                        msg[key].forEach(function(value, index, array) {
+                        msg[key].forEach(function(value, i, array) {
                             value = parseInt(parseInt(value)/1)
                             if ((value)/total < 0.01) {
                                 return
@@ -949,132 +1082,350 @@ function Canvas(canvas, width, height, space, msg) {
                             canvas.moveTo(0, 0)
                             var a = sum/total*Math.PI*2
                             var b = (sum+value)/total*Math.PI*2
-                            kit.Log(a, b)
                             canvas.arc(0, 0, (space/2)-20, a, b, false)
                             canvas.closePath()
-                            canvas.strokeStyle = "black"
-                            canvas.lineWidth = 1
-                            canvas.stroke()
+
+                            if (i == index) {
+                                canvas.fillStyle = "white"
+                                canvas.fill()
+                            } else {
+                                canvas.strokeStyle = "black"
+                                canvas.lineWidth = 1
+                                canvas.stroke()
+                            }
+
                             sum+=value
                         })
                     })
                     break
             }
-            return this
+            return what
         },
-        view: [],
         drawView: function() {
-            var that = this
-            this.view.forEach(function(view) {
-                that[view.type](view.meta)
+            view.forEach(function(view) {
+                view.meta && what[view.type](view.meta)
+            })
+            return what
+        },
+        drawLabel: function() {
+            if (!label) { return what }
+
+            var p = now
+            var q = what.reverse(p)
+
+            var weight = 0
+            index = 0
+            canvas.save()
+            if (conf.type == "trend") {
+                index = parseInt(p.x/space)
+                canvas.moveTo(p.x, -10)
+                canvas.lineTo(p.x, height)
+                canvas.moveTo(-10, p.y)
+                canvas.lineTo(width, p.y)
+            } else {
+                var a = Math.atan2(p.y, p.x)
+                a < 0 && (a += Math.PI*2)
+                var pos = a/2/Math.PI
+
+                var total = 0
+                msg[msg.append[msg.append.length-1]].forEach(function(value) {
+                    total += parseInt(value)
+                })
+                var sum = 0
+                msg[msg.append[msg.append.length-1]].forEach(function(value, i) {
+                    sum += parseInt(value), sum / total < pos && (index = i+1)
+                    index == i && (weight = parseInt(value/total*100))
+                })
+                canvas.moveTo(0, 0)
+                canvas.lineTo(p.x, p.y)
+                canvas.lineTo(p.x+10, p.y)
+            }
+            canvas.strokeStyle = conf.style
+            canvas.stroke()
+
+            canvas.resetTransform()
+            canvas.font="16px monospace"
+            canvas.fillStyle = conf.style
+            weight && canvas.fillText("weight: "+weight+"%", q.x+10, q.y+10+i*20)
+            canvas.fillText("index: "+index, q.x+10, q.y+30+i*20)
+            msg.append.forEach(function(key, i, n) {
+                msg[key][index] && canvas.fillText(key+": "+msg[key][index], q.x+10, q.y+50+i*20)
+            })
+            canvas.restore()
+            return what
+        },
+        drawShape: function() {
+            point.length > 0 && (what[conf.shape]({ps: point}), what[conf.means]({ps: point, tool: "stroke", style: "red"}))
+            return what
+        },
+
+        refresh: function() {
+            return what.clear().drawData().drawView().drawLabel().drawShape()
+        },
+        cancel: function() {
+            point = [], what.refresh()
+            return what
+        },
+        play: function() {
+            function cb() {
+                view[i] && what[view[i].type](view[i].meta) && (t = kit.Delay(view[i].type == "drawPoint"? 10: conf.play, cb))
+                i++
+                status.nshape.innerText = i+"/"+view.length
+            }
+            var i = 0
+            what.clear().drawData()
+            kit.Delay(10, cb)
+            return what
+        },
+        back: function() {
+            view.pop(), status.nshape.innerText = view.length
+            return what.refresh()
+        },
+        push: function(item) {
+            item.meta && item.meta.ps < (conf.limits[item.type]||2) && ps.push(item)
+            status.nshape.innerText = view.push(item)
+            return what
+        },
+        wait: function() {
+            status.cmd.focus()
+            return what
+        },
+        trap: function(value, event) {
+            event.target.className = (trap = !trap)? "trap": "normal"
+            page.localMap = trap? what.input: undefined
+        },
+        label: function(value, event) {
+            event.target.className = (label = !label)? "trap": "normal"
+        },
+
+        movePoint: function(p) {
+            now = p, status.xy.innerHTML = p.x+","+p.y;
+            (point.length > 0 || ps.length > 0 || label) && what.refresh()
+        },
+        pushPoint: function(p) {
+            if (ps.length > 0) {
+                ps[0].meta.ps.push(p) > 1 && ps.pop(), what.refresh()
+                return
+            }
+
+            point.push(p) >= (conf.limits[conf.shape]||2) && what.push({type: conf.shape,
+                meta: what[conf.shape]({ps: point, text: status.cmd.value||conf.text, tool: conf.tool, style: conf.style}),
+            }) && (point = [])
+            conf.means == "drawPoint" && what.push({type: conf.means, meta: what[conf.means]({ps: [p], tool: "stroke", style: "red"})})
+        },
+        transform: function(p) {
+            var t = canvas.getTransform()
+            return {
+                x: (p.x-t.c/t.d*p.y+t.c*t.f/t.d-t.e)/(t.a-t.c*t.b/t.d),
+                y: (p.y-t.b/t.a*p.x+t.b*t.e/t.a-t.f)/(t.d-t.b*t.c/t.a),
+            }
+        },
+        reverse: function(p) {
+            var t = canvas.getTransform()
+            return {
+                x: t.a*p.x+t.c*p.y+t.e,
+                y: t.b*p.x+t.d*p.y+t.f,
+            }
+        },
+
+        check: function() {
+            view.forEach(function(item, index, view) {
+                item && item.send && plugin.Run(window.event||{}, item.send.concat(["type", item.type]), function(msg) {
+                    msg.text && msg.text[0] && (item.meta.text = msg.text[0])
+                    msg.style && msg.style[0] && (item.meta.style = msg.style[0])
+                    msg.ps && msg.ps[0] && (item.meta.ps = JSON.parse(msg.ps[0]))
+                    what.refresh()
+                })
+                index == view.length -1 && kit.Delay(1000, what.check)
             })
         },
-        drawPoint: function(meta) {
-            canvas.save()
-            canvas.translate(meta.x0, meta.y0)
-            canvas.beginPath()
-            canvas.moveTo(-10, 0)
-            canvas.lineTo(10, 0)
-            canvas.moveTo(0, -10)
-            canvas.lineTo(0, 10)
-            canvas.strokeStyle = meta.style
-            canvas.stroke()
-            canvas.restore()
-            return meta
-        },
-        drawLine: function(meta) {
-            canvas.save()
-            canvas.beginPath()
-            canvas.moveTo(meta.x0, meta.y0)
-            canvas.lineTo(meta.x1, meta.y1)
-            canvas.strokeStyle = meta.style
-            canvas.stroke()
-            canvas.restore()
-            return meta
-        },
-        drawRect: function(meta) {
-            canvas.save()
-            canvas.strokeStyle = meta.style
-            canvas.strokeRect(meta.x0, meta.y0, meta.x1-meta.x0, meta.y1-meta.y0)
-            canvas.restore()
-            return meta
-        },
-        drawCircle: function(meta) {
-            var r = Math.sqrt((meta.x1-meta.x0)*(meta.x1-meta.x0)+(meta.y1-meta.y0)*(meta.y1-meta.y0))
-            canvas.save()
-            canvas.beginPath()
-            canvas.arc(meta.x0, meta.y0, r, 0, Math.PI*2, true)
-            canvas.strokeStyle = meta.style
-            canvas.stroke()
-            canvas.restore()
-            return meta
-        },
-        drawEllipse: function(meta) {
-            var r0 = Math.abs(meta.x1-meta.x0)
-            var r1 = Math.abs(meta.y1-meta.y0)
+        parse: function(txt) {
+            var meta = {}, cmds = [], rest = -1, send = []
+            txt.trim().split(" ").forEach(function(item) {
+                switch (item) {
+                    case "stroke":
+                    case "fill":
+                        meta.tool = item
+                        break
+                    case "black":
+                    case "white":
+                    case "red":
+                    case "yellow":
+                    case "green":
+                    case "cyan":
+                    case "blue":
+                    case "purple":
+                        meta.style = item
+                        break
+                    case "cmds":
+                        rest = cmds.length
+                    default:
+                        cmds.push(item)
+                }
+            }), rest != -1 && (send = cmds.slice(rest+1), cmds = cmds.slice(0, rest))
 
-            canvas.save()
-            canvas.beginPath()
-            canvas.translate(meta.x0, meta.y0)
+            var cmd = {
+                "t": "drawText",
+                "l": "drawLine",
+                "p": "drawPoly",
+                "r": "drawRect",
+                "c": "drawCircle",
+                "e": "drawEllipse",
+            }[cmds[0]] || cmds[0]
+            cmds = cmds.slice(1)
 
-            if (r1 > r0) {
-                canvas.scale(1, r1/r0)
-                canvas.arc(0, 0, r1, 0, Math.PI*2, true)
-                //
-                // canvas.scale((meta.x1-meta.x0)/(meta.y1-meta.y0), (meta.y1-meta.y0)/(meta.x1-meta.x0))
-                // canvas.arc(0, 0, Math.sqrt((meta.y1-meta.y0)*(meta.x1-meta.x0)), 0, Math.PI*2, true)
-            } else {
-                canvas.scale(r0/r1, 1)
-                canvas.arc(0, 0, r0, 0, Math.PI*2, true)
+            var args = []
+            switch (cmd) {
+                case "send":
+                    plugin.Run(window.event, cmds, function(msg) {
+                        kit.Log(msg)
+                    })
+                    return
+                default:
+                    meta.ps = []
+                    for (var i = 0; i < cmds.length; i+=2) {
+                        var x = parseInt(cmds[i])
+                        var y = parseInt(cmds[i+1])
+                        !isNaN(x) && !isNaN(y) && meta.ps.push({x: x, y: y}) || (args.push(cmds[i]), i--)
+                    }
+            }
+            meta.args = args
+
+            switch (cmd) {
+                case "drawText":
+                    meta.text = args.join(" "), delete(meta.args)
+                case "drawLine":
+                case "drawPoly":
+                case "drawRect":
+                case "drawCircle":
+                case "drawEllipse":
+                    what.push({type: cmd, meta: what[cmd](meta), send:send})
             }
 
-            canvas.strokeStyle = meta.style
-            canvas.stroke()
-            canvas.restore()
-            return meta
+            return (what[cmd] || function() {
+                return what
+            })(meta)
         },
-        shape: "drawLine",
-        movePoint: function(point, x, y) {
-            if (this.begin) {
-                this.drawData()
-                this.drawView()
-                this[shape]({x0: this.begin.x, y0: this.begin.y, x1: x, y1: y})
-                // this.drawRect({x0: this.begin.x, y0: this.begin.y, x1: x, y1: y, style: "red"})
-            }
-            point.innerHTML = x+","+y
-        },
-        pushPoint: function(point, x, y) {
-            if (this.begin) {
-                this.view.push({type: "drawPoint", meta: this["drawPoint"]({x0: x, y0: y, style: "red"})})
-                this.view.push({type: shape, meta: this[shape]({x0: this.begin.x, y0: this.begin.y, x1: x, y1: y})})
-                delete(this.begin)
-            } else {
-                this.view.push({type: "drawPoint", meta: this["drawPoint"]({x0: x, y0: y, style: "red"})})
-                this.begin = {x: x, y:y}
+        input: function(event) {
+            switch (event.key) {
+                default:
+                    var map = what.trans[event.key]
+                    map && action[map[0]] && (action[map[0]].value = map[1])
+                    map && what.trans[map[0]] && (map = what.trans[map[1]]) && (conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]]())
+                    break
             }
         },
-        button: {
-            "trend": function() {
-                type = "trend"
-                what.drawData()
-            },
-            "weight": function() {
-                type = "weight"
-                what.drawData()
-            },
-            "line": function() {
-                shape = "drawLine"
-            },
-            "rect": function() {
-                shape = "drawRect"
-            },
-            "circle": function() {
-                shape = "drawCircle"
-            },
-            "ellipse": function() {
-                shape = "drawEllipse"
-            },
+        trans: {
+            "折线图": ["type", "trend"],
+            "饼状图": ["type", "weight"],
+
+            "移动": ["shape", "move"],
+            "旋转": ["shape", "rotate"],
+            "缩放": ["shape", "scale"],
+
+            "文本": ["shape", "drawText"],
+            "直线": ["shape", "drawLine"],
+            "折线": ["shape", "drawPoly"],
+            "矩形": ["shape", "drawRect"],
+            "圆形": ["shape", "drawCircle"],
+            "椭圆": ["shape", "drawEllipse"],
+
+            "辅助点": ["means", "drawPoint"],
+            "辅助线": ["means", "drawRect"],
+
+            "画笔": ["tool", "stroke"],
+            "画刷": ["tool", "fill"],
+
+            "黑色": ["style", "black"],
+            "红色": ["style", "red"],
+            "绿色": ["style", "green"],
+            "黄色": ["style", "yellow"],
+            "蓝色": ["style", "blue"],
+            "紫色": ["style", "purple"],
+            "青色": ["style", "cyan"],
+            "白色": ["style", "white"],
+            "随机色": ["style", "random"],
+            "默认色": ["style", "default"],
+
+            "清屏": ["clear"],
+            "刷新": ["refresh"],
+            "取消": ["cancel"],
+            "播放": ["play"],
+            "回退": ["back"],
+            "输入": ["wait"],
+
+            "标签": ["label"],
+            "快捷键": ["trap"],
+
+            "x": ["折线图", "折线图"],
+            "y": ["折线图", "饼状图"],
+
+            "a": ["移动", "旋转"],
+            "m": ["移动", "移动"],
+            "z": ["移动", "缩放"],
+
+            "t": ["文本", "文本"],
+            "l": ["文本", "直线"],
+            "v": ["文本", "折线"],
+            "r": ["文本", "矩形"],
+            "c": ["文本", "圆形"],
+            "e": ["文本", "椭圆"],
+
+            "s": ["画笔", "画笔"],
+            "f": ["画笔", "画刷"],
+
+            "0": ["黑色", "黑色"],
+            "1": ["黑色", "红色"],
+            "2": ["黑色", "绿色"],
+            "3": ["黑色", "黄色"],
+            "4": ["黑色", "蓝色"],
+            "5": ["黑色", "紫色"],
+            "6": ["黑色", "青色"],
+            "7": ["黑色", "白色"],
+            "8": ["黑色", "随机色"],
+            "9": ["黑色", "默认色"],
+
+            "j": ["刷新", "刷新"],
+            "g": ["播放", "播放"],
+            "b": ["回退", "回退"],
+            "q": ["清空", "清空"],
+
+            "Escape": ["取消", "取消"],
+            " ": ["输入", "输入"],
         },
     }
-    return what
+
+    var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
+        ["折线图", "饼状图"],
+        ["移动", "旋转", "缩放"],
+        ["文本", "直线", "折线", "矩形", "圆形", "椭圆"],
+        ["辅助点", "辅助线"],
+        ["画笔", "画刷"],
+        ["黑色", "白色", "红色", "黄色", "绿色", "青色", "蓝色", "紫色"],
+        "", "清屏", "刷新", "播放", "回退",
+        "", "标签", "快捷键",
+    ], function(value, event) {
+        var map = what.trans[value]
+        conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]](value, event)
+    })
+
+    var canvas = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {width: width+20, height: height+20,
+        onclick: function(event) {
+            what.pushPoint(what.transform({x: event.offsetX, y: event.offsetY}), event.clientX, event.clientY)
+        }, onmousemove: function(event) {
+            what.movePoint(what.transform({x: event.offsetX, y: event.offsetY}), event.clientX, event.clientY)
+        },
+    }}]).last.getContext("2d")
+
+    var status = kit.AppendStatus(kit.AppendChild(output, [{view: ["status"]}]).last, [{name: "nshape"}, {"className": "cmd", style: {width: (output.clientWidth - 100)+"px"}, data: {autocomplete: "off"}, input: ["cmd", function(event) {
+        var target = event.target
+        event.type == "keyup" && event.key == "Enter" && what.parse(target.value) && (!target.History && (target.History=[]),
+            target.History.push(target.value), target.Current=target.History.length, target.value = "")
+        event.type == "keyup" && page.oninput(event), event.stopPropagation()
+
+    }]}, {name: "xy"}], function(value, name, event) {
+
+    })
+
+    return what.reset().refresh()
 }

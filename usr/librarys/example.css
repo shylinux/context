@@ -15,6 +15,7 @@ fieldset {
 legend {
     margin-left:10px;
 }
+
 fieldset>form.option div {
     margin-right:6px;
     float:left;
@@ -176,11 +177,33 @@ fieldset.item>div.output {
 fieldset.item>div.output>canvas {
     background-color:#8dd09e;
 }
+fieldset.item>div.output>div.action>button.trap {
+    background-color:lightblue;
+    border:2px blue solid;
+}
+fieldset.item>div.output>div.action>div.space {
+    width:10px;
+    display:inline-block;
+}
+fieldset.item>div.output>div.status>div {
+    float:left;
+    height:20px;
+    border:1px solid black;
+}
+fieldset.item>div.output>div.status>input.cmd {
+    float:left;
+    background-color:black;
+    color:lightgreen;;
+    font-size:16px;
+    width:250px;
+}
 
 .hidden {
     display:none;
 }
 .normal {
+}
+.choice {
 }
 
 fieldset table {
