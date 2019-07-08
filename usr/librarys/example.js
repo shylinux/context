@@ -759,7 +759,7 @@ function Plugin(page, pane, field) {
                 typeof cb == "function" && cb(msg)
             },
             trend: function(msg, cb) {
-                typeof cb == "function" && !cb(msg) || Canvas(plugin, output, output.clientWidth-40, 400, 10, msg)
+                typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, output, output.clientWidth-40, 400, 10, msg))
             },
             point: function(msg) {
                 var id = "canvas"+page.ID()
@@ -847,22 +847,41 @@ function Plugin(page, pane, field) {
     return page[field.id] = pane[field.id] = plugin.Field = field, field.Plugin = plugin
 }
 function Canvas(plugin, output, width, height, space, msg) {
-    var view = [], ps = [], point = [], index = 0, now = {}
-    var trap = false, label = false
+    var keys = [], data = {}, max = {}, nline = 0
+    var nrow = msg[msg.append[0]].length
+    var step = width / (nrow - 1)
+    msg.append.forEach(function(key, index) {
+        var list = []
+        msg[key].forEach(function(value, index) {
+            var v = parseInt(value)
+            !isNaN(v) && (list.push(v), v > (max[key]||0) && (max[key] = v))
+        })
+        list.length == nrow && (keys.push(key), data[key] = list, nline++)
+    })
 
     var conf = {
         font: "monospace", text: "hi", tool: "stroke", style: "black",
         type: "trend", shape: "drawText", means: "drawPoint",
         limits: {scale: 3, drawPoint: 1, drawPoly: 3},
+
         axies: {style: "black", width: 2},
         xlabel: {style: "red", width: 2, height: 5},
-        play: 500,
+        plabel: {style: "red", font: "16px monospace", offset: 10, height: 20, length: 20},
+        data: {style: "black", width: 1},
+
         mpoint: 10,
+        play: 500,
     }
+
+    var view = [], ps = [], point = [], now = {}, index = 0
+    var trap = false, label = false
+
     var what = {
         reset: function(x, y) {
             canvas.resetTransform()
             canvas.setTransform(1, 0, 0, -1, space+(x||0), height+space-(y||0))
+            canvas.strokeStyle = conf.data.style
+            canvas.fillStyle = conf.data.style
             return what
         },
         clear: function() {
@@ -907,8 +926,14 @@ function Canvas(plugin, output, width, height, space, msg) {
         },
 
         draw: function(meta) {
-            canvas.strokeStyle = meta.style || conf.style
-            canvas.fillStyle = meta.style || conf.style
+            function trans(value) {
+                if (value == "random") {
+                    return ["black", "red", "green", "yellow", "blue", "purple", "cyan", "white"][parseInt(Math.random()*8)]
+                }
+                return value
+            }
+            canvas.strokeStyle = trans(meta.style || conf.style)
+            canvas.fillStyle = trans(meta.style || conf.style)
             canvas[meta.tool||conf.tool]()
             return meta
         },
@@ -1000,7 +1025,7 @@ function Canvas(plugin, output, width, height, space, msg) {
             return meta
         },
 
-        drawAxies: function(space, style) {
+        drawAxies: function() {
             canvas.beginPath()
             canvas.moveTo(-space, 0)
             canvas.lineTo(width+space, 0)
@@ -1023,82 +1048,147 @@ function Canvas(plugin, output, width, height, space, msg) {
             return what
         },
 
-        drawData: function() {
-            var col = msg.append.length
-            var row = msg[msg.append[0]].length
-            var step = width / (row - 1)
-
-            switch (conf.type) {
-                case "trend":
-                    what.drawAxies(10).drawXLabel(step)
+        figure: {
+            trend: {
+                draw: function() {
+                    what.drawAxies().drawXLabel(step)
                     canvas.beginPath()
-                    msg.append.forEach(function(key) {
-                        var max = 0
-                        msg[key].forEach(function(value, index, array) {
-                            parseInt(value) > max && (max = parseInt(value))
+                    for (var key in data) {
+                        data[key].forEach(function(value, i) {
+                            i == 0? canvas.moveTo(0, value/max[key]*height): canvas.lineTo(step*i, value/max[key]*height)
+                            i == index && (canvas.moveTo(step*i, 0), canvas.lineTo(step*i, value/max[key]*height))
                         })
-                        msg[key].forEach(function(value, index, array) {
-                            if (index == 0) {
-                                canvas.moveTo(0, value/max*height)
-                            } else {
-                                canvas.lineTo(step*index, value/max*height)
-                            }
-                        })
-                    })
-                    canvas.strokeStyle = "black"
-                    canvas.lineWidth = 1
+                    }
+                    canvas.strokeStyle = conf.data.style
+                    canvas.lineWidth = conf.data.width
                     canvas.stroke()
-                    break
+                },
+                show: function(p) {
+                    index = parseInt(p.x/step)
+                    canvas.moveTo(p.x, -space)
+                    canvas.lineTo(p.x, height)
+                    canvas.moveTo(-space, p.y)
+                    canvas.lineTo(width, p.y)
+                    return p
+                },
+            },
+            stick: {
+                draw: function() {
+                    what.drawAxies().drawXLabel(step)
+                    canvas.beginPath()
 
-                case "weight":
-                    what.reset(0, height/2)
-                    var nline = 0
-                    msg.append.forEach(function(key, index) {
-                        !isNaN(parseInt(msg[key][0])) && nline++
-                    })
+                    var total = 0
+                    for (var key in max) {
+                        total += max[key]
+                    }
+
+                    for (var i = 0; i < nrow; i++) {
+                        canvas.moveTo(step*i, 0)
+                        for (var key in data) {
+                            canvas.lineTo(step*i, data[key][i]/total*height)
+                            canvas.moveTo(step*i-step/2, data[key][i]/total*height)
+                            canvas.lineTo(step*i+step/2, data[key][i]/total*height)
+                            canvas.moveTo(step*i, data[key][i]/total*height)
+                        }
+                    }
+                    canvas.strokeStyle = conf.data.style
+                    canvas.lineWidth = conf.data.width
+                    canvas.stroke()
+                },
+                show: function(p) {
+                    index = parseInt(p.x/step)
+                    canvas.moveTo(p.x, -space)
+                    canvas.lineTo(p.x, height)
+                    canvas.moveTo(-space, p.y)
+                    canvas.lineTo(width, p.y)
+                    return p
+                },
+            },
+            weight: {
+                conf: {
+                    space: 20,
+                    focus: "white",
+                    style: "black",
+                    width: 1,
+                    least: 0.01,
+                },
+                draw: function() {
+                    var that = this
                     var space = width / (nline+1)
 
-                    var order = 0
-                    msg.append.forEach(function(key, i) {
-                        if (isNaN(parseInt(msg[key][0]))) {
-                            return
-                        }
-                        order++
-
-                        canvas.translate(space, 0)
-
+                    canvas.translate(0, height/2)
+                    for (var key in data) {
                         var total = 0
-                        msg[key].forEach(function(value, i, array) {
-                            total += parseInt(value)/1
+                        data[key].forEach(function(value) {
+                            total += value
                         })
-                        var sum = 0
 
-                        msg[key].forEach(function(value, i, array) {
-                            value = parseInt(parseInt(value)/1)
-                            if ((value)/total < 0.01) {
+                        var sum = 0
+                        canvas.translate(space, 0)
+                        data[key].forEach(function(value, i) {
+                            if (value/total < that.conf.least) {
                                 return
                             }
-                            canvas.beginPath()
-                            canvas.moveTo(0, 0)
+
                             var a = sum/total*Math.PI*2
                             var b = (sum+value)/total*Math.PI*2
-                            canvas.arc(0, 0, (space/2)-20, a, b, false)
+                            sum+=value
+
+                            canvas.beginPath()
+                            canvas.moveTo(0, 0)
+                            canvas.arc(0, 0, (space/2)-that.conf.space, a, b, false)
                             canvas.closePath()
 
                             if (i == index) {
-                                canvas.fillStyle = "white"
+                                canvas.fillStyle = that.conf.focus
                                 canvas.fill()
                             } else {
-                                canvas.strokeStyle = "black"
-                                canvas.lineWidth = 1
+                                canvas.strokeStyle = that.conf.style
+                                canvas.lineWidth = that.conf.width
                                 canvas.stroke()
                             }
-
-                            sum+=value
                         })
+                    }
+                },
+                show: function(p) {
+                    var nspace = width / (nline+1)
+                    var which = parseInt((p.x-nspace/2)/nspace)
+                    which >= nline && (which = nline-1), which < 0 && (which = 0)
+
+                    var q = what.reverse(p)
+                    canvas.translate((which+1)*nspace, height/2)
+                    var p = what.transform(q)
+
+                    var a = Math.atan2(p.y, p.x)
+                    a < 0 && (a += Math.PI*2)
+                    var pos = a/2/Math.PI
+
+                    var total = 0
+                    data[keys[which]].forEach(function(value) {
+                        total += value
                     })
-                    break
-            }
+                    var sum = 0, weight = 0
+                    data[keys[which]].forEach(function(value, i) {
+                        sum += value, sum / total < pos && (index = i+1)
+                        index == i && (weight = parseInt(value/total*100))
+                    })
+
+                    canvas.moveTo(0, 0)
+                    canvas.lineTo(p.x, p.y)
+                    canvas.lineTo(p.x+conf.plabel.length, p.y)
+
+                    canvas.scale(1, -1)
+                    canvas.fillText("weight: "+weight+"%", p.x+conf.plabel.offset, -p.y+conf.plabel.offset)
+                    canvas.scale(1, -1)
+                    return p
+                },
+            },
+        },
+
+        drawData: function() {
+            canvas.save()
+            what.figure[conf.type].draw()
+            canvas.restore()
             return what
         },
         drawView: function() {
@@ -1110,46 +1200,21 @@ function Canvas(plugin, output, width, height, space, msg) {
         drawLabel: function() {
             if (!label) { return what }
 
-            var p = now
-            var q = what.reverse(p)
-
-            var weight = 0
             index = 0
             canvas.save()
-            if (conf.type == "trend") {
-                index = parseInt(p.x/space)
-                canvas.moveTo(p.x, -10)
-                canvas.lineTo(p.x, height)
-                canvas.moveTo(-10, p.y)
-                canvas.lineTo(width, p.y)
-            } else {
-                var a = Math.atan2(p.y, p.x)
-                a < 0 && (a += Math.PI*2)
-                var pos = a/2/Math.PI
-
-                var total = 0
-                msg[msg.append[msg.append.length-1]].forEach(function(value) {
-                    total += parseInt(value)
-                })
-                var sum = 0
-                msg[msg.append[msg.append.length-1]].forEach(function(value, i) {
-                    sum += parseInt(value), sum / total < pos && (index = i+1)
-                    index == i && (weight = parseInt(value/total*100))
-                })
-                canvas.moveTo(0, 0)
-                canvas.lineTo(p.x, p.y)
-                canvas.lineTo(p.x+10, p.y)
-            }
-            canvas.strokeStyle = conf.style
+            canvas.font = conf.plabel.font || conf.font
+            canvas.fillStyle = conf.plabel.style || conf.style
+            canvas.strokeStyle = conf.plabel.style || conf.style
+            var p = what.figure[conf.type].show(now)
             canvas.stroke()
 
-            canvas.resetTransform()
-            canvas.font="16px monospace"
-            canvas.fillStyle = conf.style
-            weight && canvas.fillText("weight: "+weight+"%", q.x+10, q.y+10+i*20)
-            canvas.fillText("index: "+index, q.x+10, q.y+30+i*20)
+            canvas.scale(1, -1)
+            p.x += conf.plabel.offset
+            p.y -= conf.plabel.offset
+
+            canvas.fillText("index: "+index, p.x, -p.y+conf.plabel.height)
             msg.append.forEach(function(key, i, n) {
-                msg[key][index] && canvas.fillText(key+": "+msg[key][index], q.x+10, q.y+50+i*20)
+                msg[key][index] && canvas.fillText(key+": "+msg[key][index], p.x, -p.y+(i+2)*conf.plabel.height)
             })
             canvas.restore()
             return what
@@ -1307,16 +1372,14 @@ function Canvas(plugin, output, width, height, space, msg) {
             })(meta)
         },
         input: function(event) {
-            switch (event.key) {
-                default:
-                    var map = what.trans[event.key]
-                    map && action[map[0]] && (action[map[0]].value = map[1])
-                    map && what.trans[map[0]] && (map = what.trans[map[1]]) && (conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]]())
-                    break
-            }
+            var map = what.trans[event.key]
+            map && action[map[0]] && (action[map[0]].value = map[1])
+            map && what.trans[map[0]] && (map = what.trans[map[1]]) && (conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]]())
+            what.refresh()
         },
         trans: {
             "折线图": ["type", "trend"],
+            "柱状图": ["type", "stick"],
             "饼状图": ["type", "weight"],
 
             "移动": ["shape", "move"],
@@ -1396,17 +1459,18 @@ function Canvas(plugin, output, width, height, space, msg) {
     }
 
     var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
-        ["折线图", "饼状图"],
+        ["折线图", "柱状图", "饼状图"],
         ["移动", "旋转", "缩放"],
         ["文本", "直线", "折线", "矩形", "圆形", "椭圆"],
         ["辅助点", "辅助线"],
         ["画笔", "画刷"],
-        ["黑色", "白色", "红色", "黄色", "绿色", "青色", "蓝色", "紫色"],
+        ["黑色", "红色", "绿色", "黄色", "蓝色", "紫色", "青色", "白色", "随机色", "默认色"],
         "", "清屏", "刷新", "播放", "回退",
         "", "标签", "快捷键",
     ], function(value, event) {
         var map = what.trans[value]
         conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]](value, event)
+        what.refresh()
     })
 
     var canvas = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {width: width+20, height: height+20,
