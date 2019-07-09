@@ -854,7 +854,7 @@ function Canvas(plugin, output, width, height, space, msg) {
         var list = []
         msg[key].forEach(function(value, index) {
             var v = parseInt(value)
-            !isNaN(v) && (list.push(v), v > (max[key]||0) && (max[key] = v))
+            !isNaN(v) && (list.push((value.indexOf("-") == -1)? v: value), v > (max[key]||0) && (max[key] = v))
         })
         list.length == nrow && (keys.push(key), data[key] = list, nline++)
     })
@@ -1072,6 +1072,64 @@ function Canvas(plugin, output, width, height, space, msg) {
                     return p
                 },
             },
+            ticket: {
+                draw: function() {
+                    what.drawAxies().drawXLabel(step)
+                    canvas.beginPath()
+
+                    var sum = 0, total = 0
+                    for (var i = 0; i < nrow; i++) {
+                        sum += data[keys[1]][i]
+                        sum > total && (total = sum)
+                        sum -= data[keys[2]][i]
+                    }
+                    if (!data["sum"]) {
+                        var sum = 0, max = 0, min = 0, end = 0
+                        keys = keys.concat(["sum", "max", "min", "end"])
+                        data["sum"] = []
+                        data["max"] = []
+                        data["min"] = []
+                        data["end"] = []
+                        for (var i = 0; i < nrow; i++) {
+                            max = sum + data[keys[1]][i]
+                            min = sum - data[keys[2]][i]
+                            end = sum + data[keys[1]][i] - data[keys[2]][i]
+                            data["sum"].push(sum)
+                            data["max"].push(max)
+                            data["min"].push(min)
+                            data["end"].push(end)
+                            sum = end
+                        }
+                    }
+
+                    for (var i = 0; i < nrow; i++) {
+                        if (data["sum"][i] < data["end"][i]) {
+                            canvas.moveTo(step*i, data["min"][i]/total*height)
+                            canvas.lineTo(step*i, data["sum"][i]/total*height)
+
+                            canvas.moveTo(step*i, data["max"][i]/total*height)
+                            canvas.lineTo(step*i, data["end"][i]/total*height)
+                        } else {
+                            canvas.moveTo(step*i, data["min"][i]/total*height)
+                            canvas.lineTo(step*i, data["end"][i]/total*height)
+
+                            canvas.moveTo(step*i, data["max"][i]/total*height)
+                            canvas.lineTo(step*i, data["sum"][i]/total*height)
+                        }
+                    }
+                    canvas.strokeStyle = conf.data.style
+                    canvas.lineWidth = conf.data.width
+                    canvas.stroke()
+                },
+                show: function(p) {
+                    index = parseInt(p.x/step)
+                    canvas.moveTo(p.x, -space)
+                    canvas.lineTo(p.x, height)
+                    canvas.moveTo(-space, p.y)
+                    canvas.lineTo(width, p.y)
+                    return p
+                },
+            },
             stick: {
                 draw: function() {
                     what.drawAxies().drawXLabel(step)
@@ -1212,9 +1270,12 @@ function Canvas(plugin, output, width, height, space, msg) {
             p.x += conf.plabel.offset
             p.y -= conf.plabel.offset
 
+            if (width - p.x < 200) {
+                p.x -= 200
+            }
             canvas.fillText("index: "+index, p.x, -p.y+conf.plabel.height)
-            msg.append.forEach(function(key, i, n) {
-                msg[key][index] && canvas.fillText(key+": "+msg[key][index], p.x, -p.y+(i+2)*conf.plabel.height)
+            keys.forEach(function(key, i) {
+                data[key][index] && canvas.fillText(key+": "+data[key][index], p.x, -p.y+(i+2)*conf.plabel.height)
             })
             canvas.restore()
             return what
@@ -1379,6 +1440,7 @@ function Canvas(plugin, output, width, height, space, msg) {
         },
         trans: {
             "折线图": ["type", "trend"],
+            "股价图": ["type", "ticket"],
             "柱状图": ["type", "stick"],
             "饼状图": ["type", "weight"],
 
@@ -1459,7 +1521,7 @@ function Canvas(plugin, output, width, height, space, msg) {
     }
 
     var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
-        ["折线图", "柱状图", "饼状图"],
+        ["折线图", "股价图", "柱状图", "饼状图"],
         ["移动", "旋转", "缩放"],
         ["文本", "直线", "折线", "矩形", "圆形", "椭圆"],
         ["辅助点", "辅助线"],

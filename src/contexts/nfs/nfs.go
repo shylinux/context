@@ -1253,7 +1253,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}},
 		"git": &ctx.Command{Name: "git sum", Help: "版本控制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) > 0 && arg[0] == "sum" {
-				if out, e := exec.Command("git", "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d").CombinedOutput(); m.Assert(e) {
+				if out, e := exec.Command("git", "log", "--reverse", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d").CombinedOutput(); m.Assert(e) {
 					for _, v := range strings.Split(string(out), "commit: ") {
 						if l := strings.Split(v, "\n"); len(l) > 2 {
 							fs := strings.Split(strings.TrimSpace(l[2]), ", ")
@@ -1393,6 +1393,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"draw": &ctx.Command{Name: "draw", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("nfs.dir", "src", "filename", "line", "size", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
+				return
+			}
+			if arg[0] == "git" {
+				m.Cmdy("nfs.git", "sum")
 				return
 			}
 
