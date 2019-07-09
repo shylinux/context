@@ -664,6 +664,8 @@ function Plugin(page, pane, field) {
                         item.ondblclick = function(event) {
                             action.value = kit.History.get("txt", -1).data.trim()
                         }
+                        item.autocomplete = "off"
+
                     }
                     args && count < args.length && (item.value = args[count++]||item.value||"")
                     item.className = "args"

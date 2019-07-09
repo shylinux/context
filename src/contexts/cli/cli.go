@@ -143,6 +143,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"action": &ctx.Config{Name: "action", Value: map[string]interface{}{}, Help: "交互任务"},
 
 		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
+            // vim git golang
+			"ubuntu": map[string]interface{}{
+            },
 			"github": "https://github.com/shylinux/context",
 			"env": map[string]interface{}{
 				"GOPATH": "https://github.com/shylinux/context",
@@ -613,9 +616,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				defer func() {
 					os.Exit(kit.Int(code))
 				}()
-				time.Sleep(time.Second * 1)
 				m.Cmd("cli._exit")
 				m.Cmd("nfs._exit")
+				time.Sleep(time.Second * 1)
 			})
 			return
 		}},
@@ -628,6 +631,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 		"project": &ctx.Command{Name: "project", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
+			case "prepare":
+
 			case "init":
 				if _, e := os.Stat(".git"); e == nil {
 					m.Cmdp(0, []string{"git update"}, []string{"cli.system", "git"}, [][]string{
