@@ -667,6 +667,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 					switch action {
 					case "cmd":
+                        if arg[0] == "command" {
+                            arg = arg[1:]
+                        }
 						if msg.Cmd(arg); !msg.Hand {
 							msg = msg.Cmd("cli.cmd", arg)
 						}
