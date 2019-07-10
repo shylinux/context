@@ -885,6 +885,7 @@ var version = struct {
 			}
 
 			m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "create", arg[0],
+				"daemon",
 				"cmd_env", "PATH", os.Getenv("path"),
 				"cmd_dir", m.Conf("missyou", "path"),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),

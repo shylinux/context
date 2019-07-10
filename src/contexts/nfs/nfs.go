@@ -915,7 +915,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		// 终端控制
 		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
-			if nfs.out = m.Optionv("out").(*os.File); m.Cap("goos") != "windows" && !m.Options("daemon") {
+			if nfs.out = m.Optionv("out").(*os.File); m.Conf("runtime", "host.GOOS") != "windows" && !m.Options("daemon") {
 				kit.STDIO = nfs
 				nfs.Term(m, "init")
 				m.Conf("term", "use", true)

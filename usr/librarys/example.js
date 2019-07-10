@@ -551,7 +551,7 @@ function Pane(page, field) {
         page.Sync(k).change(pane.Listen[k])
     }
     pane.Button && pane.Button.length > 0 && (kit.InsertChild(field, output, "div", pane.Button.map(function(value) {
-        return typeof value == "object"? {className: value[0], select: [value.slice(1), function(event) {
+        return typeof value == "object"? {className: value[0], select: [value.slice(1), function(value, event) {
             value = event.target.value
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
         }]}: value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, function(event) {
@@ -718,6 +718,7 @@ function Plugin(page, pane, field) {
             })
             return pane.View(field.parentNode, "plugin", field.Meta, [], field.Run).field.Plugin
         },
+
         Check: function(target, cb) {
             option.querySelectorAll(".args").forEach(function(item, index, list) {
                 item == target && (index == list.length-1? plugin.Runs(event, cb): page.plugin == field && list[index+1].focus())
@@ -729,7 +730,7 @@ function Plugin(page, pane, field) {
                 show && page.ontoast(kit.Format(args||["running..."]), meta.name, -1)
             }, 1000)
             event.Plugin = plugin, field.Run(event, args, function(msg) {
-                show = false, page.ontoast("")
+                plugin.msg = msg, show = false, page.ontoast("")
                 plugin.ondaemon[display.deal||"table"](msg, cb)
             })
         },
@@ -751,6 +752,7 @@ function Plugin(page, pane, field) {
         Clear: function() {
             output.innerHTML = ""
         },
+
         ondaemon: {
             table: function(msg, cb) {
                 output.innerHTML = ""
@@ -826,6 +828,10 @@ function Plugin(page, pane, field) {
                     option.dir.value = back
                 })
             },
+        },
+        display: function(arg) {
+            display.deal = arg
+            plugin.ondaemon[display.deal||"table"](plugin.msg)
         },
 
         Location: function(event) {
@@ -1083,7 +1089,7 @@ function Canvas(plugin, output, width, height, space, msg) {
                     for (var i = 0; i < nrow; i++) {
                         sum += data[keys[1]][i]
                         sum > total && (total = sum)
-                        sum -= data[keys[2]][i]
+                        sum -= data[keys[2]||keys[1]][i]
                     }
                     if (!data["sum"]) {
                         var sum = 0, max = 0, min = 0, end = 0
@@ -1094,8 +1100,8 @@ function Canvas(plugin, output, width, height, space, msg) {
                         data["end"] = []
                         for (var i = 0; i < nrow; i++) {
                             max = sum + data[keys[1]][i]
-                            min = sum - data[keys[2]][i]
-                            end = sum + data[keys[1]][i] - data[keys[2]][i]
+                            min = sum - data[keys[2||keys[1]]][i]
+                            end = sum + data[keys[1]][i] - data[keys[2]||keys[1]][i]
                             data["sum"].push(sum)
                             data["max"].push(max)
                             data["min"].push(min)
@@ -1276,8 +1282,8 @@ function Canvas(plugin, output, width, height, space, msg) {
                 p.x -= 200
             }
             canvas.fillText("index: "+index, p.x, -p.y+conf.plabel.height)
-            keys.forEach(function(key, i) {
-                data[key][index] && canvas.fillText(key+": "+data[key][index], p.x, -p.y+(i+2)*conf.plabel.height)
+            msg.append.forEach(function(key, i) {
+                msg[key][index] && canvas.fillText(key+": "+msg[key][index], p.x, -p.y+(i+2)*conf.plabel.height)
             })
             canvas.restore()
             return what

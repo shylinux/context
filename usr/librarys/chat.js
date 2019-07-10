@@ -339,10 +339,18 @@ page = Page({
                 "减参": function(event, value) {
                     page.plugin && page.plugin.Plugin.Remove()
                 },
+
+                "表格": function(event, value) {
+                    page.plugin && page.plugin.Plugin.display("table")
+                },
+                "图表": function(event, value) {
+                    page.plugin && page.plugin.Plugin.display("trend")
+                },
             },
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"], "",
                 "刷新", "清空", "并行", "串行", "",
                 "添加", "删除", "加参", "减参", "",
+				["display", "表格", "图表"],
             ],
         }
     },
