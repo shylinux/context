@@ -1,6 +1,7 @@
 package main
 
 import (
+    "runtime"
 	"bufio"
 	"bytes"
 	"encoding/json"
@@ -90,6 +91,7 @@ func Process(m *ctx.Message, file string, cb func(*ctx.Message, *http.Client, []
 			}
 		}(m.Spawn())
 	}
+    runtime.Gosched()
 	wg.Wait()
 	close(output)
 	return nline, time.Since(begin)
@@ -228,22 +230,35 @@ var Index = &ctx.Context{Name: "test", Help: "测试工具",
 		"cost": {Name: "cost file server nroute", Help:"接口耗时测试", Form: map[string]int{"nwork": 1, "limit": 1, "nsleep": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			var success int32 = 0
 			var times time.Duration
+            mu := sync.Mutex{}
 			limit := kit.Int(m.Confx("limit"))
-			nline, cost := Process(m, arg[0], func(msg *ctx.Message, client *http.Client, word []string, output chan []string) {
+            nline := 0
+			_, cost := Process(m, arg[0], func(msg *ctx.Message, client *http.Client, word []string, output chan []string) {
 				key, uri, args := word[0], word[1], word[2]
-				fmt.Printf("%v/%v post: %v\t%v\n", key, limit, arg[1]+uri, args)
+                for _, host := range arg[1:]{
+                    fmt.Printf("%v/%v post: %v\t%v\n", key, limit, host+uri, args)
 
-				begin := time.Now()
-				res, err := client.Post(arg[1]+uri, "application/json", bytes.NewReader([]byte(args)))
-				if res.StatusCode == http.StatusOK {
-					io.Copy(ioutil.Discard, res.Body)
-					atomic.AddInt32(&success, 1)
-				} else {
-					fmt.Printf("%v/%v error: %v\n", key, limit, err)
-				}
-				times += time.Since(begin)
+                    begin := time.Now()
+                    res, err := client.Post(host+uri, "application/json", bytes.NewReader([]byte(args)))
+                    if res.StatusCode == http.StatusOK {
+                        io.Copy(ioutil.Discard, res.Body)
+                        atomic.AddInt32(&success, 1)
+                    } else {
+                        fmt.Printf("%v/%v error: %v\n", key, limit, err)
+                    }
+                    t := time.Since(begin)
+                    times += t
+
+                    mu.Lock()
+                    nline++
+                    m.Add("append", "host", host)
+                    m.Add("append", "uri", uri)
+                    m.Add("append", "cost", t/1000000)
+                    mu.Unlock()
+                }
 			})
 
+            m.Sort("cost", "int_r")
 			m.Echo("\n\nnclient: %v nreq: %v success: %v time: %v average: %vms",
 				m.Confx("nwork"), nline, success, cost, int(times)/int(nline)/1000000)
 			return
