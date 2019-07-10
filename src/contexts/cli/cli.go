@@ -152,7 +152,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 			"import": []interface{}{
 				"github.com/nsf/termbox-go",
-				"github.com/gomodule/redigo",
+				"github.com/gomodule/redigo/redis",
 				"github.com/go-sql-driver/mysql",
 				"github.com/gomarkdown/markdown",
 				"gopkg.in/gomail.v2",

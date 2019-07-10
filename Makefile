@@ -7,7 +7,8 @@ install:
 	@go get github.com/skip2/go-qrcode
 	@go get github.com/go-sql-driver/mysql
 	@go get github.com/gomarkdown/markdown
-	@go get github.com/PuerkitoBio/goquery
+	@go get github.com/gomodule/redigo/redis
+	# @go get github.com/PuerkitoBio/goquery
 	@go get github.com/go-cas/cas
 	@go get gopkg.in/gomail.v2
 	GOPATH=$(PWD):$(GOPATH) go install $(BENCH)
