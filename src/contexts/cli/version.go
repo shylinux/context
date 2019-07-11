@@ -1,4 +1,5 @@
 package cli
+
 var version = struct {
 	time string
 	host string

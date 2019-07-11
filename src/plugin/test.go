@@ -81,6 +81,7 @@ func Process(m *ctx.Message, file string, cb func(*ctx.Message, *http.Client, []
 		go func(msg *ctx.Message) {
 			wg.Add(1)
 			defer wg.Done()
+
 			for {
 				word, ok := <-input
 				if !ok {
