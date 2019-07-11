@@ -127,10 +127,10 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			m.Echo(arg[1])
 			return
 		}},
-		"redis": &ctx.Command{Name: "redis conn address [protocol]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"redis": &ctx.Command{Name: "redis open address [protocol]", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if mdb, ok := m.Target().Server.(*MDB); m.Assert(ok) {
 				switch arg[0] {
-				case "conn":
+				case "open":
 					mdb.conn, e = redis.Dial("tcp", m.Cap("redis", arg[1]), redis.DialKeepAlive(time.Second*10))
 				default:
 					if mdb.conn == nil {
