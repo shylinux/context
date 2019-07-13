@@ -20,6 +20,25 @@ var STDIO TERM
 
 var EnableDebug = false
 
+func Split(str string, n int) []string {
+	res := []string{}
+	for i, j := 0, 0; i < len(str); i++ {
+		if str[i] == ' ' {
+			continue
+		}
+		for j = i; j < len(str); j++ {
+			if str[j] == ' ' {
+				break
+			}
+		}
+		if n == len(res)+1 {
+			j = len(str)
+		}
+		res, i = append(res, str[i:j]), j
+	}
+	return res
+}
+
 func Width(str string, mul int) int {
 	return len([]rune(str)) + (len(str)-len([]rune(str)))/2/mul
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"contexts/ctx"
 	"encoding/csv"
@@ -143,9 +144,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"action": &ctx.Config{Name: "action", Value: map[string]interface{}{}, Help: "交互任务"},
 
 		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
-            // vim git golang
-			"ubuntu": map[string]interface{}{
-            },
+			// vim git golang
+			"ubuntu": map[string]interface{}{},
 			"github": "https://github.com/shylinux/context",
 			"env": map[string]interface{}{
 				"GOPATH": "https://github.com/shylinux/context",
@@ -517,12 +517,22 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					read := csv.NewReader(out)
 					read.Comma = ' '
 					read.TrimLeadingSpace = true
-					read.FieldsPerRecord = 3
+					read.FieldsPerRecord = 4
 					data, e := read.ReadAll()
 					m.Assert(e)
 					for i := 1; i < len(data); i++ {
 						for j := 0; j < len(data[i]); j++ {
 							m.Add("append", data[0][j], data[i][j])
+						}
+					}
+					m.Table()
+
+				case "cut":
+					bio := bufio.NewScanner(out)
+					bio.Scan()
+					for heads := kit.Split(bio.Text(), -1); bio.Scan(); {
+						for i, v := range kit.Split(bio.Text(), len(heads)) {
+							m.Add("append", heads[i], v)
 						}
 					}
 					m.Table()
@@ -587,7 +597,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"proc": &ctx.Command{Name: "proc", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmdy("cli.system", "ps", kit.Select("ax", arg, 0))
+			m.Cmdy("cli.system", "cmd_parse", "cut", "ps", kit.Select("ax", arg, 0))
 			return
 		}},
 		"quit": &ctx.Command{Name: "quit code", Help: "停止服务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
