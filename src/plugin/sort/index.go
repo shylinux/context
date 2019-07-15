@@ -63,7 +63,7 @@ var Index = &ctx.Context{Name: "sort", Help: "sort code",
 		"data": &ctx.Config{Name: "data", Value: map[string]interface{}{
 			"seed": []int{47, 59, 81, 40, 56, 0, 94, 11, 18, 25},
 		}},
-		"index": &ctx.Config{Name: "index", Value: []interface{}{
+		"_index": &ctx.Config{Name: "index", Value: []interface{}{
 			map[string]interface{}{"componet_name": "select", "componet_help": "选择排序",
 				"componet_tmpl": "componet", "componet_view": "componet", "componet_init": "",
 				"componet_type": "public", "componet_ctx": "sort", "componet_cmd": "select",

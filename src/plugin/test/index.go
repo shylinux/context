@@ -134,7 +134,7 @@ var Index = &ctx.Context{Name: "test", Help: "测试工具",
 		"prefix0": {Name: "prefix0", Help: "请求前缀", Value: "uri["},
 		"prefix1": {Name: "prefix1", Help: "参数前缀", Value: "request_param["},
 
-		"index": &ctx.Config{Name: "index", Value: []interface{}{
+		"_index": &ctx.Config{Name: "index", Value: []interface{}{
 			map[string]interface{}{"componet_name": "status", "componet_help": "状态",
 				"componet_tmpl": "componet", "componet_view": "Company", "componet_init": "",
 				"componet_type": "private", "componet_ctx": "test", "componet_cmd": "diff",

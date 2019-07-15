@@ -35,6 +35,7 @@ func (c *Context) Plugin(s *Context, args []string) string {
 	c.Register(s, nil)
 	m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}
 	m.Option("log.disable", true)
+    m.Option("cli.modal", "action")
 
 	if len(args) == 0 {
 		m.Echo("%s: %s\n\n", s.Name, s.Help)

@@ -157,9 +157,46 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"github.com/go-cas/cas",
 			}, "plugin": map[string]interface{}{
 				"path": "src/plugin", "list": []interface{}{
-					map[string]interface{}{"name": "index.go", "text": ""},
-					map[string]interface{}{"name": "index.js", "text": ""},
-					map[string]interface{}{"name": "local.shy", "text": ""},
+					map[string]interface{}{"name": "index.go", "text": `package main
+
+import (
+    "contexts/cli"
+    "contexts/ctx"
+    "toolkit"
+    "fmt"
+    "os"
+)
+
+var Index = &ctx.Context{Name: "test", Help: "测试工具",
+	Caches: map[string]*ctx.Cache{},
+	Configs: map[string]*ctx.Config{
+		"_index": &ctx.Config{Name: "index", Value: []interface{}{
+			map[string]interface{}{"componet_name": "demo", "componet_help": "demo",
+				"componet_tmpl": "componet", "componet_view": "componet", "componet_init": "",
+				"componet_type": "public", "componet_ctx": "demo", "componet_cmd": "demo",
+				"componet_args": []interface{}{}, "inputs": []interface{}{
+					map[string]interface{}{"type": "text", "name": "pod", "value": "hello world"},
+					map[string]interface{}{"type": "button", "value": "执行"},
+				},
+			},
+		}},
+	},
+	Commands: map[string]*ctx.Command{
+		"demo": {Name: "demo", Help: "demo", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+            m.Echo(kit.Select("hello world", arg, 0))
+            return
+		}},
+	},
+}
+
+func main() {
+	fmt.Print(cli.Index.Plugin(Index, os.Args[1:]))
+}
+`}, map[string]interface{}{"name": "index.js", "text": `
+{init: function(page, pane, field, option, output) {
+    kit.Log("hello world")
+}}
+`}, map[string]interface{}{"name": "local.shy", "text": ` `},
 				},
 			}, "script": map[string]interface{}{
 				"path": "usr/script",
@@ -779,6 +816,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
 					m.Cmd("nfs.copy", path.Join(q, kit.Format(value["name"])), path.Join(p, kit.Format(value["name"])))
 				})
+                for _, v := range arg[1:] {
+                    m.Cmd("nfs.copy", path.Join(q, v), path.Join(p, v))
+                }
 				m.Cmdy("nfs.dir", q, "time", "size", "hash", "path")
 				return e
 			}
@@ -838,7 +878,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					if s, e := p.Lookup("Index"); m.Assert(e) {
 						msg := m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0])).Cmd("_init", arg[1:])
 						msg.Cap("stream", arg[0])
-						msg.Confm("index", func(index int, value map[string]interface{}) {
+						msg.Confm("_index", func(index int, value map[string]interface{}) {
 							value["componet_ctx"] = "cli." + arg[0]
 							m.Conf("ssh.componet", []interface{}{arg[0], index}, value)
 							m.Add("append", "index", index)

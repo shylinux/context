@@ -503,7 +503,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"tool": &ctx.Command{Name: "tool", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
-					m.Log("fuck", "what %v %v %v", m.Option("username"), m.Conf("runtime", "user.name"), m.Conf("runtime", "work.name"))
 					if kit.Format(value["componet_type"]) != "public" && m.Option("username") != m.Conf("runtime", "work.name") && m.Option("username") != m.Conf("runtime", "user.name") {
 						return
 					}
@@ -558,7 +557,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Add("append", "help", value["componet_help"])
 					m.Add("append", "view", value["componet_view"])
 					if kit.Right(value["componet_init"]) {
-						m.Add("append", "init", m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1))
+                        script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.publish", "path"), arg[0], kit.Format(value["componet_init"])), -1)
+                        if script == "" {
+                            script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1)
+                        }
+						m.Add("append", "init", script)
 					} else {
 						m.Add("append", "init", "")
 					}
@@ -1101,7 +1104,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
 
 			// 权限检查
-			if !m.Cmds("aaa.work", "right", "remote", arg[0]) {
+			if arg[0] != "tool" && !m.Cmds("aaa.work", "right", "remote", arg[0]) {
 				m.Echo("no right %s %s", "remote", arg[0])
 				return
 			}
