@@ -1121,7 +1121,7 @@ function Canvas(plugin, output, width, height, space, msg) {
                     for (var i = 0; i < nrow; i++) {
                         sum += data[keys[1]][i]
                         sum > total && (total = sum)
-                        sum -= data[keys[2]][i]
+                        sum -= data[keys[2]||keys[1]][i]
                     }
                     if (!data["sum"]) {
                         var sum = 0, max = 0, min = 0, end = 0
@@ -1132,8 +1132,8 @@ function Canvas(plugin, output, width, height, space, msg) {
                         data["end"] = []
                         for (var i = 0; i < nrow; i++) {
                             max = sum + data[keys[1]][i]
-                            min = sum - data[keys[2]][i]
-                            end = sum + data[keys[1]][i] - data[keys[2]][i]
+                            min = sum - data[keys[2||keys[1]]][i]
+                            end = sum + data[keys[1]][i] - data[keys[2]||keys[1]][i]
                             data["sum"].push(sum)
                             data["max"].push(max)
                             data["min"].push(min)

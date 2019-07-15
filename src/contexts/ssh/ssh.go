@@ -503,7 +503,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"tool": &ctx.Command{Name: "tool", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
-					if kit.Format(value["componet_type"]) != "public" && m.Option("username") != m.Conf("runtime", "work.name") {
+					m.Log("fuck", "what %v %v %v", m.Option("username"), m.Conf("runtime", "user.name"), m.Conf("runtime", "work.name"))
+					if kit.Format(value["componet_type"]) != "public" && m.Option("username") != m.Conf("runtime", "work.name") && m.Option("username") != m.Conf("runtime", "user.name") {
 						return
 					}
 

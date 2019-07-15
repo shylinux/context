@@ -462,7 +462,7 @@ page = Page({
                 this.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", this.Run([river], function(msg) {
                     kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, pod, i, tr, event) {
                         var old = table.querySelector("tr.select")
-                        tr.className = "select", old && (old.className = "normal"), field.Pane.Run([river, pod.key], function(msg) {
+                        tr.className = "select", old && (old.className = "normal"), field.Pane.Run([river, pod.key, pod["user.route"]], function(msg) {
                             device.innerHTML = "", kit.AppendTable(device, ctx.Table(msg), ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                                 var last = kit.AppendChild(ui.list, [{type: "tr", list: [
                                     {text: [com.key, "td"]}, {text: [com.index, "td"]}, {text: [com.name, "td"]}, {text: [com.help, "td"]},

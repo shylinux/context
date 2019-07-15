@@ -314,34 +314,42 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				m.Sort("key").Table()
 				return
 			}
-			if len(arg) == 2 {
-				m.Confm("flow", []string{arg[0], "tool", arg[1], "list"}, func(index int, tool map[string]interface{}) {
-					m.Add("append", "river", arg[0])
-					m.Add("append", "storm", arg[1])
-					m.Add("append", "action", index)
 
-					m.Add("append", "node", tool["node"])
-					m.Add("append", "group", tool["group"])
-					m.Add("append", "index", tool["index"])
+			switch arg[1] {
+			case "delete":
+				str := m.Conf("flow", []string{arg[0], "tool", arg[2]})
+				m.Log("info", "delete %v %v %v", arg[0], arg[2], str)
+				m.Conf("flow", []string{arg[0], "tool", arg[2]}, "")
+				m.Echo(str)
 
-					msg := m.Cmd("ssh._route", tool["node"], "tool", tool["group"], tool["index"])
+			default:
+				if len(arg) == 2 {
+					m.Confm("flow", []string{arg[0], "tool", arg[1], "list"}, func(index int, tool map[string]interface{}) {
+						m.Add("append", "river", arg[0])
+						m.Add("append", "storm", arg[1])
+						m.Add("append", "action", index)
 
-					m.Add("append", "name", msg.Append("name"))
-					m.Add("append", "help", msg.Append("help"))
-					m.Add("append", "view", msg.Append("view"))
-					m.Add("append", "init", msg.Append("init"))
-					m.Add("append", "inputs", msg.Append("inputs"))
-					m.Add("append", "exports", msg.Append("exports"))
-					m.Add("append", "display", msg.Append("display"))
-				})
-				m.Table()
-				return
+						m.Add("append", "node", tool["node"])
+						m.Add("append", "group", tool["group"])
+						m.Add("append", "index", tool["index"])
+
+						msg := m.Cmd("ssh._route", tool["node"], "tool", tool["group"], tool["index"])
+
+						m.Add("append", "name", msg.Append("name"))
+						m.Add("append", "help", msg.Append("help"))
+						m.Add("append", "view", msg.Append("view"))
+						m.Add("append", "init", msg.Append("init"))
+						m.Add("append", "inputs", msg.Append("inputs"))
+						m.Add("append", "exports", msg.Append("exports"))
+						m.Add("append", "display", msg.Append("display"))
+					})
+					m.Table()
+
+				} else if tool := m.Confm("flow", []string{arg[0], "tool", arg[1], "list", arg[2]}); tool != nil {
+					m.Cmdy("ssh._route", tool["node"], "tool", "run", tool["group"], tool["index"], arg[0], arg[3:])
+				}
 			}
 
-			if tool := m.Confm("flow", []string{arg[0], "tool", arg[1], "list", arg[2]}); tool != nil {
-				m.Cmdy("ssh._route", tool["node"], "tool", "run", tool["group"], tool["index"], arg[0], arg[3:])
-				return
-			}
 			return
 		}},
 		"steam": &ctx.Command{Name: "steam", Help: "天空", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -354,6 +362,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				m.Confm("flow", []string{arg[0], "user"}, func(key string, value map[string]interface{}) {
 					m.Add("append", "key", key)
 					m.Add("append", "user.route", value["user"])
+				})
+				m.Confm("ssh.node", func(key string, value map[string]interface{}) {
+					m.Add("append", "key", key)
+					m.Add("append", "user.route", value["name"])
 				})
 				m.Table()
 				return
@@ -375,7 +387,8 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				})
 
 			default:
-				m.Cmdy("ssh._route", m.Conf("flow", []string{arg[0], "user", arg[1], "user"}), "tool")
+				m.Cmdy("ssh._route", arg[2], "tool")
+				// m.Cmdy("ssh._route", m.Conf("flow", []string{arg[0], "user", arg[1], "user"}), "tool")
 			}
 			return
 		}},

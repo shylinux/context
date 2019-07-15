@@ -932,7 +932,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"cmd_daemon", "true",
 			}
 			if m.Conf("runtime", "host.GOOS") == "windows" {
-				m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), args)
+				m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "start", args)
 			} else {
 				m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), args)
 			}
