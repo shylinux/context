@@ -1140,6 +1140,14 @@ function Canvas(plugin, output, width, height, space, msg) {
                             data["end"].push(end)
                             sum = end
                         }
+                        msg.append.push("sum")
+                        msg.sum = data.sum
+                        msg.append.push("max")
+                        msg.max = data.max
+                        msg.append.push("min")
+                        msg.min = data.min
+                        msg.append.push("end")
+                        msg.end = data.end
                     }
 
                     for (var i = 0; i < nrow; i++) {

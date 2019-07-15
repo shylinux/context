@@ -309,7 +309,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "dir", "view": "long"},
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{
-							"branch", "status", "diff", "log", "push", "update",
+							"branch", "status", "diff", "log", "sum", "push", "update",
 						}},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},

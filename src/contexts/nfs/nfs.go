@@ -1318,12 +1318,18 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return
 			}},
 		"git": &ctx.Command{Name: "git sum", Help: "版本控制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 0 && arg[0] == "sum" {
-				if out, e := exec.Command("git", "log", "--reverse", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d").CombinedOutput(); m.Assert(e) {
+			if len(arg) > 0 && arg[0] == "sum" || len(arg) > 1 && arg[1] == "sum" {
+				args := []string{"log"}
+				if len(arg) > 1 && arg[1] == "sum" && arg[0] != "" {
+					args = append(args, "-C", arg[0])
+				}
+				args = append(args, "--reverse", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d %H:%M")
+				if out, e := exec.Command("git", args...).CombinedOutput(); m.Assert(e) {
 					for _, v := range strings.Split(string(out), "commit: ") {
 						if l := strings.Split(v, "\n"); len(l) > 2 {
 							fs := strings.Split(strings.TrimSpace(l[2]), ", ")
-							m.Add("append", "date", l[0])
+							hs := strings.Split(l[0], " ")
+							m.Add("append", "date", hs[0])
 
 							if adds := strings.Split(fs[1], " "); len(fs) > 2 {
 								dels := strings.Split(fs[2], " ")
@@ -1336,6 +1342,13 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								m.Add("append", "adds", "0")
 								m.Add("append", "dels", adds[0])
 							}
+							m.Add("append", "time", hs[1])
+						} else if len(l[0]) > 0 {
+							hs := strings.Split(l[0], " ")
+							m.Add("append", "date", hs[0])
+							m.Add("append", "adds", 0)
+							m.Add("append", "dels", 0)
+							m.Add("append", "time", hs[1])
 						}
 					}
 					m.Table()
