@@ -1,25 +1,27 @@
 package main
 
 import (
-    "runtime"
+	"contexts/cli"
+	"contexts/ctx"
+	"toolkit"
+
 	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"contexts/ctx"
-	kit "toolkit"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-func Input(m *ctx.Message, file string, input chan[]string) {
+func Input(m *ctx.Message, file string, input chan []string) {
 	f, e := os.Open(file)
 	m.Assert(e)
 	defer f.Close()
@@ -38,7 +40,7 @@ func Input(m *ctx.Message, file string, input chan[]string) {
 		}
 
 		input <- []string{fmt.Sprintf("%d", nline), uri, arg}
-		if nline++; nline % kit.Int(m.Confx("nsleep")) == 0 {
+		if nline++; nline%kit.Int(m.Confx("nsleep")) == 0 {
 			fmt.Printf("nline:%d sleep 1s...\n", nline)
 			time.Sleep(time.Second)
 		}
@@ -46,7 +48,7 @@ func Input(m *ctx.Message, file string, input chan[]string) {
 	close(input)
 }
 
-func Output(m *ctx.Message, output <-chan[]string) {
+func Output(m *ctx.Message, output <-chan []string) {
 	os.MkdirAll(m.Conf("outdir"), 0777)
 
 	files := map[string]*os.File{}
@@ -62,7 +64,7 @@ func Output(m *ctx.Message, output <-chan[]string) {
 			defer f.Close()
 			files[uri] = f
 		}
-		for _, v:= range data {
+		for _, v := range data {
 			fmt.Fprintf(files[uri], v)
 		}
 	}
@@ -88,11 +90,11 @@ func Process(m *ctx.Message, file string, cb func(*ctx.Message, *http.Client, []
 					break
 				}
 				atomic.AddInt32(&nline, 1)
-				cb(msg, &http.Client{Timeout:kit.Duration(m.Conf("timeout"))}, word, output)
+				cb(msg, &http.Client{Timeout: kit.Duration(m.Conf("timeout"))}, word, output)
 			}
 		}(m.Spawn())
 	}
-    runtime.Gosched()
+	runtime.Gosched()
 	wg.Wait()
 	close(output)
 	return nline, time.Since(begin)
@@ -120,20 +122,32 @@ func Compare(b1 []byte, b2 []byte) bool {
 var Index = &ctx.Context{Name: "test", Help: "测试工具",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"nread": {Name: "nread", Help: "读取Channel长度", Value: 1},
-		"nwork": {Name: "nwork", Help: "协程数量", Value: 20},
-		"limit":{Name: "limit", Help: "请求数量", Value: 100},
-		"nskip": {Name: "nskip", Help: "请求限长", Value: 100},
+		"nread":  {Name: "nread", Help: "读取Channel长度", Value: 1},
+		"nwork":  {Name: "nwork", Help: "协程数量", Value: 20},
+		"limit":  {Name: "limit", Help: "请求数量", Value: 100},
+		"nskip":  {Name: "nskip", Help: "请求限长", Value: 100},
 		"nsleep": {Name: "nsleep", Help: "阻塞时长", Value: "10000"},
-		"nwrite":{Name: "nwrite", Help: "输出Channel长度", Value: 1},
+		"nwrite": {Name: "nwrite", Help: "输出Channel长度", Value: 1},
 		"outdir": {Name: "outdir", Help: "输出目录", Value: "tmp"},
 
 		"timeout": {Name: "timeout", Help: "请求超时", Value: "10s"},
 		"prefix0": {Name: "prefix0", Help: "请求前缀", Value: "uri["},
 		"prefix1": {Name: "prefix1", Help: "参数前缀", Value: "request_param["},
+
+		"index": &ctx.Config{Name: "index", Value: []interface{}{
+			map[string]interface{}{"componet_name": "status", "componet_help": "状态",
+				"componet_tmpl": "componet", "componet_view": "Company", "componet_init": "",
+				"componet_type": "private", "componet_ctx": "test", "componet_cmd": "diff",
+				"componet_args": []interface{}{}, "inputs": []interface{}{
+					map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
+					map[string]interface{}{"type": "select", "name": "sub", "values": []interface{}{"status", ""}},
+					map[string]interface{}{"type": "button", "value": "执行"},
+				},
+			},
+		}},
 	},
 	Commands: map[string]*ctx.Command{
-		"diff": {Name: "diff file server1 server2", Form: map[string]int{"nsleep": 1}, Help:"接口对比工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"diff": {Name: "diff file server1 server2", Form: map[string]int{"nsleep": 1}, Help: "接口对比工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) < 3 {
 				m.Echo("usage: %v", "diff file server1 server2")
 				return
@@ -203,7 +217,7 @@ var Index = &ctx.Context{Name: "test", Help: "测试工具",
 						result1 = append(result1, string(b2))
 						result1 = append(result1, "\n")
 						result1 = append(result1, "\n")
-						output <-  result1
+						output <- result1
 					}
 					size1 = len(b1)
 					size2 = len(b2)
@@ -228,43 +242,43 @@ var Index = &ctx.Context{Name: "test", Help: "测试工具",
 			m.Sort("time1", "int").Table()
 			return
 		}},
-		"cost": {Name: "cost file server nroute", Help:"接口耗时测试", Form: map[string]int{"nwork": 1, "limit": 1, "nsleep": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"cost": {Name: "cost file server nroute", Help: "接口耗时测试", Form: map[string]int{"nwork": 1, "limit": 1, "nsleep": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			var success int32 = 0
 			var times time.Duration
-            mu := sync.Mutex{}
+			mu := sync.Mutex{}
 			limit := kit.Int(m.Confx("limit"))
-            nline := 0
+			nline := 0
 			_, cost := Process(m, arg[0], func(msg *ctx.Message, client *http.Client, word []string, output chan []string) {
 				key, uri, args := word[0], word[1], word[2]
-                for _, host := range arg[1:]{
-                    fmt.Printf("%v/%v post: %v\t%v\n", key, limit, host+uri, args)
+				for _, host := range arg[1:] {
+					fmt.Printf("%v/%v post: %v\t%v\n", key, limit, host+uri, args)
 
-                    begin := time.Now()
-                    res, err := client.Post(host+uri, "application/json", bytes.NewReader([]byte(args)))
-                    if res.StatusCode == http.StatusOK {
-                        io.Copy(ioutil.Discard, res.Body)
-                        atomic.AddInt32(&success, 1)
-                    } else {
-                        fmt.Printf("%v/%v error: %v\n", key, limit, err)
-                    }
-                    t := time.Since(begin)
-                    times += t
+					begin := time.Now()
+					res, err := client.Post(host+uri, "application/json", bytes.NewReader([]byte(args)))
+					if res.StatusCode == http.StatusOK {
+						io.Copy(ioutil.Discard, res.Body)
+						atomic.AddInt32(&success, 1)
+					} else {
+						fmt.Printf("%v/%v error: %v\n", key, limit, err)
+					}
+					t := time.Since(begin)
+					times += t
 
-                    mu.Lock()
-                    nline++
-                    m.Add("append", "host", host)
-                    m.Add("append", "uri", uri)
-                    m.Add("append", "cost", t/1000000)
-                    mu.Unlock()
-                }
+					mu.Lock()
+					nline++
+					m.Add("append", "host", host)
+					m.Add("append", "uri", uri)
+					m.Add("append", "cost", t/1000000)
+					mu.Unlock()
+				}
 			})
 
-            m.Sort("cost", "int_r")
+			m.Sort("cost", "int_r")
 			m.Echo("\n\nnclient: %v nreq: %v success: %v time: %v average: %vms",
 				m.Confx("nwork"), nline, success, cost, int(times)/int(nline)/1000000)
 			return
 		}},
-		"cmd": {Name: "cmd file", Help:"生成测试命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"cmd": {Name: "cmd file", Help: "生成测试命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			str := kit.Select("./hey -n 10000 -c 100 -m POST -T \"application/json\" -d '%s' http://127.0.0.1:6363%s\n", arg, 1)
 			Process(m, arg[0], func(msg *ctx.Message, client *http.Client, word []string, output chan []string) {
 				m.Echo(str, word[2], word[1])
@@ -273,7 +287,7 @@ var Index = &ctx.Context{Name: "test", Help: "测试工具",
 		}},
 	},
 }
+
 func main() {
-	kit.DisableLog = true
-	fmt.Print(Index.Plugin(os.Args[1:]))
+	fmt.Print(cli.Index.Plugin(Index, os.Args[1:]))
 }

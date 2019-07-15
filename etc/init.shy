@@ -8,6 +8,7 @@
     config load tmp/data.json ktv
 ~wiki
     config load tmp/wiki.json wiki_visit
+
 source etc/common.shy
 ~ssh
     remote auto

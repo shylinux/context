@@ -754,6 +754,41 @@ function Plugin(page, pane, field) {
         },
 
         ondaemon: {
+            editor: function(msg, cb) {
+                output.innerHTML = ""
+                !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
+                    page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
+                });
+
+                var args = [option.pod.value, option.dir.value]
+
+                if (msg.file) {
+                    var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
+                        "追加", "提交", "取消",
+                    ], function(value, event) {
+                        switch (value) {
+                            case "追加":
+                                field.Run(event, args.concat(["dir_sed", "add"]))
+                                break
+                            case "提交":
+                                field.Run(event, args.concat(["dir_sed", "put"]))
+                                break
+                            case "取消":
+                                break
+                        }
+                    })
+
+                    kit.AppendChild(output, [{view: ["edit", "table"], list: msg.result.map(function(value, index) {
+                        return {view: ["line", "tr"], list: [{view: ["num", "td", index+1]}, {view: ["txt", "td"], list: [{value: value, input: [value, function(event) {
+                            if (event.key == "Enter") {
+                                field.Run(event, args.concat(["dir_sed", "set", index, event.target.value]))
+                            }
+                        }]}]}]}
+                    })}])
+                }
+
+                typeof cb == "function" && cb(msg)
+            },
             table: function(msg, cb) {
                 output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
@@ -819,14 +854,8 @@ function Plugin(page, pane, field) {
                     return value
                 }
 
-                var deal = display.deal
-                var back = option.dir.value
-                display.deal = "void"
                 option.dir.value = value
-                plugin.Runs(window.event, function() {
-                    display.deal = deal
-                    option.dir.value = back
-                })
+                plugin.Runs(window.event)
             },
         },
         display: function(arg) {

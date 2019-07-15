@@ -6,6 +6,7 @@ import (
 	"contexts/ctx"
 	"encoding/csv"
 	"encoding/json"
+	"io/ioutil"
 	"os/exec"
 	"os/user"
 	"path"
@@ -144,13 +145,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"action": &ctx.Config{Name: "action", Value: map[string]interface{}{}, Help: "交互任务"},
 
 		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
-			// vim git golang
-			"ubuntu": map[string]interface{}{},
-			"github": "https://github.com/shylinux/context",
-			"env": map[string]interface{}{
-				"GOPATH": "https://github.com/shylinux/context",
-			},
-			"import": []interface{}{
+			"github":  "https://github.com/shylinux/context",
+			"goproxy": "https://goproxy.cn", "import": []interface{}{
 				"github.com/nsf/termbox-go",
 				"github.com/gomodule/redigo/redis",
 				"github.com/go-sql-driver/mysql",
@@ -159,13 +155,28 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"github.com/skip2/go-qrcode",
 				"github.com/PuerkitoBio/goquery",
 				"github.com/go-cas/cas",
+			}, "plugin": map[string]interface{}{
+				"path": "src/plugin", "list": []interface{}{
+					map[string]interface{}{"name": "index.go", "text": ""},
+					map[string]interface{}{"name": "index.js", "text": ""},
+					map[string]interface{}{"name": "local.shy", "text": ""},
+				},
+			}, "script": map[string]interface{}{
+				"path": "usr/script",
 			},
-		}, Help: "运行环境"},
+		}, Help: "项目管理"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
-			"bench": "src/extend/bench.go",
-			"tmp":   "var/tmp/go",
-			"env":   []interface{}{"GOPATH", "PATH"},
-		}, Help: "运行环境"},
+			"bench": "src/extend/bench.go", "list": []interface{}{
+				map[string]interface{}{"os": "linux", "cpu": "amd64"},
+				map[string]interface{}{"os": "linux", "cpu": "386"},
+				map[string]interface{}{"os": "linux", "cpu": "arm"},
+				map[string]interface{}{"os": "windows", "cpu": "amd64"},
+				map[string]interface{}{"os": "windows", "cpu": "386"},
+				map[string]interface{}{"os": "darwin", "cpu": "amd64"},
+			},
+			"env": []interface{}{"GOPATH", "PATH"},
+			"tmp": "var/tmp/go",
+		}, Help: "源码编译"},
 		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
 			"path": "usr/publish", "list": map[string]interface{}{
 				"boot_sh":    "bin/boot.sh",
@@ -177,7 +188,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"template_tar_gz": "usr/template",
 				"librarys_tar_gz": "usr/librarys",
 			},
-		}, Help: "运行环境"},
+		}, Help: "版本发布"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
 			"system": []interface{}{"boot.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
 			"portal": []interface{}{"template.tar.gz", "librarys.tar.gz"},
@@ -193,10 +204,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"template_tar_gz": "usr/template.tar.gz",
 				"librarys_tar_gz": "usr/librarys.tar.gz",
 			},
-		}, Help: "日志地址"},
+		}, Help: "服务升级"},
 		"missyou": &ctx.Config{Name: "missyou", Value: map[string]interface{}{
-			"path": "usr/work",
-		}, Help: "免密登录"},
+			"path": "usr/local/work", "local": "usr/local",
+		}, Help: "任务管理"},
 
 		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
 		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
@@ -639,27 +650,23 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 
-		"project": &ctx.Command{Name: "project", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"project": &ctx.Command{Name: "project init|stat|import|plugin", Help: "项目管理, ", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
-			case "prepare":
-
 			case "init":
 				if _, e := os.Stat(".git"); e == nil {
 					m.Cmdp(0, []string{"git update"}, []string{"cli.system", "git"}, [][]string{
-						[]string{"git", "stash"},
-						[]string{"git", "pull"},
-						[]string{"git", "stash", "pop"},
+						[]string{"git", "stash"}, []string{"git", "pull"}, []string{"git", "stash", "pop"},
 					})
+					m.Cmdy("nfs.git", "status")
 					return e
 				}
 				m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
-					[]string{"init"},
-					[]string{"remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
-					[]string{"stash"},
-					[]string{"pull"},
-					[]string{"checkout", "-f", "master"},
-					[]string{"stash", "pop"},
+					[]string{"init"}, []string{"remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
+					[]string{"stash"}, []string{"pull"}, []string{"checkout", "-f", "master"}, []string{"stash", "pop"},
 				})
+
+			case "stat":
+				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r").CopyTo(m, "append")
 
 			case "import":
 				list := [][]string{}
@@ -671,44 +678,67 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Table()
 
 				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
+					"cmd_env", "GOPROXY", m.Conf("project", "goproxy"),
 					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
-			case "stat":
-				m.Cmd("nfs.dir", "src", "dir_deep", "dir_type", "file").CopyTo(m, "append")
-				m.Cmd("nfs.dir", "usr/librarys", "dir_deep", "dir_type", "file").CopyTo(m, "append")
-				m.Set("result").Table()
+
+			case "plugin":
+				arg = arg[1:]
+				if len(arg) == 0 {
+					m.Cmdy("nfs.dir", m.Conf("project", "plugin.path"))
+					break
+				}
+				fallthrough
+			default:
+				p := path.Join(m.Conf("project", "plugin.path"), arg[0])
+				if _, e := os.Stat(p); os.IsNotExist(e) && m.Assert(os.MkdirAll(p, 0777)) {
+					m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
+						ioutil.WriteFile(path.Join(p, kit.Format(value["name"])), []byte(kit.Format(value["text"])), 0666)
+					})
+				}
+				m.Cmdy("nfs.dir", p, "time", "size", "line", "path")
 			}
 			return
 		}},
-		"compile": &ctx.Command{Name: "compile [OS [ARCH]]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.version", "create")
-			if len(arg) > 0 && arg[0] == "self" {
-				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
-					m.Echo("%v: %v ", version.host, version.self)
-					m.Cmdy("cli.quit", 1)
-				}
-				return
-			}
-
-			if len(arg) > 0 && arg[0] == "all" {
-				m.Cmdp(0, []string{"go build"}, []string{"cli.compile"}, [][]string{
-					[]string{"linux", "386"},
-					[]string{"linux", "amd64"},
-					[]string{"linux", "arm"},
-					[]string{"windows", "386"},
-					[]string{"windows", "amd64"},
-					[]string{"darwin", "amd64"},
+		"compile": &ctx.Command{Name: "compile all|self|[[[plugin] name] [OS [ARCH]]]", Help: "源码编译", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch arg[0] {
+			case "all":
+				list := [][]string{}
+				m.Confm("compile", "list", func(index int, value map[string]interface{}) {
+					list = append(list, []string{kit.Format(value["os"]), kit.Format(value["cpu"])})
 				})
-				m.Echo("done %s", m.Time())
-				return
-			}
-			if len(arg) > 0 {
+				m.Cmdp(0, []string{"go build"}, []string{"cli.compile"}, list)
+				m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_reg", "bench")
+
+			case "self":
+				m.Cmd("cli.version", "create")
+				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+					m.Cmdy("cli.quit", 1)
+					m.Append("host", version.host)
+					m.Append("self", version.self)
+					m.Table()
+				}
+
+			case "plugin":
+				arg = arg[1:]
+				if len(arg) == 0 {
+					m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_deep", "dir_reg", ".*\\.so", "time", "size", "hash", "path")
+					break
+				}
+				fallthrough
+			default:
+				p, q, o := path.Join(m.Conf("project", "plugin.path"), arg[0], "index.go"), "", []string{}
+				if _, e := os.Stat(p); e == nil {
+					q = path.Join(m.Conf("publish", "path"), arg[0], "index.so")
+					o = []string{"-buildmode=plugin"}
+					arg = arg[1:]
+				}
+
 				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
 				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
-				name := strings.Join([]string{"bench", goos, arch}, "_")
 
 				wd, _ := os.Getwd()
 				os.MkdirAll(m.Conf("compile", "tmp"), 0777)
-				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch, "cmd_env",
+				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch,
 					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),
 					"cmd_env", "GOCACHE", path.Join(wd, m.Conf("compile", "tmp")),
 				}
@@ -716,18 +746,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
 				})
 
-				p := m.Cmdx("nfs.path", m.Conf("compile", "bench"))
-				q := path.Join(m.Conf("publish", "path"), name)
-				if m.Cmdy("cli.system", env, "go", "build", "-o", q, p); m.Result(0) == "" {
+				if q == "" {
+					q = path.Join(m.Conf("publish", "path"), strings.Join([]string{"bench", goos, arch}, "_"))
+					p = m.Cmdx("nfs.path", m.Conf("compile", "bench"))
+				}
+
+				if m.Cmdy("cli.system", env, "go", "build", o, "-o", q, p); m.Result(0) == "" {
 					m.Append("time", m.Time())
-					m.Append("bin", name)
+					m.Append("bin", q)
 					m.Append("hash", kit.Hashs(q))
 					m.Table()
 				}
 			}
 			return
 		}},
-		"publish": &ctx.Command{Name: "publish", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"publish": &ctx.Command{Name: "publish", Help: "版本发布", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			dir := m.Conf("publish", "path")
 			m.Assert(os.MkdirAll(dir, 0777))
 
@@ -738,6 +771,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				})
 				m.Cmdp(0, []string{"copy"}, []string{"cli.publish"}, list)
 				return
+			}
+
+			p := path.Join(m.Conf("project", "plugin.path"), arg[0])
+			q := path.Join(m.Conf("publish", "path"), arg[0])
+			if _, e := os.Stat(p); e == nil && m.Assert(os.MkdirAll(q, 0777)) {
+				m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
+					m.Cmd("nfs.copy", path.Join(q, kit.Format(value["name"])), path.Join(p, kit.Format(value["name"])))
+				})
+				m.Cmdy("nfs.dir", q, "time", "size", "hash", "path")
+				return e
 			}
 
 			for _, key := range arg {
@@ -757,105 +800,91 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 			}
 			m.Table()
-			// m.Cmdy("nfs.dir", dir, "dir_sort", "time", "time_r")
 			return
 		}},
-		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				types := reflect.TypeOf(version)
-				value := reflect.ValueOf(version)
-				for i := 0; i < types.NumField(); i++ {
-					key := types.Field(i)
-					val := value.Field(i)
-					m.Add("append", "name", key.Name)
-					m.Add("append", "type", key.Type.Name())
-					m.Add("append", "value", fmt.Sprintf("%v", val))
-				}
-
-				m.Table()
-				return
-			}
-			m.Cmd("nfs.save", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/contexts/cli/version.go"), fmt.Sprintf(`package cli
-var version = struct {
-	time string
-	host string
-	self int
-}{
-	"%s", "%s", %d,
-}
-`, m.Time(), m.Conf("runtime", "node.route"), version.self+1))
-
-			m.Append("directory", "")
-			return
-		}},
-		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|plugin|portal|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|plugin|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "upgrade")
 				return
 			}
-			if len(arg) > 0 && arg[0] == "project" {
+			switch arg[0] {
+			case "project":
 				m.Cmd("cli.project", "init")
 				m.Cmd("cli.compile", "all")
 				m.Cmd("cli.publish")
-				return
-			}
-			if len(arg) > 0 && arg[0] == "plugin" {
-				m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", arg[1]),
-					"upgrade", "plugin", "save", path.Join("src/plugin", arg[1]))
-				m.Cmdy("cli.plugin", "test.so")
-				return
-			}
-			if len(arg) > 1 && arg[0] == "script" {
+
+			case "script":
+				if len(arg) == 1 {
+					m.Cmdy("nfs.dir", m.Conf("project", "script.path"), "time", "size", "line", "hash", "path")
+					break
+				}
 				miss := ""
 				if len(arg) > 2 {
-					miss, arg = arg[1], arg[2:]
-				} else {
-					arg = arg[1:]
+					miss, arg = arg[1], arg[1:]
 				}
-				for _, v := range arg {
+				for _, v := range arg[1:] {
 					m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", v),
 						"upgrade", "script", "missyou", miss, "save", path.Join("usr/script", v))
 				}
-				return
-			}
 
-			restart := false
-			for _, link := range kit.View([]string{arg[0]}, m.Confm("upgrade")) {
-				file := kit.Select(link, m.Conf("upgrade", []string{"list", strings.Replace(link, ".", "_", -1)}))
-				if arg[0] == "script" {
-					file = path.Join("usr/script", file)
+			case "plugin":
+				if arg = arg[1:]; len(arg) == 0 {
+					m.Cmdy("cli.context")
+					break
 				}
-
-				m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", link),
-					"GOARCH", m.Conf("runtime", "host.GOARCH"),
-					"GOOS", m.Conf("runtime", "host.GOOS"),
-					"upgrade", arg[0], "save", file)
-
-				if strings.HasPrefix(file, "bin/") {
-					if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
-						m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
-						m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
-						file = "bin/bench"
+				fallthrough
+			default:
+				if p, e := plugin.Open(path.Join(m.Conf("publish", "path"), arg[0], "index.so")); e == nil {
+					if s, e := p.Lookup("Index"); m.Assert(e) {
+						msg := m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0])).Cmd("_init", arg[1:])
+						msg.Cap("stream", arg[0])
+						msg.Confm("index", func(index int, value map[string]interface{}) {
+							value["componet_ctx"] = "cli." + arg[0]
+							m.Conf("ssh.componet", []interface{}{arg[0], index}, value)
+							m.Add("append", "index", index)
+							m.Add("append", "name", value["componet_name"])
+							m.Add("append", "help", value["componet_help"])
+						})
+						m.Table()
 					}
-					restart = true
+					return e
 				}
 
-				m.Add("append", "time", m.Time())
-				m.Add("append", "file", file)
-				m.Add("append", "hash", kit.Hashs(file))
+				restart := false
+				for _, link := range kit.View([]string{arg[0]}, m.Confm("upgrade")) {
+					file := kit.Select(link, m.Conf("upgrade", []string{"list", strings.Replace(link, ".", "_", -1)}))
 
-				if strings.HasSuffix(link, ".tar.gz") {
-					m.Cmd("cli.system", "tar", "-xvf", file, "-C", path.Dir(file))
+					m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", link),
+						"GOARCH", m.Conf("runtime", "host.GOARCH"),
+						"GOOS", m.Conf("runtime", "host.GOOS"),
+						"upgrade", arg[0], "save", file)
+
+					if strings.HasPrefix(file, "bin/") {
+						if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
+							m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
+							m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
+							file = "bin/bench"
+						}
+						restart = true
+					}
+
+					m.Add("append", "time", m.Time())
+					m.Add("append", "file", file)
+					m.Add("append", "hash", kit.Hashs(file))
+
+					if strings.HasSuffix(link, ".tar.gz") {
+						m.Cmd("cli.system", "tar", "-xvf", file, "-C", path.Dir(file))
+					}
+				}
+
+				if m.Table(); restart {
+					m.Cmd("cli.quit", 1)
 				}
 			}
-			m.Table()
 
-			if restart {
-				m.Cmd("cli.quit", 1)
-			}
 			return
 		}},
-		"missyou": &ctx.Command{Name: "missyou", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"missyou": &ctx.Command{Name: "missyou [name [stop]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Option("dir_root", "")
 				m.Cmd("nfs.dir", m.Conf("missyou", "path")).Table(func(value map[string]string) {
@@ -888,31 +917,56 @@ var version = struct {
 
 			p := path.Join(m.Conf("missyou", "path"), arg[0])
 			if _, e := os.Stat(p); e != nil {
-				m.Cmd("nfs.copy", path.Join(p, "etc/local.shy"), "usr/missyou/job.shy")
+				m.Cmd("nfs.copy", path.Join(p, "etc/local.shy"), path.Join(m.Conf("publish", "path"), kit.Select("hello", arg, 1), "local.shy"))
 				m.Confm("missyou", "local", func(index string, local string) {
-					m.Cmd("nfs.git", "clone", local, path.Join(p, "usr/local", index))
+					m.Cmd("nfs.git", "clone", local, path.Join(p, m.Conf("missyou", "local"), index))
 				})
 			}
 
-			m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "create", arg[0],
-				"daemon",
-				"cmd_env", "PATH", os.Getenv("path"),
-				"cmd_dir", m.Conf("missyou", "path"),
+			args := []string{
+				"daemon", "cmd_dir", p,
+				"cmd_env", "PATH", os.Getenv("PATH"),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
 				"cmd_daemon", "true",
-			)
-			return
-			m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), "daemon",
-				"cmd_dir", p,
-				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
-				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
-				"cmd_daemon", "true",
-			)
+			}
+			if m.Conf("runtime", "host.GOOS") == "windows" {
+				m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), args)
+			} else {
+				m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), args)
+			}
 			return
 		}},
 
+		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				types := reflect.TypeOf(version)
+				value := reflect.ValueOf(version)
+				for i := 0; i < types.NumField(); i++ {
+					key := types.Field(i)
+					val := value.Field(i)
+					m.Add("append", "name", key.Name)
+					m.Add("append", "type", key.Type.Name())
+					m.Add("append", "value", fmt.Sprintf("%v", val))
+				}
+
+				m.Table()
+				return
+			}
+			m.Cmd("nfs.save", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/contexts/cli/version.go"), fmt.Sprintf(`package cli
+var version = struct {
+	time string
+	host string
+	self int
+}{
+	"%s", "%s", %d,
+}
+`, m.Time(), m.Conf("runtime", "node.route"), version.self+1))
+
+			m.Append("directory", "")
+			return
+		}},
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("dir", "", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")

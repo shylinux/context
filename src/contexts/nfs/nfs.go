@@ -1210,10 +1210,56 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 		"dir": &ctx.Command{Name: "dir [path [fields...]]", Help: []string{"查看目录, path: 路径, fields...: 查询字段, time|type|full|path|tree|filename|size|line|hash",
 			"dir_deep: 递归查询", "dir_type both|file|dir|all: 文件类型", "dir_reg reg: 正则表达式", "dir_sort field order: 排序"},
-			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2},
+			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2, "dir_sed": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if len(arg) == 0 {
 					arg = append(arg, "")
+				}
+
+				p := arg[0]
+				p0 := p + ".tmp0"
+				p1 := p + ".tmp1"
+				if args := kit.Trans(m.Optionv("dir_sed")); len(args) > 0 {
+					if _, e := os.Stat(p1); e == nil {
+						return e
+					}
+					out, e := os.Create(p1)
+					defer os.Remove(p1)
+					defer out.Close()
+					m.Log("info", "open %v", p1)
+
+					if _, e := os.Stat(p0); e != nil {
+						m.Cmd("nfs.copy", p0, p)
+					}
+					in, e := os.Open(p0)
+					defer in.Close()
+					m.Log("info", "open %v", p0)
+
+					switch args[0] {
+					case "set":
+						defer os.Rename(p1, p0)
+						defer os.Remove(p0)
+
+						index := kit.Int(args[1])
+						for bio, i := bufio.NewScanner(in), 0; bio.Scan(); i++ {
+							if i == index {
+								out.WriteString(args[2])
+							} else {
+								out.WriteString(bio.Text())
+							}
+							out.WriteString("\n")
+						}
+						return e
+
+					case "add":
+						out0, _ := os.OpenFile(p0, os.O_WRONLY|os.O_APPEND, 0666)
+						defer out0.Close()
+						out0.WriteString("\n")
+
+					case "put":
+						defer os.Rename(p0, p)
+					}
+					return e
 				}
 
 				wd, e := os.Getwd()
@@ -1231,7 +1277,25 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "),
 								m.Conf("time_format"))
 						} else {
-							m.Append("directory", p)
+							if s.Size() < 100 {
+								p0 := p + ".tmp0"
+								f, e := os.Open(p0)
+								if e != nil {
+									f, e = os.Open(p)
+									m.Log("info", "open %v", p)
+								} else {
+									p = p0
+									m.Log("info", "open %v", p0)
+								}
+								for bio := bufio.NewScanner(f); bio.Scan(); {
+									m.Echo(bio.Text())
+								}
+								m.Append("file", p)
+								m.Append("size", s.Size())
+								m.Append("time", s.ModTime().Format(m.Conf("time_format")))
+							} else {
+								m.Append("directory", p)
+							}
 						}
 						return true
 					}
@@ -1247,7 +1311,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						m.Echo(v).Echo(" ")
 					}
 				} else {
-					m.Table()
+					if !m.Appends("file") {
+						m.Table()
+					}
 				}
 				return
 			}},

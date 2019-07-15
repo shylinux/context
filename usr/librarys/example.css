@@ -83,6 +83,18 @@ fieldset>div.output table td {
     word-break:keep-all;
     min-width:40px;
 }
+fieldset>div.output>table.edit {
+}
+fieldset>div.output>table.edit td {
+    min-width:4px;
+    padding:0px;
+}
+fieldset>div.output>table.edit td>input {
+    width:600px;
+    padding:0px;
+}
+fieldset>div.output table.edit {
+}
 
 fieldset.toast {
     border:solid 2px red;

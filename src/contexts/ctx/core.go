@@ -8,41 +8,51 @@ import (
 	"toolkit"
 )
 
-func (c *Context) Register(s *Context, x Server, args ...interface{}) {
-	force := false
+func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
+	name, force := s.Name, false
 	if len(args) > 0 {
 		switch arg := args[0].(type) {
 		case bool:
 			force = arg
+		case string:
+			name, s.Name = arg, arg
 		}
 	}
 
 	if c.contexts == nil {
 		c.contexts = make(map[string]*Context)
 	}
-	if x, ok := c.contexts[s.Name]; ok && !force {
+	if x, ok := c.contexts[name]; ok && !force {
 		panic(errors.New(c.Name + "上下文中已存在模块:" + x.Name))
 	}
 
-	c.contexts[s.Name] = s
+	c.contexts[name] = s
 	s.context = c
 	s.Server = x
+	return s
 }
-func (c *Context) Plugin(args []string) string {
-	Index.Register(c, nil)
-	m := &Message{code: 0, time: time.Now(), source: c, target: c, Meta: map[string][]string{}}
+func (c *Context) Plugin(s *Context, args []string) string {
+	c.Register(s, nil)
+	m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}
 	m.Option("log.disable", true)
+
 	if len(args) == 0 {
-		m.Echo("%s: %s\n\n", c.Name, c.Help)
+		m.Echo("%s: %s\n\n", s.Name, s.Help)
 		m.Echo("命令列表:\n")
-		for k, v := range c.Commands {
-			m.Echo("  %s: %s\n    %v\n\n", k, v.Name, v.Help)
+		for k, v := range s.Commands {
+			if !strings.HasPrefix(k, "_") {
+				m.Echo("  %s: %s\n    %v\n\n", k, v.Name, v.Help)
+			}
 		}
 		m.Echo("配置列表:\n")
-		for k, v := range c.Configs {
-			m.Echo("  %s(%v): %s\n", k, v.Value, v.Help)
+		for k, v := range s.Configs {
+			if !strings.HasPrefix(k, "_") {
+				m.Echo("--%s(%v): %s\n", k, kit.Formats(v.Value), v.Help)
+			}
 		}
 	} else {
+		if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
+		}
 		m.Cmd(args)
 	}
 	return strings.Join(m.Meta["result"], "")
@@ -369,7 +379,7 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 	select {
 	case <-time.After(kit.Duration(m.Confx("call_timeout"))):
 		m.Log("sync", m.Format("timeout", "detail", "option"))
-        m.Echo("time out %v", m.Confx("call_timeout"))
+		m.Echo("time out %v", m.Confx("call_timeout"))
 	case <-wait:
 	}
 	return m

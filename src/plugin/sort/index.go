@@ -1,13 +1,16 @@
 package main
 
 import (
+	"contexts/cli"
 	"contexts/ctx"
+	_ "contexts/nfs"
+	"toolkit"
+
 	"fmt"
 	"math"
 	"math/rand"
 	"os"
 	"strings"
-	"toolkit"
 )
 
 func Merge(left []int, right []int) []int {
@@ -55,9 +58,20 @@ func QuickSort(m *ctx.Message, level int, data []int, left int, right int) {
 }
 
 var Index = &ctx.Context{Name: "sort", Help: "sort code",
+	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"data": &ctx.Config{Name: "data", Value: map[string]interface{}{
 			"seed": []int{47, 59, 81, 40, 56, 0, 94, 11, 18, 25},
+		}},
+		"index": &ctx.Config{Name: "index", Value: []interface{}{
+			map[string]interface{}{"componet_name": "select", "componet_help": "选择排序",
+				"componet_tmpl": "componet", "componet_view": "componet", "componet_init": "",
+				"componet_type": "public", "componet_ctx": "sort", "componet_cmd": "select",
+				"componet_args": []interface{}{}, "inputs": []interface{}{
+					map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
+					map[string]interface{}{"type": "button", "value": "执行"},
+				},
+			},
 		}},
 	},
 	Commands: map[string]*ctx.Command{
@@ -180,5 +194,5 @@ var Index = &ctx.Context{Name: "sort", Help: "sort code",
 }
 
 func main() {
-	fmt.Print(Index.Plugin(os.Args[1:]))
+	fmt.Print(cli.Index.Plugin(Index, os.Args[1:]))
 }

@@ -54,11 +54,11 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			},
 		}, Help: "组件列表"},
 
-		"wiki_level": &ctx.Config{Name: "wiki_level", Value: "wiki/自然/编程", Help: "路由数量"},
+		"wiki_level": &ctx.Config{Name: "wiki_level", Value: "local/wiki/自然/编程", Help: "路由数量"},
 		"wiki_favor": &ctx.Config{Name: "wiki_favor", Value: "index.md", Help: "路由数量"},
 		"wiki_visit": &ctx.Config{Name: "wiki_visit", Value: map[string]interface{}{}, Help: "路由数量"},
 
-		"wiki_dir":  &ctx.Config{Name: "wiki_dir", Value: "wiki", Help: "路由数量"},
+		"wiki_dir":  &ctx.Config{Name: "wiki_dir", Value: "usr/local/wiki", Help: "路由数量"},
 		"wiki_list": &ctx.Config{Name: "wiki_list", Value: []interface{}{}, Help: "路由数量"},
 		"wiki_list_show": &ctx.Config{Name: "wiki_list_show", Value: map[string]interface{}{
 			"md": true,
