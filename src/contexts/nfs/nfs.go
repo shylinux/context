@@ -114,7 +114,7 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 							}
 						}
 						m.Add("append", "line", nline)
-					case "hash":
+					case "hash", "hashs":
 						if f.IsDir() {
 							d, e := ioutil.ReadDir(path.Join(name, f.Name()))
 							m.Assert(e)
@@ -132,7 +132,12 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 						f, e := ioutil.ReadFile(path.Join(name, f.Name()))
 						m.Assert(e)
 						h := sha1.Sum(f)
-						m.Add("append", "hash", hex.EncodeToString(h[:]))
+
+                        if field == "hash" {
+                            m.Add("append", "hash", hex.EncodeToString(h[:]))
+                        } else {
+                            m.Add("append", "hash", hex.EncodeToString(h[:4]))
+                        }
 					}
 				}
 			}

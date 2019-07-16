@@ -34,6 +34,7 @@ func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 func (c *Context) Plugin(s *Context, args []string) string {
 	c.Register(s, nil)
 	m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}
+	kit.DisableLog = true
 	m.Option("log.disable", true)
     m.Option("cli.modal", "action")
 
@@ -56,7 +57,10 @@ func (c *Context) Plugin(s *Context, args []string) string {
 		}
 		m.Cmd(args)
 	}
-	return strings.Join(m.Meta["result"], "")
+    for _, v := range m.Meta["result"] {
+        m.Show(v)
+    }
+	return ""
 }
 func (c *Context) Spawn(m *Message, name string, help string) *Context {
 	s := &Context{Name: name, Help: help, root: c.root, context: c, message: m,

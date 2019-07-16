@@ -732,7 +732,7 @@ func main() {
 						ioutil.WriteFile(path.Join(p, kit.Format(value["name"])), []byte(kit.Format(value["text"])), 0666)
 					})
 				}
-				m.Cmdy("nfs.dir", p, "time", "size", "line", "path")
+				m.Cmdy("nfs.dir", p, "time", "line", "hashs", "path")
 			}
 			return
 		}},
@@ -790,8 +790,8 @@ func main() {
 
 				if m.Cmdy("cli.system", env, "go", "build", o, "-o", q, p); m.Result(0) == "" {
 					m.Append("time", m.Time())
+                    m.Append("hash", kit.Hashs(q)[:8])
 					m.Append("bin", q)
-					m.Append("hash", kit.Hashs(q))
 					m.Table()
 				}
 			}
@@ -819,7 +819,7 @@ func main() {
                 for _, v := range arg[1:] {
                     m.Cmd("nfs.copy", path.Join(q, v), path.Join(p, v))
                 }
-				m.Cmdy("nfs.dir", q, "time", "size", "hash", "path")
+				m.Cmdy("nfs.dir", q, "time", "size", "hashs", "path")
 				return e
 			}
 
