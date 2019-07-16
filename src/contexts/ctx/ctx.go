@@ -3,6 +3,7 @@ package ctx
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -1185,8 +1186,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				}
 				return
 			}},
-		"select": &Command{Name: "select key value field",
-			Form: map[string]int{"eq": 2, "expand": 2, "hide": -1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
+		"select": &Command{Name: "select field...",
+			Form: map[string]int{"reg": 2, "eq": 2, "expand": 2, "hide": -1, "fields": -1, "group": 1, "order": 2, "limit": 1, "offset": 1, "format": -1, "trans_map": -1, "vertical": 0},
 			Help: "选取数据", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 				msg := m.Set("result").Spawn()
 
@@ -1260,6 +1261,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					// if len(arg) == 0 || strings.Contains(m.Meta[arg[0]][i], arg[1]) {
 					if m.Has("eq") {
 						if m.Meta[m.Meta["eq"][0]][i] != m.Meta["eq"][1] {
+							continue
+						}
+					}
+					if m.Has("reg") {
+						if b, e := regexp.MatchString(m.Meta["reg"][1], m.Meta[m.Meta["reg"][0]][i]); e != nil || !b {
 							continue
 						}
 					}

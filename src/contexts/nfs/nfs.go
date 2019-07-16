@@ -133,11 +133,11 @@ func dir(m *ctx.Message, name string, level int, deep bool, dir_type string, tri
 						m.Assert(e)
 						h := sha1.Sum(f)
 
-                        if field == "hash" {
-                            m.Add("append", "hash", hex.EncodeToString(h[:]))
-                        } else {
-                            m.Add("append", "hash", hex.EncodeToString(h[:4]))
-                        }
+						if field == "hash" {
+							m.Add("append", "hash", hex.EncodeToString(h[:]))
+						} else {
+							m.Add("append", "hash", hex.EncodeToString(h[:4]))
+						}
 					}
 				}
 			}
@@ -1282,7 +1282,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "),
 								m.Conf("time_format"))
 						} else {
-							if s.Size() < 100 {
+							if s.Size() < int64(m.Confi("buf_size")) {
 								p0 := p + ".tmp0"
 								f, e := os.Open(p0)
 								if e != nil {
@@ -1405,6 +1405,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 		"grep": &ctx.Command{Name: "grep", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			hold := false
 			if len(arg) > 0 {
 				switch arg[0] {
 				case "add":
@@ -1421,6 +1422,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						}
 					})
 					return
+
 				case "tail":
 					m.Confm("grep", "list", func(index int, value map[string]interface{}) {
 						if len(arg) == 1 {
@@ -1429,6 +1431,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						}
 					})
 					return
+
+				case "hold":
+					hold, arg = true, arg[1:]
 				}
 			}
 
@@ -1450,6 +1455,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				m.Assert(e)
 
 				n := 0
+				offset := kit.Int(value["offset"])
 				bio := bufio.NewScanner(f)
 				for i := 0; i < m.Optioni("page.limit") && bio.Scan(); i++ {
 					text := bio.Text()
@@ -1459,16 +1465,19 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						// m.Add("append", "pos",begin+int64(n))
 						// m.Add("append", "len",len(text))
 						// m.Add("append", "end",s.Size())
-						m.Add("append", "line", kit.Int(value["offset"]))
+						m.Add("append", "line", offset)
 						m.Add("append", "text", text)
 					} else {
 						i--
 					}
 					n += len(text) + 1
-					value["offset"] = kit.Int(value["offset"]) + 1
+					offset += 1
 				}
 
-				value["pos"] = begin + int64(n)
+				if !hold {
+					value["offset"] = offset
+					value["pos"] = begin + int64(n)
+				}
 			})
 			m.Table()
 			return

@@ -70,11 +70,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				map[string]interface{}{"componet_name": "script", "componet_help": "脚本",
 					"componet_tmpl": "componet", "componet_view": "Compile", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
-					"componet_args": []interface{}{"$$", "context", "cli", "upgrade"}, "inputs": []interface{}{
+					"componet_args": []interface{}{"$$", "context", "cli", "upgrade", "script"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "select", "name": "action", "values": []interface{}{"script", "portal", "system", "bench"}},
-						map[string]interface{}{"type": "text", "name": "action", "view": "long"},
-						map[string]interface{}{"type": "button", "value": "升级"},
+						map[string]interface{}{"type": "text", "name": "you", "imports": "plugin_you", "view": "long"},
+						map[string]interface{}{"type": "text", "name": "txt", "view": "long", "value": "test.php"},
+						map[string]interface{}{"type": "button", "value": "上传"},
 					},
 					"display": map[string]interface{}{"show_result": true},
 				},
@@ -92,7 +92,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "nfs", "grep"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "value": "", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{"", "tail", "head"}},
+						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{"", "hold", "tail", "head"}},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
 				},
@@ -134,13 +134,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "text", "name": "who"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
+					"exports": []interface{}{"see", "filename", "see"},
 				},
 				map[string]interface{}{"componet_name": "compile", "componet_help": "编译",
 					"componet_tmpl": "componet", "componet_view": "componet", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "compile",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
 						map[string]interface{}{"type": "select", "name": "cmd", "values": []interface{}{"plugin", "windows", "darwin", "linux", "self", "all"}},
-						map[string]interface{}{"type": "text", "name": "who"},
+						map[string]interface{}{"type": "text", "name": "who", "imports": "plugin_see"},
 						map[string]interface{}{"type": "button", "value": "编译"},
 					},
 				},
@@ -148,7 +149,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_tmpl": "componet", "componet_view": "componet", "componet_init": "",
 					"componet_type": "private", "componet_ctx": "cli", "componet_cmd": "publish",
 					"componet_args": []interface{}{}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "who"},
+						map[string]interface{}{"type": "text", "name": "who", "imports": "plugin_see"},
 						map[string]interface{}{"type": "button", "value": "发布"},
 					},
 				},
@@ -283,7 +284,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "nfs", "dir", "$$", "time", "size", "line", "path"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": []interface{}{"plugin_you", "plugin_pod"}},
-						map[string]interface{}{"type": "text", "name": "dir", "value": "", "view": "long", "imports": "plugin_dir", "action": "auto"},
+						map[string]interface{}{"type": "text", "name": "dir", "value": "usr/script", "view": "long", "imports": "plugin_dir", "action": "auto"},
 						map[string]interface{}{"type": "button", "value": "查看", "action": "auto"},
 						map[string]interface{}{"type": "button", "value": "回退", "click": "Back"},
 					},
@@ -350,6 +351,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "cli", "proc"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "value": "", "imports": "plugin_pod"},
+						map[string]interface{}{"type": "text", "name": "cmd", "value": ""},
 						map[string]interface{}{"type": "text", "name": "cmd", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
@@ -387,7 +389,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Add("append", "pod", key)
 					m.Add("append", "type", value["type"])
 				})
-				m.Sort("key").Table()
+				m.Sort("pod").Table()
 				return
 			}
 
@@ -557,10 +559,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Add("append", "help", value["componet_help"])
 					m.Add("append", "view", value["componet_view"])
 					if kit.Right(value["componet_init"]) {
-                        script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.publish", "path"), arg[0], kit.Format(value["componet_init"])), -1)
-                        if script == "" {
-                            script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1)
-                        }
+						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.publish", "path"), arg[0], kit.Format(value["componet_init"])), -1)
+						if script == "" {
+							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1)
+						}
 						m.Add("append", "init", script)
 					} else {
 						m.Add("append", "init", "")
@@ -649,6 +651,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						} else if node.Appends("user.route") && !m.Confs("runtime", "user.route") {
 							m.Cmd("ssh.user", "create", node.Append("user.route"))
 						}
+						m.Log("info", "script %v", m.Append("work.script"))
+						m.Cmd("nfs.save", "etc/temp.shy", m.Append("work.script"))
 
 						// 工作路由
 						if node.Appends("work.route") && !m.Confs("runtime", "work.route") {
@@ -676,6 +680,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Append("node.route", m.Conf("runtime", "node.route"))
 				m.Append("user.route", m.Conf("runtime", "user.route"))
 				m.Append("work.route", m.Conf("runtime", "work.route"))
+				m.Append("work.script", m.Cmdx("nfs.load", path.Join(m.Conf("cli.publish", "script."+arg[2]))))
 				m.Echo(name).Back(m)
 
 			default:

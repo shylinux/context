@@ -554,7 +554,7 @@ function Pane(page, field) {
         return typeof value == "object"? {className: value[0], select: [value.slice(1), function(value, event) {
             value = event.target.value
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
-        }]}: value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, function(event) {
+        }]}: value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, function(value, event) {
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
         }]}
     })).className="action "+name)
@@ -754,41 +754,6 @@ function Plugin(page, pane, field) {
         },
 
         ondaemon: {
-            editor: function(msg, cb) {
-                output.innerHTML = ""
-                !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
-                    page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
-                });
-
-                var args = [option.pod.value, option.dir.value]
-
-                if (msg.file) {
-                    var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
-                        "追加", "提交", "取消",
-                    ], function(value, event) {
-                        switch (value) {
-                            case "追加":
-                                field.Run(event, args.concat(["dir_sed", "add"]))
-                                break
-                            case "提交":
-                                field.Run(event, args.concat(["dir_sed", "put"]))
-                                break
-                            case "取消":
-                                break
-                        }
-                    })
-
-                    kit.AppendChild(output, [{view: ["edit", "table"], list: msg.result.map(function(value, index) {
-                        return {view: ["line", "tr"], list: [{view: ["num", "td", index+1]}, {view: ["txt", "td"], list: [{value: value, input: [value, function(event) {
-                            if (event.key == "Enter") {
-                                field.Run(event, args.concat(["dir_sed", "set", index, event.target.value]))
-                            }
-                        }]}]}]}
-                    })}])
-                }
-
-                typeof cb == "function" && cb(msg)
-            },
             table: function(msg, cb) {
                 output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
@@ -796,6 +761,12 @@ function Plugin(page, pane, field) {
                 });
                 (display.show_result || !msg.append) && msg.result && kit.OrderCode(kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}]).first)
                 typeof cb == "function" && cb(msg)
+            },
+            editor: function(msg, cb) {
+                (output.innerHTML = "", Editor(plugin, option, output, output.clientWidth-40, 400, 10, msg))
+            },
+            canvas: function(msg, cb) {
+                typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, option, output, output.clientWidth-40, 400, 10, msg))
             },
             trend: function(msg, cb) {
                 typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, output, output.clientWidth-40, 400, 10, msg))
@@ -829,6 +800,9 @@ function Plugin(page, pane, field) {
         onexport: {
             "": function(value, name) {
                 return value
+            },
+            see: function(value, name, line) {
+                return value.split("/")[0]
             },
             you: function(value, name, line) {
                 window.event.Plugin = plugin
@@ -883,7 +857,40 @@ function Plugin(page, pane, field) {
     plugin.init(page, pane, field, option, output)
     return page[field.id] = pane[field.id] = plugin.Field = field, field.Plugin = plugin
 }
-function Canvas(plugin, output, width, height, space, msg) {
+function Editor(plugin, option, output, width, height, space, msg) {
+    exports = ["dir", "path", "dir"]
+    msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
+        page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
+    });
+
+    var args = [option.pod.value, option.dir.value]
+
+    if (msg.file) {
+        var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
+            "追加", "提交", "取消",
+        ], function(value, event) {
+            switch (value) {
+                case "追加":
+                    field.Run(event, args.concat(["dir_sed", "add"]))
+                    break
+                case "提交":
+                    field.Run(event, args.concat(["dir_sed", "put"]))
+                    break
+                case "取消":
+                    break
+            }
+        })
+
+        kit.AppendChild(output, [{view: ["edit", "table"], list: msg.result.map(function(value, index) {
+            return {view: ["line", "tr"], list: [{view: ["num", "td", index+1]}, {view: ["txt", "td"], list: [{value: value, style: {width: width+"px"}, input: [value, function(event) {
+                if (event.key == "Enter") {
+                    field.Run(event, args.concat(["dir_sed", "set", index, event.target.value]))
+                }
+            }]}]}]}
+        })}])
+    }
+}
+function Canvas(plugin, option, output, width, height, space, msg) {
     var keys = [], data = {}, max = {}, nline = 0
     var nrow = msg[msg.append[0]].length
     var step = width / (nrow - 1)
@@ -1603,3 +1610,4 @@ function Canvas(plugin, output, width, height, space, msg) {
 
     return what.reset().refresh()
 }
+
