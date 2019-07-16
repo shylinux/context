@@ -1,1 +1,1 @@
-usr/wiki/自然/编程/终端工具链/context.md
+usr/local/wiki/自然/编程/终端工具链/context.md
