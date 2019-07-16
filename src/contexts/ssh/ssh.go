@@ -157,7 +157,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
 					"componet_args": []interface{}{"$$", "context", "cli", "upgrade"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "select", "name": "action", "values": []interface{}{"script", "plugin", "portal", "system", "bench"}},
+						map[string]interface{}{"type": "select", "name": "action", "values": []interface{}{"script", "restart", "plugin", "portal", "system", "bench"}},
 						map[string]interface{}{"type": "text", "name": "who"},
 						map[string]interface{}{"type": "button", "value": "升级"},
 					},

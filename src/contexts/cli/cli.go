@@ -848,6 +848,9 @@ func main() {
 				return
 			}
 			switch arg[0] {
+			case "restart":
+				m.Cmd("cli.quit", "1")
+
 			case "project":
 				m.Cmd("cli.project", "init")
 				m.Cmd("cli.compile", "all")

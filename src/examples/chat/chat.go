@@ -360,12 +360,12 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			}
 			if len(arg) == 1 {
 				m.Confm("flow", []string{arg[0], "user"}, func(key string, value map[string]interface{}) {
-					m.Add("append", "key", key)
-					m.Add("append", "user.route", value["user"])
+					m.Add("append", "user", key)
+					m.Add("append", "node", value["user"])
 				})
 				m.Confm("ssh.node", func(key string, value map[string]interface{}) {
-					m.Add("append", "key", key)
-					m.Add("append", "user.route", value["name"])
+					m.Add("append", "user", "")
+					m.Add("append", "node", value["name"])
 				})
 				m.Table()
 				return
