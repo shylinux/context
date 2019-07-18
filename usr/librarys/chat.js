@@ -5,7 +5,7 @@ page = Page({
         kit.isWindows && (document.body.style.overflow = "hidden")
 
         var height = document.body.clientHeight-page.conf.border
-        var width = document.body.clientWidth-page.conf.border
+        var width = document.body.clientWidth-page.conf.border-2
         page.conf.height = height
         page.conf.width = width
 
@@ -353,7 +353,7 @@ page = Page({
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"], "",
                 "刷新", "清空", "并行", "串行", "",
                 "添加", "删除", "加参", "减参", "",
-				["display", "表格", "绘图"],
+				["display", "表格", "编辑", "绘图"],
             ],
         }
     },
