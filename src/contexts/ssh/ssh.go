@@ -652,7 +652,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 							m.Cmd("ssh.user", "create", node.Append("user.route"))
 						}
 						m.Log("info", "script %v", m.Append("work.script"))
-						m.Cmd("nfs.save", "etc/temp.shy", m.Append("work.script"))
+						m.Cmd("nfs.save", "etc/local.shy", m.Append("work.script"))
 
 						// 工作路由
 						if node.Appends("work.route") && !m.Confs("runtime", "work.route") {

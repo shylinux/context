@@ -515,8 +515,11 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 		"get": &ctx.Command{Name: "get [which] name [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
-			Form: map[string]int{"which": 1, "method": 1, "headers": 2, "content_type": 1, "file": 2, "body": 1, "parse": 1, "temp": -1, "save": 1, "temp_expire": 1},
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			Form: map[string]int{
+				"which": 1, "method": 1, "args": 1, "headers": 2,
+				"content_type": 1, "body": 1, "file": 2,
+				"parse": 1, "temp": -1, "temp_expire": 1, "save": 1,
+			}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				// 查看配置
 				if len(arg) == 0 {
 					m.Cmdy("web.spide")
@@ -590,6 +593,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							m.Assert(e)
 							m.Log("info", "json %v", string(b))
 							body = bytes.NewReader(b)
+							if m.Has("args") {
+								uri = uri[:index] + "?" + m.Option("args")
+								index = len(uri)
+							}
 
 						default: // POST form
 							m.Log("info", "body %v", string(uri[index+1:]))
