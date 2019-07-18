@@ -513,6 +513,9 @@ function Pane(page, field) {
                 } else {
                     first && index == 0 && ui.first.click()
                 }
+                if (index == msg[msg.append[0]].length-1) {
+                    pane.Field.scrollTo(0, 0)
+                }
             })
         },
         Share: function(objs) {
@@ -629,7 +632,7 @@ function Plugin(page, pane, field) {
                     event.preventDefault()
                     return true
                 })
-                item.type != "textarea" && event.key == "Enter" && plugin.Check(action)
+                item.type != "textarea" && event.key == "Enter" && (item.history == "true"? plugin.Goto(event.target.value): plugin.Check(action))
             }
 
             var input = {type: "input", name: name, data: item}
@@ -674,13 +677,13 @@ function Plugin(page, pane, field) {
             var ui = kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])
             var action = ui[name] || {}
 
-            action.History = [""], action.Goto = function(value, cb) {
+            item.history == "true" && (action.History = [""], plugin.Goto = function(value) {
                 action.History.push(action.value = value)
-                plugin.Check(action, cb)
+                plugin.Runs(window.event)
                 return value
-            }, action.Back = function() {
-                action.History.pop(), action.History.length > 0 && action.Goto(action.History.pop())
-            };
+            }, plugin.Back = function() {
+                action.History.pop(), action.History.length > 0 && plugin.Goto(action.History.pop())
+            });
 
             (typeof item.imports == "object"? item.imports: typeof item.imports == "string"? [item.imports]: []).forEach(function(imports) {
                 page.Sync(imports).change(function(value) {
@@ -768,9 +771,6 @@ function Plugin(page, pane, field) {
             canvas: function(msg, cb) {
                 typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, option, output, output.clientWidth-40, 400, 10, msg))
             },
-            trend: function(msg, cb) {
-                typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, output, output.clientWidth-40, 400, 10, msg))
-            },
             point: function(msg) {
                 var id = "canvas"+page.ID()
                 var canvas = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {id: id, width: output.clientWidth-15}}]).last.getContext("2d")
@@ -823,9 +823,9 @@ function Plugin(page, pane, field) {
                 if (name != "path") {
                     value = line.path
                 }
+                plugin.Goto(value)
+                return value
                 if (value.endsWith("/")) {
-                    option.dir.Goto(value)
-                    return value
                 }
 
                 option.dir.value = value
@@ -881,7 +881,7 @@ function Editor(plugin, option, output, width, height, space, msg) {
             }
         })
 
-        kit.AppendChild(output, [{view: ["edit", "table"], list: msg.result.map(function(value, index) {
+        kit.AppendChild(output, [{view: ["edit", "table"], list: (msg.result||[]).map(function(value, index) {
             return {view: ["line", "tr"], list: [{view: ["num", "td", index+1]}, {view: ["txt", "td"], list: [{value: value, style: {width: width+"px"}, input: [value, function(event) {
                 if (event.key == "Enter") {
                     field.Run(event, args.concat(["dir_sed", "set", index, event.target.value]))

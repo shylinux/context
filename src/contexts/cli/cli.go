@@ -967,7 +967,7 @@ func main() {
 			case "plugin":
 				arg = arg[1:]
 				if len(arg) == 0 {
-					m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_deep", "dir_reg", ".*\\.so", "time", "size", "hash", "path")
+					m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_deep", "dir_reg", ".*\\.so", "time", "size", "hashs", "path")
 					break
 				}
 				fallthrough
@@ -1094,6 +1094,7 @@ func main() {
 						msg.Confm("_index", func(index int, value map[string]interface{}) {
 							value["componet_ctx"] = "cli." + arg[0]
 							m.Conf("ssh.componet", []interface{}{arg[0], index}, value)
+							m.Add("append", "componet", arg[0])
 							m.Add("append", "index", index)
 							m.Add("append", "name", value["componet_name"])
 							m.Add("append", "help", value["componet_help"])
@@ -1101,6 +1102,8 @@ func main() {
 						m.Table()
 					}
 					return e
+				} else {
+					m.Log("info", "open %v", e)
 				}
 
 				restart := false
@@ -1192,49 +1195,6 @@ func main() {
 			return
 		}},
 
-		"plugin": &ctx.Command{Name: "plugin [action] file", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			suffix, action, target := "go", "build", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/examples/app/bench.go")
-			if len(arg) == 0 {
-				arg = append(arg, target)
-			}
-			if cs := strings.Split(arg[0], "."); len(cs) > 1 {
-				suffix = cs[len(cs)-1]
-			} else if cs := strings.Split(arg[1], "."); len(cs) > 1 {
-				suffix, action, arg = cs[len(cs)-1], arg[0], arg[1:]
-			}
-
-			if target = m.Cmdx("nfs.path", arg[0]); target == "" {
-				target = m.Cmdx("nfs.path", path.Join("src/plugin/", arg[0]))
-			}
-
-			for suffix != "" && action != "" {
-				m.Log("info", "%v %v %v", suffix, action, target)
-				cook := m.Confv("plugin", suffix)
-				next := strings.Replace(target, "."+suffix, "."+kit.Chains(cook, "next.0"), -1)
-
-				args := []string{}
-				if suffix == "so" {
-					if p, e := plugin.Open(target); m.Assert(e) {
-						s, e := p.Lookup("Index")
-						m.Assert(e)
-						w := *(s.(**ctx.Context))
-						w.Name = kit.Select(w.Name, arg, 1)
-						c.Register(w, nil)
-						m.Spawn(w).Cmd("_init", arg[1:])
-					}
-				} else {
-					if suffix == "go" {
-						args = append(args, "-o", next)
-					}
-					m.Assert(m.Cmd("cli.system", kit.Chain(cook, action), args, target))
-				}
-
-				suffix = kit.Chains(cook, "next.0")
-				action = kit.Chains(cook, "next.1")
-				target = next
-			}
-			return
-		}},
 		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				types := reflect.TypeOf(version)

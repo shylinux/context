@@ -665,7 +665,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 					switch action {
 					case "cmd":
-						if arg[0] == "command" {
+						if len(arg) == 0 {
+							arg = append(arg, "command")
+						} else if arg[0] == "command" && len(arg) > 1 {
 							arg = arg[1:]
 						}
 						if msg.Cmd(arg); !msg.Hand {
