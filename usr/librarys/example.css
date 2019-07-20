@@ -183,6 +183,9 @@ fieldset.Login>form.option button {
     height:28px;
 }
 
+fieldset.item {
+    float:left;
+}
 fieldset.item>div.output {
     overflow:auto;
 }

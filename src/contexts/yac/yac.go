@@ -233,15 +233,11 @@ func (yac *YAC) parse(m *ctx.Message, out *ctx.Message, page int, void int, line
 }
 
 func (yac *YAC) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{}
 	if len(arg) > 0 && arg[0] == "scan" {
 		return yac
 	}
 
-	s := new(YAC)
-	s.Context = c
-	return s
+	return &YAC{Context: c}
 }
 func (yac *YAC) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return yac
@@ -259,10 +255,6 @@ func (yac *YAC) Start(m *ctx.Message, arg ...string) (close bool) {
 	return true
 }
 func (yac *YAC) Close(m *ctx.Message, arg ...string) bool {
-	switch yac.Context {
-	case m.Target():
-	case m.Source():
-	}
 	return true
 }
 
@@ -492,7 +484,5 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 }
 
 func init() {
-	yac := &YAC{}
-	yac.Context = Index
-	ctx.Index.Register(Index, yac)
+	ctx.Index.Register(Index, &YAC{Context: Index})
 }

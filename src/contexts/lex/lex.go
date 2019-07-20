@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"toolkit"
 )
 
 type Seed struct {
@@ -12,38 +13,41 @@ type Seed struct {
 	hash int
 	word string
 }
+type Point struct {
+	s int
+	c byte
+}
 type State struct {
 	star bool
 	next int
 	hash int
 }
-type Point struct {
-	s int
-	c byte
-}
 type LEX struct {
-	seed []*Seed
-	page map[string]int
-	hash map[string]int
+	seed  []*Seed
+	hash  map[string]int
+	hashs map[int]string
+	pages map[int]string
+	page  map[string]int
 
-	mat   []map[byte]*State
-	state map[State]*State
 	char  map[byte][]byte
+	state map[State]*State
+	mat   []map[byte]*State
 
 	*ctx.Context
 }
 
 func (lex *LEX) index(m *ctx.Message, hash string, h string) int {
-	which := lex.page
-	if hash == "nhash" {
-		which = lex.hash
+	which, names := lex.hash, lex.hashs
+	if hash == "npage" {
+		which, names = lex.page, lex.pages
 	}
 
 	if x, e := strconv.Atoi(h); e == nil {
-		if hash == "nhash" {
-			lex.hash[hash] = x
+		if hash == "npage" {
+			m.Assert(x <= m.Capi("npage"), "语法集合未创建")
+		} else {
+			lex.hash[h] = x
 		}
-		m.Assert(hash != "npage" || x < m.Capi("npage"))
 		return x
 	}
 
@@ -52,7 +56,8 @@ func (lex *LEX) index(m *ctx.Message, hash string, h string) int {
 	}
 
 	which[h] = m.Capi(hash, 1)
-	m.Assert(hash != "npage" || m.Capi("npage") < m.Confi("info", "nlang"))
+	names[which[h]] = h
+	m.Assert(hash != "npage" || m.Capi("npage") < m.Confi("meta", "nlang"), "语法集合超过上限")
 	return which[h]
 }
 func (lex *LEX) charset(c byte) []byte {
@@ -65,8 +70,8 @@ func (lex *LEX) train(m *ctx.Message, page int, hash int, seed []byte) int {
 	m.Log("debug", "%s %s page: %v hash: %v seed: %v", "train", "lex", page, hash, string(seed))
 
 	ss := []int{page}
-	cn := make([]bool, m.Confi("info", "ncell"))
-	cc := make([]byte, 0, m.Confi("info", "ncell"))
+	cn := make([]bool, m.Confi("meta", "ncell"))
+	cc := make([]byte, 0, m.Confi("meta", "ncell"))
 	sn := make([]bool, m.Capi("nline"))
 
 	points := []*Point{}
@@ -160,7 +165,7 @@ func (lex *LEX) train(m *ctx.Message, page int, hash int, seed []byte) int {
 				}
 
 				if state.next == 0 {
-					if line == 0 || !m.Confs("info", "compact") {
+					if line == 0 || !m.Confs("meta", "compact") {
 						lex.mat = append(lex.mat, make(map[byte]*State))
 						line = m.Capi("nline", 1) - 1
 						sn = append(sn, false)
@@ -184,7 +189,7 @@ func (lex *LEX) train(m *ctx.Message, page int, hash int, seed []byte) int {
 	}
 
 	for _, s := range ss {
-		if s < m.Confi("info", "nlang") || s >= len(lex.mat) {
+		if s < m.Confi("meta", "nlang") || s >= len(lex.mat) {
 			continue
 		}
 
@@ -270,27 +275,21 @@ func (lex *LEX) parse(m *ctx.Message, page int, line []byte) (hash int, rest []b
 }
 
 func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{}
-
-	s := new(LEX)
-	s.Context = c
-	return s
+	return &LEX{Context: c}
 }
 func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	lex.Caches["nseed"] = &ctx.Cache{Name: "种子数量", Value: "0", Help: "词法模板的数量"}
 	lex.Caches["npage"] = &ctx.Cache{Name: "集合数量", Value: "0", Help: "词法集合的数量"}
-	lex.Caches["nhash"] = &ctx.Cache{Name: "类型数量", Value: "0", Help: "单词类型的数量"}
+	lex.Caches["nhash"] = &ctx.Cache{Name: "类型数量", Value: "0", Help: "词法类型的数量"}
 
-	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: m.Conf("info", "nlang"), Help: "状态机状态的数量"}
+	lex.Caches["nline"] = &ctx.Cache{Name: "状态数量", Value: m.Conf("meta", "nlang"), Help: "状态机状态的数量"}
 	lex.Caches["nnode"] = &ctx.Cache{Name: "节点数量", Value: "0", Help: "状态机连接的逻辑数量"}
 	lex.Caches["nreal"] = &ctx.Cache{Name: "实点数量", Value: "0", Help: "状态机连接的存储数量"}
 
 	lex.page = map[string]int{"nil": 0}
 	lex.hash = map[string]int{"nil": 0}
-
-	lex.mat = make([]map[byte]*State, m.Confi("info", "nlang"))
-	lex.state = make(map[State]*State)
+	lex.hashs = map[int]string{0: "nil"}
+	lex.pages = map[int]string{0: "nil"}
 
 	lex.char = map[byte][]byte{
 		't': []byte{'\t'},
@@ -300,6 +299,8 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 		'd': []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'},
 		'x': []byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'},
 	}
+	lex.state = make(map[State]*State)
+	lex.mat = make([]map[byte]*State, m.Capi("nline"))
 
 	return lex
 }
@@ -307,62 +308,89 @@ func (lex *LEX) Start(m *ctx.Message, arg ...string) bool {
 	return false
 }
 func (lex *LEX) Close(m *ctx.Message, arg ...string) bool {
-	switch lex.Context {
-	case m.Target():
-	case m.Source():
-	}
 	return true
 }
 
 var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 	Caches: map[string]*ctx.Cache{
-		"nmat": &ctx.Cache{Name: "nmat", Value: "0", Help: "nmat"},
+		"nmat": &ctx.Cache{Name: "nmat", Value: "0", Help: "矩阵数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"npage": &ctx.Config{Name: "npage", Value: "1", Help: "npage"},
-		"nhash": &ctx.Config{Name: "nhash", Value: "1", Help: "npage"},
-		"info":  &ctx.Config{Name: "info", Value: map[string]interface{}{"compact": true, "ncell": 128, "nlang": 64}, Help: "嵌套层级日志的标记"},
+		"npage": &ctx.Config{Name: "npage", Value: "1", Help: "默认页"},
+		"nhash": &ctx.Config{Name: "nhash", Value: "1", Help: "默认值"},
+		"meta": &ctx.Config{Name: "meta", Value: map[string]interface{}{
+			"ncell": 128, "nlang": 64, "compact": true,
+			"name": "mat%d", "help": "matrix",
+		}, Help: "初始参数"},
 	},
 	Commands: map[string]*ctx.Command{
-		"init": &ctx.Command{Name: "init", Help: "启动", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			return
-		}},
-		"spawn": &ctx.Command{Name: "spawn", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "默认矩阵", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*LEX); m.Assert(ok) {
-				m.Start(fmt.Sprintf("matrix%d", m.Capi("nmat", 1)), "matrix")
+				m.Spawn().Cmd("train", "-?[a-zA-Z_0-9:/.]+", "key", "cmd")
+				m.Spawn().Cmd("train", "\"[^\"]*\"", "str", "cmd")
+				m.Spawn().Cmd("train", "'[^']*'", "str", "cmd")
+				m.Spawn().Cmd("train", "#[^\n]*", "com", "cmd")
+				m.Spawn().Cmd("train", "[~!@$%()]", "ops", "cmd")
 			}
 			return
 		}},
-		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "添加词法规则", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"spawn": &ctx.Command{Name: "spawn [help [name]]", Help: "创建矩阵", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if _, ok := m.Target().Server.(*LEX); m.Assert(ok) {
+				m.Start(fmt.Sprintf(kit.Select(m.Conf("lex.meta", "name"), arg, 1), m.Capi("nmat", 1)),
+					kit.Select(m.Conf("lex.meta", "help"), arg, 0))
+			}
+			return
+		}},
+		"train": &ctx.Command{Name: "train seed [hash [page]", Help: "词法训练", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
-				page := lex.index(m, "npage", m.Confx("npage", arg, 2))
 				hash := lex.index(m, "nhash", m.Confx("nhash", arg, 1))
+				page := lex.index(m, "npage", m.Confx("npage", arg, 2))
 				if lex.mat[page] == nil {
 					lex.mat[page] = map[byte]*State{}
 				}
-				m.Cap("npage", len(lex.page))
-				m.Cap("nhash", len(lex.hash))
-
 				m.Result(0, lex.train(m, page, hash, []byte(arg[0])))
+
 				lex.seed = append(lex.seed, &Seed{page, hash, arg[0]})
-				m.Cap("stream", fmt.Sprintf("%d,%s,%s", m.Capi("nseed", 1), m.Cap("npage"), m.Cap("nhash")))
+				m.Cap("stream", fmt.Sprintf("%s,%s,%s", m.Cap("nseed", len(lex.seed)),
+					m.Cap("npage"), m.Cap("nhash", len(lex.hash)-1)))
 			}
 			return
 		}},
-		"parse": &ctx.Command{Name: "parse line [page]", Help: "解析单词", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"parse": &ctx.Command{Name: "parse line [page]", Help: "词法解析", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
-				page := lex.index(m, "npage", m.Confx("npage", arg, 1))
-				hash, rest, word := lex.parse(m, page, []byte(arg[0]))
+				hash, rest, word := lex.parse(m, lex.index(m, "npage", m.Confx("npage", arg, 1)), []byte(arg[0]))
 				m.Result(0, hash, string(rest), string(word))
 			}
 			return
 		}},
-		"show": &ctx.Command{Name: "show seed|page|hash|mat", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"split": &ctx.Command{Name: "split line [page]", Help: "词法分隔", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
+				for input := []byte(arg[0]); len(input) > 0; {
+					hash, rest, word := lex.parse(m, lex.index(m, "npage", m.Confx("npage", arg, 1)), input)
+					m.Log("fuck", "what %v %v %v", hash, rest, word)
+					if hash == 0 || len(word) == 0 || len(rest) == len(input) {
+						if len(input) > 0 {
+							input = input[1:]
+						}
+						continue
+					}
+
+					m.Push("word", string(word))
+					m.Push("hash", lex.hashs[hash])
+					m.Push("rest", string(rest))
+					input = rest
+				}
+				m.Table()
+			}
+			return
+		}},
+		"show": &ctx.Command{Name: "show seed|page|hash|mat|node", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
 				if len(arg) == 0 {
 					m.Append("seed", len(lex.seed))
 					m.Append("page", len(lex.page))
 					m.Append("hash", len(lex.hash))
+					m.Append("nmat", len(lex.mat))
 					m.Append("node", len(lex.state))
 					m.Table()
 					return
@@ -370,35 +398,72 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 				switch arg[0] {
 				case "seed":
 					for _, v := range lex.seed {
-						m.Add("append", "page", fmt.Sprintf("%d", v.page))
-						m.Add("append", "hash", fmt.Sprintf("%d", v.hash))
-						m.Add("append", "word", fmt.Sprintf("%s", strings.Replace(strings.Replace(v.word, "\n", "\\n", -1), "\t", "\\t", -1)))
+						m.Push("page", fmt.Sprintf("%s", lex.pages[v.page]))
+						m.Push("word", fmt.Sprintf("%s", strings.Replace(strings.Replace(v.word, "\n", "\\n", -1), "\t", "\\t", -1)))
+						m.Push("hash", fmt.Sprintf("%s", lex.hashs[v.hash]))
 					}
-					m.Table()
+					m.Sort("page", "int").Table()
+
 				case "page":
 					for k, v := range lex.page {
-						m.Add("append", "page", k)
-						m.Add("append", "code", fmt.Sprintf("%d", v))
+						if k == "nil" {
+							continue
+						}
+						m.Push("page", k)
+						m.Push("code", fmt.Sprintf("%d", v))
 					}
 					m.Sort("code", "int").Table()
+
 				case "hash":
 					for k, v := range lex.hash {
-						m.Add("append", "hash", k)
-						m.Add("append", "code", fmt.Sprintf("%d", v))
+						if k == "nil" {
+							continue
+						}
+						m.Push("hash", k)
+						m.Push("code", fmt.Sprintf("%d", v))
+					}
+					m.Sort("code", "int").Table()
+
+				case "node":
+					for _, v := range lex.state {
+						m.Push("star", v.star)
+						m.Push("next", v.next)
+						m.Push("hash", v.hash)
 					}
 					m.Table()
+
 				case "mat":
-					for _, v := range lex.mat {
-						for j := byte(0); j < byte(m.Confi("info", "ncell")); j++ {
-							s := v[j]
-							if s == nil {
-								m.Add("append", fmt.Sprintf("%c", j), "")
+					for i, v := range lex.mat {
+						if i <= m.Capi("npage") {
+							m.Push("index", lex.pages[i])
+						} else if i < m.Confi("meta", "nlang") {
+							continue
+						} else {
+							m.Push("index", i)
+						}
+
+						for j := byte(0); j < byte(m.Confi("meta", "ncell")); j++ {
+							c := fmt.Sprintf("%c", j)
+							switch c {
+							case "\n":
+								c = "\\n"
+							case "\t":
+								c = "\\t"
+							case " ":
+							default:
+								if j < 0x20 {
+									c = fmt.Sprintf("\\%x", j)
+								}
+							}
+
+							if s := v[j]; s == nil {
+								m.Push(c, "")
 							} else {
 								star := 0
 								if s.star {
 									star = 1
 								}
-								m.Add("append", fmt.Sprintf("%c", j), fmt.Sprintf("%d,%d,%d", star, s.next, s.hash))
+								m.Push(c, fmt.Sprintf("%d,%d,%d", star, s.next, s.hash))
 							}
 						}
 					}
@@ -443,7 +508,5 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 }
 
 func init() {
-	lex := &LEX{}
-	lex.Context = Index
-	ctx.Index.Register(Index, lex)
+	ctx.Index.Register(Index, &LEX{Context: Index})
 }

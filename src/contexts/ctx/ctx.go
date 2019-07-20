@@ -103,7 +103,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 	},
 	Commands: map[string]*Command{
 		"_init": &Command{Name: "_init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			for _, x := range []string{"cli", "nfs", "aaa", "ssh", "web"} {
+			for _, x := range []string{"lex", "cli", "nfs", "aaa", "ssh", "web"} {
 				m.Cmd(x + "._init")
 			}
 			return

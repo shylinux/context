@@ -532,11 +532,15 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 
 	return m
 }
-func (m *Message) Show(args ...interface{}) *Message {
+func (m *Message) Show(str string, args ...interface{}) *Message {
+	res := fmt.Sprintf(str, args...)
+
 	if m.Option("cli.modal") == "action" {
-		fmt.Printf(kit.Format(args...))
+		fmt.Printf(res)
 	} else if kit.STDIO != nil {
-		kit.STDIO.Show(args...)
+		kit.STDIO.Show(res)
+	} else {
+		m.Log("info", "show: %v", res)
 	}
 	return m
 }

@@ -623,7 +623,7 @@ function Plugin(page, pane, field) {
                             plugin.Append(item).focus()
                             break
                         case "m":
-                            plugin.Clone().plugin.Plugin.Select()
+                            plugin.Clone().Select()
                             break
                         default:
                             return false
