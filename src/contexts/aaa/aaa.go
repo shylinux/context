@@ -1,7 +1,6 @@
 package aaa
 
 import (
-	"gopkg.in/gomail.v2"
 	"contexts/ctx"
 	"crypto"
 	"crypto/aes"
@@ -16,6 +15,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"gopkg.in/gomail.v2"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -36,7 +36,7 @@ type AAA struct {
 }
 
 func Auto(m *ctx.Message, arg ...string) {
-	msg := m.Spawn().Add("option", "auto_cmd", "").Cmd("auth", arg)
+	msg := m.Spawn().Add("option", "bio.cmd", "").Cmd("auth", arg)
 	msg.Table(func(line int, maps map[string]string) {
 		m.Add("append", "value", maps["key"])
 		m.Add("append", "name", fmt.Sprintf("%s: %s", maps["type"], maps["meta"]))
@@ -130,10 +130,10 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 		"expire": &ctx.Config{Name: "expire(s)", Value: "72000", Help: "会话超时"},
 		"email": &ctx.Config{Name: "email", Value: map[string]interface{}{
-            "self": "shylinux@163.com",
-            "smtp": "smtp.163.com",
-            "port": "25",
-        }, Help: "会话超时"},
+			"self": "shylinux@163.com",
+			"smtp": "smtp.163.com",
+			"port": "25",
+		}, Help: "会话超时"},
 	},
 	Commands: map[string]*ctx.Command{
 		"_init": &ctx.Command{Name: "_init", Help: "数字摘要", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -723,7 +723,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			msg.SetHeader("From", m.Conf("email", "self"))
 			msg.SetHeader("To", arg[0])
 			msg.SetHeader("Subject", arg[1])
-            msg.SetBody("text/html", strings.Join(arg[2:], ""))
+			msg.SetBody("text/html", strings.Join(arg[2:], ""))
 			d := gomail.NewDialer(m.Conf("email", "smtp"), kit.Int(m.Conf("email", "port")), m.Conf("email", "self"), m.Conf("email", "code"))
 			if e := d.DialAndSend(msg); e != nil {
 				m.Echo("%v", e)
@@ -832,8 +832,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 						// 生成证书
 						template := x509.Certificate{
-							SerialNumber:          big.NewInt(1),
-							IsCA:                  true,
+							SerialNumber: big.NewInt(1),
+							IsCA:         true,
 							BasicConstraintsValid: true,
 							KeyUsage:              x509.KeyUsageCertSign,
 							Subject:               pkix.Name{CommonName: kit.Format(common)},

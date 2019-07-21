@@ -57,7 +57,7 @@ func (mdb *MDB) Close(m *ctx.Message, arg ...string) bool {
 var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 	Caches: map[string]*ctx.Cache{
 		"nsource": &ctx.Cache{Name: "nsource", Value: "0", Help: "已打开数据库的数量"},
-		"redis": &ctx.Cache{Name: "redis", Value: "", Help: "服务地址"},
+		"redis":   &ctx.Cache{Name: "redis", Value: "", Help: "服务地址"},
 	},
 	Configs: map[string]*ctx.Config{
 		"database": &ctx.Config{Name: "database", Value: "demo", Help: "默认数据库"},
@@ -138,7 +138,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						break
 					}
 					if mdb.conn.Err() != nil {
-                        mdb.conn, e = redis.Dial("tcp", m.Cap("redis"), redis.DialKeepAlive(time.Second*10))
+						mdb.conn, e = redis.Dial("tcp", m.Cap("redis"), redis.DialKeepAlive(time.Second*10))
 					}
 					args := []interface{}{}
 					for _, v := range arg[1:] {
@@ -156,13 +156,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 						}
 						m.Table()
 					default:
-                        str := kit.Format(res)
-                        var data interface{}
-                        if json.Unmarshal([]byte(str), &data) == nil {
-                            m.Echo(kit.Formats(data))
-                        } else {
-                            m.Echo(str)
-                        }
+						str := kit.Format(res)
+						var data interface{}
+						if json.Unmarshal([]byte(str), &data) == nil {
+							m.Echo(kit.Formats(data))
+						} else {
+							m.Echo(str)
+						}
 					}
 				}
 			}
@@ -265,7 +265,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		"db": &ctx.Command{Name: "db [which]", Help: "查看或选择数据库",
 			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
 				if len(arg) == 0 {
-					m.Put("option", "auto_cmd", "").Spawn().Cmd("query", "show databases").Table(func(line map[string]string) {
+					m.Put("option", "bio.cmd", "").Spawn().Cmd("query", "show databases").Table(func(line map[string]string) {
 						for _, v := range line {
 							m.Auto(v, "", "")
 						}
@@ -287,13 +287,13 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
 				switch len(arg) {
 				case 0:
-					m.Put("option", "auto_cmd", "").Spawn().Cmd("query", "show tables").Table(func(line map[string]string) {
+					m.Put("option", "bio.cmd", "").Spawn().Cmd("query", "show tables").Table(func(line map[string]string) {
 						for _, v := range line {
 							m.Auto(v, "", "")
 						}
 					})
 				case 1:
-					m.Put("option", "auto_cmd", "").Spawn().Cmd("query", fmt.Sprintf("desc %s", arg[0])).Table(func(line map[string]string) {
+					m.Put("option", "bio.cmd", "").Spawn().Cmd("query", fmt.Sprintf("desc %s", arg[0])).Table(func(line map[string]string) {
 						m.Auto(line["Field"], line["Type"], line["Default"])
 					})
 				}
@@ -314,7 +314,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			Form: map[string]int{"where": 1, "eq": 2, "like": 2, "in": 2, "begin": 2, "group": 1, "order": 1, "desc": 0, "limit": 1, "offset": 1, "other": -1},
 			Auto: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) bool {
 				if len(arg) == 0 {
-					m.Put("option", "auto_cmd", "").Spawn().Cmd("query", "show tables").Table(func(line map[string]string) {
+					m.Put("option", "bio.cmd", "").Spawn().Cmd("query", "show tables").Table(func(line map[string]string) {
 						for _, v := range line {
 							m.Auto(v, "", "")
 						}

@@ -1,11 +1,11 @@
 ~aaa
     role root user shy shaoying
 
-~mdb
-    note model favor spirit spirit relate relate
-    note model money expend expend amount amount
-    note model state active active elapse elapse
-    note model event action action target target
-    note model proxy ctx text cmd text
-    note model share stuff stuff right right
-
+# ~mdb
+#     note model favor spirit spirit relate relate
+#     note model money expend expend amount amount
+#     note model state active active elapse elapse
+#     note model event action action target target
+#     note model proxy ctx text cmd text
+#     note model share stuff stuff right right
+#

@@ -36,7 +36,7 @@ func (c *Context) Plugin(s *Context, args []string) string {
 	m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}
 	kit.DisableLog = true
 	m.Option("log.disable", true)
-    m.Option("cli.modal", "action")
+	m.Option("bio.modal", "action")
 
 	if len(args) == 0 {
 		m.Echo("%s: %s\n\n", s.Name, s.Help)
@@ -57,9 +57,9 @@ func (c *Context) Plugin(s *Context, args []string) string {
 		}
 		m.Cmd(args)
 	}
-    for _, v := range m.Meta["result"] {
-        m.Show(v)
-    }
+	for _, v := range m.Meta["result"] {
+		m.Show(v)
+	}
 	return ""
 }
 func (c *Context) Spawn(m *Message, name string, help string) *Context {
@@ -235,7 +235,7 @@ func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) 
 }
 func (m *Message) Gos(msg *Message, hand ...func(msg *Message)) *Message {
 	go func() {
-		msg.Option("routine", m.Capi("ngo", 1))
+		msg.Option("ctx.routine", m.Capi("ngo", 1))
 		m.TryCatch(msg, true, hand...)
 	}()
 	return m

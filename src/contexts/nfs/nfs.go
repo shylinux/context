@@ -191,11 +191,10 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 		rest := make([]rune, 0, 1024)
 		back := make([]rune, 0, 1024)
 
-		m.Optionv("auto_target", m.Optionv("ps_target"))
-		m.Option("auto_cmd", "")
-		m.Options("show_shadow", m.Confs("show_shadow"))
+		m.Option("bio.cmd", "")
+		m.Options("bio.shadow", m.Confs("show_shadow"))
 
-		defer func() { m.Option("auto_cmd", "") }()
+		defer func() { m.Option("bio.cmd", "") }()
 
 		frame, table, index, pick := map[string]interface{}{}, []map[string]string{}, 0, 0
 		if change, f, t, i := nfs.Auto(what, ":", 0); change {
@@ -358,13 +357,13 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 
 				case termbox.KeyCtrlG:
 				case termbox.KeyCtrlX:
-					m.Options("show_shadow", !m.Options("show_shadow"))
+					m.Options("bio.shadow", !m.Options("bio.shadow"))
 				case termbox.KeyCtrlS:
 
 				case termbox.KeyCtrlZ:
 
 				case termbox.KeyTab:
-					m.Options("show_shadow", true)
+					m.Options("bio.shadow", true)
 					// if index > len(what) {
 					// 	nfs.shadow("", table, frame)
 					// } else {
@@ -380,7 +379,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				case termbox.KeySpace:
 					what = append(what, ' ')
 					nfs.prompt(what).shadow(rest)
-					if !m.Options("show_shadow") {
+					if !m.Options("bio.shadow") {
 						break
 					}
 
@@ -402,7 +401,7 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 				default:
 					what = append(what, ev.Ch)
 					nfs.prompt(what).shadow(rest)
-					if !m.Options("show_shadow") {
+					if !m.Options("bio.shadow") {
 						break
 					}
 
@@ -428,9 +427,10 @@ func (nfs *NFS) Read(p []byte) (n int, err error) {
 	return
 }
 func (nfs *NFS) Auto(what []rune, trigger string, index int) (change bool, frame map[string]interface{}, table []map[string]string, nindex int) {
+	return
 	m := nfs.Context.Message()
 
-	auto_target := m.Optionv("auto_target").(*ctx.Context)
+	auto_target := m.Optionv("bio.ctx").(*ctx.Context)
 	auto_cmd := ""
 	auto_arg := []string{}
 
@@ -439,14 +439,14 @@ func (nfs *NFS) Auto(what []rune, trigger string, index int) (change bool, frame
 		switch m.Conf("term", "help_state") {
 		case "context":
 			auto_target = auto_target.Sub(m.Option("auto_key"))
-			m.Optionv("auto_target", auto_target)
+			m.Optionv("bio.ctx", auto_target)
 			trigger = ":"
 		case "command":
 			m.Option("arg_index", index)
-			auto_cmd = m.Option("auto_cmd", m.Option("auto_key"))
+			auto_cmd = m.Option("bio.cmd", m.Option("auto_key"))
 			trigger = "="
 		case "argument":
-			auto_cmd = m.Option("auto_cmd")
+			auto_cmd = m.Option("bio.cmd")
 			auto_arg = strings.Split(strings.TrimSpace(string(what[m.Optioni("arg_index"):])), " ")
 			trigger = "="
 		}
@@ -720,7 +720,7 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 }
 func (nfs *NFS) prompt(arg ...interface{}) *NFS {
 	m := nfs.Context.Message()
-	target, _ := m.Optionv("ps_target").(*ctx.Context)
+	target, _ := m.Optionv("bio.ctx").(*ctx.Context)
 	if target == nil {
 		target = nfs.Context
 	}
@@ -783,10 +783,10 @@ func (nfs *NFS) shadow(args ...interface{}) *NFS {
 
 	return nfs
 }
-func (nfs *NFS) printf(arg ...interface{}) *NFS {
+func (nfs *NFS) print(arg ...string) *NFS {
 	m := nfs.Context.Message()
 
-	line := strings.TrimRight(kit.Format(arg...), "\n")
+	line := strings.TrimRight(strings.Join(arg, ""), "\n")
 	m.Log("debug", "noutput %s", m.Cap("noutput", m.Capi("noutput")+1))
 	m.Confv("output", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 
@@ -900,16 +900,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 	}
 
 	if len(arg) > 0 && arg[0] == "scan" {
-		// 终端用户
-		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.username")))
-
-		// 创建会话
-		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
-
-		// 创建空间
-		m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
-
-		// 默认配置
 		m.Cap("stream", arg[1])
 		nfs.Caches["ninput"] = &ctx.Cache{Value: "0"}
 		nfs.Caches["noutput"] = &ctx.Cache{Value: "0"}
@@ -919,20 +909,28 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		nfs.Configs["prompt"] = &ctx.Config{Value: ""}
 
 		// 终端控制
-		if nfs.in = m.Optionv("in").(*os.File); m.Has("out") {
-			if nfs.out = m.Optionv("out").(*os.File); m.Conf("runtime", "host.GOOS") != "windows" && !m.Options("daemon") {
-				kit.STDIO = nfs
-				nfs.Term(m, "init")
-				m.Conf("term", "use", true)
+		if nfs.in = m.Optionv("bio.in").(*os.File); m.Has("bio.out") {
+			if nfs.out = m.Optionv("bio.out").(*os.File); m.Conf("runtime", "host.GOOS") != "windows" && !m.Options("daemon") {
+				m.Conf("term", "use", nfs.Term(m, "init") != nil)
 				defer nfs.Term(m, "exit")
-			}
-			if what := make(chan bool); m.Options("daemon") {
-				<-what
+				kit.STDIO = nfs
+
+			} else if m.Options("daemon") {
+				return true
 			}
 		}
 
+		// 终端用户
+		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.username")))
+		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
+		m.Optionv("bio.ctx", m.Target())
+		stack := kit.Stack{}
+		stack.Push(m.Option("stack.key", "source"), m.Options("stack.run", true), m.Optioni("stack.pos", 0))
+
 		line, bio := "", bufio.NewScanner(nfs)
-		for nfs.prompt(); !m.Options("scan_end"); nfs.prompt() {
+		for nfs.prompt(); ; nfs.prompt() {
+
+			// 读取数据
 			for bio.Scan() {
 				if text := bio.Text(); text == "" {
 					continue
@@ -944,31 +942,66 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				}
 			}
 			if line == "" {
-				line = "return"
+				break
 			}
-
 			m.Log("debug", "%s %d %d [%s]", "input", m.Capi("ninput", 1), len(line), line)
 			m.Confv("input", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 
+			// 解析数据
 			for i := m.Capi("ninput") - 1; i < m.Capi("ninput"); i++ {
 				line = m.Conf("input", []interface{}{i, "line"})
 
-				msg := m.Backs(m.Spawn(m.Source()).Set(
-					"detail", line).Set(
-					"option", "file_pos", i).Set(
-					"option", "username", m.Conf("runtime", "boot.username")))
+				// 结束语句
+				if strings.TrimSpace(line) == "end" {
+					m.Log("stack", " pop %v", stack.Peek().String("/"))
+					if stack.Pop(); m.Options("stack.run") && m.Option("stack.key") == "for" {
+						i = m.Optioni("stack.pos") - 1
+					}
+					frame := stack.Peek()
+					m.Options("stack.run", frame.Run)
+					m.Option("stack.key", frame.Key)
+					continue
+				}
 
-				nfs.printf(m.Conf("prompt"), line)
-				nfs.printf(msg.Meta["result"])
+				// 跳过语句
+				if !stack.Peek().Run {
+					m.Log("stack", "skip %v", line)
+					continue
+				}
 
-				if msg.Appends("file_pos0") {
-					i = int(msg.Appendi("file_pos0")) - 1
-					msg.Append("file_pos0", "")
+				// 执行语句
+				msg := m.Cmd("yac.parse", line+"\n").Set("option", "bio.pos", i)
+				nfs.print(m.Conf("prompt"), line)
+				nfs.print(msg.Meta["result"]...)
+
+				// 切换模块
+				if v := msg.Optionv("bio.ctx"); v != nil {
+					m.Optionv("bio.ctx", v)
+				}
+
+				// 压栈语句
+				if msg.Appends("stack.key") {
+					stack.Push(m.Option("stack.key", msg.Append("stack.key")), m.Options("stack.run", msg.Appends("stack.run")), m.Optioni("stack.pos", i))
+					m.Log("stack", "push %v", stack.Peek().String("\\"))
+					msg.Append("stack.key", "")
+				}
+
+				// 跳转语句
+				if msg.Appends("bio.pos0") {
+					i = int(msg.Appendi("bio.pos0")) - 1
+					msg.Append("bio.pos0", "")
+				}
+
+				// 结束脚本
+				if msg.Appends("bio.end") {
+					m.Copy(msg, "append")
+					m.Copy(msg, "result")
+					break
 				}
 			}
 			line = ""
 		}
-		return false
+		return true
 	}
 
 	m.Cap("stream", m.Option("ms_source"))
@@ -1775,7 +1808,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 
 			m.Start(fmt.Sprintf("file%d", m.Capi("nfile")), fmt.Sprintf("file %s", arg[0]), "open", arg[0])
-			m.Append("ps_target1", m.Cap("module"))
+			m.Append("bio.ctx1", m.Cap("module"))
 			m.Echo(m.Cap("module"))
 			return
 		}},
@@ -1819,19 +1852,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
-		"scan": &ctx.Command{Name: "scan file name", Help: "扫描文件, file: 文件名, name: 模块名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-				if help := fmt.Sprintf("scan %s", arg[0]); arg[0] == "stdio" {
-					m.Put("option", "in", os.Stdin).Put("option", "out", os.Stdout).Start(arg[0], help, key, arg[0])
-				} else if p, f, e := open(m, arg[0]); m.Assert(e) {
-					m.Put("option", "in", f).Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), help, key, p)
-				}
-			}
-			return
-		}},
 		"printf": &ctx.Command{Name: "printf arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
-				nfs.printf(arg)
+				nfs.print(arg...)
 			}
 			return
 		}},
@@ -1850,8 +1873,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"action": &ctx.Command{Name: "action cmd", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) {
 				msg := m.Cmd("cli.source", arg)
-				nfs.printf(msg.Conf("prompt"), arg, "\n")
-				nfs.printf(msg.Meta["result"])
+				// nfs.print(msg.Conf("prompt"), arg, "\n")
+				nfs.print(msg.Meta["result"]...)
 			}
 			return
 		}},
@@ -1873,6 +1896,103 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"send": &ctx.Command{Name: "send [file] args...", Help: "连接文件服务, args: 参考tcp模块, dial命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.io != nil {
 				nfs.send <- m.Set("detail", arg)
+			}
+			return
+		}},
+
+		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
+				m.Optionv("bio.args", arg)
+				if help := fmt.Sprintf("scan %s", arg[0]); arg[0] == "stdio" {
+					m.Put("option", "bio.in", os.Stdin).Put("option", "bio.out", os.Stdout).Start(arg[0], help, "scan", arg[0])
+					m.Wait()
+
+				} else if p, f, e := open(m, arg[0]); e == nil {
+					m.Put("option", "bio.in", f).Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), help, "scan", p)
+					m.Wait()
+
+				} else {
+
+				}
+			}
+			return
+			if len(arg) == 0 {
+				m.Cmdy("dir", "", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
+				return
+			}
+
+			m.Cap("stream", m.Sess("yac").Call(func(cmd *ctx.Message) *ctx.Message {
+				if !m.Caps("parse") {
+					switch cmd.Detail(0) {
+					case "if":
+						cmd.Set("detail", "if", "false")
+					case "else":
+					case "end":
+					case "for":
+					default:
+						cmd.Hand = true
+						return nil
+					}
+				}
+
+				if cmd.Cmd(); cmd.Has("return") {
+					m.Options("scan_end", true)
+					m.Target().Close(m)
+				}
+
+				v := cmd.Optionv("bio.ctx")
+				if v != nil {
+					m.Optionv("bio.ctx", v)
+				}
+				return nil
+			}, "scan", arg).Target().Name)
+
+			// 解析脚本文件
+			if p := m.Cmdx("nfs.path", arg[0]); p != "" && strings.Contains(p, ".") {
+				arg[0] = p
+				switch path.Ext(p) {
+				case "":
+				case ".shy":
+					m.Option("scan_end", "false")
+					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
+					m.Wait()
+				default:
+					m.Cmdy("system", m.Conf("system", []string{"script", strings.TrimPrefix(path.Ext(p), ".")}), arg)
+				}
+				m.Append("directory", "")
+				return
+			}
+
+			// 解析终端命令
+			if arg[0] == "stdio" {
+				m.Option("scan_end", "false")
+				m.Start("shy", "shell", "stdio", "engine")
+				m.Wait()
+				return
+			}
+
+			text := strings.Join(arg, " ")
+			if !strings.HasPrefix(text, "sess") && m.Options("remote") {
+				text = m.Current(text)
+			}
+
+			// 解析代码片段
+			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
+				switch msg.Cmd().Detail(0) {
+				case "cmd":
+					m.Set("append").Copy(msg, "append")
+					m.Set("result").Copy(msg, "result")
+				}
+				return nil
+			}, "parse", "line", "void", text)
+			return
+		}},
+		"arguments": &ctx.Command{Name: "arguments", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			args := kit.Trans(m.Optionv("bio.args"))
+			if len(arg) == 0 {
+				m.Set("result", args)
+			} else {
+				m.Echo(kit.Select("", args, kit.Int(arg[0])))
 			}
 			return
 		}},

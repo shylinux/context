@@ -16,24 +16,13 @@ import (
 	"fmt"
 	"os"
 	"plugin"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 )
 
-type Frame struct {
-	key   string
-	run   bool
-	pos   int
-	index int
-	list  []string
-}
 type CLI struct {
-	label map[string]string
-	stack []*Frame
-
 	*time.Timer
 	Context *ctx.Context
 }
@@ -51,51 +40,16 @@ func (cli *CLI) schedule(m *ctx.Message) string {
 }
 
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	c.Caches = map[string]*ctx.Cache{
-		"level": &ctx.Cache{Name: "level", Value: "0", Help: "嵌套层级"},
-		"parse": &ctx.Cache{Name: "parse(true/false)", Value: "true", Help: "命令解析"},
-	}
-
 	return &CLI{Context: c}
 }
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return cli
 }
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
-	m.Cap("stream", m.Sess("yac").Call(func(cmd *ctx.Message) *ctx.Message {
-		if !m.Caps("parse") {
-			switch cmd.Detail(0) {
-			case "if":
-				cmd.Set("detail", "if", "false")
-			case "else":
-			case "end":
-			case "for":
-			default:
-				cmd.Hand = true
-				return nil
-			}
-		}
-
-		if cmd.Cmd(); cmd.Has("return") {
-			m.Options("scan_end", true)
-			m.Target().Close(m)
-		}
-
-		v := cmd.Optionv("ps_target")
-		if v != nil {
-			m.Optionv("ps_target", v)
-		}
-		return nil
-	}, "scan", arg).Target().Name)
-
-	return false
+	return true
 }
 func (cli *CLI) Close(m *ctx.Message, arg ...string) bool {
-	switch cli.Context {
-	case m.Target():
-	case m.Source():
-	}
-	return true
+	return false
 }
 
 var Index = &ctx.Context{Name: "cli", Help: "管理中心",
@@ -605,52 +559,6 @@ func main() {
 			}
 			return
 		}},
-		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				m.Cmdy("dir", "", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
-				return
-			}
-
-			// 解析脚本文件
-			if p := m.Cmdx("nfs.path", arg[0]); p != "" && strings.Contains(p, ".") {
-				arg[0] = p
-				switch path.Ext(p) {
-				case "":
-				case ".shy":
-					m.Option("scan_end", "false")
-					m.Start(fmt.Sprintf("shell%d", m.Capi("nshell", 1)), "shell", arg...)
-					m.Wait()
-				default:
-					m.Cmdy("system", m.Conf("system", []string{"script", strings.TrimPrefix(path.Ext(p), ".")}), arg)
-				}
-				m.Append("directory", "")
-				return
-			}
-
-			// 解析终端命令
-			if arg[0] == "stdio" {
-				m.Option("scan_end", "false")
-				m.Start("shy", "shell", "stdio", "engine")
-				m.Wait()
-				return
-			}
-
-			text := strings.Join(arg, " ")
-			if !strings.HasPrefix(text, "sess") && m.Options("remote") {
-				text = m.Current(text)
-			}
-
-			// 解析代码片段
-			m.Sess("yac").Call(func(msg *ctx.Message) *ctx.Message {
-				switch msg.Cmd().Detail(0) {
-				case "cmd":
-					m.Set("append").Copy(msg, "append")
-					m.Set("result").Copy(msg, "result")
-				}
-				return nil
-			}, "parse", "line", "void", text)
-			return
-		}},
 		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if d, e := time.ParseDuration(arg[0]); m.Assert(e) {
 				m.Log("info", "sleep %v", d)
@@ -866,7 +774,7 @@ func main() {
 				m.Echo("quit")
 
 			case "1":
-				if m.Option("cli.modal") != "action" {
+				if m.Option("bio.modal") != "action" {
 					m.Cmd("cli.source", m.Conf("system", "script.exit"))
 					m.Echo("restart")
 				}
@@ -1289,16 +1197,16 @@ var version = struct {
 			detail = append(detail, arg...)
 
 			// 目标切换
-			target := m.Optionv("ps_target")
+			target := m.Optionv("bio.ctx")
 			if detail[0] != "context" {
-				defer func() { m.Optionv("ps_target", target) }()
+				defer func() { m.Optionv("bio.ctx", target) }()
 			}
 
 			// 解析脚本
 			msg := m
 			for k, v := range m.Confv("system", "script").(map[string]interface{}) {
 				if strings.HasSuffix(detail[0], "."+k) {
-					msg = m.Spawn(m.Optionv("ps_target"))
+					msg = m.Spawn(m.Optionv("bio.ctx"))
 					detail[0] = m.Cmdx("nfs.path", detail[0])
 					detail = append([]string{v.(string)}, detail...)
 					break
@@ -1319,7 +1227,7 @@ var version = struct {
 					}
 					detail[0] = routes[len(routes)-1]
 				} else {
-					msg = m.Spawn(m.Optionv("ps_target"))
+					msg = m.Spawn(m.Optionv("bio.ctx"))
 				}
 			}
 			msg.Copy(m, "option").Copy(m, "append")
@@ -1378,7 +1286,7 @@ var version = struct {
 			if msg.Set("detail", args).Cmd(); !msg.Hand {
 				msg.Cmd("system", args)
 			}
-			if msg.Appends("ps_target1") {
+			if msg.Appends("bio.ctx1") {
 				target = msg.Target()
 			}
 
@@ -1413,249 +1321,9 @@ var version = struct {
 			}
 
 			// 返回结果
-			m.Optionv("ps_target", msg.Target())
+			m.Optionv("bio.ctx", msg.Target())
 			m.Set("append").Copy(msg, "append")
 			m.Set("result").Copy(msg, "result")
-			return
-		}},
-		"str": &ctx.Command{Name: "str word", Help: "解析字符串", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo(arg[0][1 : len(arg[0])-1])
-			return
-		}},
-		"exe": &ctx.Command{Name: "exe $ ( cmd )", Help: "解析嵌套命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch len(arg) {
-			case 1:
-				m.Echo(arg[0])
-			case 2:
-				msg := m.Spawn(m.Optionv("ps_target"))
-				switch arg[0] {
-				case "$":
-					m.Echo(msg.Cap(arg[1]))
-				case "@":
-					value := msg.Option(arg[1])
-					if value == "" {
-						value = msg.Conf(arg[1])
-					}
-
-					m.Echo(value)
-				default:
-					m.Echo(arg[0]).Echo(arg[1])
-				}
-			default:
-				switch arg[0] {
-				case "$", "@":
-					m.Result(0, arg[2:len(arg)-1])
-				}
-			}
-			return
-		}},
-		"val": &ctx.Command{Name: "val exp", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			result := "false"
-			switch len(arg) {
-			case 0:
-				result = ""
-			case 1:
-				result = arg[0]
-			case 2:
-				switch arg[0] {
-				case "-z":
-					if arg[1] == "" {
-						result = "true"
-					}
-				case "-n":
-					if arg[1] != "" {
-						result = "true"
-					}
-
-				case "-e":
-					if _, e := os.Stat(arg[1]); e == nil {
-						result = "true"
-					}
-				case "-f":
-					if info, e := os.Stat(arg[1]); e == nil && !info.IsDir() {
-						result = "true"
-					}
-				case "-d":
-					if info, e := os.Stat(arg[1]); e == nil && info.IsDir() {
-						result = "true"
-					}
-				case "+":
-					result = arg[1]
-				case "-":
-					result = arg[1]
-					if i, e := strconv.Atoi(arg[1]); e == nil {
-						result = fmt.Sprintf("%d", -i)
-					}
-				}
-			case 3:
-				v1, e1 := strconv.Atoi(arg[0])
-				v2, e2 := strconv.Atoi(arg[2])
-				switch arg[1] {
-				case ":=":
-					if !m.Target().Has(arg[0]) {
-						result = m.Cap(arg[0], arg[0], arg[2], "临时变量")
-					}
-				case "=":
-					result = m.Cap(arg[0], arg[2])
-				case "+=":
-					if i, e := strconv.Atoi(m.Cap(arg[0])); e == nil && e2 == nil {
-						result = m.Cap(arg[0], fmt.Sprintf("%d", v2+i))
-					} else {
-						result = m.Cap(arg[0], m.Cap(arg[0])+arg[2])
-					}
-				case "+":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%d", v1+v2)
-					} else {
-						result = arg[0] + arg[2]
-					}
-				case "-":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%d", v1-v2)
-					} else {
-						result = strings.Replace(arg[0], arg[1], "", -1)
-					}
-				case "*":
-					result = arg[0]
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%d", v1*v2)
-					}
-				case "/":
-					result = arg[0]
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%d", v1/v2)
-					}
-				case "%":
-					result = arg[0]
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%d", v1%v2)
-					}
-
-				case "<":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%t", v1 < v2)
-					} else {
-						result = fmt.Sprintf("%t", arg[0] < arg[2])
-					}
-				case "<=":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%t", v1 <= v2)
-					} else {
-						result = fmt.Sprintf("%t", arg[0] <= arg[2])
-					}
-				case ">":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%t", v1 > v2)
-					} else {
-						result = fmt.Sprintf("%t", arg[0] > arg[2])
-					}
-				case ">=":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%t", v1 >= v2)
-					} else {
-						result = fmt.Sprintf("%t", arg[0] >= arg[2])
-					}
-				case "==":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%t", v1 == v2)
-					} else {
-						result = fmt.Sprintf("%t", arg[0] == arg[2])
-					}
-				case "!=":
-					if e1 == nil && e2 == nil {
-						result = fmt.Sprintf("%t", v1 != v2)
-					} else {
-						result = fmt.Sprintf("%t", arg[0] != arg[2])
-					}
-
-				case "~":
-					if m, e := regexp.MatchString(arg[2], arg[0]); m && e == nil {
-						result = "true"
-					}
-				case "!~":
-					if m, e := regexp.MatchString(arg[2], arg[0]); !m || e != nil {
-						result = "true"
-					}
-				}
-			}
-			m.Echo(result)
-
-			return
-		}},
-		"exp": &ctx.Command{Name: "exp word", Help: "表达式运算", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 0 && arg[0] == "{" {
-				msg := m.Spawn()
-				for i := 1; i < len(arg); i++ {
-					key := arg[i]
-					for i += 3; i < len(arg); i++ {
-						if arg[i] == "]" {
-							break
-						}
-						msg.Add("append", key, arg[i])
-					}
-				}
-				m.Echo("%d", msg.Code())
-				return
-			}
-
-			pre := map[string]int{
-				"=": 1,
-				"+": 2, "-": 2,
-				"*": 3, "/": 3, "%": 3,
-			}
-			num := []string{arg[0]}
-			op := []string{}
-
-			for i := 1; i < len(arg); i += 2 {
-				if len(op) > 0 && pre[op[len(op)-1]] >= pre[arg[i]] {
-					num[len(op)-1] = m.Spawn().Cmd("val", num[len(op)-1], op[len(op)-1], num[len(op)]).Get("result")
-					num = num[:len(num)-1]
-					op = op[:len(op)-1]
-				}
-
-				num = append(num, arg[i+1])
-				op = append(op, arg[i])
-			}
-
-			for i := len(op) - 1; i >= 0; i-- {
-				num[i] = m.Spawn().Cmd("val", num[i], op[i], num[i+1]).Get("result")
-			}
-
-			m.Echo("%s", num[0])
-			return
-		}},
-		"let": &ctx.Command{Name: "let a = exp", Help: "设置变量, a: 变量名, exp: 表达式(a {+|-|*|/|%} b)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch arg[2] {
-			case "=":
-				m.Cap(arg[1], arg[3])
-			case "<-":
-				m.Cap(arg[1], m.Cap("last_msg"))
-			}
-			m.Echo(m.Cap(arg[1]))
-			return
-		}},
-		"var": &ctx.Command{Name: "var a [= exp]", Help: "定义变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Cap(arg[1], arg[1], "", "临时变量"); len(arg) > 1 {
-				switch arg[2] {
-				case "=":
-					m.Cap(arg[1], arg[3])
-				case "<-":
-					m.Cap(arg[1], m.Cap("last_msg"))
-				}
-			}
-			m.Echo(m.Cap(arg[1]))
-			return
-		}},
-		"expr": &ctx.Command{Name: "expr arg...", Help: "输出表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo("%s", strings.Join(arg[1:], ""))
-			return
-		}},
-		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, result: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Add("append", "return", arg[1:])
-			return
-		}},
-		"arguments": &ctx.Command{Name: "arguments", Help: "脚本参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Set("result", m.Optionv("arguments"))
 			return
 		}},
 
@@ -1702,125 +1370,6 @@ var version = struct {
 			m.Table()
 			return
 		}},
-
-		"label": &ctx.Command{Name: "label name", Help: "记录当前脚本的位置, name: 位置名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				if cli.label == nil {
-					cli.label = map[string]string{}
-				}
-				cli.label[arg[1]] = m.Option("file_pos")
-			}
-			return
-		}},
-		"goto": &ctx.Command{Name: "goto label [exp] condition", Help: "向上跳转到指定位置, label: 跳转位置, condition: 跳转条件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				if pos, ok := cli.label[arg[1]]; ok {
-					if !kit.Right(arg[len(arg)-1]) {
-						return
-					}
-					m.Append("file_pos0", pos)
-				}
-			}
-			return
-		}},
-		"if": &ctx.Command{Name: "if exp", Help: "条件语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				run := m.Caps("parse") && kit.Right(arg[1])
-				cli.stack = append(cli.stack, &Frame{pos: m.Optioni("file_pos"), key: key, run: run})
-				m.Capi("level", 1)
-				m.Caps("parse", run)
-			}
-			return
-		}},
-		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				if !m.Caps("parse") {
-					m.Caps("parse", true)
-				} else {
-					if len(cli.stack) == 1 {
-						m.Caps("parse", false)
-					} else {
-						frame := cli.stack[len(cli.stack)-2]
-						m.Caps("parse", !frame.run)
-					}
-				}
-			}
-			return
-		}},
-		"end": &ctx.Command{Name: "end", Help: "结束语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-				if frame := cli.stack[len(cli.stack)-1]; frame.key == "for" && frame.run {
-					m.Append("file_pos0", frame.pos)
-					return
-				}
-
-				if cli.stack = cli.stack[:len(cli.stack)-1]; m.Capi("level", -1) > 0 {
-					m.Caps("parse", cli.stack[len(cli.stack)-1].run)
-				} else {
-					m.Caps("parse", true)
-				}
-			}
-			return
-		}},
-		"for": &ctx.Command{Name: "for [[express ;] condition]|[index message meta value]",
-			Help: "循环语句, express: 每次循环运行的表达式, condition: 循环条件, index: 索引消息, message: 消息编号, meta: value: ",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				if cli, ok := m.Target().Server.(*CLI); m.Assert(ok) {
-					run := m.Caps("parse")
-					defer func() { m.Caps("parse", run) }()
-
-					msg := m
-					if run {
-						if arg[1] == "index" {
-							if code, e := strconv.Atoi(arg[2]); m.Assert(e) {
-								msg = m.Target().Message().Tree(code)
-								run = run && msg != nil && msg.Meta != nil
-								switch len(arg) {
-								case 4:
-									run = run && len(msg.Meta) > 0
-								case 5:
-									run = run && len(msg.Meta[arg[3]]) > 0
-								}
-							}
-						} else {
-							run = run && kit.Right(arg[len(arg)-1])
-						}
-
-						if len(cli.stack) > 0 {
-							if frame := cli.stack[len(cli.stack)-1]; frame.key == "for" && frame.pos == m.Optioni("file_pos") {
-								if arg[1] == "index" {
-									frame.index++
-									if run = run && len(frame.list) > frame.index; run {
-										if len(arg) == 5 {
-											arg[3] = arg[4]
-										}
-										m.Cap(arg[3], frame.list[frame.index])
-									}
-								}
-								frame.run = run
-								return
-							}
-						}
-					}
-
-					cli.stack = append(cli.stack, &Frame{pos: m.Optioni("file_pos"), key: key, run: run, index: 0})
-					if m.Capi("level", 1); run && arg[1] == "index" {
-						frame := cli.stack[len(cli.stack)-1]
-						switch len(arg) {
-						case 4:
-							frame.list = []string{}
-							for k, _ := range msg.Meta {
-								frame.list = append(frame.list, k)
-							}
-						case 5:
-							frame.list = msg.Meta[arg[3]]
-							arg[3] = arg[4]
-						}
-						m.Cap(arg[3], arg[3], frame.list[0], "临时变量")
-					}
-				}
-				return
-			}},
 	},
 }
 

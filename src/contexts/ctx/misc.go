@@ -129,7 +129,7 @@ func (m *Message) Format(arg ...interface{}) string {
 		case "code":
 			meta = append(meta, kit.Format(m.code))
 		case "ship":
-			meta = append(meta, fmt.Sprintf("%s:%d(%s->%s)", m.Option("routine"), m.code, m.source.Name, m.target.Name))
+			meta = append(meta, fmt.Sprintf("%s:%d(%s->%s)", m.Option("ctx.routine"), m.code, m.source.Name, m.target.Name))
 		case "source":
 			target := m.target
 			m.target = m.source
@@ -535,7 +535,7 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 func (m *Message) Show(str string, args ...interface{}) *Message {
 	res := fmt.Sprintf(str, args...)
 
-	if m.Option("cli.modal") == "action" {
+	if m.Option("bio.modal") == "action" {
 		fmt.Printf(res)
 	} else if kit.STDIO != nil {
 		kit.STDIO.Show(res)
@@ -631,7 +631,7 @@ func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context
 	}
 
 	context := []*Context{m.target}
-	for _, v := range []string{"aaa", "ssh", "cli", "nfs"} {
+	for _, v := range kit.Trans(m.Optionv("ctx.chain")) {
 		if msg := m.Sess(v, false); msg != nil && msg.target != nil {
 			context = append(context, msg.target)
 		}

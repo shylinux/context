@@ -4,5 +4,5 @@ var version = struct {
 	host string
 	self int
 }{
-	"2019-07-20 15:41:22", "mac", 229,
+	"2019-07-20 17:10:58", "mac", 232,
 }

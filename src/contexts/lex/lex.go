@@ -22,12 +22,13 @@ type State struct {
 	next int
 	hash int
 }
+
 type LEX struct {
-	seed  []*Seed
-	hash  map[string]int
-	hashs map[int]string
-	pages map[int]string
-	page  map[string]int
+	seed []*Seed
+	hash map[string]int
+	word map[int]string
+	hand map[int]string
+	page map[string]int
 
 	char  map[byte][]byte
 	state map[State]*State
@@ -36,10 +37,16 @@ type LEX struct {
 	*ctx.Context
 }
 
+func (lex *LEX) charset(c byte) []byte {
+	if cs, ok := lex.char[c]; ok {
+		return cs
+	}
+	return []byte{c}
+}
 func (lex *LEX) index(m *ctx.Message, hash string, h string) int {
-	which, names := lex.hash, lex.hashs
+	which, names := lex.hash, lex.word
 	if hash == "npage" {
-		which, names = lex.page, lex.pages
+		which, names = lex.page, lex.hand
 	}
 
 	if x, e := strconv.Atoi(h); e == nil {
@@ -59,12 +66,6 @@ func (lex *LEX) index(m *ctx.Message, hash string, h string) int {
 	names[which[h]] = h
 	m.Assert(hash != "npage" || m.Capi("npage") < m.Confi("meta", "nlang"), "语法集合超过上限")
 	return which[h]
-}
-func (lex *LEX) charset(c byte) []byte {
-	if cs, ok := lex.char[c]; ok {
-		return cs
-	}
-	return []byte{c}
 }
 func (lex *LEX) train(m *ctx.Message, page int, hash int, seed []byte) int {
 	m.Log("debug", "%s %s page: %v hash: %v seed: %v", "train", "lex", page, hash, string(seed))
@@ -288,8 +289,8 @@ func (lex *LEX) Begin(m *ctx.Message, arg ...string) ctx.Server {
 
 	lex.page = map[string]int{"nil": 0}
 	lex.hash = map[string]int{"nil": 0}
-	lex.hashs = map[int]string{0: "nil"}
-	lex.pages = map[int]string{0: "nil"}
+	lex.word = map[int]string{0: "nil"}
+	lex.hand = map[int]string{0: "nil"}
 
 	lex.char = map[byte][]byte{
 		't': []byte{'\t'},
@@ -376,7 +377,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 					}
 
 					m.Push("word", string(word))
-					m.Push("hash", lex.hashs[hash])
+					m.Push("hash", lex.word[hash])
 					m.Push("rest", string(rest))
 					input = rest
 				}
@@ -387,40 +388,34 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 		"show": &ctx.Command{Name: "show seed|page|hash|mat|node", Help: "查看信息", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if lex, ok := m.Target().Server.(*LEX); m.Assert(ok) {
 				if len(arg) == 0 {
-					m.Append("seed", len(lex.seed))
-					m.Append("page", len(lex.page))
-					m.Append("hash", len(lex.hash))
-					m.Append("nmat", len(lex.mat))
-					m.Append("node", len(lex.state))
+					m.Push("seed", len(lex.seed))
+					m.Push("page", len(lex.page))
+					m.Push("hash", len(lex.hash))
+					m.Push("nmat", len(lex.mat))
+					m.Push("node", len(lex.state))
 					m.Table()
 					return
 				}
 				switch arg[0] {
 				case "seed":
 					for _, v := range lex.seed {
-						m.Push("page", fmt.Sprintf("%s", lex.pages[v.page]))
-						m.Push("word", fmt.Sprintf("%s", strings.Replace(strings.Replace(v.word, "\n", "\\n", -1), "\t", "\\t", -1)))
-						m.Push("hash", fmt.Sprintf("%s", lex.hashs[v.hash]))
+						m.Push("page", lex.hand[v.page])
+						m.Push("word", strings.Replace(strings.Replace(v.word, "\n", "\\n", -1), "\t", "\\t", -1))
+						m.Push("hash", lex.word[v.hash])
 					}
 					m.Sort("page", "int").Table()
 
 				case "page":
 					for k, v := range lex.page {
-						if k == "nil" {
-							continue
-						}
 						m.Push("page", k)
-						m.Push("code", fmt.Sprintf("%d", v))
+						m.Push("code", v)
 					}
 					m.Sort("code", "int").Table()
 
 				case "hash":
 					for k, v := range lex.hash {
-						if k == "nil" {
-							continue
-						}
 						m.Push("hash", k)
-						m.Push("code", fmt.Sprintf("%d", v))
+						m.Push("code", v)
 					}
 					m.Sort("code", "int").Table()
 
@@ -435,7 +430,7 @@ var Index = &ctx.Context{Name: "lex", Help: "词法中心",
 				case "mat":
 					for i, v := range lex.mat {
 						if i <= m.Capi("npage") {
-							m.Push("index", lex.pages[i])
+							m.Push("index", lex.hand[i])
 						} else if i < m.Confi("meta", "nlang") {
 							continue
 						} else {

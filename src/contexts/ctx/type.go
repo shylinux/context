@@ -281,6 +281,97 @@ func (m *Message) Results(arg ...interface{}) bool {
 	return kit.Right(m.Result(arg...))
 }
 
+func (m *Message) Form(x *Command, arg []string) []string {
+	for _, form := range []map[string]int{m.Optionv("ctx.form").(map[string]int), x.Form} {
+
+		if args := []string{}; form != nil {
+			for i := 0; i < len(arg); i++ {
+				if n, ok := form[arg[i]]; ok {
+					if n < 0 {
+						n += len(arg) - i
+					}
+					for j := i + 1; j <= i+n && j < len(arg); j++ {
+						if _, ok := form[arg[j]]; ok {
+							n = j - i - 1
+						}
+					}
+					if i+1+n > len(arg) {
+						m.Add("option", arg[i], arg[i+1:])
+					} else {
+						m.Add("option", arg[i], arg[i+1:i+1+n])
+					}
+					i += n
+				} else {
+					args = append(args, arg[i])
+				}
+			}
+			arg = args
+		}
+	}
+
+	return arg
+}
+func (m *Message) Push(str string, arg ...interface{}) *Message {
+	return m.Add("append", str, arg...)
+}
+func (m *Message) Sort(key string, arg ...string) *Message {
+	cmp := "str"
+	if len(arg) > 0 {
+		cmp = arg[0]
+	}
+
+	number := map[int]int{}
+	table := []map[string]string{}
+	m.Table(func(index int, line map[string]string) {
+		table = append(table, line)
+		switch cmp {
+		case "int":
+			number[index] = kit.Int(line[key])
+		case "int_r":
+			number[index] = -kit.Int(line[key])
+		case "time":
+			number[index] = kit.Time(line[key])
+		case "time_r":
+			number[index] = -kit.Time(line[key])
+		}
+	})
+
+	for i := 0; i < len(table)-1; i++ {
+		for j := i + 1; j < len(table); j++ {
+			result := false
+			switch cmp {
+			case "str":
+				if table[i][key] > table[j][key] {
+					result = true
+				}
+			case "str_r":
+				if table[i][key] < table[j][key] {
+					result = true
+				}
+			default:
+				if number[i] > number[j] {
+					result = true
+				}
+			}
+
+			if result {
+				table[i], table[j] = table[j], table[i]
+				number[i], number[j] = number[j], number[i]
+			}
+		}
+	}
+
+	for _, k := range m.Meta["append"] {
+		delete(m.Meta, k)
+	}
+
+	for _, v := range table {
+		for _, k := range m.Meta["append"] {
+			m.Add("append", k, v[k])
+		}
+	}
+	return m
+}
 func (m *Message) Table(cbs ...interface{}) *Message {
 	if len(m.Meta["append"]) == 0 {
 		return m
@@ -376,63 +467,11 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 
 	return m
 }
-func (m *Message) Sort(key string, arg ...string) *Message {
-	cmp := "str"
+func (m *Message) Echo(str string, arg ...interface{}) *Message {
 	if len(arg) > 0 {
-		cmp = arg[0]
+		return m.Add("result", fmt.Sprintf(str, arg...))
 	}
-
-	number := map[int]int{}
-	table := []map[string]string{}
-	m.Table(func(index int, line map[string]string) {
-		table = append(table, line)
-		switch cmp {
-		case "int":
-			number[index] = kit.Int(line[key])
-		case "int_r":
-			number[index] = -kit.Int(line[key])
-		case "time":
-			number[index] = kit.Time(line[key])
-		case "time_r":
-			number[index] = -kit.Time(line[key])
-		}
-	})
-
-	for i := 0; i < len(table)-1; i++ {
-		for j := i + 1; j < len(table); j++ {
-			result := false
-			switch cmp {
-			case "str":
-				if table[i][key] > table[j][key] {
-					result = true
-				}
-			case "str_r":
-				if table[i][key] < table[j][key] {
-					result = true
-				}
-			default:
-				if number[i] > number[j] {
-					result = true
-				}
-			}
-
-			if result {
-				table[i], table[j] = table[j], table[i]
-				number[i], number[j] = number[j], number[i]
-			}
-		}
-	}
-
-	for _, k := range m.Meta["append"] {
-		delete(m.Meta, k)
-	}
-
-	for _, v := range table {
-		for _, k := range m.Meta["append"] {
-			m.Add("append", k, v[k])
-		}
-	}
-	return m
+	return m.Add("result", str)
 }
 func (m *Message) Copy(msg *Message, arg ...string) *Message {
 	if msg == nil || m == msg {
@@ -486,15 +525,6 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 	}
 
 	return m
-}
-func (m *Message) Push(str string, arg ...interface{}) *Message {
-	return m.Add("append", str, arg...)
-}
-func (m *Message) Echo(str string, arg ...interface{}) *Message {
-	if len(arg) > 0 {
-		return m.Add("result", fmt.Sprintf(str, arg...))
-	}
-	return m.Add("result", str)
 }
 
 func (m *Message) Cmdp(t time.Duration, head []string, prefix []string, suffix [][]string) *Message {
@@ -571,43 +601,19 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 		if x, ok := c.Commands[key]; ok && x.Hand != nil {
 			msg.TryCatch(msg, true, func(msg *Message) {
 				msg.Log("cmd", "%s %s %v %v", c.Name, key, arg, msg.Meta["option"])
-
-				for _, form := range []map[string]int{map[string]int{"page.limit": 1, "page.offset": 1}, x.Form} {
-
-					if args := []string{}; form != nil {
-						for i := 0; i < len(arg); i++ {
-							if n, ok := form[arg[i]]; ok {
-								if n < 0 {
-									n += len(arg) - i
-								}
-								for j := i + 1; j <= i+n && j < len(arg); j++ {
-									if _, ok := form[arg[j]]; ok {
-										n = j - i - 1
-									}
-								}
-								if i+1+n > len(arg) {
-									msg.Add("option", arg[i], arg[i+1:])
-								} else {
-									msg.Add("option", arg[i], arg[i+1:i+1+n])
-								}
-								i += n
-							} else {
-								args = append(args, arg[i])
-							}
-						}
-						arg = args
-					}
-				}
+				msg.Hand = true
+				x.Hand(msg, c, key, msg.Form(x, arg)...)
+				msg.Log("cmd", "%s %s %v %v", c.Name, key, len(msg.Meta["result"]), msg.Meta["append"])
+				return
 
 				target := msg.target
 				msg.target = s
 
-				msg.Hand = true
 				switch v := msg.Gdb("command", key, arg).(type) {
 				case string:
 					msg.Echo(v)
 				case nil:
-					if msg.Options("auto_cmd") {
+					if msg.Options("bio.cmd") {
 						if x.Auto != nil {
 							x.Auto(msg, c, key, arg...)
 						}

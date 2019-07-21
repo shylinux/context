@@ -22,10 +22,15 @@ func (ctx *CTX) Spawn(m *Message, c *Context, arg ...string) Server {
 	return s
 }
 func (ctx *CTX) Begin(m *Message, arg ...string) Server {
+	m.Option("ctx.routine", 0)
 	m.Option("log.disable", true)
+	m.Option("ctx.chain", "aaa", "ssh", "cli", "nfs")
+
 	m.Option("page.limit", 10)
 	m.Option("page.offset", 0)
-	m.Option("routine", 0)
+	m.Optionv("ctx.form", map[string]int{
+		"page.limit": 1, "page.offset": 1,
+	})
 
 	m.root = m
 	m.Sess(m.target.Name, m)
@@ -39,19 +44,20 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	return ctx
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
-	m.Cmd("ctx._init")
-	if m.Optionv("ps_target", Index); len(arg) == 0 {
-		m.Option("cli.modal", "active")
+	if m.Optionv("bio.ctx", Index); len(arg) == 0 {
+		m.Option("bio.modal", "active")
 		m.Option("log.disable", false)
-		m.Cap("stream", "shy")
+		m.Cap("stream", "stdio")
 		m.Cmd("log._init")
-		m.Cmd("yac._init")
 		m.Cmd("gdb._init")
-		m.Cmd("cli.source", m.Conf("system", "script.init")).Cmd("cli.source", "stdio").Cmd("cli.source", m.Conf("system", "script.exit"))
+
+		m.Cmd("ctx._init")
+		m.Cmd("nfs.source", m.Conf("system", "script.init")).Cmd("nfs.source", "stdio").Cmd("nfs.source", m.Conf("system", "script.exit"))
 	} else {
-		m.Option("cli.modal", "action")
-		// m.Cmd("yac._init")
-		for _, v := range m.Spawn().Cmd(arg).Meta["result"] {
+		m.Option("bio.modal", "action")
+
+		m.Cmd("ctx._init")
+		for _, v := range m.Sess("cli").Cmd(arg).Meta["result"] {
 			fmt.Printf("%s", v)
 		}
 	}
@@ -103,7 +109,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 	},
 	Commands: map[string]*Command{
 		"_init": &Command{Name: "_init", Help: "启动", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			for _, x := range []string{"lex", "cli", "nfs", "aaa", "ssh", "web"} {
+			for _, x := range []string{"lex", "cli", "yac", "nfs", "aaa", "ssh", "web"} {
+				kit.Log("error", "%v", x)
 				m.Cmd(x + "._init")
 			}
 			return
@@ -735,7 +742,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 		"message": &Command{Name: "message [code] [cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			msg := m
-			if ms := m.Find(m.Cap("ps_target")); ms != nil {
+			if ms := m.Find(m.Cap("bio.ctx")); ms != nil {
 				msg = ms
 			}
 
@@ -816,7 +823,11 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						keys[k] = true
 						m.Add("append", "key", k)
 						m.Add("append", "len", len(msg.Meta[k]))
-						m.Add("append", "value", fmt.Sprintf("%v", msg.Meta[k]))
+						if _, ok := msg.Data[k]; ok {
+							m.Add("append", "value", kit.Format(msg.Data[k]))
+						} else {
+							m.Add("append", "value", kit.Format(msg.Meta[k]))
+						}
 						continue
 					}
 
@@ -1420,7 +1431,7 @@ func Start(args ...string) bool {
 		args = args[1:]
 	}
 	if len(args) > 0 && args[0] == "daemon" {
-		Pulse.Options("cli.modal", "daemon")
+		Pulse.Options("bio.modal", "daemon")
 		Pulse.Options("daemon", true)
 		args = args[1:]
 	}
