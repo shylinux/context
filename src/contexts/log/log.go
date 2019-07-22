@@ -160,6 +160,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 			"start": map[string]interface{}{"value": []interface{}{"bench", "red"}},
 			"close": map[string]interface{}{"value": []interface{}{"bench", "red"}},
 			"warn":  map[string]interface{}{"value": []interface{}{"bench", "yellow"}},
+			"stack": map[string]interface{}{"value": []interface{}{"bench", "yellow"}},
 
 			"cmd": map[string]interface{}{"value": []interface{}{"bench", "green"},
 				"lex": map[string]interface{}{"value": []interface{}{"debug", "green"}},

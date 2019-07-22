@@ -916,16 +916,14 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				kit.STDIO = nfs
 
 			} else if m.Options("daemon") {
-				return true
+				return false
 			}
 		}
 
-		// 终端用户
-		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.username")))
-		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
-		m.Optionv("bio.ctx", m.Target())
+		// 语句堆栈
 		stack := kit.Stack{}
 		stack.Push(m.Option("stack.key", "source"), m.Options("stack.run", true), m.Optioni("stack.pos", 0))
+		m.Optionv("bio.ctx", m.Target())
 
 		line, bio := "", bufio.NewScanner(nfs)
 		for nfs.prompt(); ; nfs.prompt() {
@@ -953,7 +951,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 				// 结束语句
 				if strings.TrimSpace(line) == "end" {
-					m.Log("stack", " pop %v", stack.Peek().String("/"))
+					m.Log("stack", "pop: %v", stack.Peek().String("/"))
 					if stack.Pop(); m.Options("stack.run") && m.Option("stack.key") == "for" {
 						i = m.Optioni("stack.pos") - 1
 					}
@@ -964,7 +962,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				}
 
 				// 跳过语句
-				if !stack.Peek().Run {
+				if !m.Options("stack.run") && !strings.HasPrefix(strings.TrimSpace(line), "else") {
 					m.Log("stack", "skip %v", line)
 					continue
 				}
@@ -980,10 +978,18 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				}
 
 				// 压栈语句
-				if msg.Appends("stack.key") {
-					stack.Push(m.Option("stack.key", msg.Append("stack.key")), m.Options("stack.run", msg.Appends("stack.run")), m.Optioni("stack.pos", i))
-					m.Log("stack", "push %v", stack.Peek().String("\\"))
-					msg.Append("stack.key", "")
+				if msg.Has("stack.key") {
+					m.Log("stack", "push %v", stack.Push(
+						m.Option("stack.key", msg.Append("stack.key")),
+						m.Options("stack.run", msg.Appends("stack.run")),
+						m.Optioni("stack.pos", i),
+					).String("\\"))
+				}
+				if msg.Has("stack.run") {
+					m.Log("stack", "set: run = %v", m.Options("stack.run", msg.Appends("stack.run")))
+				}
+				if msg.Has("stack.else") {
+					m.Options("stack.else", msg.Appends("stack.else"))
 				}
 
 				// 跳转语句

@@ -20,6 +20,12 @@ type TCP struct {
 }
 
 func (tcp *TCP) parse(m *ctx.Message, arg ...string) ([]string, []string) {
+	defer func() {
+		if e := recover(); e != nil {
+			m.Log("warn", "%v", e)
+		}
+	}()
+
 	address := []string{}
 	if arg[1] == "dev" {
 		m.Cmd("web.get", arg[1], arg[2], "temp", "ports", "format", "object").Table(func(line map[string]string) {
@@ -101,6 +107,9 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 }
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
 	address, arg := tcp.parse(m, arg...)
+	if len(address) == 0 {
+		return true
+	}
 	m.Cap("security", m.Confx("security", arg, 2))
 	m.Cap("protocol", m.Confx("protocol", arg, 3))
 

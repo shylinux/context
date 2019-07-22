@@ -185,6 +185,9 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			for k, v := range r.Form {
 				msg.Add("option", k, v)
 			}
+			if !msg.Has("username") || !m.Options("username") {
+				msg.Option("username", "")
+			}
 
 			// 请求数据
 			switch r.Header.Get("Content-Type") {

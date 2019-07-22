@@ -242,13 +242,20 @@ func (yac *YAC) parse(m *ctx.Message, msg *ctx.Message, page int, void int, line
 	if hash == 0 {
 		word = word[:0]
 
-	} else if !m.Confs("exec", []string{yac.hand[hash], "disable"}) { //执行命令
+	} else if !m.Confs("exec", []string{yac.hand[hash], "disable"}) {
+		//执行命令
 		cmd := msg.Spawn(m.Optionv("bio.ctx"))
 		if cmd.Cmd(yac.hand[hash], word); cmd.Hand {
 			word = cmd.Meta["result"]
 		}
+		//切换模块
 		if v := cmd.Optionv("bio.ctx"); v != nil {
 			m.Optionv("bio.ctx", v)
+		}
+		for _, key := range []string{"stack.key", "stack.run", "stack.else"} {
+			if cmd.Has(key) {
+				msg.Appends(key, cmd.Appends(key))
+			}
 		}
 	}
 
@@ -301,11 +308,13 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		"seed": &ctx.Config{Name: "seed", Value: []interface{}{
 			map[string]interface{}{"page": "void", "hash": "void", "word": []interface{}{"[\t ]+"}},
 
+			// 数据类型
 			map[string]interface{}{"page": "num", "hash": "num", "word": []interface{}{"mul{", "0", "-?[1-9][0-9]*", "0[0-9]+", "0x[0-9]+", "}"}},
 			map[string]interface{}{"page": "key", "hash": "key", "word": []interface{}{"[A-Za-z_][A-Za-z_0-9]*"}},
 			map[string]interface{}{"page": "str", "hash": "str", "word": []interface{}{"mul{", "\"[^\"]*\"", "'[^']*'", "}"}},
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"mul{", "$", "@", "}", "opt{", "key", "}"}},
 
+			// 表达式语句
 			map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-", "+", "}"}},
 			map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "+", "-", "*", "/", "%", "}"}},
 			map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "<", "<=", ">", ">=", "==", "!=", "}"}},
@@ -315,14 +324,18 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "stm", "hash": "var", "word": []interface{}{"var", "key", "opt{", "=", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "return", "word": []interface{}{"return", "rep{", "exp", "}"}},
 
+			// 命令语句
 			map[string]interface{}{"page": "word", "hash": "word", "word": []interface{}{"mul{", "~", "!", "\\?", "\\?\\?", "exe", "str", "[\\-a-zA-Z0-9_:/.]+", "=", "<", ">$", ">@", ">", "\\|", "%", "}"}},
 			map[string]interface{}{"page": "cmd", "hash": "cmd", "word": []interface{}{"rep{", "word", "}"}},
 			map[string]interface{}{"page": "com", "hash": "com", "word": []interface{}{"mul{", ";", "#[^\n]*\n?", "\n", "}"}},
 			map[string]interface{}{"page": "line", "hash": "line", "word": []interface{}{"opt{", "mul{", "stm", "cmd", "}", "}", "com"}},
 
+			// 复合语句
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"$", "(", "cmd", ")"}},
 			map[string]interface{}{"page": "stm", "hash": "if", "word": []interface{}{"if", "exp"}},
 			map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "rep{", "exp", "}"}},
+			map[string]interface{}{"page": "stm", "hash": "else", "word": []interface{}{"else", "opt{", "if", "exp", "}"}},
+			map[string]interface{}{"page": "stm", "hash": "end", "word": []interface{}{"end"}},
 			/*
 
 				map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-z", "-n", "}"}},
@@ -337,15 +350,10 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				map[string]interface{}{"page": "stm", "hash": "var", "word": []interface{}{"var", "key", "<-", "opt{", "exe", "}"}},
 				map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "<-", "opt{", "exe", "}"}},
 
-				map[string]interface{}{"page": "stm", "hash": "else", "word": []interface{}{"else"}},
-				map[string]interface{}{"page": "stm", "hash": "end", "word": []interface{}{"end"}},
 				map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "opt{", "exp", ";", "}", "exp"}},
 				map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "index", "exp", "opt{", "exp", "}", "exp"}},
 				map[string]interface{}{"page": "stm", "hash": "label", "word": []interface{}{"label", "exp"}},
 				map[string]interface{}{"page": "stm", "hash": "goto", "word": []interface{}{"goto", "exp", "opt{", "exp", "}", "exp"}},
-
-				map[string]interface{}{"page": "stm", "hash": "expr", "word": []interface{}{"expr", "rep{", "exp", "}"}},
-				map[string]interface{}{"page": "stm", "hash": "return", "word": []interface{}{"return", "rep{", "exp", "}"}},
 
 			*/
 
@@ -707,7 +715,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			switch arg[2] {
 			case "=":
 				m.Cap(arg[1], arg[3])
-				m.Log("stack", " set %v = %v", arg[1], arg[3])
+				m.Log("stack", "let %v = %v", arg[1], arg[3])
 			case "<-":
 				m.Cap(arg[1], m.Cap("last_msg"))
 			}
@@ -736,8 +744,12 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		}},
 
 		"if": &ctx.Command{Name: "if exp", Help: "条件语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Appends("stack.else", true)
 			m.Push("stack.key", arg[0])
 			m.Push("stack.run", m.Options("stack.run") && kit.Right(arg[1]))
+			if m.Appends("stack.run") {
+				m.Appends("stack.else", false)
+			}
 			return
 		}},
 		"for": &ctx.Command{Name: "for [[express ;] condition]|[index message meta value]",
@@ -804,11 +816,14 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				*/
 				return
 			}},
-
-		"expr": &ctx.Command{Name: "expr arg...", Help: "输出表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo("%s", strings.Join(arg[1:], ""))
+		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Appends("stack.run", m.Options("stack.else") && !m.Options("stack.run") && (len(arg) == 1 || kit.Right(arg[2])))
+			if m.Appends("stack.run") {
+				m.Appends("stack.else", false)
+			}
 			return
 		}},
+
 		"label": &ctx.Command{Name: "label name", Help: "记录当前脚本的位置, name: 位置名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if cli, ok := m.Target().Server.(*YAC); m.Assert(ok) {
 				if cli.label == nil {
@@ -827,23 +842,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					m.Append("file_pos0", pos)
 				}
 			}
-			return
-		}},
-		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			/*
-				if cli, ok := m.Target().Server.(*YAC); m.Assert(ok) {
-					if !m.Caps("parse") {
-						m.Caps("parse", true)
-					} else {
-						if len(cli.stack) == 1 {
-							m.Caps("parse", false)
-						} else {
-							frame := cli.stack[len(cli.stack)-2]
-							m.Caps("parse", !frame.run)
-						}
-					}
-				}
-			*/
 			return
 		}},
 	},

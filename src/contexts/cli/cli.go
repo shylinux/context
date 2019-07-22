@@ -407,6 +407,9 @@ func main() {
 			for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
 				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
 			}
+			for _, k := range []string{"PATH"} {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, os.Getenv(k)))
+			}
 			if len(cmd.Env) > 0 {
 				m.Log("info", "env %v", cmd.Env)
 			}
@@ -770,12 +773,12 @@ func main() {
 			code := kit.Select("0", arg, 0)
 			switch code {
 			case "0":
-				m.Cmd("cli.source", m.Conf("system", "script.exit"))
+				m.Cmd("nfs.source", m.Conf("system", "script.exit"))
 				m.Echo("quit")
 
 			case "1":
 				if m.Option("bio.modal") != "action" {
-					m.Cmd("cli.source", m.Conf("system", "script.exit"))
+					m.Cmd("nfs.source", m.Conf("system", "script.exit"))
 					m.Echo("restart")
 				}
 
@@ -854,6 +857,7 @@ func main() {
 			return
 		}},
 		"compile": &ctx.Command{Name: "compile all|self|[[[plugin] name] [OS [ARCH]]]", Help: "源码编译", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			wd, _ := os.Getwd()
 			switch arg[0] {
 			case "all":
 				list := [][]string{}
@@ -864,8 +868,12 @@ func main() {
 				m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_reg", "bench")
 
 			case "self":
+				env := []string{
+					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),
+					"cmd_env", "GOCACHE", path.Join(wd, m.Conf("compile", "tmp")),
+				}
 				m.Cmd("cli.version", "create")
-				if m.Cmdy("cli.system", "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+				if m.Cmdy("cli.system", env, "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
 					m.Cmdy("cli.quit", 1)
 					m.Append("host", version.host)
 					m.Append("self", version.self)
@@ -890,7 +898,6 @@ func main() {
 				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
 				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
 
-				wd, _ := os.Getwd()
 				os.MkdirAll(m.Conf("compile", "tmp"), 0777)
 				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch,
 					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),

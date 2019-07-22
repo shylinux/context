@@ -52,6 +52,8 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 		m.Cmd("gdb._init")
 
 		m.Cmd("ctx._init")
+		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.username")))
+		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
 		m.Cmd("nfs.source", m.Conf("system", "script.init")).Cmd("nfs.source", "stdio").Cmd("nfs.source", m.Conf("system", "script.exit"))
 	} else {
 		m.Option("bio.modal", "action")

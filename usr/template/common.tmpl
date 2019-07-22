@@ -6,8 +6,8 @@
             <meta name="{{index $meta "name"}}" content="{{index $meta "content"}}">
         {{end}}
 
-        <title>{{options . "componet_name"}}</title>
-        <link rel="shortcut icon" type="image/ico" href="/static/librarys/{{options . "favicon"}}">
+        <title>{{option . "componet_name" 0}}</title>
+        <link rel="shortcut icon" type="image/ico" href="/static/librarys/{{option . "favicon" 0}}">
         {{range $index, $lib := option . "styles"}}
             <link rel="stylesheet" type="text/css" href="/static/librarys/{{$lib}}"></link>
         {{end}}
@@ -25,18 +25,18 @@
     </fieldset>
 {{end}}
 {{define "banner"}}
-    <fieldset class="{{options . "componet_view"}}" data-init="{{options . "componet_init"}}">
+    <fieldset class="{{option . "componet_view" 0}}" data-init="{{option . "componet_init" 0}}">
         <ul>{{range $key, $item := conf . "componet"}}<li>{{$key}}</li>{{end}}</ul>
     </fieldset>
 {{end}}
 {{define "fieldset"}}
-    <fieldset class="{{options . "componet_view"}}" data-init="{{options . "componet_init"}}">
-        <form class="option {{options . "componet_name"}}"
+    <fieldset class="{{option . "componet_view" 0}}" data-init="{{option . "componet_init" 0}}">
+        <form class="option {{option . "componet_name" 0}}"
               data-componet_name="{{options . "componet_name"}}"
               data-componet_group="{{options . "componet_group"}}">
               <input style="display:none"></input>
         </form>
-        <div class="output {{options . "componet_name"}}"></div>
+        <div class="output {{option . "componet_name" 0}}"></div>
     </fieldset>
  {{end}}
 {{define "tail"}}

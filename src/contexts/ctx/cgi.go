@@ -317,7 +317,7 @@ var CGI = template.FuncMap{
 		switch m := arg[0].(type) {
 		case *Message:
 			if len(arg) == 1 {
-				return kit.Format(m.Meta["option"])
+				return strings.Join(m.Meta["option"], "")
 			}
 
 			switch value := arg[1].(type) {
@@ -327,7 +327,12 @@ var CGI = template.FuncMap{
 				}
 			case string:
 				if len(arg) == 2 {
-					return kit.Format(m.Optionv(value))
+					switch v := m.Optionv(value).(type) {
+					case []string:
+						return kit.Format(strings.Join(v, ""))
+					default:
+						return kit.Format(v)
+					}
 				}
 
 				switch val := arg[2].(type) {
