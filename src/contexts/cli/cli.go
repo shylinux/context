@@ -35,8 +35,8 @@ func (cli *CLI) schedule(m *ctx.Message) string {
 			first, timer = k, val["action_time"].(int64)
 		}
 	}
-	cli.Timer.Reset(time.Until(time.Unix(0, timer/int64(m.Confi("time_unit"))*1000000000)))
-	return m.Conf("timer_next", first)
+	cli.Timer.Reset(time.Until(time.Unix(0, timer/int64(m.Confi("time", "unit"))*1000000000)))
+	return m.Conf("timer", "next", first)
 }
 
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
@@ -46,19 +46,17 @@ func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return cli
 }
 func (cli *CLI) Start(m *ctx.Message, arg ...string) bool {
-	return true
+	return false
 }
 func (cli *CLI) Close(m *ctx.Message, arg ...string) bool {
-	return false
+	return true
 }
 
 var Index = &ctx.Context{Name: "cli", Help: "管理中心",
-	Caches: map[string]*ctx.Cache{
-		"nshell": &ctx.Cache{Name: "nshell", Value: "0", Help: "终端数量"},
-	},
+	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
-			"init_env": []interface{}{
+			"init": []interface{}{
 				"ctx_log", "ctx_app", "ctx_bin",
 				"ctx_ups", "ctx_box", "ctx_dev",
 				"ctx_cas",
@@ -70,7 +68,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"ssh_port": ":9090",
 				"username": "shy",
 			},
-		}, Help: "运行环境"},
+		}, Help: "运行环境, host, init, boot, node, user, work"},
 		"system": &ctx.Config{Name: "system", Value: map[string]interface{}{
 			"timeout": "60s",
 			"env":     map[string]interface{}{},
@@ -86,17 +84,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"init": "etc/init.shy", "exit": "etc/exit.shy",
 			},
 		}, Help: "系统环境, shell: path, cmd, arg, dir, env, active, daemon; "},
-		"plugin": &ctx.Config{Name: "plugin", Value: map[string]interface{}{
-			"go": map[string]interface{}{
-				"build": []interface{}{"go", "build", "-buildmode=plugin"},
-				"next":  []interface{}{"so", "load"},
-			},
-			"so": map[string]interface{}{
-				"load": []interface{}{"load"},
-			},
-		}, Help: "免密登录"},
 		"daemon": &ctx.Config{Name: "daemon", Value: map[string]interface{}{}, Help: "守护任务"},
-		"action": &ctx.Config{Name: "action", Value: map[string]interface{}{}, Help: "交互任务"},
+		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{
+			"list": map[string]interface{}{}, "next": "",
+		}, Help: "定时器"},
+		"time": &ctx.Config{Name: "timer", Value: map[string]interface{}{
+			"unit": 1000, "close": "open",
+		}, Help: "时间参数"},
 
 		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
 			"github":  "https://github.com/shylinux/context",
@@ -165,7 +159,7 @@ func main() {
 				map[string]interface{}{"os": "windows", "cpu": "386"},
 				map[string]interface{}{"os": "darwin", "cpu": "amd64"},
 			},
-			"env": []interface{}{"GOPATH", "PATH"},
+			"env": []interface{}{"GOBIN", "GOPATH", "PATH"},
 			"tmp": "var/tmp/go",
 		}, Help: "源码编译"},
 		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
@@ -203,26 +197,6 @@ func main() {
 		"missyou": &ctx.Config{Name: "missyou", Value: map[string]interface{}{
 			"path": "usr/local/work", "local": "usr/local",
 		}, Help: "任务管理"},
-
-		"timer":      &ctx.Config{Name: "timer", Value: map[string]interface{}{}, Help: "定时器"},
-		"timer_next": &ctx.Config{Name: "timer_next", Value: "", Help: "定时器"},
-		"time_unit":  &ctx.Config{Name: "time_unit", Value: "1000", Help: "时间倍数"},
-		"time_close": &ctx.Config{Name: "time_close(open/close)", Value: "open", Help: "时间区间"},
-
-		"alias": &ctx.Config{Name: "alias", Value: map[string]interface{}{
-			"~":  []string{"context"},
-			"!":  []string{"message"},
-			":":  []string{"command"},
-			"::": []string{"command", "list"},
-
-			"note":     []string{"mdb.note"},
-			"pwd":      []string{"nfs.pwd"},
-			"path":     []string{"nfs.path"},
-			"dir":      []string{"nfs.dir"},
-			"git":      []string{"nfs.git"},
-			"brow":     []string{"web.brow"},
-			"ifconfig": []string{"tcp.ifconfig"},
-		}, Help: "启动脚本"},
 	},
 	Commands: map[string]*ctx.Command{
 		"_init": &ctx.Command{Name: "_init", Help: "环境初始化", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -231,7 +205,7 @@ func main() {
 			m.Conf("runtime", "host.pid", os.Getpid())
 			runtime.GOMAXPROCS(1)
 
-			m.Confm("runtime", "init_env", func(index int, key string) {
+			m.Confm("runtime", "init", func(index int, key string) {
 				if value := os.Getenv(key); value != "" {
 					m.Conf("runtime", "boot."+key, kit.Select("", value, value != "-"))
 				}
@@ -313,53 +287,6 @@ func main() {
 			"cmd_error":   0,
 			"app_log":     1,
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			pid := ""
-			if len(arg) > 0 && m.Confs("daemon", arg[0]) {
-				pid, arg = arg[0], arg[1:]
-			}
-
-			// 守护列表
-			if len(arg) == 0 {
-				m.Confm("daemon", func(key string, info map[string]interface{}) {
-					if pid != "" && key != pid {
-						return
-					}
-
-					m.Add("append", "key", key)
-					m.Add("append", "log", info["log"])
-					m.Add("append", "create_time", info["create_time"])
-					m.Add("append", "finish_time", info["finish_time"])
-
-					if cmd, ok := info["sub"].(*exec.Cmd); ok {
-						info["pid"] = cmd.Process.Pid
-						info["cmd"] = kit.Select(cmd.Args[0], cmd.Args, 1)
-						if cmd.ProcessState != nil {
-							info["str"] = cmd.ProcessState.String()
-						}
-					}
-					m.Add("append", "pid", kit.Format(info["pid"]))
-					m.Add("append", "cmd", kit.Format(info["cmd"]))
-					m.Add("append", "str", kit.Format(info["str"]))
-				})
-				m.Table()
-				return
-			}
-
-			// 守护操作
-			if pid != "" {
-				if cmd, ok := m.Confm("daemon", pid)["sub"].(*exec.Cmd); ok {
-					switch arg[0] {
-					case "stop":
-						kit.Log("error", "kill: %s", cmd.Process.Pid)
-						m.Log("kill", "kill: %d", cmd.Process.Pid)
-						m.Echo("%s", cmd.Process.Signal(os.Interrupt))
-					default:
-						m.Echo("%v", cmd)
-					}
-				}
-				return
-			}
-
 			// 管道参数
 			for _, v := range m.Meta["result"] {
 				if strings.TrimSpace(v) != "" {
@@ -406,9 +333,6 @@ func main() {
 			})
 			for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
 				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
-			}
-			for _, k := range []string{"PATH"} {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, os.Getenv(k)))
 			}
 			if len(cmd.Env) > 0 {
 				m.Log("info", "env %v", cmd.Env)
@@ -562,6 +486,53 @@ func main() {
 			}
 			return
 		}},
+		"daemon": &ctx.Command{Name: "daemon", Help: "守护任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			pid := ""
+			if len(arg) > 0 && m.Confs("daemon", arg[0]) {
+				pid, arg = arg[0], arg[1:]
+			}
+
+			if len(arg) == 0 {
+				m.Confm("daemon", func(key string, info map[string]interface{}) {
+					if pid != "" && key != pid {
+						return
+					}
+
+					m.Add("append", "key", key)
+					m.Add("append", "log", info["log"])
+					m.Add("append", "create_time", info["create_time"])
+					m.Add("append", "finish_time", info["finish_time"])
+
+					if cmd, ok := info["sub"].(*exec.Cmd); ok {
+						info["pid"] = cmd.Process.Pid
+						info["cmd"] = kit.Select(cmd.Args[0], cmd.Args, 1)
+						if cmd.ProcessState != nil {
+							info["str"] = cmd.ProcessState.String()
+						}
+					}
+					m.Add("append", "pid", kit.Format(info["pid"]))
+					m.Add("append", "cmd", kit.Format(info["cmd"]))
+					m.Add("append", "str", kit.Format(info["str"]))
+				})
+				m.Table()
+				return
+			}
+
+			if pid != "" {
+				if cmd, ok := m.Confm("daemon", pid)["sub"].(*exec.Cmd); ok {
+					switch arg[0] {
+					case "stop":
+						kit.Log("error", "kill: %s", cmd.Process.Pid)
+						m.Log("kill", "kill: %d", cmd.Process.Pid)
+						m.Echo("%s", cmd.Process.Signal(os.Interrupt))
+					default:
+						m.Echo("%v", cmd)
+					}
+				}
+				return
+			}
+			return
+		}},
 		"sleep": &ctx.Command{Name: "sleep time", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if d, e := time.ParseDuration(arg[0]); m.Assert(e) {
 				m.Log("info", "sleep %v", d)
@@ -574,9 +545,9 @@ func main() {
 			if cli, ok := c.Server.(*CLI); m.Assert(ok) {
 				// 定时列表
 				if len(arg) == 0 {
-					m.Confm("timer", func(key string, timer map[string]interface{}) {
+					m.Confm("timer", "list", func(key string, timer map[string]interface{}) {
 						m.Add("append", "key", key)
-						m.Add("append", "action_time", time.Unix(0, timer["action_time"].(int64)/int64(m.Confi("time_unit"))*1000000000).Format(m.Conf("time_format")))
+						m.Add("append", "action_time", time.Unix(0, timer["action_time"].(int64)/int64(m.Confi("time", "unit"))*1000000000).Format(m.Conf("time_format")))
 						m.Add("append", "order", timer["order"])
 						m.Add("append", "time", timer["time"])
 						m.Add("append", "cmd", timer["cmd"])
@@ -589,19 +560,19 @@ func main() {
 
 				switch arg[0] {
 				case "stop":
-					if timer := m.Confm("timer", arg[1]); timer != nil {
+					if timer := m.Confm("timer", "list", arg[1]); timer != nil {
 						timer["stop"] = true
 					}
 					cli.schedule(m)
 					return
 				case "start":
-					if timer := m.Confm("timer", arg[1]); timer != nil {
+					if timer := m.Confm("timer", "list", arg[1]); timer != nil {
 						timer["stop"] = false
 					}
 					cli.schedule(m)
 					return
 				case "delete":
-					delete(m.Confm("timer"), arg[1])
+					delete(m.Confm("timer", "list"), arg[1])
 					cli.schedule(m)
 					return
 				}
@@ -626,7 +597,7 @@ func main() {
 
 				// 创建任务
 				hash := m.Sess("aaa").Cmd("hash", "timer", arg, "time", "rand").Result(0)
-				m.Confv("timer", hash, map[string]interface{}{
+				m.Confv("timer", []string{"list", hash}, map[string]interface{}{
 					"create_time": now,
 					"begin_time":  begin,
 					"action_time": action,
@@ -641,16 +612,16 @@ func main() {
 				})
 
 				if cli.Timer == nil { // 创建时间队列
-					cli.Timer = time.NewTimer((time.Duration)((action - now) / int64(m.Confi("time_unit")) * 1000000000))
+					cli.Timer = time.NewTimer((time.Duration)((action - now) / int64(m.Confi("time", "unit")) * 1000000000))
 					m.GoLoop(m, func(m *ctx.Message) {
 						select {
 						case <-cli.Timer.C:
-							if m.Conf("timer_next") == "" {
+							if m.Conf("timer", "next") == "" {
 								break
 							}
 
-							if timer := m.Confm("timer", m.Conf("timer_next")); timer != nil && !kit.Right(timer["stop"]) {
-								m.Log("info", "timer %s %v", m.Conf("timer_next"), timer["cmd"])
+							if timer := m.Confm("timer", "list", m.Conf("timer", "next")); timer != nil && !kit.Right(timer["stop"]) {
+								m.Log("info", "timer %s %v", m.Conf("timer", "next"), timer["cmd"])
 
 								msg := m.Sess("cli").Cmd("source", timer["cmd"])
 								timer["result"] = msg.Meta["result"]
@@ -681,7 +652,7 @@ func main() {
 				t, stamp := time.Now(), true
 				if len(arg) > 0 {
 					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
-						t, stamp, arg = time.Unix(int64(i/int64(m.Confi("time_unit"))), 0), false, arg[1:]
+						t, stamp, arg = time.Unix(int64(i/int64(m.Confi("time", "unit"))), 0), false, arg[1:]
 					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
 						t, arg = n, arg[1:]
 					} else {
@@ -704,7 +675,7 @@ func main() {
 						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds%dns", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()))
 						m.Assert(e)
 						t, arg = t.Add(time.Duration(24*time.Hour)-d), arg[1:]
-						if m.Confx("time_close") == "close" {
+						if kit.Select(m.Conf("time", "close"), m.Option("time_close")) == "close" {
 							t = t.Add(-time.Second)
 						}
 					case "yestoday":
@@ -719,7 +690,7 @@ func main() {
 						d, e := time.ParseDuration(fmt.Sprintf("%dh%dm%ds", int((t.Weekday()-time.Monday+7)%7)*24+t.Hour(), t.Minute(), t.Second()))
 						m.Assert(e)
 						t, arg = t.Add(time.Duration(7*24*time.Hour)-d), arg[1:]
-						if m.Confx("time_close") == "close" {
+						if kit.Select(m.Conf("time", "close"), m.Option("time_close")) == "close" {
 							t = t.Add(-time.Second)
 						}
 					case "first":
@@ -730,14 +701,14 @@ func main() {
 							month, year = 1, year+1
 						}
 						t, arg = time.Date(year, month, 1, 0, 0, 0, 0, time.Local), arg[1:]
-						if m.Confx("time_close") == "close" {
+						if kit.Select(m.Conf("time", "close"), m.Option("time_close")) == "close" {
 							t = t.Add(-time.Second)
 						}
 					case "new":
 						t, arg = time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
 					case "eve":
 						t, arg = time.Date(t.Year()+1, 1, 1, 0, 0, 0, 0, time.Local), arg[1:]
-						if m.Confx("time_close") == "close" {
+						if kit.Select(m.Conf("time", "close"), m.Option("time_close")) == "close" {
 							t = t.Add(-time.Second)
 						}
 					case "":
@@ -752,16 +723,16 @@ func main() {
 				}
 
 				m.Append("datetime", t.Format(m.Confx("time_format")))
-				m.Append("timestamp", t.Unix()*int64(m.Confi("time_unit")))
+				m.Append("timestamp", t.Unix()*int64(m.Confi("time", "unit")))
 
 				if stamp {
-					m.Echo("%d", t.Unix()*int64(m.Confi("time_unit")))
+					m.Echo("%d", t.Unix()*int64(m.Confi("time", "unit")))
 				} else {
 					m.Echo(t.Format(m.Confx("time_format")))
 				}
 				return
 			}},
-		"proc": &ctx.Command{Name: "proc", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"proc": &ctx.Command{Name: "proc", Help: "进程管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmdy("cli.system", "cmd_parse", "cut", "ps", kit.Select("ax", arg, 0))
 			if len(arg) > 0 {
 				m.Cmd("select", "reg", "COMMAND", arg[1])
@@ -791,18 +762,15 @@ func main() {
 			m.Echo(", wait 1s\n").Table()
 
 			m.Gos(m, func(m *ctx.Message) {
-				defer func() {
-					os.Exit(kit.Int(code))
-				}()
-				m.Cmd("cli._exit")
-				m.Cmd("nfs._exit")
+				defer os.Exit(kit.Int(code))
+				m.Cmd("ctx._exit")
 				time.Sleep(time.Second * 1)
 			})
 			return
 		}},
-		"_exit": &ctx.Command{Name: "_exit", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_exit": &ctx.Command{Name: "_exit", Help: "退出命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Confm("daemon", func(key string, info map[string]interface{}) {
-				m.Cmd("cli.system", key, "stop")
+				m.Cmd("cli.daemon", key, "stop")
 			})
 			return
 		}},
@@ -868,12 +836,13 @@ func main() {
 				m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_reg", "bench")
 
 			case "self":
-				env := []string{
-					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),
-					"cmd_env", "GOCACHE", path.Join(wd, m.Conf("compile", "tmp")),
-				}
+				env := []string{}
+				m.Confm("compile", "env", func(index int, key string) {
+					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
+				})
+
 				m.Cmd("cli.version", "create")
-				if m.Cmdy("cli.system", env, "go", "install", m.Cmdx("nfs.path", m.Conf("compile", "bench"))); m.Result(0) == "" {
+				if m.Cmdy("cli.system", env, "go", "install", path.Join(m.Conf("runtime", "boot.ctx_home"), m.Conf("compile", "bench"))); m.Result(0) == "" {
 					m.Cmdy("cli.quit", 1)
 					m.Append("host", version.host)
 					m.Append("self", version.self)
@@ -1109,7 +1078,6 @@ func main() {
 			}
 			return
 		}},
-
 		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				types := reflect.TypeOf(version)
@@ -1138,250 +1106,9 @@ var version = struct {
 			m.Append("directory", "")
 			return
 		}},
-		"notice": &ctx.Command{Name: "notice", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmd("cli.system", "osascript", "-e", fmt.Sprintf("display notification \"%s\"", kit.Select("", arg, 0)))
-			return
-		}},
-
-		"alias": &ctx.Command{Name: "alias [short [long...]]|[delete short]|[import module [command [alias]]]",
-			Help: "查看、定义或删除命令别名, short: 命令别名, long: 命令原名, delete: 删除别名, import导入模块所有命令",
-			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				switch len(arg) {
-				case 0:
-					m.Cmdy("ctx.config", "alias")
-				case 1:
-					m.Cmdy("ctx.config", "alias", arg[0])
-				default:
-					switch arg[0] {
-					case "delete":
-						alias := m.Confm("alias")
-						m.Echo("delete: %s %v\n", arg[1], alias[arg[1]])
-						delete(alias, arg[1])
-					case "import":
-						msg := m.Find(arg[1], false)
-						if msg == nil {
-							msg = m.Find(arg[1], true)
-						}
-						if msg == nil {
-							m.Echo("%s not exist", arg[1])
-							return
-						}
-
-						module := msg.Cap("module")
-						for k, _ := range msg.Target().Commands {
-							if len(k) > 0 && k[0] == '/' {
-								continue
-							}
-
-							if len(arg) == 2 {
-								m.Confv("alias", k, []string{module + "." + k})
-								m.Log("info", "import %s.%s", module, k)
-								continue
-							}
-
-							if key := k; k == arg[2] {
-								if len(arg) > 3 {
-									key = arg[3]
-								}
-								m.Confv("alias", key, []string{module + "." + k})
-								m.Log("info", "import %s.%s as %s", module, k, key)
-								break
-							}
-						}
-					default:
-						m.Confv("alias", arg[0], arg[1:])
-						m.Log("info", "%s: %v", arg[0], arg[1:])
-					}
-				}
-				return
-			}},
-		"cmd": &ctx.Command{Name: "cmd word", Help: "解析命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			// 解析别名
-			detail := []string{}
-			if alias, ok := m.Confv("alias", arg[0]).([]string); ok {
-				detail, arg = append(detail, alias...), arg[1:]
-			}
-			detail = append(detail, arg...)
-
-			// 目标切换
-			target := m.Optionv("bio.ctx")
-			if detail[0] != "context" {
-				defer func() { m.Optionv("bio.ctx", target) }()
-			}
-
-			// 解析脚本
-			msg := m
-			for k, v := range m.Confv("system", "script").(map[string]interface{}) {
-				if strings.HasSuffix(detail[0], "."+k) {
-					msg = m.Spawn(m.Optionv("bio.ctx"))
-					detail[0] = m.Cmdx("nfs.path", detail[0])
-					detail = append([]string{v.(string)}, detail...)
-					break
-				}
-			}
-
-			// 解析路由
-			if msg == m {
-				if routes := strings.Split(detail[0], "."); len(routes) > 1 && !strings.Contains(detail[0], ":") {
-					route := strings.Join(routes[:len(routes)-1], ".")
-					if msg = m.Find(route, false); msg == nil {
-						msg = m.Find(route, true)
-					}
-
-					if msg == nil {
-						m.Echo("%s not exist", route)
-						return
-					}
-					detail[0] = routes[len(routes)-1]
-				} else {
-					msg = m.Spawn(m.Optionv("bio.ctx"))
-				}
-			}
-			msg.Copy(m, "option").Copy(m, "append")
-
-			// 解析命令
-			args, rest := []string{}, []string{}
-			exports := []map[string]string{}
-			exec, execexec := true, false
-			for i := 0; i < len(detail); i++ {
-				switch detail[i] {
-				case "?":
-					if !kit.Right(detail[i+1]) {
-						return
-					}
-					i++
-				case "??":
-					exec = false
-					execexec = execexec || kit.Right(detail[i+1])
-					i++
-				case "<":
-					m.Cmdy("nfs.import", detail[i+1])
-					i++
-				case ">":
-					exports = append(exports, map[string]string{"file": detail[i+1]})
-					i++
-				case ">$":
-					if i == len(detail)-2 {
-						exports = append(exports, map[string]string{"cache": detail[i+1], "index": "result"})
-						i += 1
-						break
-					}
-					exports = append(exports, map[string]string{"cache": detail[i+1], "index": detail[i+2]})
-					i += 2
-				case ">@":
-					if i == len(detail)-2 {
-						exports = append(exports, map[string]string{"config": detail[i+1], "index": "result"})
-						i += 1
-						break
-					}
-					exports = append(exports, map[string]string{"config": detail[i+1], "index": detail[i+2]})
-					i += 2
-				case "|":
-					detail, rest = detail[:i], detail[i+1:]
-				case "%":
-					rest = append(rest, "select")
-					detail, rest = detail[:i], append(rest, detail[i+1:]...)
-				default:
-					args = append(args, detail[i])
-				}
-			}
-			if !exec && !execexec {
-				return
-			}
-
-			// 执行命令
-			if msg.Set("detail", args).Cmd(); !msg.Hand {
-				msg.Cmd("system", args)
-			}
-			if msg.Appends("bio.ctx1") {
-				target = msg.Target()
-			}
-
-			// 管道命令
-			if len(rest) > 0 {
-				pipe := msg.Spawn()
-				pipe.Copy(msg, "append").Copy(msg, "result").Cmd("cmd", rest)
-				msg.Set("append").Copy(pipe, "append")
-				msg.Set("result").Copy(pipe, "result")
-			}
-
-			// 导出结果
-			for _, v := range exports {
-				if v["file"] != "" {
-					m.Sess("nfs").Copy(msg, "option").Copy(msg, "append").Copy(msg, "result").Cmd("export", v["file"])
-					msg.Set("result")
-				}
-				if v["cache"] != "" {
-					if v["index"] == "result" {
-						m.Cap(v["cache"], strings.Join(msg.Meta["result"], ""))
-					} else {
-						m.Cap(v["cache"], msg.Append(v["index"]))
-					}
-				}
-				if v["config"] != "" {
-					if v["index"] == "result" {
-						m.Conf(v["config"], strings.Join(msg.Meta["result"], ""))
-					} else {
-						m.Conf(v["config"], msg.Append(v["index"]))
-					}
-				}
-			}
-
-			// 返回结果
-			m.Optionv("bio.ctx", msg.Target())
-			m.Set("append").Copy(msg, "append")
-			m.Set("result").Copy(msg, "result")
-			return
-		}},
-
-		"tmux": &ctx.Command{Name: "tmux buffer", Help: "终端管理, buffer: 查看复制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch arg[0] {
-			case "buffer":
-				bufs := strings.Split(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n")
-
-				n := 3
-				if m.Option("limit") != "" {
-					n = m.Optioni("limit")
-				}
-
-				for i, b := range bufs {
-					if i >= n {
-						break
-					}
-					bs := strings.SplitN(b, ": ", 3)
-					if len(bs) > 1 {
-						m.Add("append", "buffer", bs[0][:len(bs[0])])
-						m.Add("append", "length", bs[1][:len(bs[1])-6])
-						m.Add("append", "strings", bs[2][1:len(bs[2])-1])
-					}
-				}
-
-				if m.Option("index") == "" {
-					m.Echo(m.Spawn().Cmd("system", "tmux", "show-buffer").Result(0))
-				} else {
-					m.Echo(m.Spawn().Cmd("system", "tmux", "show-buffer", "-b", m.Option("index")).Result(0))
-				}
-			}
-			return
-		}},
-		"sysinfo": &ctx.Command{Name: "sysinfo", Help: "sysinfo", Hand: sysinfo},
-		"windows": &ctx.Command{Name: "windows", Help: "windows", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Append("nclient", strings.Count(m.Spawn().Cmd("system", "tmux", "list-clients").Result(0), "\n"))
-			m.Append("nsession", strings.Count(m.Spawn().Cmd("system", "tmux", "list-sessions").Result(0), "\n"))
-			m.Append("nwindow", strings.Count(m.Spawn().Cmd("system", "tmux", "list-windows", "-a").Result(0), "\n"))
-			m.Append("npane", strings.Count(m.Spawn().Cmd("system", "tmux", "list-panes", "-a").Result(0), "\n"))
-
-			m.Append("nbuf", strings.Count(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n"))
-			m.Append("ncmd", strings.Count(m.Spawn().Cmd("system", "tmux", "list-commands").Result(0), "\n"))
-			m.Append("nkey", strings.Count(m.Spawn().Cmd("system", "tmux", "list-keys").Result(0), "\n"))
-			m.Table()
-			return
-		}},
 	},
 }
 
 func init() {
-	cli := &CLI{}
-	cli.Context = Index
-	ctx.Index.Register(Index, cli)
+	ctx.Index.Register(Index, &CLI{Context: Index})
 }
