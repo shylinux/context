@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,10 @@ import (
 
 var DisableLog = false
 
+func Pwd() string {
+	wd, _ := os.Getwd()
+	return wd
+}
 func Env(key string) {
 	os.Getenv(key)
 }
@@ -295,4 +300,14 @@ func View(args []string, conf map[string]interface{}) []string {
 		}
 	}
 	return keys
+}
+
+func Create(p string) (*os.File, string, error) {
+	if dir, _ := path.Split(p); dir != "" {
+		if e := os.MkdirAll(dir, 0777); e != nil {
+			return nil, p, e
+		}
+	}
+	f, e := os.Create(p)
+	return f, p, e
 }

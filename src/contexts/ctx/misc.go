@@ -192,7 +192,7 @@ func (m *Message) Format(arg ...interface{}) string {
 			}
 		case "stack":
 			pc := make([]uintptr, 100)
-			pc = pc[:runtime.Callers(6, pc)]
+			pc = pc[:runtime.Callers(0, pc)]
 			frames := runtime.CallersFrames(pc)
 
 			for {

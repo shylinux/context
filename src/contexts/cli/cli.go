@@ -29,7 +29,7 @@ type CLI struct {
 
 func (cli *CLI) schedule(m *ctx.Message) string {
 	first, timer := "", int64(1<<50)
-	for k, v := range m.Confv("timer").(map[string]interface{}) {
+	for k, v := range m.Confv("timer", "list").(map[string]interface{}) {
 		val := v.(map[string]interface{})
 		if val["action_time"].(int64) < timer && !val["done"].(bool) {
 			first, timer = k, val["action_time"].(int64)
@@ -331,6 +331,9 @@ func main() {
 			for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
 				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
 			}
+			for _, k := range []string{"PATH", "HOME"} {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, os.Getenv(k)))
+			}
 			if len(cmd.Env) > 0 {
 				m.Log("info", "env %v", cmd.Env)
 			}
@@ -617,10 +620,10 @@ func main() {
 								break
 							}
 
-							if timer := m.Confm("timer", "list", m.Conf("timer", "next")); timer != nil && !kit.Right(timer["stop"]) {
+							if timer := m.Confm("timer", []string{"list", m.Conf("timer", "next")}); timer != nil && !kit.Right(timer["stop"]) {
 								m.Log("info", "timer %s %v", m.Conf("timer", "next"), timer["cmd"])
 
-								msg := m.Sess("cli").Cmd("source", timer["cmd"])
+								msg := m.Cmd("nfs.source", timer["cmd"])
 								timer["result"] = msg.Meta["result"]
 								timer["msg"] = msg.Code()
 
@@ -834,16 +837,23 @@ func main() {
 				m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_reg", "bench")
 
 			case "self":
-				env := []string{}
+				env := []string{
+					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),
+					"cmd_env", "GOCACHE", path.Join(wd, m.Conf("compile", "tmp")),
+				}
 				m.Confm("compile", "env", func(index int, key string) {
 					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
 				})
 
 				m.Cmd("cli.version", "create")
-				if m.Cmdy("cli.system", env, "go", "install", path.Join(m.Conf("runtime", "boot.ctx_home"), m.Conf("compile", "bench"))); m.Result(0) == "" {
+				os.MkdirAll(m.Conf("compile", "tmp"), 0777)
+
+				p, q := path.Join(m.Conf("runtime", "boot.ctx_home"), m.Conf("compile", "bench")), path.Join(kit.Select(os.Getenv("GOBIN"), ""), "bench")
+				if m.Cmdy("cli.system", env, "go", "build", "-o", q, p); m.Result(0) == "" {
 					m.Cmdy("cli.quit", 1)
-					m.Append("host", version.host)
-					m.Append("self", version.self)
+					m.Append("time", m.Time())
+					m.Append("hash", kit.Hashs(q)[:8])
+					m.Append("bin", q)
 					m.Table()
 				}
 
@@ -1008,7 +1018,7 @@ func main() {
 
 					m.Add("append", "time", m.Time())
 					m.Add("append", "file", file)
-					m.Add("append", "hash", kit.Hashs(file))
+					m.Add("append", "hash", kit.Hashs(file)[:8])
 
 					if strings.HasSuffix(link, ".tar.gz") {
 						m.Cmd("cli.system", "tar", "-xvf", file, "-C", path.Dir(file))

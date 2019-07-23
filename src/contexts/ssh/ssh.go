@@ -608,7 +608,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			case "_redial": // 断线重连
 				if !m.Caps("stream") {
-					m.Cmdx("remote", "dial", arg[1:])
+					m.Cmdx("ssh.remote", "dial", arg[1:])
 				}
 
 			case "dial": // 连接主机
