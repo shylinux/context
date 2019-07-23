@@ -98,7 +98,7 @@ func (m *Message) Time(arg ...interface{}) string {
 		}
 	}
 
-	str := m.Conf("time_format")
+	str := m.Conf("time", "format")
 	if len(arg) > 1 {
 		str = fmt.Sprintf(arg[0].(string), arg[1:]...)
 	} else if len(arg) > 0 {
@@ -401,7 +401,7 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 	}
 
 	//计算列宽
-	space := m.Confx("table_space")
+	space := kit.Select(m.Conf("table", "space"), m.Option("table.space"))
 	depth, width := 0, map[string]int{}
 	for _, k := range m.Meta["append"] {
 		if len(m.Meta[k]) > depth {
@@ -420,9 +420,9 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 	if len(cbs) > 0 {
 		cb = cbs[0].(func(maps map[string]string, list []string, line int) (goon bool))
 	} else {
-		row := m.Confx("table_row_sep")
-		col := m.Confx("table_col_sep")
-		compact := kit.Right(m.Confx("table_compact"))
+		row := kit.Select(m.Conf("table", "row_sep"), m.Option("table.row_sep"))
+		col := kit.Select(m.Conf("table", "col_sep"), m.Option("table.col_sep"))
+		compact := kit.Right(kit.Select(m.Conf("table", "compact"), m.Option("table.compact")))
 		cb = func(maps map[string]string, lists []string, line int) bool {
 			for i, v := range lists {
 				if k := m.Meta["append"][i]; compact {
@@ -603,7 +603,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 				msg.Log("cmd", "%s %s %v %v", c.Name, key, arg, msg.Meta["option"])
 				msg.Hand = true
 				x.Hand(msg, c, key, msg.Form(x, arg)...)
-				msg.Log("cmd", "%s %s %v %v", c.Name, key, len(msg.Meta["result"]), msg.Meta["append"])
+				// msg.Log("cmd", "%s %s %v %v", c.Name, key, len(msg.Meta["result"]), msg.Meta["append"])
 				return
 
 				target := msg.target

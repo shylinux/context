@@ -921,9 +921,10 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		}
 
 		// 语句堆栈
-		stack := kit.Stack{}
+		stack := &kit.Stack{}
 		stack.Push(m.Option("stack.key", "source"), m.Options("stack.run", true), m.Optioni("stack.pos", 0))
 		m.Optionv("bio.ctx", m.Target())
+		m.Optionv("bio.stack", stack)
 
 		line, bio := "", bufio.NewScanner(nfs)
 		for nfs.prompt(); ; nfs.prompt() {
@@ -948,48 +949,17 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			// 解析数据
 			for i := m.Capi("ninput") - 1; i < m.Capi("ninput"); i++ {
 				line = m.Conf("input", []interface{}{i, "line"})
-
-				// 结束语句
-				if strings.TrimSpace(line) == "end" {
-					m.Log("stack", "pop: %v", stack.Peek().String("/"))
-					if stack.Pop(); m.Options("stack.run") && m.Option("stack.key") == "for" {
-						i = m.Optioni("stack.pos") - 1
-					}
-					frame := stack.Peek()
-					m.Options("stack.run", frame.Run)
-					m.Option("stack.key", frame.Key)
-					continue
-				}
-
-				// 跳过语句
-				if !m.Options("stack.run") && !strings.HasPrefix(strings.TrimSpace(line), "else") {
-					m.Log("stack", "skip %v", line)
-					continue
-				}
+				m.Optionv("input", m.Confv("input"))
+				m.Optioni("stack.pos", i)
 
 				// 执行语句
-				msg := m.Cmd("yac.parse", line+"\n").Set("option", "bio.pos", i)
+				msg := m.Cmd("yac.parse", line+"\n")
 				nfs.print(m.Conf("prompt"), line)
 				nfs.print(msg.Meta["result"]...)
 
 				// 切换模块
 				if v := msg.Optionv("bio.ctx"); v != nil {
 					m.Optionv("bio.ctx", v)
-				}
-
-				// 压栈语句
-				if msg.Has("stack.key") {
-					m.Log("stack", "push %v", stack.Push(
-						m.Option("stack.key", msg.Append("stack.key")),
-						m.Options("stack.run", msg.Appends("stack.run")),
-						m.Optioni("stack.pos", i),
-					).String("\\"))
-				}
-				if msg.Has("stack.run") {
-					m.Log("stack", "set: run = %v", m.Options("stack.run", msg.Appends("stack.run")))
-				}
-				if msg.Has("stack.else") {
-					m.Options("stack.else", msg.Appends("stack.else"))
 				}
 
 				// 跳转语句
@@ -1002,7 +972,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				if msg.Appends("bio.end") {
 					m.Copy(msg, "append")
 					m.Copy(msg, "result")
-					break
+					msg.Appends("bio.end", "")
+					return true
 				}
 			}
 			line = ""
@@ -1060,7 +1031,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				msg.Add(field, value)
 
 			case "":
-				m.Log("recv", "time %v", time.Now().Format(m.Conf("time_format")))
+				m.Log("recv", "time %v", time.Now().Format(m.Conf("time", "format")))
 				if head == "detail" { // 接收请求
 					msg.Detail(-1, "_route")
 					msg.Option("remote_code", code)
@@ -1210,7 +1181,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"commit": map[string]interface{}{"args": []interface{}{"commit", "-am"}},
 			"branch": map[string]interface{}{"args": []interface{}{"branch", "-v"}},
 			"status": map[string]interface{}{"args": []interface{}{"status", "-sb"}},
-			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "@page.limit", "--skip", "@page.offset", "pretty", "date"}},
+			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "@table.limit", "--skip", "@table.offset", "pretty", "date"}},
 			"trans": map[string]interface{}{
 				"date":   "--date=format:%m/%d %H:%M",
 				"pretty": "--pretty=format:%h %ad %an %s",
@@ -1319,7 +1290,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						if s.IsDir() {
 							dir(m, p, 0, kit.Right(m.Has("dir_deep")), m.Confx("dir_type"), trip, rg,
 								strings.Split(m.Confx("dir_fields", strings.Join(arg[1:], " ")), " "),
-								m.Conf("time_format"))
+								m.Conf("time", "format"))
 						} else {
 							if s.Size() < int64(m.Confi("buf_size")) {
 								p0 := p + ".tmp0"
@@ -1336,7 +1307,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								}
 								m.Append("file", p)
 								m.Append("size", s.Size())
-								m.Append("time", s.ModTime().Format(m.Conf("time_format")))
+								m.Append("time", s.ModTime().Format(m.Conf("time", "format")))
 							} else {
 								m.Append("directory", p)
 							}
@@ -1496,7 +1467,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				n := 0
 				offset := kit.Int(value["offset"])
 				bio := bufio.NewScanner(f)
-				for i := 0; i < m.Optioni("page.limit") && bio.Scan(); i++ {
+				for i := 0; i < m.Optioni("table.limit") && bio.Scan(); i++ {
 					text := bio.Text()
 					if len(arg) == 0 || strings.Contains(text, arg[0]) {
 						m.Add("append", "index", index)
@@ -1689,7 +1660,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			m.Option("filepath", p)
 			m.Option("filename", s.Name())
 			m.Option("filesize", s.Size())
-			m.Option("filetime", s.ModTime().Format(m.Conf("time_format")))
+			m.Option("filetime", s.ModTime().Format(m.Conf("time", "format")))
 
 			switch {
 			case strings.HasSuffix(arg[0], ".json"):

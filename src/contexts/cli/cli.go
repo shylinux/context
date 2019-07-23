@@ -88,9 +88,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{
 			"list": map[string]interface{}{}, "next": "",
 		}, Help: "定时器"},
-		"time": &ctx.Config{Name: "timer", Value: map[string]interface{}{
-			"unit": 1000, "close": "open",
-		}, Help: "时间参数"},
 
 		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
 			"github":  "https://github.com/shylinux/context",
@@ -384,7 +381,7 @@ func main() {
 					} else if e := cmd.Wait(); e != nil {
 						m.Echo("error: ").Echo("%s\n", e)
 					}
-					m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time_format")))
+					m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time", "format")))
 				})
 				return e
 			}
@@ -547,7 +544,7 @@ func main() {
 				if len(arg) == 0 {
 					m.Confm("timer", "list", func(key string, timer map[string]interface{}) {
 						m.Add("append", "key", key)
-						m.Add("append", "action_time", time.Unix(0, timer["action_time"].(int64)/int64(m.Confi("time", "unit"))*1000000000).Format(m.Conf("time_format")))
+						m.Add("append", "action_time", time.Unix(0, timer["action_time"].(int64)/int64(m.Confi("time", "unit"))*1000000000).Format(m.Conf("time", "format")))
 						m.Add("append", "order", timer["order"])
 						m.Add("append", "time", timer["time"])
 						m.Add("append", "cmd", timer["cmd"])
@@ -649,11 +646,12 @@ func main() {
 			Help: "查看时间, when: 输入的时间戳, 剩余参数是时间偏移",
 			Form: map[string]int{"time_format": 1, "time_close": 1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				format := kit.Select(m.Conf("time", "format"), m.Option("time_format"))
 				t, stamp := time.Now(), true
 				if len(arg) > 0 {
 					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
 						t, stamp, arg = time.Unix(int64(i/int64(m.Confi("time", "unit"))), 0), false, arg[1:]
-					} else if n, e := time.ParseInLocation(m.Confx("time_format"), arg[0], time.Local); e == nil {
+					} else if n, e := time.ParseInLocation(format, arg[0], time.Local); e == nil {
 						t, arg = n, arg[1:]
 					} else {
 						for _, v := range []string{"01-02", "2006-01-02", "15:04:05", "15:04"} {
@@ -722,13 +720,13 @@ func main() {
 					}
 				}
 
-				m.Append("datetime", t.Format(m.Confx("time_format")))
+				m.Append("datetime", t.Format(format))
 				m.Append("timestamp", t.Unix()*int64(m.Confi("time", "unit")))
 
 				if stamp {
 					m.Echo("%d", t.Unix()*int64(m.Confi("time", "unit")))
 				} else {
-					m.Echo(t.Format(m.Confx("time_format")))
+					m.Echo(t.Format(format))
 				}
 				return
 			}},

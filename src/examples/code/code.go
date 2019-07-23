@@ -525,6 +525,52 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 			return
 		}},
+		"tmux": &ctx.Command{Name: "tmux buffer", Help: "终端管理, buffer: 查看复制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch arg[0] {
+			case "buffer":
+				bufs := strings.Split(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n")
+
+				n := 3
+				if m.Option("limit") != "" {
+					n = m.Optioni("limit")
+				}
+
+				for i, b := range bufs {
+					if i >= n {
+						break
+					}
+					bs := strings.SplitN(b, ": ", 3)
+					if len(bs) > 1 {
+						m.Add("append", "buffer", bs[0][:len(bs[0])])
+						m.Add("append", "length", bs[1][:len(bs[1])-6])
+						m.Add("append", "strings", bs[2][1:len(bs[2])-1])
+					}
+				}
+
+				if m.Option("index") == "" {
+					m.Echo(m.Spawn().Cmd("system", "tmux", "show-buffer").Result(0))
+				} else {
+					m.Echo(m.Spawn().Cmd("system", "tmux", "show-buffer", "-b", m.Option("index")).Result(0))
+				}
+			}
+			return
+		}},
+		"windows": &ctx.Command{Name: "windows", Help: "windows", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Append("nclient", strings.Count(m.Spawn().Cmd("system", "tmux", "list-clients").Result(0), "\n"))
+			m.Append("nsession", strings.Count(m.Spawn().Cmd("system", "tmux", "list-sessions").Result(0), "\n"))
+			m.Append("nwindow", strings.Count(m.Spawn().Cmd("system", "tmux", "list-windows", "-a").Result(0), "\n"))
+			m.Append("npane", strings.Count(m.Spawn().Cmd("system", "tmux", "list-panes", "-a").Result(0), "\n"))
+
+			m.Append("nbuf", strings.Count(m.Spawn().Cmd("system", "tmux", "list-buffers").Result(0), "\n"))
+			m.Append("ncmd", strings.Count(m.Spawn().Cmd("system", "tmux", "list-commands").Result(0), "\n"))
+			m.Append("nkey", strings.Count(m.Spawn().Cmd("system", "tmux", "list-keys").Result(0), "\n"))
+			m.Table()
+			return
+		}},
+		"notice": &ctx.Command{Name: "notice", Help: "睡眠, time(ns/us/ms/s/m/h): 时间值(纳秒/微秒/毫秒/秒/分钟/小时)", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmd("cli.system", "osascript", "-e", fmt.Sprintf("display notification \"%s\"", kit.Select("", arg, 0)))
+			return
+		}},
 	},
 }
 

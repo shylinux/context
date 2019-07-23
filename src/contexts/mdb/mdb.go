@@ -575,8 +575,8 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 		}},
 		"note": &ctx.Command{Name: "note [model [name [type name]...]]|[index [name data...]]|[value name data...]|[name model data...]",
 			Form: map[string]int{"eq": 2, "begin": 2, "offset": 1, "limit": 1}, Help: "记事", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				offset := kit.Int(kit.Select(m.Conf("page_offset"), m.Option("offset")))
-				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
+				offset := kit.Int(kit.Select(m.Conf("table", "offset"), m.Option("table.offset")))
+				limit := kit.Int(kit.Select(m.Conf("table", "limit"), m.Option("table.limit")))
 
 				// 节点列表
 				if len(arg) == 0 {
