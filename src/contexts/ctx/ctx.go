@@ -15,21 +15,21 @@ import (
 )
 
 type CTX struct {
+	*Context
 }
 
 func (ctx *CTX) Spawn(m *Message, c *Context, arg ...string) Server {
-	s := new(CTX)
-	return s
+	return &CTX{Context: c}
 }
 func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	m.Option("ctx.routine", 0)
 	m.Option("log.disable", true)
 	m.Option("ctx.chain", "aaa", "ssh", "cli", "nfs")
 
-	m.Option("page.limit", 10)
-	m.Option("page.offset", 0)
+	m.Option("table.limit", 10)
+	m.Option("table.offset", 0)
 	m.Optionv("ctx.form", map[string]int{
-		"page.limit": 1, "page.offset": 1,
+		"table.limit": 1, "table.offset": 1,
 	})
 
 	m.root = m
@@ -79,34 +79,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"nmessage": &Cache{Name: "nmessage", Value: "1", Help: "消息数量"},
 	},
 	Configs: map[string]*Config{
-		"chain":       &Config{Name: "chain", Value: map[string]interface{}{}, Help: "调试模式，on:打印，off:不打印)"},
-		"compact_log": &Config{Name: "compact_log(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
-		"auto_make":   &Config{Name: "auto_make(true/false)", Value: "true", Help: "调试模式，on:打印，off:不打印)"},
-		"debug":       &Config{Name: "debug(on/off)", Value: "on", Help: "调试模式，on:打印，off:不打印)"},
-
-		"search": &Config{Name: "search", Value: map[string]interface{}{
-			"context": []interface{}{"nfs", "web.code"},
-		}, Help: "搜索引擎"},
-
-		"search_method": &Config{Name: "search_method(find/search)", Value: "search", Help: "搜索方法, find: 模块名精确匹配, search: 模块名或帮助信息模糊匹配"},
-		"search_choice": &Config{Name: "search_choice(first/last/rand/magics)", Value: "magics", Help: "搜索匹配, first: 匹配第一个模块, last: 匹配最后一个模块, rand: 随机选择, magics: 加权选择"},
-		"search_action": &Config{Name: "search_action(list/switch)", Value: "switch", Help: "搜索操作, list: 输出模块列表, switch: 模块切换"},
-		"search_root":   &Config{Name: "search_root(true/false)", Value: "true", Help: "搜索起点, true: 根模块, false: 当前模块"},
-
-		"insert_limit": &Config{Name: "insert_limit(true/false)", Value: "true", Help: "参数的索引"},
-		"detail_index": &Config{Name: "detail_index", Value: "0", Help: "参数的索引"},
-		"result_index": &Config{Name: "result_index", Value: "-2", Help: "返回值的索引"},
-
-		"list_help":     &Config{Name: "list_help", Value: "list command", Help: "命令列表帮助"},
-		"table_compact": &Config{Name: "table_compact", Value: "false", Help: "命令列表帮助"},
-		"table_col_sep": &Config{Name: "table_col_sep", Value: "  ", Help: "命令列表帮助"},
-		"table_row_sep": &Config{Name: "table_row_sep", Value: "\n", Help: "命令列表帮助"},
-		"table_space":   &Config{Name: "table_space", Value: " ", Help: "命令列表帮助"},
-
-		"page_offset": &Config{Name: "page_offset", Value: "0", Help: "列表偏移"},
-		"page_limit":  &Config{Name: "page_limit", Value: "10", Help: "列表大小"},
-
-		"time_format":  &Config{Name: "time_format", Value: "2006-01-02 15:04:05", Help: "时间格式"},
+		"time": &Config{Name: "timer", Value: map[string]interface{}{
+			"unit": 1000, "close": "open", "format": "2006-01-02 15:04:05",
+		}, Help: "时间参数"},
+		"table": &Config{Name: "table", Value: map[string]interface{}{
+			"space": " ", "compact": "false", "col_sep": " ", "row_sep": "\n",
+			"offset": 0, "limit": 10,
+		}, Help: "制表"},
 		"call_timeout": &Config{Name: "call_timeout", Value: "10s", Help: "回调超时"},
 	},
 	Commands: map[string]*Command{
@@ -118,7 +97,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			return
 		}},
 		"_exit": &Command{Name: "_exit", Help: "退出", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			for _, x := range []string{"cli"} {
+			for _, x := range []string{"nfs", "cli"} {
 				m.Cmd(x + "._exit")
 			}
 			return
@@ -680,7 +659,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							arg = arg[1:]
 						}
 						if msg.Cmd(arg); !msg.Hand {
-							msg = msg.Cmd("cli.cmd", arg)
+							msg = msg.Cmd("nfs.cmd", arg)
 						}
 						msg.CopyTo(m)
 
@@ -1018,7 +997,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					}
 				}
 
-				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
+				limit := kit.Int(kit.Select(m.Conf("table", "limit"), m.Option("table.limit")))
 				if len(arg) > 0 && arg[0] == "limit" {
 					limit, arg = kit.Int(arg[1]), arg[2:]
 				}
@@ -1068,7 +1047,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 						} else {
 							i := 0
 							for _, v := range val {
-								if i++; i > kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))) {
+								if i++; i > kit.Int(kit.Select(m.Conf("table", "limit"), m.Option("table.limit"))) {
 									break
 								}
 								if line, ok := v.(map[string]interface{}); ok {
@@ -1085,7 +1064,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 						i := 0
 						for k, v := range val {
-							if i++; i > kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit"))) {
+							if i++; i > kit.Int(kit.Select(m.Conf("table", "limit"), m.Option("table.limit"))) {
 								break
 							}
 							if line, ok := v.(map[string]interface{}); ok {
@@ -1358,7 +1337,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 				// 分页
 				offset := kit.Int(kit.Select("0", m.Option("offset")))
-				limit := kit.Int(kit.Select(m.Conf("page_limit"), m.Option("limit")))
+				limit := kit.Int(kit.Select(m.Conf("table", "limit"), m.Option("table.limit")))
 
 				nrow = len(m.Meta[m.Meta["append"][0]])
 				if offset > nrow {
@@ -1427,8 +1406,6 @@ func Start(args ...string) bool {
 	if len(args) == 0 {
 		args = append(args, os.Args[1:]...)
 	}
-
-	kit.DisableLog = true
 	if len(args) > 0 && args[0] == "start" {
 		args = args[1:]
 	}
@@ -1438,6 +1415,7 @@ func Start(args ...string) bool {
 		args = args[1:]
 	}
 
+	kit.DisableLog = true
 	if Index.Begin(Pulse, args...); Index.Start(Pulse, args...) {
 		return Index.Close(Pulse, args...)
 	}
