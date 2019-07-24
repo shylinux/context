@@ -243,7 +243,7 @@ func (yac *YAC) parse(m *ctx.Message, msg *ctx.Message, stack *kit.Stack, page i
 		word = word[:0]
 
 	} else if !m.Confs("exec", []string{"disable", yac.hand[hash]}) {
-		if stack.Peek().Run || m.Confs("exec", []string{"always", yac.hand[hash]}) {
+		if stack == nil || stack.Peek().Run || m.Confs("exec", []string{"always", yac.hand[hash]}) {
 			//执行命令
 			cmd := msg.Spawn(m.Optionv("bio.ctx"))
 			if cmd.Cmd(yac.hand[hash], word); cmd.Hand {
@@ -317,8 +317,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "<", "<=", ">", ">=", "==", "!=", "}"}},
 			map[string]interface{}{"page": "val", "hash": "val", "word": []interface{}{"opt{", "op1", "}", "mul{", "num", "key", "str", "exe", "}"}},
 			map[string]interface{}{"page": "exp", "hash": "exp", "word": []interface{}{"val", "rep{", "op2", "val", "}"}},
-			map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "opt{", "=", "exp", "}"}},
-			map[string]interface{}{"page": "stm", "hash": "var", "word": []interface{}{"var", "key", "opt{", "=", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "return", "word": []interface{}{"return", "rep{", "exp", "}"}},
 
 			// 命令语句
@@ -329,12 +327,13 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 
 			// 复合语句
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"$", "(", "cmd", ")"}},
+			map[string]interface{}{"page": "stm", "hash": "var", "word": []interface{}{"var", "key", "opt{", "=", "exp", "}"}},
+			map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "opt{", "=", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "if", "word": []interface{}{"if", "exp"}},
 			map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "rep{", "exp", "}"}},
+			map[string]interface{}{"page": "stm", "hash": "fun", "word": []interface{}{"fun", "key", "rep{", "key", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "else", "word": []interface{}{"else", "opt{", "if", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "end", "word": []interface{}{"end"}},
-
-			map[string]interface{}{"page": "stm", "hash": "fun", "word": []interface{}{"fun", "key", "rep{", "key", "}"}},
 			/*
 
 				map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-z", "-n", "}"}},
@@ -420,7 +419,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		}},
 		"parse": &ctx.Command{Name: "parse line", Help: "解析语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if yac, ok := m.Target().Server.(*YAC); m.Assert(ok) {
-				stack := m.Optionv("bio.stack").(*kit.Stack)
+				stack, _ := m.Optionv("bio.stack").(*kit.Stack)
 				m.Optioni("yac.page", yac.page[m.Conf("nline")])
 				m.Optioni("yac.void", yac.page[m.Conf("nvoid")])
 
@@ -734,29 +733,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			m.Echo("%s", num[0])
 			return
 		}},
-		"let": &ctx.Command{Name: "let a = exp", Help: "设置变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch arg[2] {
-			case "=":
-				m.Cap(arg[1], arg[3])
-				m.Log("stack", "let %v = %v", arg[1], arg[3])
-			case "<-":
-				m.Cap(arg[1], m.Cap("last_msg"))
-			}
-			m.Echo(m.Cap(arg[1]))
-			return
-		}},
-		"var": &ctx.Command{Name: "var a [= exp]", Help: "定义变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Cap(arg[1], arg[1], "", "临时变量"); len(arg) > 1 {
-				switch arg[2] {
-				case "=":
-					m.Cap(arg[1], arg[3])
-				case "<-":
-					m.Cap(arg[1], m.Cap("last_msg"))
-				}
-			}
-			m.Echo(m.Cap(arg[1]))
-			return
-		}},
 		"return": &ctx.Command{Name: "return result...", Help: "结束脚本, result: 返回值", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Appends("bio.end", true)
 			m.Result(arg[1:])
@@ -956,6 +932,29 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				return
 			}},
 
+		"var": &ctx.Command{Name: "var a [= exp]", Help: "定义变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if m.Cap(arg[1], arg[1], "", "临时变量"); len(arg) > 1 {
+				switch arg[2] {
+				case "=":
+					m.Cap(arg[1], arg[3])
+				case "<-":
+					m.Cap(arg[1], m.Cap("last_msg"))
+				}
+			}
+			m.Echo(m.Cap(arg[1]))
+			return
+		}},
+		"let": &ctx.Command{Name: "let a = exp", Help: "设置变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch arg[2] {
+			case "=":
+				m.Cap(arg[1], arg[3])
+				m.Log("stack", "let %v = %v", arg[1], arg[3])
+			case "<-":
+				m.Cap(arg[1], m.Cap("last_msg"))
+			}
+			m.Echo(m.Cap(arg[1]))
+			return
+		}},
 		"if": &ctx.Command{Name: "if exp", Help: "条件语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			stack := m.Optionv("bio.stack").(*kit.Stack)
 			p := stack.Push(arg[0], stack.Peek().Run && kit.Right(arg[1]), m.Optioni("stack.pos"))
@@ -963,77 +962,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			if p.Run {
 				p.Done = true
 			}
-			return
-		}},
-		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			p := m.Optionv("bio.stack").(*kit.Stack).Peek()
-			p.Run = !p.Done && !p.Run && (len(arg) == 1 || kit.Right(arg[2]))
-			m.Log("stack", "set: run = %v", p.Run)
-			if p.Run {
-				p.Done = true
-			}
-			return
-		}},
-		"end": &ctx.Command{Name: "end", Help: "结束语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			p := m.Optionv("bio.stack").(*kit.Stack).Pop()
-			m.Log("stack", "pop: %v", p.String("/"))
-			switch p.Key {
-			case "for":
-				if p.Run {
-					m.Appendi("bio.pos0", p.Pos)
-				}
-			case "fun":
-				end := m.Optioni("stack.pos")
-				self := p.Data.(*ctx.Command)
-				help := []string{}
-				for i, v := range m.Optionv("input").([]interface{}) {
-					if p.Pos < i && i < end {
-						val := v.(map[string]interface{})
-						help = append(help, val["line"].(string))
-					}
-				}
-				self.Help = help
-			}
-
-			return
-		}},
-		"fun": &ctx.Command{Name: "fun", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			p := m.Optionv("bio.stack").(*kit.Stack).Push(arg[0], false, m.Optioni("stack.pos"))
-			m.Log("stack", "push %v", p.String("\\"))
-
-			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
-			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				stack := &kit.Stack{}
-				stack.Push("fun", true, 0)
-				m.Optionv("bio.stack", stack)
-				help := self.Help.([]string)
-
-				// 解析数据
-				for i := 0; i < len(help); i++ {
-					line := help[i]
-					m.Optioni("stack.pos", i)
-
-					// 执行语句
-					msg := m.Cmd("yac.parse", line+"\n")
-
-					// 跳转语句
-					if msg.Appends("bio.pos0") {
-						i = int(msg.Appendi("bio.pos0")) - 1
-						msg.Append("bio.pos0", "")
-					}
-
-					// 结束脚本
-					if msg.Appends("bio.end") {
-						m.Copy(msg, "append")
-						m.Copy(msg, "result")
-						msg.Appends("bio.end", "")
-						break
-					}
-				}
-				return
-			}
-			m.Target().Commands[arg[1]] = self
-			p.Data = self
 			return
 		}},
 		"for": &ctx.Command{Name: "for [[express ;] condition]|[index message meta value]",
@@ -1100,6 +1028,77 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				*/
 				return
 			}},
+		"fun": &ctx.Command{Name: "fun", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			p := m.Optionv("bio.stack").(*kit.Stack).Push(arg[0], false, m.Optioni("stack.pos"))
+			m.Log("stack", "push %v", p.String("\\"))
+
+			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
+			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				stack := &kit.Stack{}
+				stack.Push("fun", true, 0)
+				m.Optionv("bio.stack", stack)
+				help := self.Help.([]string)
+
+				// 解析数据
+				for i := 0; i < len(help); i++ {
+					line := help[i]
+					m.Optioni("stack.pos", i)
+
+					// 执行语句
+					msg := m.Cmd("yac.parse", line+"\n")
+
+					// 跳转语句
+					if msg.Appends("bio.pos0") {
+						i = int(msg.Appendi("bio.pos0")) - 1
+						msg.Append("bio.pos0", "")
+					}
+
+					// 结束脚本
+					if msg.Appends("bio.end") {
+						m.Copy(msg, "append")
+						m.Copy(msg, "result")
+						msg.Appends("bio.end", "")
+						break
+					}
+				}
+				return
+			}
+			m.Target().Commands[arg[1]] = self
+			p.Data = self
+			return
+		}},
+		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			p := m.Optionv("bio.stack").(*kit.Stack).Peek()
+			p.Run = !p.Done && !p.Run && (len(arg) == 1 || kit.Right(arg[2]))
+			m.Log("stack", "set: run = %v", p.Run)
+			if p.Run {
+				p.Done = true
+			}
+			return
+		}},
+		"end": &ctx.Command{Name: "end", Help: "结束语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			p := m.Optionv("bio.stack").(*kit.Stack).Pop()
+			m.Log("stack", "pop: %v", p.String("/"))
+			switch p.Key {
+			case "for":
+				if p.Run {
+					m.Appendi("bio.pos0", p.Pos)
+				}
+			case "fun":
+				end := m.Optioni("stack.pos")
+				self := p.Data.(*ctx.Command)
+				help := []string{}
+				for i, v := range m.Optionv("input").([]interface{}) {
+					if p.Pos < i && i < end {
+						val := v.(map[string]interface{})
+						help = append(help, val["line"].(string))
+					}
+				}
+				self.Help = help
+			}
+
+			return
+		}},
 
 		"label": &ctx.Command{Name: "label name", Help: "记录当前脚本的位置, name: 位置名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if cli, ok := m.Target().Server.(*YAC); m.Assert(ok) {
