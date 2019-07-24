@@ -78,12 +78,14 @@ func dir(m *ctx.Message, root string, name string, level int, deep bool, dir_typ
 						} else {
 							m.Add("append", "path", path.Join(name, f.Name()))
 						}
-					case "name":
+					case "file":
 						if f.IsDir() {
 							m.Add("append", "name", f.Name()+"/")
 						} else {
 							m.Add("append", "name", f.Name())
 						}
+					case "name":
+						m.Add("append", "name", f.Name())
 					case "tree":
 						if level == 0 {
 							m.Add("append", "tree", f.Name())

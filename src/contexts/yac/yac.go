@@ -1034,33 +1034,8 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 
 			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
 			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-				stack := &kit.Stack{}
-				stack.Push("fun", true, 0)
-				m.Optionv("bio.stack", stack)
-				help := self.Help.([]string)
 
-				// 解析数据
-				for i := 0; i < len(help); i++ {
-					line := help[i]
-					m.Optioni("stack.pos", i)
-
-					// 执行语句
-					msg := m.Cmd("yac.parse", line+"\n")
-
-					// 跳转语句
-					if msg.Appends("bio.pos0") {
-						i = int(msg.Appendi("bio.pos0")) - 1
-						msg.Append("bio.pos0", "")
-					}
-
-					// 结束脚本
-					if msg.Appends("bio.end") {
-						m.Copy(msg, "append")
-						m.Copy(msg, "result")
-						msg.Appends("bio.end", "")
-						break
-					}
-				}
+				m.Goshy(self.Help.([]string), 0, nil)
 				return
 			}
 			m.Target().Commands[arg[1]] = self

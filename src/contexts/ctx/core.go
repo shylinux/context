@@ -404,3 +404,34 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 	m.freeback = append(m.freeback, cbs...)
 	return m
 }
+
+func (m *Message) Goshy(input []string, index int, stack *kit.Stack) *kit.Stack {
+	if stack == nil {
+		stack = &kit.Stack{}
+		stack.Push("source", true, 0)
+	}
+	m.Optionv("bio.stack", stack)
+	m.Optionv("bio.input", input)
+
+	for i := index; i < len(input); i++ {
+		line := input[i]
+		m.Optioni("stack.pos", i)
+
+		// 执行语句
+		msg := m.Cmd("yac.parse", line+"\n")
+
+		// 跳转语句
+		if msg.Appends("bio.pos0") {
+			i = int(msg.Appendi("bio.pos0")) - 1
+			msg.Append("bio.pos0", "")
+		}
+
+		// 结束脚本
+		if msg.Appends("bio.end") {
+			m.Copy(msg, "append").Copy(msg, "result")
+			msg.Appends("bio.end", "")
+			break
+		}
+	}
+	return stack
+}

@@ -331,11 +331,11 @@ func main() {
 			for i := 0; i < len(m.Meta["cmd_env"])-1; i += 2 {
 				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", m.Meta["cmd_env"][i], m.Parse(m.Meta["cmd_env"][i+1])))
 			}
-			for _, k := range []string{"PATH", "HOME"} {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, os.Getenv(k)))
-			}
 			if len(cmd.Env) > 0 {
 				m.Log("info", "env %v", cmd.Env)
+			}
+			for _, k := range []string{"PATH", "HOME"} {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, os.Getenv(k)))
 			}
 
 			// 交互命令
@@ -810,7 +810,7 @@ func main() {
 			case "plugin":
 				arg = arg[1:]
 				if len(arg) == 0 {
-					m.Cmdy("nfs.dir", m.Conf("project", "plugin.path"))
+					m.Cmdy("nfs.dir", m.Conf("project", "plugin.path"), "time", "line", "name")
 					break
 				}
 				fallthrough
@@ -1035,8 +1035,8 @@ func main() {
 		"missyou": &ctx.Command{Name: "missyou [name [stop]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Option("dir_root", "")
-				m.Cmd("nfs.dir", m.Conf("missyou", "path")).Table(func(value map[string]string) {
-					name := strings.TrimSuffix(value["filename"], "/")
+				m.Cmd("nfs.dir", m.Conf("missyou", "path"), "time", "name").Table(func(value map[string]string) {
+					name := strings.TrimSuffix(value["name"], "/")
 					m.Add("append", "create_time", value["time"])
 					m.Add("append", "you", name)
 					if m.Confs("nfs.node", name) {
