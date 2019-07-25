@@ -326,7 +326,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		stack := &kit.Stack{}
 		stack.Push(m.Option("stack.key", "source"), m.Options("stack.run", true), m.Optioni("stack.pos", 0))
 		m.Optionv("bio.ctx", m.Target())
-		m.Optionv("bio.stack", stack)
+
+		input := make([]string, 0, 128)
 
 		line, bio := "", bufio.NewScanner(nfs)
 		for nfs.prompt(); ; nfs.prompt() {
@@ -348,35 +349,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			m.Log("debug", "%s %d %d [%s]", "input", m.Capi("ninput", 1), len(line), line)
 			m.Confv("input", -2, map[string]interface{}{"time": time.Now().Unix(), "line": line})
 
-			// 解析数据
-			for i := m.Capi("ninput") - 1; i < m.Capi("ninput"); i++ {
-				line = m.Conf("input", []interface{}{i, "line"})
-				m.Optionv("input", m.Confv("input"))
-				m.Optioni("stack.pos", i)
-
-				// 执行语句
-				msg := m.Cmd("yac.parse", line+"\n")
-				nfs.print(m.Conf("prompt"), line)
+			if input = append(input, line); m.Goshy(input, len(input)-1, stack, func(msg *ctx.Message) {
+				if m.Confs("term", "use") {
+					nfs.print(m.Conf("prompt"), line)
+				}
 				nfs.print(msg.Meta["result"]...)
-
-				// 切换模块
-				if v := msg.Optionv("bio.ctx"); v != nil {
-					m.Optionv("bio.ctx", v)
-				}
-
-				// 跳转语句
-				if msg.Appends("bio.pos0") {
-					i = int(msg.Appendi("bio.pos0")) - 1
-					msg.Append("bio.pos0", "")
-				}
-
-				// 结束脚本
-				if msg.Appends("bio.end") {
-					m.Copy(msg, "append")
-					m.Copy(msg, "result")
-					msg.Appends("bio.end", "")
-					return true
-				}
+			}) {
+				break
 			}
 			line = ""
 		}

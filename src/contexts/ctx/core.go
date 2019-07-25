@@ -405,7 +405,7 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 	return m
 }
 
-func (m *Message) Goshy(input []string, index int, stack *kit.Stack) *kit.Stack {
+func (m *Message) Goshy(input []string, index int, stack *kit.Stack, cb func(*Message)) bool {
 	if stack == nil {
 		stack = &kit.Stack{}
 		stack.Push("source", true, 0)
@@ -419,6 +419,14 @@ func (m *Message) Goshy(input []string, index int, stack *kit.Stack) *kit.Stack 
 
 		// 执行语句
 		msg := m.Cmd("yac.parse", line+"\n")
+		if cb != nil {
+			cb(msg)
+		}
+
+		// 切换模块
+		if v := msg.Optionv("bio.ctx"); v != nil {
+			m.Optionv("bio.ctx", v)
+		}
 
 		// 跳转语句
 		if msg.Appends("bio.pos0") {
@@ -430,8 +438,8 @@ func (m *Message) Goshy(input []string, index int, stack *kit.Stack) *kit.Stack 
 		if msg.Appends("bio.end") {
 			m.Copy(msg, "append").Copy(msg, "result")
 			msg.Appends("bio.end", "")
-			break
+			return true
 		}
 	}
-	return stack
+	return false
 }

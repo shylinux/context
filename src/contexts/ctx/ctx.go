@@ -675,6 +675,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							cs = append(cs, msg.target)
 							return false
 						})
+						msg = m.Spawn()
 
 						for _, v := range cs {
 							if msg.target = v; v == nil {

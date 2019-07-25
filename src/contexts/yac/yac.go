@@ -334,6 +334,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "stm", "hash": "fun", "word": []interface{}{"fun", "key", "rep{", "key", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "else", "word": []interface{}{"else", "opt{", "if", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "end", "word": []interface{}{"end"}},
+
+			map[string]interface{}{"page": "stm", "hash": "label", "word": []interface{}{"label", "key"}},
+			map[string]interface{}{"page": "stm", "hash": "goto", "word": []interface{}{"goto", "key"}},
 			/*
 
 				map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-z", "-n", "}"}},
@@ -350,8 +353,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 
 				map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "opt{", "exp", ";", "}", "exp"}},
 				map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "index", "exp", "opt{", "exp", "}", "exp"}},
-				map[string]interface{}{"page": "stm", "hash": "label", "word": []interface{}{"label", "exp"}},
-				map[string]interface{}{"page": "stm", "hash": "goto", "word": []interface{}{"goto", "exp", "opt{", "exp", "}", "exp"}},
 
 			*/
 
@@ -543,6 +544,12 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				msg := m.Spawn(m.Optionv("bio.ctx"))
 				switch arg[0] {
 				case "$":
+					if stack, ok := m.Optionv("bio.stack").(*kit.Stack); ok {
+						if v, ok := stack.Hash(arg[1]); ok {
+							m.Echo("%v", v)
+							break
+						}
+					}
 					m.Echo(msg.Cap(arg[1]))
 				case "@":
 					value := msg.Option(arg[1])
@@ -933,33 +940,25 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}},
 
 		"var": &ctx.Command{Name: "var a [= exp]", Help: "定义变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Cap(arg[1], arg[1], "", "临时变量"); len(arg) > 1 {
-				switch arg[2] {
-				case "=":
-					m.Cap(arg[1], arg[3])
-				case "<-":
-					m.Cap(arg[1], m.Cap("last_msg"))
-				}
+			if stack, ok := m.Optionv("bio.stack").(*kit.Stack); ok {
+				m.Log("stack", "%v = %v", arg[1], arg[3])
+				stack.Peek().Hash[arg[1]] = arg[3]
 			}
-			m.Echo(m.Cap(arg[1]))
 			return
 		}},
 		"let": &ctx.Command{Name: "let a = exp", Help: "设置变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch arg[2] {
-			case "=":
-				m.Cap(arg[1], arg[3])
-				m.Log("stack", "let %v = %v", arg[1], arg[3])
-			case "<-":
-				m.Cap(arg[1], m.Cap("last_msg"))
+			if stack, ok := m.Optionv("bio.stack").(*kit.Stack); ok {
+				m.Log("stack", "%v = %v", arg[1], arg[3])
+				stack.Hash(arg[1], arg[3])
 			}
-			m.Echo(m.Cap(arg[1]))
 			return
 		}},
 		"if": &ctx.Command{Name: "if exp", Help: "条件语句, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			stack := m.Optionv("bio.stack").(*kit.Stack)
-			p := stack.Push(arg[0], stack.Peek().Run && kit.Right(arg[1]), m.Optioni("stack.pos"))
+			o := stack.Peek()
+			p := stack.Push(arg[0], o.Run && kit.Right(arg[1]), m.Optioni("stack.pos"))
 			m.Log("stack", "push %v", p.String("\\"))
-			if p.Run {
+			if !o.Run || p.Run {
 				p.Done = true
 			}
 			return
@@ -1034,8 +1033,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 
 			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
 			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-
-				m.Goshy(self.Help.([]string), 0, nil)
+				m.Goshy(self.Help.([]string), 0, nil, nil)
 				return
 			}
 			m.Target().Commands[arg[1]] = self
@@ -1045,7 +1043,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			p := m.Optionv("bio.stack").(*kit.Stack).Peek()
 			p.Run = !p.Done && !p.Run && (len(arg) == 1 || kit.Right(arg[2]))
-			m.Log("stack", "set: run = %v", p.Run)
+			m.Log("stack", "set: %v", p.String("|"))
 			if p.Run {
 				p.Done = true
 			}
@@ -1063,10 +1061,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				end := m.Optioni("stack.pos")
 				self := p.Data.(*ctx.Command)
 				help := []string{}
-				for i, v := range m.Optionv("input").([]interface{}) {
+				for i, v := range m.Optionv("bio.input").([]string) {
 					if p.Pos < i && i < end {
-						val := v.(map[string]interface{})
-						help = append(help, val["line"].(string))
+						help = append(help, v)
 					}
 				}
 				self.Help = help
@@ -1076,22 +1073,19 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		}},
 
 		"label": &ctx.Command{Name: "label name", Help: "记录当前脚本的位置, name: 位置名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*YAC); m.Assert(ok) {
-				if cli.label == nil {
-					cli.label = map[string]string{}
-				}
-				cli.label[arg[1]] = m.Option("file_pos")
+			p := m.Optionv("bio.stack").(*kit.Stack).Peek()
+			if p.Label == nil {
+				p.Label = map[string]int{}
 			}
+			m.Log("stack", "%v <= %v", arg[1], m.Optioni("stack.pos")+1)
+			p.Label[arg[1]] = m.Optioni("stack.pos") + 1
 			return
 		}},
 		"goto": &ctx.Command{Name: "goto label [exp] condition", Help: "向上跳转到指定位置, label: 跳转位置, condition: 跳转条件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if cli, ok := m.Target().Server.(*YAC); m.Assert(ok) {
-				if pos, ok := cli.label[arg[1]]; ok {
-					if !kit.Right(arg[len(arg)-1]) {
-						return
-					}
-					m.Append("file_pos0", pos)
-				}
+			stack := m.Optionv("bio.stack").(*kit.Stack)
+			if i, ok := stack.Label(arg[1]); ok {
+				m.Log("stack", "%v => %v", arg[1], i)
+				m.Append("bio.pos0", i)
 			}
 			return
 		}},
