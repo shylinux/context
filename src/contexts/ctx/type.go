@@ -3,6 +3,7 @@ package ctx
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -714,7 +715,14 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 			}
 		}
 	case func(string, int, map[string]interface{}):
-		for k, v := range value {
+		keys := make([]string, 0, len(value))
+		for k, _ := range value {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			v := value[k]
 			if val, ok := v.([]interface{}); ok {
 				for i, v := range val {
 					if val, ok := v.(map[string]interface{}); ok {

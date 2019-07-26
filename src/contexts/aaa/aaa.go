@@ -75,9 +75,7 @@ func (aaa *AAA) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server 
 		"right": &ctx.Config{Name: "right", Value: map[string]interface{}{}, Help: "用户权限"},
 	}
 
-	s := new(AAA)
-	s.Context = c
-	return s
+	return &AAA{Context: c}
 }
 func (aaa *AAA) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return aaa
@@ -1111,7 +1109,5 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 }
 
 func init() {
-	aaa := &AAA{}
-	aaa.Context = Index
-	ctx.Index.Register(Index, aaa)
+	ctx.Index.Register(Index, &AAA{Context: Index})
 }
