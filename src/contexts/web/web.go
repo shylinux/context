@@ -336,7 +336,7 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 	web.Caches["directory"] = &ctx.Cache{Name: "directory", Value: kit.Select(m.Conf("serve", "directory"), arg, 0), Help: "服务目录"}
 	web.Caches["protocol"] = &ctx.Cache{Name: "protocol", Value: kit.Select(m.Conf("serve", "protocol"), arg, 2), Help: "服务协议"}
-	web.Caches["address"] = &ctx.Cache{Name: "address", Value: kit.Select(m.Conf("serve", "address"), arg, 1), Help: "服务地址"}
+	web.Caches["address"] = &ctx.Cache{Name: "address", Value: kit.Select(m.Conf("runtime", "boot.web_port"), arg, 1), Help: "服务地址"}
 	m.Log("info", "%d %s %s://%s", m.Capi("nserve", 1), m.Cap("directory"), m.Cap("protocol"), m.Cap("stream", m.Cap("address")))
 
 	render := m.Target().Commands["/render"]
@@ -423,7 +423,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			"form_size":  "102400",
 			"directory":  "usr",
 			"protocol":   "http",
-			"address":    ":9094",
 			"cert":       "etc/cert.pem",
 			"key":        "etc/key.pem",
 			"site":       "",

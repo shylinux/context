@@ -64,7 +64,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"web_port", "ssh_port",
 			},
 			"boot": map[string]interface{}{
-				"web_port": ":9094",
+				"web_port": ":9095",
 				"ssh_port": ":9090",
 				"username": "shy",
 			},
@@ -761,11 +761,10 @@ func main() {
 			m.Append("time", m.Time())
 			m.Append("code", code)
 			m.Echo(", wait 1s\n").Table()
-
 			m.Gos(m, func(m *ctx.Message) {
-				defer os.Exit(kit.Int(code))
 				m.Cmd("ctx._exit")
-				time.Sleep(time.Second * 1)
+				time.Sleep(time.Second)
+				os.Exit(kit.Int(code))
 			})
 			return
 		}},

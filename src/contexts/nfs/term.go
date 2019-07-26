@@ -331,6 +331,13 @@ func (nfs *NFS) Term(msg *ctx.Message, action string, args ...interface{}) *NFS 
 	// m.Log("debug", "%s %v", action, args)
 
 	switch action {
+	case "exit":
+		if m.Caps("termbox") {
+			termbox.Close()
+		}
+		m.Caps("termbox", false)
+		return nfs
+
 	case "init":
 		defer func() {
 			if e := recover(); e != nil {

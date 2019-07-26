@@ -1102,9 +1102,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"source": &ctx.Command{Name: "source [script|stdio|snippet]", Help: "解析脚本, script: 脚本文件, stdio: 命令终端, snippet: 代码片段", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Options("local.shy") {
-				return
-			}
 			if len(arg) == 0 {
 				m.Cmdy("dir", "src", "time", "line", "path", "dir_deep", "dir_reg", ".*\\.(sh|shy|py)$")
 				return
@@ -1150,7 +1147,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
-		"socket": &ctx.Command{Name: "socket listen|dial args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"socket": &ctx.Command{Name: "remote listen|dial args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
 				m.Sess("tcp").Call(func(msg *ctx.Message) *ctx.Message {
 					if msg.Has("node.port") {

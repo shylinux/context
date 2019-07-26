@@ -354,7 +354,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			},
 		}, Help: "组件列表"},
 
-		"file":  &ctx.Config{Name: "file", Value: map[string]interface{}{}, Help: "共享文件"},
 		"flow":  &ctx.Config{Name: "flow", Value: map[string]interface{}{}, Help: "聊天群组"},
 		"work":  &ctx.Config{Name: "work", Value: map[string]interface{}{}, Help: "工作信息"},
 		"node":  &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
@@ -423,7 +422,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"user": &ctx.Command{Name: "user [init|create [node]]", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"user": &ctx.Command{Name: "user [init|create|trust [node]]", Help: "用户管理, init: 用户节点, create: 用户创建, trust: 用户授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Echo(m.Conf("runtime", "user.route"))
 				return
@@ -455,11 +454,21 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				}
 				m.Cmd("aaa.user", "root", m.Conf("runtime", "user.name"))
 				m.Echo(m.Conf("runtime", "user.cert"))
+
+			case "trust":
+				if len(arg) > 1 {
+					m.Conf("trust", arg[1], kit.Right(arg[2]))
+				}
+				if len(arg) > 1 {
+					m.Cmdy("ctx.config", "trust", arg[1])
+				} else {
+					m.Cmdy("ctx.config", "trust")
+				}
 			}
 			m.Append("user.route", m.Conf("runtime", "user.route"))
 			return
 		}},
-		"work": &ctx.Command{Name: "work [serve|create|search]", Help: "工作", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"work": &ctx.Command{Name: "work [serve|create|search]", Help: "工作管理, serve: 创建组织, create: 创建员工, search: 搜索员工", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("work", func(key string, value map[string]interface{}) {
 					m.Add("append", "key", key)
@@ -492,15 +501,24 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Echo("error: %s from %s", name, work)
 				}
 
+			case "share":
+				user := m.Conf("runtime", "node.route")
+				name := kit.Select(m.Conf("runtime", "user.name"), arg, 1)
+				work := kit.Select(m.Conf("runtime", "work.route"), arg, 2)
+
+				if n := m.Cmdx("ssh._route", work, "_check", "work", name, user); n != "" {
+					m.Echo(n)
+				}
+
 			case "search":
 				m.Cmdy("ssh._route", m.Conf("runtime", "work.route"), "_check", "work", "search", arg[1:])
 			}
 			return
 		}},
-		"tool": &ctx.Command{Name: "tool", Help: "工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"tool": &ctx.Command{Name: "tool [group index][run group index chatid arg...]", Help: "工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
-					if kit.Format(value["componet_type"]) != "public" && m.Option("username") != m.Conf("runtime", "work.name") && m.Option("username") != m.Conf("runtime", "user.name") {
+					if kit.Format(value["componet_type"]) != "public" && m.Option("userrole") != "root" {
 						return
 					}
 
@@ -516,12 +534,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			switch arg[0] {
 			case "run":
 				tool := m.Confm("componet", []string{arg[1], arg[2]})
-				if kit.Format(tool["componet_type"]) == "private" && m.Option("username") != m.Conf("runtime", "work.name") {
+				if kit.Format(tool["componet_type"]) == "private" && m.Option("userrole") != "root" {
 					m.Echo("private componet of %s", m.Conf("runtime", "work.name"))
 					break
 				}
 				if kit.Format(tool["componet_type"]) == "protected" && !m.Confs("flow", []string{arg[3], "user", m.Option("username")}) {
-					m.Echo("private componet of %s", m.Conf("runtime", "work.name"))
+					m.Echo("protected componet of %s", m.Conf("runtime", "work.name"))
 					break
 				}
 
@@ -568,9 +586,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				})
 				m.Table()
 			}
-			return
-		}},
-		"file": &ctx.Command{Name: "file", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			return
 		}},
 
@@ -890,7 +905,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				case "trust": // 可信代理
 					hash := kit.Hashs("rand", m.Option("text.time", m.Time("stamp")), arg[2])
 					m.Option("user.sign", m.Cmdx("ssh._route", m.Option("user.route"), "_check", "user", arg[2], hash))
-					m.Echo("%v", m.Options("user.sign") && m.Cmds("ssh._check", hash))
+					m.Echo("%v", m.Options("user.sign") && m.Cmds("ssh._right", "user", "check", hash))
 				}
 
 			case "work": // 公有认证
@@ -901,7 +916,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				switch arg[1] {
 				case "check": // 数字验签
-					if m.Option("user.route") != m.Cmdx("ssh._route", kit.Select(m.Conf("runtime", "work.route"), arg, 3), "_check", "work", arg[2]) {
+					if arg[3] != m.Cmdx("ssh._route", kit.Select(m.Conf("runtime", "work.route"), m.Option("work.route")), "_check", "work", arg[2]) {
 						m.Log("warn", "work error")
 						m.Echo("false")
 					} else {
@@ -986,7 +1001,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Append("user.name", m.Conf("runtime", "user.name"))
 					m.Append("user.route", kit.Select(m.Conf("runtime", "node.route"), m.Conf("runtime", "user.route")))
 				} else { // 代理签证
-					if arg[1] == m.Conf("runtime", "node.route") || m.Cmds("aaa.auth", "proxy", arg[1], "session") {
+					m.Log("fuck", "what %v", arg[1])
+					m.Log("fuck", "what %v", m.Conf("trust"))
+					if m.Confs("trust", arg[1]) {
 						m.Echo(m.Cmdx("aaa.rsa", "sign", m.Conf("runtime", "user.key"), arg[2]))
 					}
 				}
@@ -1062,7 +1079,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Option("text.username"),
 			)
 
-			if m.Option("sessid", m.Cmd("aaa.auth", "access", access, "session").Append("key")); m.Option("username", m.Cmd("aaa.sess", "user").Append("meta")) != "" { // 历史会话
+			if m.Option("sessid", m.Cmd("aaa.auth", "access", access, "session").Append("key")); false && m.Option("username", m.Cmd("aaa.sess", "user").Append("meta")) != "" { // 历史会话
 				m.Log("warn", "access: %s", access)
 				m.Log("info", "sessid: %s", m.Option("sessid"))
 				m.Option("trust", m.Cmdx("aaa.auth", "access", access, "data", "trust"))
@@ -1092,7 +1109,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Option("trust", "none")
 
 			} else { // 验证失败
-				m.Log("warn", "user error of %s", m.Option("user.route"))
+				m.Log("warn", "user error of %s", m.Option("node.route"))
 				m.Echo("user error")
 				return
 			}
