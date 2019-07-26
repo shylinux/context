@@ -1079,11 +1079,13 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Option("text.username"),
 			)
 
-			if m.Option("sessid", m.Cmd("aaa.auth", "access", access, "session").Append("key")); false && m.Option("username", m.Cmd("aaa.sess", "user").Append("meta")) != "" { // 历史会话
+			if m.Option("sessid", m.Cmd("aaa.auth", "access", access, "session").Append("key")); m.Option("username", m.Cmd("aaa.sess", "user").Append("meta")) != "" { // 历史会话
 				m.Log("warn", "access: %s", access)
 				m.Log("info", "sessid: %s", m.Option("sessid"))
 				m.Option("trust", m.Cmdx("aaa.auth", "access", access, "data", "trust"))
-				m.Option("userrole", m.Cmdx("aaa.auth", "access", access, "data", "userrole"))
+				if m.Option("userrole", m.Cmdx("aaa.auth", "access", access, "data", "userrole")); !m.Options("userrole") {
+					m.Option("userrole", m.Cmd("aaa.user", "role").Append("meta"))
+				}
 
 			} else if m.Option("username", m.Option("text.username")); !m.Confs("runtime", "user.route") && m.Confs("trust", "fresh") { // 免签节点
 				m.Log("warn", "trust fresh %s", m.Option("node.route"))
@@ -1113,6 +1115,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Echo("user error")
 				return
 			}
+
 			m.Log("info", "username: %s", m.Option("username"))
 			m.Log("info", "userrole: %s", m.Option("userrole"))
 
@@ -1123,13 +1126,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"data", "trust", m.Option("trust"), "userrole", m.Option("userrole"))
 			}
 
-			// 创建空间
-			m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
-
 			// 权限检查
-			if arg[0] != "tool" && !m.Cmds("aaa.work", "right", "remote", arg[0]) {
-				m.Echo("no right %s %s", "remote", arg[0])
-				return
+			if arg[0] != "tool" {
+				// 创建空间
+				m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
+				if !m.Cmds("aaa.work", "right", "remote", arg[0]) {
+					m.Echo("no right %s %s", "remote", arg[0])
+					return
+				}
 			}
 
 			// 执行命令

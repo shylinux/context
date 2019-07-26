@@ -5,10 +5,8 @@ import (
 	"contexts/ctx"
 	"encoding/json"
 	"fmt"
-	"github.com/skip2/go-qrcode"
-	"strconv"
-	// "github.com/PuerkitoBio/goquery"
 	"github.com/go-cas/cas"
+	"github.com/skip2/go-qrcode"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -18,9 +16,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
+	"strconv"
 	"strings"
-	"time"
 	"toolkit"
 )
 
@@ -92,6 +89,9 @@ func Merge(m *ctx.Message, client map[string]interface{}, uri string, arg ...str
 }
 
 func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) bool {
+	if !msg.Has("username") || !msg.Options("username") {
+		msg.Option("username", "")
+	}
 	// if msg.Confs("skip_login", msg.Option("path")) {
 	// 	return true
 	// }
@@ -134,23 +134,23 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 			w.WriteHeader(http.StatusUnauthorized)
 		}
 		return false
-	}
 
-	if msg.Log("info", "sessid: %s", msg.Option("sessid")); msg.Options("sessid") {
-		msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta")))
-	}
-
-	if !msg.Options("username") && msg.Options("relay") {
+	} else if msg.Options("relay") {
 		if relay := msg.Cmd("aaa.relay", "check", msg.Option("relay")); relay.Appends("username") {
 			if role := msg.Cmdx("aaa.relay", "check", msg.Option("relay"), "userrole"); role != "" {
 				msg.Log("info", "login: %s", msg.Option("username", relay.Append("username")))
-				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("aaa.user", "session", "select"), Path: "/"})
+				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
 				msg.Cmd("aaa.role", role, "user", msg.Option("username"))
 				msg.Log("info", "relay: %s", role)
+				return true
 			}
 		}
 	}
 
+	if msg.Log("info", "sessid: %s", msg.Option("sessid")); msg.Options("sessid") {
+		msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta")))
+		msg.Log("info", "userrole: %v", msg.Option("userrole", msg.Cmd("aaa.user", "role").Append("meta")))
+	}
 	return true
 }
 func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
@@ -185,9 +185,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			for k, v := range r.Form {
 				msg.Add("option", k, v)
 			}
-			if !msg.Has("username") || !m.Options("username") {
-				msg.Option("username", "")
-			}
 
 			// 请求数据
 			switch r.Header.Get("Content-Type") {
@@ -205,20 +202,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 					}
 				}
 			}
-
-			// 请求系统
-			// msg.Option("GOOS", m.Conf("runtime", "host.GOOS"))
-			// msg.Option("GOARCH", m.Conf("runtime", "host.GOARCH"))
-			// agent := r.Header.Get("User-Agent")
-			// switch {
-			// case strings.Contains(agent, "Macintosh"):
-			// 	msg.Option("GOOS", "darwin")
-			// }
-			// switch {
-			// case strings.Contains(agent, "Intel"):
-			// 	msg.Option("GOARCH", "386")
-			// }
-			//
 
 			// 用户登录
 			if msg.Put("option", "request", r).Put("option", "response", w).Sess("web", msg); web.Login(msg, w, r) {
@@ -238,10 +221,10 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 				msg.Spawn().Add("option", "componet_group", msg.Meta["componet"]).Cmd("/render")
 
 			case msg.Has("qrcode"):
-				w.Header().Set("Content-Type", "image/png")
-				qr, e := qrcode.New(msg.Append("qrcode"), qrcode.Medium)
-				m.Assert(e)
-				m.Assert(qr.Write(256, w))
+				if qr, e := qrcode.New(msg.Append("qrcode"), qrcode.Medium); m.Assert(e) {
+					w.Header().Set("Content-Type", "image/png")
+					m.Assert(qr.Write(256, w))
+				}
 
 			case msg.Has("append"):
 				meta := map[string]interface{}{}
@@ -316,12 +299,7 @@ func (web *WEB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *WEB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{}
-
-	s := new(WEB)
-	s.Context = c
-	return s
+	return &WEB{Context: c}
 }
 func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	web.Caches["master"] = &ctx.Cache{Name: "master(yes/no)", Value: "no", Help: "服务入口"}
@@ -353,7 +331,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 				s.Handle(m.Cap("route"), http.StripPrefix(path.Dir(m.Cap("route")), h))
 			}
 
-			// 通用响应
+			// 模板文件
 			if m.Target().Commands["/render"] == nil {
 				m.Target().Commands["/render"] = render
 			}
@@ -361,7 +339,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 				m.Target().Commands["/proxy/"] = proxy
 			}
 
-			// 路由节点
+			// 动态文件
 			msg := m.Target().Message()
 			for k, x := range m.Target().Commands {
 				if k[0] == '/' {
@@ -370,7 +348,7 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 				}
 			}
 
-			// 路由文件
+			// 静态文件
 			if m.Cap("directory") != "" {
 				m.Log("info", "route: %sstatic/ <- [%s]\n", m.Cap("route"), m.Cap("directory"))
 				h.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(m.Cap("directory")))))
@@ -390,8 +368,8 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		handler = web
 	}
 
-	m.Log("info", "web: %s", m.Cap("address"))
 	// 启动服务
+	m.Log("info", "web: %s", m.Cap("address"))
 	web.Server = &http.Server{Addr: m.Cap("address"), Handler: handler}
 	if m.Caps("master", true); m.Cap("protocol") == "https" {
 		web.Server.ListenAndServeTLS(m.Conf("runtime", "node.cert"), m.Conf("runtime", "node.key"))
@@ -460,14 +438,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Cmd("web.spide", "dev", "client", "new", kit.Select(m.Conf("runtime", "boot.ctx_dev"), m.Conf("runtime", "boot.ctx_box")))
 			return
 		}},
-		"spide": &ctx.Command{Name: "spide [which [client|cookie [name [value]]]]", Help: "爬虫配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"spide": &ctx.Command{Name: "spide [which [client|header|cookie [name|new [value]]]]", Help: "爬虫配置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:
 				m.Confm("spide", func(key string, value map[string]interface{}) {
-					m.Add("append", "key", key)
-					m.Add("append", "protocol", kit.Chains(value, "client.protocol"))
-					m.Add("append", "hostname", kit.Chains(value, "client.hostname"))
-					m.Add("append", "path", kit.Chains(value, "client.path"))
+					m.Push("key", key)
+					m.Push("protocol", kit.Chains(value, "client.protocol"))
+					m.Push("hostname", kit.Chains(value, "client.hostname"))
+					m.Push("path", kit.Chains(value, "client.path"))
 				})
 				m.Sort("key").Table()
 			case 1:
@@ -516,6 +494,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			return
 		}},
+		"post": &ctx.Command{Name: "post args...", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy("web.get", "method", "POST", arg)
+			return
+		}},
 		"get": &ctx.Command{Name: "get [which] name [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
 			Form: map[string]int{
 				"which": 1, "method": 1, "args": 1, "headers": 2,
@@ -543,8 +525,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 				method := kit.Select(kit.Format(client["method"]), m.Option("method"))
 				uri := Merge(m, client, arg[0], arg[1:]...)
-
 				uri_arg := ""
+
 				body, ok := m.Optionv("body").(io.Reader)
 				if method == "POST" && !ok {
 					uuu, e := url.Parse(uri)
@@ -560,15 +542,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							}
 						}
 
-						file, e := os.Open(m.Cmdx("nfs.path", m.Meta["file"][1]))
-						m.Assert(e)
-						defer file.Close()
+						if file, e := os.Open(m.Cmdx("nfs.path", m.Meta["file"][1])); m.Assert(e) {
+							defer file.Close()
 
-						part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1]))
-						m.Assert(e)
-						io.Copy(part, file)
+							if part, e := writer.CreateFormFile(m.Option("file"), filepath.Base(m.Meta["file"][1])); m.Assert(e) {
+								io.Copy(part, file)
+								m.Option("content_type", writer.FormDataContentType())
+							}
+						}
 
-						m.Option("content_type", writer.FormDataContentType())
 					} else if index := strings.Index(uri, "?"); index > 0 {
 						switch m.Option("content_type") {
 						case "application/json": // POST json
@@ -591,13 +573,13 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								}
 							}
 
-							b, e := json.Marshal(data)
-							m.Assert(e)
-							m.Log("info", "json %v", string(b))
-							body = bytes.NewReader(b)
-							if m.Has("args") {
-								uri = uri[:index] + "?" + m.Option("args")
-								index = len(uri)
+							if b, e := json.Marshal(data); m.Assert(e) {
+								m.Log("info", "json %v", string(b))
+
+								if body = bytes.NewReader(b); m.Has("args") {
+									uri = uri[:index] + "?" + m.Option("args")
+									index = len(uri)
+								}
 							}
 
 						default: // POST form
@@ -638,18 +620,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				if m.Options("content_length") {
 					req.Header.Set("Content-Length", m.Option("content_length"))
 				}
-
-				// 请求cookie
-				kit.Structm(m.Magic("user", []string{"cookie", which}), func(key string, value string) {
-					req.AddCookie(&http.Cookie{Name: key, Value: value})
-					m.Log("info", "set-cookie %s: %v", key, value)
-				})
-
-				if web.Client == nil {
-					web.Client = &http.Client{Timeout: kit.Duration(kit.Format(client["timeout"]))}
-				}
-
-				// 请求日志
+				// 请求头
 				if kit.Right(client["logheaders"]) {
 					for k, v := range req.Header {
 						m.Log("info", "%s: %s", k, v)
@@ -657,7 +628,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					m.Log("info", "")
 				}
 
+				// 请求cookie
+				kit.Structm(m.Magic("user", []string{"cookie", which}), func(key string, value string) {
+					req.AddCookie(&http.Cookie{Name: key, Value: value})
+					m.Log("info", "set-cookie %s: %v", key, value)
+				})
+
 				// 发送请求
+				if web.Client == nil {
+					web.Client = &http.Client{Timeout: kit.Duration(kit.Format(client["timeout"]))}
+				}
 				res, e := web.Client.Do(req)
 				if e != nil {
 					m.Log("warn", "%v", e)
@@ -665,161 +645,65 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					return e
 				}
 
-				// 响应日志
-				var result interface{}
-				ct := res.Header.Get("Content-Type")
-				parse := kit.Select(kit.Format(client["parse"]), m.Option("parse"))
-				m.Log("info", "status %s parse: %s content: %s", res.Status, parse, ct)
-				if kit.Right(client["logheaders"]) {
-					for k, v := range res.Header {
-						m.Log("info", "%s: %v", k, v)
-					}
-				}
-
-				// 响应失败
+				// 响应结果
 				if res.StatusCode != http.StatusOK {
-					m.Echo("%d: %s", res.StatusCode, res.Status)
+					m.Log("warn", "%d: %s\n", res.StatusCode, res.Status)
+					m.Echo("%d: %s\n", res.StatusCode, res.Status)
 				}
 
-				// 响应cookie
+				// 保存cookie
 				for _, v := range res.Cookies() {
 					if m.Log("info", "get-cookie %s: %v", v.Name, v.Value); v.Value != "" {
 						m.Magic("user", []string{"cookie", which, v.Name}, v.Value)
 					}
 				}
 
+				// 响应头
+				if kit.Right(client["logheaders"]) {
+					for k, v := range res.Header {
+						m.Log("info", "%s: %v", k, v)
+					}
+				}
+
+				// 保存响应
+				if res.StatusCode == http.StatusOK && m.Options("save") {
+					if f, p, e := kit.Create(m.Option("save")); m.Assert(e) {
+						defer f.Close()
+
+						if n, e := io.Copy(f, res.Body); m.Assert(e) {
+							m.Log("info", "save %d %s", n, p)
+							m.Echo(p)
+						}
+					}
+					return
+				}
+
 				// 解析响应
+				var result interface{}
+				ct := res.Header.Get("Content-Type")
+				parse := kit.Select(kit.Format(client["parse"]), m.Option("parse"))
+				m.Log("info", "parse: %s content: %s", parse, ct)
+
 				switch {
+				// 解析数据
 				case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
 					if json.NewDecoder(res.Body).Decode(&result); !m.Has("temp") {
 						m.Option("temp", "")
 					}
 					m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
 
+				// 解析网页
 				case parse == "html":
-					/*
-						page, e := goquery.NewDocumentFromReader(res.Body)
-						m.Assert(e)
+					parseHTML()
 
-						page.Find(kit.Select("html", m.Option("parse_chain"))).Each(func(n int, s *goquery.Selection) {
-							if m.Options("parse_select") {
-								for i := 0; i < len(m.Meta["parse_select"])-2; i += 3 {
-									item := s.Find(m.Meta["parse_select"][i+1])
-									if m.Meta["parse_select"][i+1] == "" {
-										item = s
-									}
-									if v, ok := item.Attr(m.Meta["parse_select"][i+2]); ok {
-										m.Add("append", m.Meta["parse_select"][i], v)
-										m.Log("info", "item attr %v", v)
-									} else {
-										m.Add("append", m.Meta["parse_select"][i], strings.Replace(item.Text(), "\n", "", -1))
-										m.Log("info", "item text %v", item.Text())
-									}
-								}
-								return
-							}
-
-							s.Find("a").Each(func(n int, s *goquery.Selection) {
-								if attr, ok := s.Attr("href"); ok {
-									s.SetAttr("href", proxy(m, attr))
-								}
-							})
-							s.Find("img").Each(func(n int, s *goquery.Selection) {
-								if attr, ok := s.Attr("src"); ok {
-									s.SetAttr("src", proxy(m, attr))
-								}
-								if attr, ok := s.Attr("r-lazyload"); ok {
-									s.SetAttr("src", proxy(m, attr))
-								}
-							})
-							s.Find("script").Each(func(n int, s *goquery.Selection) {
-								if attr, ok := s.Attr("src"); ok {
-									s.SetAttr("src", proxy(m, attr))
-								}
-							})
-
-							if html, e := s.Html(); e == nil {
-								m.Add("append", "html", html)
-							}
-						})
-						m.Table()
-
-					*/
+				// 输出数据
 				default:
-					if res.StatusCode == http.StatusOK && m.Options("save") {
-						dir := path.Dir(m.Option("save"))
-						if _, e = os.Stat(dir); e != nil {
-							m.Assert(os.MkdirAll(dir, 0777))
-						}
-
-						f, e := os.Create(m.Option("save"))
-						m.Assert(e)
-						defer f.Close()
-
-						n, e := io.Copy(f, res.Body)
-						m.Assert(e)
-						m.Log("info", "save %d %s", n, m.Option("save"))
-						m.Echo(m.Option("save"))
-					} else {
-						buf, e := ioutil.ReadAll(res.Body)
-						m.Assert(e)
+					if buf, e := ioutil.ReadAll(res.Body); m.Assert(e) {
 						m.Echo(string(buf))
 					}
 				}
 				return
 			}},
-		"post": &ctx.Command{Name: "post args...", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmdy("web.get", "method", "POST", arg)
-			return
-		}},
-		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				m.Cmd("tcp.ifconfig").Table(func(index int, value map[string]string) {
-					m.Append("index", index)
-					m.Append("site", fmt.Sprintf("%s://%s%s", m.Conf("serve", "protocol"), value["ip"], m.Conf("runtime", "boot.web_port")))
-				})
-				m.Table()
-				return
-			}
-
-			switch runtime.GOOS {
-			case "windows":
-				m.Cmd("cli.system", "explorer", arg[0])
-			case "darwin":
-				m.Cmd("cli.system", "open", arg[0])
-			default:
-				m.Cmd("web.get", arg[0])
-			}
-			return
-		}},
-		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			date := time.Now().Add(time.Hour * 24).Format("2006-01-02")
-			if len(arg) > 0 {
-				date, arg = arg[0], arg[1:]
-			}
-			to := "QFK"
-			if len(arg) > 0 {
-				to, arg = arg[0], arg[1:]
-			}
-			from := "BJP"
-			if len(arg) > 0 {
-				from, arg = arg[0], arg[1:]
-			}
-			m.Echo("%s->%s %s\n", from, to, date)
-
-			m.Cmd("web.get", fmt.Sprintf("https://kyfw.12306.cn/otn/leftTicket/queryX?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT", date, from, to), "temp", "data.result")
-			for _, v := range m.Meta["value"] {
-				fields := strings.Split(v, "|")
-				m.Add("append", "车次--", fields[3])
-				m.Add("append", "出发----", fields[8])
-				m.Add("append", "到站----", fields[9])
-				m.Add("append", "时长----", fields[10])
-				m.Add("append", "二等座", fields[30])
-				m.Add("append", "一等座", fields[31])
-			}
-			m.Table()
-			return
-		}},
 
 		"serve": &ctx.Command{Name: "serve [directory [address [protocol [cert [key]]]]", Help: "启动服务, directory: 服务路径, address: 服务地址, protocol: 服务协议(https/http), cert: 服务证书, key: 服务密钥", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Set("detail", arg).Target().Start(m)
@@ -962,18 +846,35 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-				// 响应类型
-				accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
-				w := m.Optionv("response").(http.ResponseWriter)
-				if accept_json {
-					// w.Header().Add("Content-Type", "application/json")
+			// 权限检查
+			if m.Confs("login", "check") {
+				if m.Option("username") == "" { // 没有登录
+					m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
 				} else {
-					w.Header().Add("Content-Type", "text/html")
-				}
+					// 创建空间
+					if bench := m.Option("bench"); m.Option("bench", m.Cmdx("aaa.sess", "bench", "select")) != bench {
+						m.Append("redirect", merge(m, m.Option("index_url"), "bench", m.Option("bench")))
+						return
+					}
+					m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
 
-				// 响应数据
-				list := []interface{}{}
+					if !m.Cmds("aaa.work", "right", m.Confx("componet_group")) { // 没有权限
+						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
+					}
+				}
+			}
+
+			// 响应类型
+			w := m.Optionv("response").(http.ResponseWriter)
+			accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
+			if accept_json {
+				// w.Header().Add("Content-Type", "application/json")
+			} else {
+				w.Header().Add("Content-Type", "text/html")
+			}
+
+			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
+				// 响应模板
 				tmpl := web.Template
 				if m.Confs("route", "template_debug") {
 					tmpl = template.New("render").Funcs(ctx.CGI)
@@ -981,23 +882,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
 				}
 
-				// 权限检查
-				if m.Confs("login", "check") {
-					if m.Option("username") == "" { // 没有登录
-						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
-					} else {
-						// 创建空间
-						if bench := m.Option("bench"); m.Option("bench", m.Cmdx("aaa.sess", "bench", "select")) != bench {
-							m.Append("redirect", merge(m, m.Option("index_url"), "bench", m.Option("bench")))
-							return
-						}
-						m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
-
-						if !m.Cmds("aaa.work", "right", m.Confx("componet_group")) { // 没有权限
-							m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
-						}
-					}
-				}
+				// 响应数据
+				list := []interface{}{}
 
 				// 响应模板
 				group, order := m.Option("componet_group", kit.Select(m.Conf("route", "componet_index"), m.Option("componet_group"))), m.Option("componet_name")
@@ -1054,7 +940,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 					if len(arg) > 0 {
 						// 权限检查
-						if m.Options("bench") && !m.Cmds("aaa.work", "right", m.Option("componet_group"), arg[0]) {
+						if m.Options("bench") && m.Option("userrole", m.Cmdx("aaa.work", "right", m.Option("componet_group"), arg[0])) == "" {
 							continue
 						}
 
@@ -1097,29 +983,28 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
-			f, h, e := r.FormFile("upload")
-			m.Assert(e)
-			defer f.Close()
+			if f, h, e := r.FormFile("upload"); m.Assert(e) {
+				defer f.Close()
 
-			p := path.Join(m.Cmdx("nfs.path", m.Magic("session", "current.dir")), h.Filename)
-			m.Log("upload", "file: %s", p)
-			m.Echo("%s", p)
+				if o, p, e := kit.Create(path.Join(m.Cmdx("nfs.path", m.Magic("session", "current.dir")), h.Filename)); m.Assert(e) {
+					defer o.Close()
 
-			o, e := os.Create(p)
-			m.Assert(e)
-			defer o.Close()
-
-			io.Copy(o, f)
+					if n, e := io.Copy(o, f); m.Assert(e) {
+						m.Log("upload", "file: %s %d", p, n)
+						m.Echo("%s", p)
+					}
+				}
+			}
 			return
 		}},
 		"/download/": &ctx.Command{Name: "/download/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 
-			p := m.Cmdx("nfs.path", strings.TrimPrefix(key, "/download/"))
-			m.Log("info", "download %s %s", p, m.Cmdx("aaa.hash", "file", p))
-
-			http.ServeFile(w, r, p)
+			if p := m.Cmdx("nfs.path", strings.TrimPrefix(key, "/download/")); p != "" {
+				m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", p))
+				http.ServeFile(w, r, p)
+			}
 			return
 		}},
 		"/proxy/": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -1202,7 +1087,5 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 }
 
 func init() {
-	web := &WEB{}
-	web.Context = Index
-	ctx.Index.Register(Index, web)
+	ctx.Index.Register(Index, &WEB{Context: Index})
 }

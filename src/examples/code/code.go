@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"plugin"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -497,6 +498,54 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			data["extra"] = extra
 
 			m.Conf("schedule", []string{"data", "-1"}, data)
+			return
+		}},
+		"12306": &ctx.Command{Name: "12306", Help: "12306", Form: map[string]int{"fields": 1, "limit": 1, "offset": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			date := time.Now().Add(time.Hour * 24).Format("2006-01-02")
+			if len(arg) > 0 {
+				date, arg = arg[0], arg[1:]
+			}
+			to := "QFK"
+			if len(arg) > 0 {
+				to, arg = arg[0], arg[1:]
+			}
+			from := "BJP"
+			if len(arg) > 0 {
+				from, arg = arg[0], arg[1:]
+			}
+			m.Echo("%s->%s %s\n", from, to, date)
+
+			m.Cmd("web.get", fmt.Sprintf("https://kyfw.12306.cn/otn/leftTicket/queryX?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT", date, from, to), "temp", "data.result")
+			for _, v := range m.Meta["value"] {
+				fields := strings.Split(v, "|")
+				m.Add("append", "车次--", fields[3])
+				m.Add("append", "出发----", fields[8])
+				m.Add("append", "到站----", fields[9])
+				m.Add("append", "时长----", fields[10])
+				m.Add("append", "二等座", fields[30])
+				m.Add("append", "一等座", fields[31])
+			}
+			m.Table()
+			return
+		}},
+		"brow": &ctx.Command{Name: "brow url", Help: "浏览网页", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Cmd("tcp.ifconfig").Table(func(index int, value map[string]string) {
+					m.Append("index", index)
+					m.Append("site", fmt.Sprintf("%s://%s%s", m.Conf("serve", "protocol"), value["ip"], m.Conf("runtime", "boot.web_port")))
+				})
+				m.Table()
+				return
+			}
+
+			switch runtime.GOOS {
+			case "windows":
+				m.Cmd("cli.system", "explorer", arg[0])
+			case "darwin":
+				m.Cmd("cli.system", "open", arg[0])
+			default:
+				m.Cmd("web.get", arg[0])
+			}
 			return
 		}},
 

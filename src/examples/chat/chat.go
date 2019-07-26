@@ -387,6 +387,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				})
 
 			default:
+				if m.Option("username") != arg[1] && arg[1] != "" {
+					m.Option("username", arg[1])
+					m.Option("userrole", m.Cmd("aaa.user", "role").Append("meta"))
+				}
 				m.Cmdy("ssh._route", arg[2], "tool")
 				// m.Cmdy("ssh._route", m.Conf("flow", []string{arg[0], "user", arg[1], "user"}), "tool")
 			}
