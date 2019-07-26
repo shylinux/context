@@ -66,11 +66,13 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"wiki_tree": &ctx.Command{Name: "wiki_tree", Help: "wiki_tree", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmdy("nfs.dir", path.Join(m.Confx("wiki_level"), kit.Select(m.Option("wiki_class"), arg, 0)), "dir_sort", "time", "time_r")
+			m.Cmdy("nfs.dir", path.Join(m.Confx("wiki_level"), kit.Select(m.Option("wiki_class"), arg, 0)),
+				"time", "line", "size", "file", "dir_sort", "time", "time_r")
 			return
 		}},
 		"wiki_text": &ctx.Command{Name: "wiki_text", Help: "wiki_text", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			which := m.Cmdx("nfs.path", path.Join(m.Confx("wiki_level"), m.Option("wiki_class"), m.Confx("wiki_favor", arg, 0)))
+			which := m.Cmdx("nfs.path", path.Join(m.Confx("wiki_level"), m.Option("wiki_class"), m.Confx("wiki_favor", arg, 0)),
+				"time", "line", "size", "file")
 
 			if ls, e := ioutil.ReadFile(which); e == nil {
 				m.Conf("wiki_visit", []string{which, m.Option("access")},

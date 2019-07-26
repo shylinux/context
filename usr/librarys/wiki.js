@@ -64,13 +64,13 @@ var page = Page({
                     })))
 
                     ui.tree.innerHTML = "", kit.AppendChild(ui.tree, ctx.Table(msg, function(value, index) {
-                        return value.filename.endsWith("/") && {"text": [value.filename, "div"], click: function(event, target) {
-                            location.hash = "", ctx.Search({"wiki_class": ctx.Search("wiki_class")+value.filename, "wiki_favor": ""})
+                        return value.file.endsWith("/") && {"text": [value.file, "div"], click: function(event, target) {
+                            location.hash = "", ctx.Search({"wiki_class": ctx.Search("wiki_class")+value.file, "wiki_favor": ""})
                         }}
                     }))
                     ui.list.innerHTML = "", kit.AppendChild(ui.list, ctx.Table(msg, function(value, index) {
-                        return !value.filename.endsWith("/") && {"text": [value.time.substr(5, 5)+" "+value.filename, "div"], click: function(event, target) {
-                            location.hash = "", ctx.Search("wiki_favor", value.filename)
+                        return !value.file.endsWith("/") && {"text": [value.time.substr(5, 5)+" "+value.file, "div"], click: function(event, target) {
+                            location.hash = "", ctx.Search("wiki_favor", value.file)
                         }}
                     }))
                 })
@@ -93,6 +93,9 @@ var page = Page({
                 page.Conf("menu.display", value || (page.Conf("menu.display")? "": "none"))
             },
             Size: function(width, height) {
+                if (kit.isMobile) {
+                    return
+                }
                 if (page.Conf("menu.float")) {
                     ui.menu.className = "menu left"
                 } else {
