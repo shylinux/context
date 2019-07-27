@@ -178,7 +178,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			r.ParseMultipartForm(int64(msg.Confi("serve", "form_size")))
 			if r.ParseForm(); len(r.PostForm) > 0 {
 				for k, v := range r.PostForm {
-					m.Log("info", "waht %v ", m.Gdb("web"))
 					msg.Log("info", "%s: %v", k, v)
 				}
 				msg.Log("info", "")

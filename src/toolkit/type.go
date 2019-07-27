@@ -50,12 +50,8 @@ func Int64(arg ...interface{}) int64 {
 			result += int64(val)
 		case int16:
 			result += int64(val)
-		// case int32:
-		// 	result += int64(val)
 		case int64:
 			result += int64(val)
-		// case uint8:
-		// 	result += int64(val)
 		case uint16:
 			result += int64(val)
 		case uint32:
@@ -124,8 +120,6 @@ func Format(arg ...interface{}) string {
 			} else {
 				result = append(result, fmt.Sprintf("%T", v))
 			}
-		// case error:
-		// 	result = append(result, fmt.Sprintf("%v", val))
 		default:
 			if b, e := json.Marshal(val); e == nil {
 				result = append(result, string(b))
@@ -167,12 +161,6 @@ func Trans(arg ...interface{}) []string {
 	ls := []string{}
 	for _, v := range arg {
 		switch val := v.(type) {
-		// case *Message:
-		// 	if val.Hand {
-		// 		ls = append(ls, val.Meta["result"]...)
-		// 	} else {
-		// 		ls = append(ls, val.Meta["detail"]...)
-		// 	}
 		case nil:
 		case []float64:
 			for _, v := range val {

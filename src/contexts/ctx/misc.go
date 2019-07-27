@@ -2,6 +2,7 @@ package ctx
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -10,72 +11,57 @@ import (
 	"toolkit"
 )
 
-func (c *Context) Has(key ...string) bool {
-	switch len(key) {
-	case 2:
-		if _, ok := c.Commands[key[0]]; ok && key[1] == "command" {
-			return true
-		}
-		if _, ok := c.Configs[key[0]]; ok && key[1] == "config" {
-			return true
-		}
-		if _, ok := c.Caches[key[0]]; ok && key[1] == "cache" {
-			return true
-		}
-	case 1:
-		if _, ok := c.Commands[key[0]]; ok {
-			return true
-		}
-		if _, ok := c.Configs[key[0]]; ok {
-			return true
-		}
-		if _, ok := c.Caches[key[0]]; ok {
-			return true
-		}
-	}
-	return false
-}
-func (c *Context) Sub(key string) *Context {
-	return c.contexts[key]
-}
-func (c *Context) Travel(m *Message, hand func(m *Message, n int) (stop bool)) *Context {
-	if c == nil {
-		return nil
-	}
-	target := m.target
-
-	cs := []*Context{c}
-	for i := 0; i < len(cs); i++ {
-		if m.target = cs[i]; hand(m, i) {
-			return cs[i]
-		}
-
-		keys := []string{}
-		for k, _ := range cs[i].contexts {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			cs = append(cs, cs[i].contexts[k])
-		}
+func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
+	if action == "error" {
+		kit.Log("error", fmt.Sprintf("chain: %s", m.Format("chain")))
+		kit.Log("error", fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
+		kit.Log("error", fmt.Sprintf("stack: %s", m.Format("stack")))
 	}
 
-	m.target = target
-	return target
-}
-func (c *Context) BackTrace(m *Message, hand func(m *Message) (stop bool)) *Context {
-	target := m.target
-
-	for s := m.target; s != nil; s = s.context {
-		if m.target = s; hand(m) {
-			return s
-		}
+	if m.Options("log.disable") {
+		return m
 	}
 
-	m.target = target
-	return target
-}
+	if l := m.Sess("log", false); l != nil {
+		if log, ok := l.target.Server.(LOGGER); ok {
+			if action == "error" {
+				log.Log(m, "error", "chain: %s", m.Format("chain"))
+			}
+			if log.Log(m, action, str, arg...); action == "error" {
+				log.Log(m, "error", "stack: %s", m.Format("stack"))
+			}
+			return m
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, str, arg...)
+	}
 
+	return m
+}
+func (m *Message) Gdb(arg ...interface{}) interface{} {
+	// if !m.Options("log.enable") {
+	// 	return ""
+	// }
+
+	if g := m.Sess("gdb", false); g != nil {
+		if gdb, ok := g.target.Server.(DEBUG); ok {
+			return gdb.Wait(m, arg...)
+		}
+	}
+	return ""
+}
+func (m *Message) Show(str string, args ...interface{}) *Message {
+	res := fmt.Sprintf(str, args...)
+
+	if m.Option("bio.modal") == "action" {
+		fmt.Printf(res)
+	} else if kit.STDIO != nil {
+		kit.STDIO.Show(res)
+	} else {
+		m.Log("info", "show: %v", res)
+	}
+	return m
+}
 func (m *Message) Format(arg ...interface{}) string {
 	if len(arg) == 0 {
 		arg = append(arg, "time", "ship")
@@ -205,20 +191,115 @@ func (m *Message) Format(arg ...interface{}) string {
 			}
 
 		default:
-			meta = append(meta, kit.FileName(kit.Format(v), "time"))
+			meta = append(meta, kit.Format(v))
 		}
 	}
 	return strings.Join(meta, " ")
 }
-func (m *Message) Tree(code int) *Message {
-	ms := []*Message{m}
-	for i := 0; i < len(ms); i++ {
-		if ms[i].Code() == code {
-			return ms[i]
-		}
-		ms = append(ms, ms[i].messages...)
+
+func (m *Message) Start(name string, help string, arg ...string) bool {
+	return m.Set("detail", arg).target.Spawn(m, name, help).Begin(m).Start(m)
+}
+func (m *Message) Wait() bool {
+	if m.target.exit != nil {
+		return <-m.target.exit
 	}
-	return nil
+	return true
+}
+func (m *Message) Find(name string, root ...bool) *Message {
+	if name == "" {
+		return m.Spawn()
+	}
+	target := m.target.root
+	if len(root) > 0 && !root[0] {
+		target = m.target
+	}
+
+	cs := target.contexts
+	for _, v := range strings.Split(name, ".") {
+		if x, ok := cs[v]; ok {
+			target, cs = x, x.contexts
+		} else if target.Name == v {
+			continue
+		} else {
+			m.Log("error", "context not find %s", name)
+			return nil
+		}
+	}
+
+	if len(root) > 1 && root[1] {
+		m.target = target
+		return m
+	}
+
+	return m.Spawn(target)
+}
+func (m *Message) Search(key string, root ...bool) []*Message {
+	reg, e := regexp.Compile(key)
+	m.Assert(e)
+
+	target := m.target
+	if target == nil {
+		return []*Message{nil}
+	}
+	if len(root) > 0 && root[0] {
+		target = m.target.root
+	}
+
+	cs := make([]*Context, 0, 3)
+	target.Travel(m, func(m *Message, i int) bool {
+		if reg.MatchString(m.target.Name) || reg.FindString(m.target.Help) != "" {
+			cs = append(cs, m.target)
+		}
+		return false
+	})
+
+	ms := make([]*Message, len(cs))
+	for i := 0; i < len(cs); i++ {
+		ms[i] = m.Spawn(cs[i])
+	}
+	if len(ms) == 0 {
+		ms = append(ms, nil)
+	}
+
+	return ms
+}
+func (c *Context) Travel(m *Message, hand func(m *Message, n int) (stop bool)) *Context {
+	if c == nil {
+		return nil
+	}
+	target := m.target
+
+	cs := []*Context{c}
+	for i := 0; i < len(cs); i++ {
+		if m.target = cs[i]; hand(m, i) {
+			return cs[i]
+		}
+
+		keys := []string{}
+		for k, _ := range cs[i].contexts {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			cs = append(cs, cs[i].contexts[k])
+		}
+	}
+
+	m.target = target
+	return target
+}
+func (c *Context) BackTrace(m *Message, hand func(m *Message) (stop bool)) *Context {
+	target := m.target
+
+	for s := m.target; s != nil; s = s.context {
+		if m.target = s; hand(m) {
+			return s
+		}
+	}
+
+	m.target = target
+	return target
 }
 
 func (m *Message) Add(meta string, key string, value ...interface{}) *Message {
@@ -374,96 +455,6 @@ func (m *Message) CopyFuck(msg *Message, arg ...string) *Message {
 
 	return m
 }
-func (m *Message) Auto(arg ...string) *Message {
-	for i := 0; i < len(arg); i += 3 {
-		m.Add("append", "value", arg[i])
-		m.Add("append", "name", arg[i+1])
-		m.Add("append", "help", arg[i+2])
-	}
-	return m
-}
-
-func (m *Message) Insert(meta string, index int, arg ...interface{}) string {
-	if m.Meta == nil {
-		m.Meta = make(map[string][]string)
-	}
-	m.Meta[meta] = kit.Array(m.Meta[meta], index, arg)
-
-	if -1 < index && index < len(m.Meta[meta]) {
-		return m.Meta[meta][index]
-	}
-	return ""
-}
-func (m *Message) Magic(begin string, chain interface{}, args ...interface{}) interface{} {
-	auth := []string{"bench", "session", "user", "role", "componet", "command"}
-	key := []string{"bench", "sessid", "username", "role", "componet", "command"}
-	aaa := m.Sess("aaa", false)
-	for i, v := range auth {
-		if v == begin {
-			h := m.Option(key[i])
-			if v == "user" {
-				h, _ = kit.Hash("username", m.Option("username"))
-			}
-
-			data := aaa.Confv("auth", []string{h, "data"})
-
-			if kit.Format(chain) == "" {
-				return data
-			}
-
-			if len(args) > 0 {
-				value := kit.Chain(data, chain, args[0])
-				aaa.Conf("auth", []string{m.Option(key[i]), "data"}, value)
-				return value
-			}
-
-			value := kit.Chain(data, chain)
-			if value != nil {
-				return value
-			}
-
-			if i < len(auth)-1 {
-				begin = auth[i+1]
-			}
-		}
-	}
-	return nil
-}
-func (m *Message) Current(text string) string {
-	cs := []string{}
-	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
-		cs = append(cs, "context", "ssh", "remote", "'"+pod+"'")
-	}
-	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
-		cs = append(cs, "context", ctx)
-	}
-	if cmd := kit.Format(m.Magic("session", "current.cmd")); cmd != "" {
-		cs = append(cs, cmd)
-	}
-	m.Log("info", "%s %s current %v", m.Option("username"), m.Option("sessid"), cs)
-	cs = append(cs, text)
-	return strings.Join(cs, " ")
-}
-func (m *Message) Parse(arg interface{}) string {
-	switch str := arg.(type) {
-	case string:
-		if len(str) > 1 && str[0] == '$' {
-			return m.Cap(str[1:])
-		}
-		if len(str) > 1 && str[0] == '@' {
-			if v := m.Option(str[1:]); v != "" {
-				return v
-			}
-			if v := kit.Format(m.Magic("bench", str[1:])); v != "" {
-				return v
-			}
-			v := m.Conf(str[1:])
-			return v
-		}
-		return str
-	}
-	return ""
-}
 func (m *Message) ToHTML(style string) string {
 	cmd := strings.Join(m.Meta["detail"], " ")
 	result := []string{}
@@ -493,135 +484,4 @@ func (m *Message) ToHTML(style string) string {
 		result = append(result, "</code></pre>")
 	}
 	return strings.Join(result, "")
-}
-
-func (m *Message) Show(str string, args ...interface{}) *Message {
-	res := fmt.Sprintf(str, args...)
-
-	if m.Option("bio.modal") == "action" {
-		fmt.Printf(res)
-	} else if kit.STDIO != nil {
-		kit.STDIO.Show(res)
-	} else {
-		m.Log("info", "show: %v", res)
-	}
-	return m
-}
-func (m *Message) GoLoop(msg *Message, hand ...func(msg *Message)) *Message {
-	m.Gos(msg, func(msg *Message) {
-		for {
-			hand[0](msg)
-		}
-	})
-	return m
-}
-
-func (m *Message) Start(name string, help string, arg ...string) bool {
-	return m.Set("detail", arg).target.Spawn(m, name, help).Begin(m).Start(m)
-}
-func (m *Message) Close(arg ...string) bool {
-	return m.Target().Close(m, arg...)
-}
-func (m *Message) Wait() bool {
-	if m.target.exit != nil {
-		return <-m.target.exit
-	}
-	return true
-}
-
-func (m *Message) Find(name string, root ...bool) *Message {
-	if name == "" {
-		return m.Spawn()
-	}
-	target := m.target.root
-	if len(root) > 0 && !root[0] {
-		target = m.target
-	}
-
-	cs := target.contexts
-	for _, v := range strings.Split(name, ".") {
-		if x, ok := cs[v]; ok {
-			target, cs = x, x.contexts
-		} else if target.Name == v {
-			continue
-		} else {
-			m.Log("error", "context not find %s", name)
-			return nil
-		}
-	}
-
-	if len(root) > 1 && root[1] {
-		m.target = target
-		return m
-	}
-
-	return m.Spawn(target)
-}
-func (m *Message) Search(key string, root ...bool) []*Message {
-	reg, e := regexp.Compile(key)
-	m.Assert(e)
-
-	target := m.target
-	if target == nil {
-		return []*Message{nil}
-	}
-	if len(root) > 0 && root[0] {
-		target = m.target.root
-	}
-
-	cs := make([]*Context, 0, 3)
-	target.Travel(m, func(m *Message, i int) bool {
-		if reg.MatchString(m.target.Name) || reg.FindString(m.target.Help) != "" {
-			m.Log("search", "%d %s match [%s]", len(cs), m.target.Name, key)
-			cs = append(cs, m.target)
-		}
-		return false
-	})
-
-	ms := make([]*Message, len(cs))
-	for i := 0; i < len(cs); i++ {
-		ms[i] = m.Spawn(cs[i])
-	}
-	if len(ms) == 0 {
-		ms = append(ms, nil)
-	}
-
-	return ms
-}
-func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context, c *Context, key string) bool) *Message {
-	if m == nil {
-		return m
-	}
-
-	context := []*Context{m.target}
-	for _, v := range kit.Trans(m.Optionv("ctx.chain")) {
-		if msg := m.Sess(v, false); msg != nil && msg.target != nil {
-			context = append(context, msg.target)
-		}
-	}
-	// if m.target.root != nil && m.target.root.Configs != nil && m.target.root.Configs["search"] != nil && m.target.root.Configs["search"].Value != nil {
-	// 	target := m.target
-	// 	for _, v := range kit.Trans(kit.Chain(m.target.root.Configs["search"].Value, "context")) {
-	// 		if t := m.Find(v, true, true); t != nil {
-	// 			kit.Log("error", "%v", t)
-	// 			// 		// 	context = append(context, t.target)
-	// 		}
-	// 	}
-	// 	m.target = target
-	// }
-
-	context = append(context, m.source)
-
-	for _, s := range context {
-		for c := s; c != nil; c = c.context {
-			if hand(m, s, c, key) {
-				return m
-			}
-		}
-	}
-	return m
-}
-func (m *Message) Backs(msg *Message) *Message {
-	m.Back(msg)
-	return msg
 }

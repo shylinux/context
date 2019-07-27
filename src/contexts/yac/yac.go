@@ -110,8 +110,8 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string, level int) 
 			default:
 				x, ok := yac.page[word[i]]
 				if !ok {
-					if x = yac.lex.Spawn().Cmd("parse", word[i], yac.name(s)).Resulti(0); x == 0 {
-						x = yac.lex.Spawn().Cmd("train", word[i], len(yac.mat[s]), yac.name(s)).Resulti(0)
+					if x = kit.Int(yac.lex.Spawn().Cmdx("parse", word[i], yac.name(s))); x == 0 {
+						x = kit.Int(yac.lex.Spawn().Cmdx("train", word[i], len(yac.mat[s]), yac.name(s)))
 					}
 				}
 
@@ -213,7 +213,7 @@ func (yac *YAC) parse(m *ctx.Message, msg *ctx.Message, stack *kit.Stack, page i
 
 		//全局语法检查
 		if state != nil {
-			if key := yac.lex.Spawn().Cmd("parse", line, "key"); key.Resulti(0) == 0 || len(key.Result(2)) <= len(result[2]) {
+			if key := yac.lex.Spawn().Cmd("parse", line, "key"); key.Result(0) == "0" || len(key.Result(2)) <= len(result[2]) {
 				line, word = result[1], append(word, result[2])
 			} else {
 				state = nil
@@ -611,10 +611,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				v1, e1 := strconv.Atoi(arg[0])
 				v2, e2 := strconv.Atoi(arg[2])
 				switch arg[1] {
-				case ":=":
-					if !m.Target().Has(arg[0]) {
-						result = m.Cap(arg[0], arg[0], arg[2], "临时变量")
-					}
 				case "=":
 					result = m.Cap(arg[0], arg[2])
 				case "+=":

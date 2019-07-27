@@ -2,53 +2,11 @@ package ctx
 
 import (
 	"errors"
-	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 	"toolkit"
 )
-
-func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
-	if action == "error" {
-		kit.Log("error", fmt.Sprintf("chain: %s", m.Format("chain")))
-		kit.Log("error", fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
-		kit.Log("error", fmt.Sprintf("stack: %s", m.Format("stack")))
-	}
-
-	if m.Options("log.disable") {
-		return m
-	}
-
-	if l := m.Sess("log", false); l != nil {
-		if log, ok := l.target.Server.(LOGGER); ok {
-			if action == "error" {
-				log.Log(m, "error", "chain: %s", m.Format("chain"))
-			}
-			if log.Log(m, action, str, arg...); action == "error" {
-				log.Log(m, "error", "stack: %s", m.Format("stack"))
-			}
-			return m
-		}
-	} else {
-		fmt.Fprintf(os.Stderr, str, arg...)
-	}
-
-	return m
-}
-func (m *Message) Gdb(arg ...interface{}) interface{} {
-	// if !m.Options("log.enable") {
-	// 	return ""
-	// }
-
-	if g := m.Sess("gdb", false); g != nil {
-		if gdb, ok := g.target.Server.(DEBUG); ok {
-			return gdb.Wait(m, arg...)
-		}
-	}
-	return ""
-}
 
 func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 	name, force := s.Name, false
@@ -137,15 +95,6 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	m.source.sessions = append(m.source.sessions, m)
 	c.exit = make(chan bool, 3)
 
-	/*
-		m.Log("begin", "%d context %v %v", m.Capi("ncontext", 1), m.Meta["detail"], m.Meta["option"])
-		for k, x := range c.Configs {
-			if x.Hand != nil {
-				m.Log("begin", "%s config %v", k, m.Conf(k, x.Value))
-			}
-		}
-	*/
-
 	if c.Server != nil {
 		c.Server.Begin(m, m.Meta["detail"]...)
 	}
@@ -228,6 +177,29 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 	return true
 }
 
+func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message {
+	defer func() {
+		switch e := recover(); e {
+		case io.EOF:
+		case nil:
+		default:
+			m.Log("bench", "chain: %s", msg.Format("chain"))
+			m.Log("bench", "catch: %s", e)
+			m.Log("bench", "stack: %s", msg.Format("stack"))
+
+			if m.Log("error", "catch: %s", e); len(hand) > 1 {
+				m.TryCatch(msg, safe, hand[1:]...)
+			} else if !safe {
+				m.Assert(e)
+			}
+		}
+	}()
+
+	if len(hand) > 0 {
+		hand[0](msg)
+	}
+	return m
+}
 func (m *Message) Assert(e interface{}, msg ...string) bool {
 	switch v := e.(type) {
 	case nil:
@@ -252,27 +224,12 @@ func (m *Message) Assert(e interface{}, msg ...string) bool {
 	kit.Log("error", "%v", e)
 	panic(e)
 }
-func (m *Message) TryCatch(msg *Message, safe bool, hand ...func(msg *Message)) *Message {
-	defer func() {
-		switch e := recover(); e {
-		case io.EOF:
-		case nil:
-		default:
-			m.Log("bench", "chain: %s", msg.Format("chain"))
-			m.Log("bench", "catch: %s", e)
-			m.Log("bench", "stack: %s", msg.Format("stack"))
-
-			if m.Log("error", "catch: %s", e); len(hand) > 1 {
-				m.TryCatch(msg, safe, hand[1:]...)
-			} else if !safe {
-				m.Assert(e)
-			}
+func (m *Message) GoLoop(msg *Message, hand ...func(msg *Message)) *Message {
+	m.Gos(msg, func(msg *Message) {
+		for {
+			hand[0](msg)
 		}
-	}()
-
-	if len(hand) > 0 {
-		hand[0](msg)
-	}
+	})
 	return m
 }
 func (m *Message) Gos(msg *Message, hand ...func(msg *Message)) *Message {
@@ -371,6 +328,36 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 
 	return nil
 }
+func (m *Message) Form(x *Command, arg []string) []string {
+	for _, form := range []map[string]int{m.Optionv("ctx.form").(map[string]int), x.Form} {
+
+		if args := []string{}; form != nil {
+			for i := 0; i < len(arg); i++ {
+				if n, ok := form[arg[i]]; ok {
+					if n < 0 {
+						n += len(arg) - i
+					}
+					for j := i + 1; j <= i+n && j < len(arg); j++ {
+						if _, ok := form[arg[j]]; ok {
+							n = j - i - 1
+						}
+					}
+					if i+1+n > len(arg) {
+						m.Add("option", arg[i], arg[i+1:])
+					} else {
+						m.Add("option", arg[i], arg[i+1:i+1+n])
+					}
+					i += n
+				} else {
+					args = append(args, arg[i])
+				}
+			}
+			arg = args
+		}
+	}
+
+	return arg
+}
 func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{}) *Message {
 	if m == nil {
 		return m
@@ -415,13 +402,11 @@ func (m *Message) CallBack(sync bool, cb func(msg *Message) (sub *Message), arg 
 	}
 
 	wait := make(chan *Message, 10)
-	// m.Gos(m, func(m *Message) {
 	m.Call(func(sub *Message) *Message {
 		msg := cb(sub)
 		wait <- m
 		return msg
 	}, arg...)
-	// })
 
 	select {
 	case <-time.After(kit.Duration(m.Confx("call_timeout"))):
@@ -447,6 +432,83 @@ func (m *Message) Free(cbs ...func(msg *Message) (done bool)) *Message {
 	return m
 }
 
+func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context, c *Context, key string) bool) *Message {
+	if m == nil {
+		return m
+	}
+
+	context := []*Context{m.target}
+	for _, v := range kit.Trans(m.Optionv("ctx.chain")) {
+		if msg := m.Sess(v, false); msg != nil && msg.target != nil {
+			context = append(context, msg.target)
+		}
+	}
+	context = append(context, m.source)
+
+	for _, s := range context {
+		for c := s; c != nil; c = c.context {
+			if hand(m, s, c, key) {
+				return m
+			}
+		}
+	}
+	return m
+}
+func (m *Message) Magic(begin string, chain interface{}, args ...interface{}) interface{} {
+	auth := []string{"bench", "session", "user", "role", "componet", "command"}
+	key := []string{"bench", "sessid", "username", "role", "componet", "command"}
+	aaa := m.Sess("aaa", false)
+	for i, v := range auth {
+		if v == begin {
+			h := m.Option(key[i])
+			if v == "user" {
+				h, _ = kit.Hash("username", m.Option("username"))
+			}
+
+			data := aaa.Confv("auth", []string{h, "data"})
+
+			if kit.Format(chain) == "" {
+				return data
+			}
+
+			if len(args) > 0 {
+				value := kit.Chain(data, chain, args[0])
+				aaa.Conf("auth", []string{m.Option(key[i]), "data"}, value)
+				return value
+			}
+
+			value := kit.Chain(data, chain)
+			if value != nil {
+				return value
+			}
+
+			if i < len(auth)-1 {
+				begin = auth[i+1]
+			}
+		}
+	}
+	return nil
+}
+func (m *Message) Parse(arg interface{}) string {
+	switch str := arg.(type) {
+	case string:
+		if len(str) > 1 && str[0] == '$' {
+			return m.Cap(str[1:])
+		}
+		if len(str) > 1 && str[0] == '@' {
+			if v := m.Option(str[1:]); v != "" {
+				return v
+			}
+			if v := kit.Format(m.Magic("bench", str[1:])); v != "" {
+				return v
+			}
+			v := m.Conf(str[1:])
+			return v
+		}
+		return str
+	}
+	return ""
+}
 func (m *Message) Goshy(input []string, index int, stack *kit.Stack, cb func(*Message)) bool {
 	if stack == nil {
 		stack = &kit.Stack{}

@@ -272,7 +272,7 @@ func (nfs *NFS) Auto(what []rune, trigger string, index int) (change bool, frame
 	case " ":
 		switch m.Conf("term", "help_state") {
 		case "context":
-			auto_target = auto_target.Sub(m.Option("auto_key"))
+			// auto_target = auto_target.Sub(m.Option("auto_key"))
 			m.Optionv("bio.ctx", auto_target)
 			trigger = ":"
 		case "command":

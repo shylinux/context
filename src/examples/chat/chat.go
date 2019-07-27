@@ -309,7 +309,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			if len(arg) == 1 {
 				m.Confm("flow", []string{arg[0], "tool"}, func(key string, value map[string]interface{}) {
 					m.Add("append", "key", key)
-					m.Add("append", "count", kit.Len(value["list"]))
+					m.Add("append", "count", len(value["list"].([]interface{})))
 				})
 				m.Sort("key").Table()
 				return

@@ -927,19 +927,18 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			case "file":
 				switch arg[1] {
 				case "import":
-					if msg := m.Cmd("nfs.hash", arg[2]); msg.Results(0) {
-						h := msg.Result(0)
-						m.Conf("file", kit.Hashs(h, msg.Append("name")), map[string]interface{}{
-							"create_time": m.Time(),
-							"create_user": m.Option("username"),
-							"name":        msg.Append("name"),
-							"type":        msg.Append("type"),
-							"size":        msg.Append("size"),
-							"hash":        h,
-						})
+					msg := m.Cmd("nfs.hash", arg[2])
+					h := msg.Result(0)
+					m.Conf("file", kit.Hashs(h, msg.Append("name")), map[string]interface{}{
+						"create_time": m.Time(),
+						"create_user": m.Option("username"),
+						"name":        msg.Append("name"),
+						"type":        msg.Append("type"),
+						"size":        msg.Append("size"),
+						"hash":        h,
+					})
 
-						m.Cmdy("nfs.copy", path.Join("var/file/hash", h[:2], h), arg[2])
-					}
+					m.Cmdy("nfs.copy", path.Join("var/file/hash", h[:2], h), arg[2])
 
 				case "fetch":
 					if m.Confs("file", arg[2]) {

@@ -3,41 +3,12 @@ package kit
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
 	"math/rand"
-	"os"
-	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
-
-var DisableLog = false
-
-func Log(action string, str string, args ...interface{}) {
-	if DisableLog {
-		return
-	}
-
-	if len(args) > 0 {
-		str = fmt.Sprintf(str, args...)
-	}
-	fmt.Fprintf(os.Stderr, "%s: %s\n", action, str)
-}
-
-func Pwd() string {
-	wd, _ := os.Getwd()
-	return wd
-}
-func Env(key string) {
-	os.Getenv(key)
-}
-func Errorf(str string, args ...interface{}) {
-	Log("error", str, args...)
-}
-func Debugf(str string, args ...interface{}) {
-	Log("debug", str, args...)
-}
 
 func Time(arg ...string) int {
 	if len(arg) == 0 {
@@ -90,6 +61,52 @@ func Hashs(arg ...interface{}) string {
 	h, _ := Hash(arg...)
 	return h
 }
+
+func Select(value string, args ...interface{}) string {
+	if len(args) == 0 {
+		return value
+	}
+
+	switch arg := args[0].(type) {
+	case string:
+		if len(args) > 1 {
+			switch b := args[1].(type) {
+			case bool:
+				if b && arg != "" {
+					return arg
+				}
+				return value
+			}
+		}
+		if arg != "" {
+			return arg
+		}
+	case []interface{}:
+		index := 0
+		if len(args) > 1 {
+			index = Int(args[1])
+		}
+		if index < len(arg) && Format(arg[index]) != "" {
+			return Format(arg[index])
+		}
+	case []string:
+		index := 0
+		if len(args) > 1 {
+			index = Int(args[1])
+		}
+		if index < len(arg) && arg[index] != "" {
+			return arg[index]
+		}
+	default:
+		if v := Format(args...); v != "" {
+			return v
+		}
+	}
+	return value
+}
+func Chains(root interface{}, args ...interface{}) string {
+	return Format(Chain(root, args...))
+}
 func Chain(root interface{}, args ...interface{}) interface{} {
 	for i := 0; i < len(args); i += 2 {
 		if arg, ok := args[i].(map[string]interface{}); ok {
@@ -113,8 +130,6 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 		data := root
 		for j, key := range keys {
 			index, e := strconv.Atoi(key)
-
-			// Log("error", "chain [%v %v] [%v %v] [%v/%v %v/%v] %v", parent_key, parent_index, key, index, i, len(args), j, len(keys), data)
 
 			var next interface{}
 			switch value := data.(type) {
@@ -208,73 +223,41 @@ func Chain(root interface{}, args ...interface{}) interface{} {
 
 	return root
 }
-func Chains(root interface{}, args ...interface{}) string {
-	return Format(Chain(root, args...))
-}
-
-func Select(value string, args ...interface{}) string {
-	if len(args) == 0 {
-		return value
-	}
-
-	switch arg := args[0].(type) {
-	case string:
-		if len(args) > 1 {
-			switch b := args[1].(type) {
-			case bool:
-				if b && arg != "" {
-					return arg
-				}
-				return value
-			}
-		}
-		if arg != "" {
-			return arg
-		}
-	case []interface{}:
-		index := 0
-		if len(args) > 1 {
-			index = Int(args[1])
-		}
-		if index < len(arg) && Format(arg[index]) != "" {
-			return Format(arg[index])
-		}
-	case []string:
-		index := 0
-		if len(args) > 1 {
-			index = Int(args[1])
-		}
-		if index < len(arg) && arg[index] != "" {
-			return arg[index]
-		}
-	default:
-		if v := Format(args...); v != "" {
-			return v
-		}
-	}
-	return value
-}
-func Slice(arg []string, args ...interface{}) ([]string, string) {
+func Array(list []string, index int, arg ...interface{}) []string {
 	if len(arg) == 0 {
-		return arg, ""
-	}
-	if len(args) == 0 {
-		return arg[1:], arg[0]
+		if -1 < index && index < len(list) {
+			return []string{list[index]}
+		}
+		return []string{""}
 	}
 
-	result := ""
-	switch v := args[0].(type) {
-	case int:
-	case string:
-		if arg[0] == v && len(arg) > 1 {
-			return arg[2:], arg[1]
+	str := Trans(arg...)
+
+	index = (index+2)%(len(list)+2) - 2
+	if index == -1 {
+		list = append(str, list...)
+	} else if index == -2 {
+		list = append(list, str...)
+	} else {
+		if index < -2 {
+			index += len(list) + 2
 		}
-		if len(args) > 1 {
-			return arg, Format(args[1])
+		if index < 0 {
+			index = 0
+		}
+
+		for i := len(list); i < index+len(str); i++ {
+			list = append(list, "")
+		}
+		for i := 0; i < len(str); i++ {
+			list[index+i] = str[i]
 		}
 	}
 
-	return arg, result
+	return list
+}
+func Width(str string, mul int) int {
+	return len([]rune(str)) + (len(str)-len([]rune(str)))/2/mul
 }
 func View(args []string, conf map[string]interface{}) []string {
 	if len(args) == 0 {
@@ -291,13 +274,91 @@ func View(args []string, conf map[string]interface{}) []string {
 	}
 	return keys
 }
+func Map(v interface{}, random string, args ...interface{}) map[string]interface{} {
+	table, _ := v.([]interface{})
+	value, _ := v.(map[string]interface{})
+	if len(args) == 0 {
+		return value
+	}
 
-func Create(p string) (*os.File, string, error) {
-	if dir, _ := path.Split(p); dir != "" {
-		if e := os.MkdirAll(dir, 0777); e != nil {
-			return nil, p, e
+	switch fun := args[0].(type) {
+	case func(map[string]interface{}):
+		if len(value) == 0 {
+			return nil
+		}
+		fun(value)
+	case func(int, string):
+		for i, v := range table {
+			fun(i, Format(v))
+		}
+	case func(int, string) bool:
+		for i, v := range table {
+			if fun(i, Format(v)) {
+				break
+			}
+		}
+	case func(string, string):
+		for k, v := range value {
+			fun(k, Format(v))
+		}
+	case func(string, string) bool:
+		for k, v := range value {
+			if fun(k, Format(v)) {
+				break
+			}
+		}
+
+	case func(int, map[string]interface{}):
+		for i := 0; i < len(table); i++ {
+			if val, ok := table[i].(map[string]interface{}); ok {
+				fun(i, val)
+			}
+		}
+	case func(string, map[string]interface{}):
+		switch random {
+		case "%":
+			n, i := rand.Intn(len(value)), 0
+			for k, v := range value {
+				if val, ok := v.(map[string]interface{}); i == n && ok {
+					fun(k, val)
+					break
+				}
+				i++
+			}
+		case "*":
+			fallthrough
+		default:
+			for k, v := range value {
+				if val, ok := v.(map[string]interface{}); ok {
+					fun(k, val)
+				}
+			}
+		}
+	case func(string, map[string]interface{}) bool:
+		for k, v := range value {
+			if val, ok := v.(map[string]interface{}); ok {
+				if fun(k, val) {
+					break
+				}
+			}
+		}
+	case func(string, int, map[string]interface{}):
+		keys := make([]string, 0, len(value))
+		for k, _ := range value {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			v := value[k]
+			if val, ok := v.([]interface{}); ok {
+				for i, v := range val {
+					if val, ok := v.(map[string]interface{}); ok {
+						fun(k, i, val)
+					}
+				}
+			}
 		}
 	}
-	f, e := os.Create(p)
-	return f, p, e
+	return value
 }

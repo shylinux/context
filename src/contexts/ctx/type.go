@@ -2,8 +2,6 @@ package ctx
 
 import (
 	"fmt"
-	"math/rand"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -93,9 +91,7 @@ func (m *Message) Time(arg ...interface{}) string {
 	t := m.time
 	if len(arg) > 0 {
 		if d, e := time.ParseDuration(arg[0].(string)); e == nil {
-			arg = arg[1:]
-			t = t.Add(d)
-		} else {
+			arg, t = arg[1:], t.Add(d)
 		}
 	}
 
@@ -120,10 +116,18 @@ func (m *Message) Source() *Context {
 func (m *Message) Target() *Context {
 	return m.target
 }
-func (m *Message) Message() *Message {
-	return m.message
-}
 
+func (m *Message) Insert(meta string, index int, arg ...interface{}) string {
+	if m.Meta == nil {
+		m.Meta = make(map[string][]string)
+	}
+	m.Meta[meta] = kit.Array(m.Meta[meta], index, arg)
+
+	if -1 < index && index < len(m.Meta[meta]) {
+		return m.Meta[meta][index]
+	}
+	return ""
+}
 func (m *Message) Detail(arg ...interface{}) string {
 	noset, index := true, 0
 	if len(arg) > 0 {
@@ -137,12 +141,6 @@ func (m *Message) Detail(arg ...interface{}) string {
 	}
 
 	return m.Insert("detail", index, arg...)
-}
-func (m *Message) Detaili(arg ...interface{}) int {
-	return kit.Int(m.Detail(arg...))
-}
-func (m *Message) Details(arg ...interface{}) bool {
-	return kit.Right(m.Detail(arg...))
 }
 func (m *Message) Option(key string, arg ...interface{}) string {
 	if len(arg) > 0 {
@@ -175,10 +173,6 @@ func (m *Message) Optionv(key string, arg ...interface{}) interface{} {
 	if len(arg) > 0 {
 		switch arg[0].(type) {
 		case nil:
-		// case []string:
-		// 	m.Option(key, v...)
-		// case string:
-		// 	m.Option(key, v)
 		default:
 			m.Put("option", key, arg[0])
 		}
@@ -198,17 +192,6 @@ func (m *Message) Optionv(key string, arg ...interface{}) interface{} {
 		}
 	}
 	return nil
-}
-func (m *Message) Optionx(key string, arg ...string) interface{} {
-	value := m.Conf(key)
-	if value == "" {
-		value = m.Option(key)
-	}
-
-	if len(arg) > 0 {
-		value = fmt.Sprintf(arg[0], value)
-	}
-	return value
 }
 func (m *Message) Append(key string, arg ...interface{}) string {
 	if len(arg) > 0 {
@@ -239,28 +222,6 @@ func (m *Message) Appendi(key string, arg ...interface{}) int64 {
 func (m *Message) Appends(key string, arg ...interface{}) bool {
 	return kit.Right(m.Append(key, arg...))
 }
-func (m *Message) Appendv(key string, arg ...interface{}) interface{} {
-	if len(arg) > 0 {
-		m.Put("append", key, arg[0])
-	}
-
-	ms := []*Message{m}
-	for i := 0; i < len(ms); i++ {
-		ms = append(ms, ms[i].messages...)
-		if !ms[i].Has(key) {
-			continue
-		}
-		for _, k := range ms[i].Meta["append"] {
-			if k == key {
-				if v, ok := ms[i].Data[key]; ok {
-					return v
-				}
-				return ms[i].Meta[key]
-			}
-		}
-	}
-	return nil
-}
 func (m *Message) Result(arg ...interface{}) string {
 	noset, index := true, 0
 	if len(arg) > 0 {
@@ -275,43 +236,7 @@ func (m *Message) Result(arg ...interface{}) string {
 
 	return m.Insert("result", index, arg...)
 }
-func (m *Message) Resulti(arg ...interface{}) int {
-	return kit.Int(m.Result(arg...))
-}
-func (m *Message) Results(arg ...interface{}) bool {
-	return kit.Right(m.Result(arg...))
-}
 
-func (m *Message) Form(x *Command, arg []string) []string {
-	for _, form := range []map[string]int{m.Optionv("ctx.form").(map[string]int), x.Form} {
-
-		if args := []string{}; form != nil {
-			for i := 0; i < len(arg); i++ {
-				if n, ok := form[arg[i]]; ok {
-					if n < 0 {
-						n += len(arg) - i
-					}
-					for j := i + 1; j <= i+n && j < len(arg); j++ {
-						if _, ok := form[arg[j]]; ok {
-							n = j - i - 1
-						}
-					}
-					if i+1+n > len(arg) {
-						m.Add("option", arg[i], arg[i+1:])
-					} else {
-						m.Add("option", arg[i], arg[i+1:i+1+n])
-					}
-					i += n
-				} else {
-					args = append(args, arg[i])
-				}
-			}
-			arg = args
-		}
-	}
-
-	return arg
-}
 func (m *Message) Push(str string, arg ...interface{}) *Message {
 	return m.Add("append", str, arg...)
 }
@@ -417,26 +342,21 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 	}
 
 	// 回调函数
-	var cb func(maps map[string]string, list []string, line int) (goon bool)
-	if len(cbs) > 0 {
-		cb = cbs[0].(func(maps map[string]string, list []string, line int) (goon bool))
-	} else {
-		row := kit.Select(m.Conf("table", "row_sep"), m.Option("table.row_sep"))
-		col := kit.Select(m.Conf("table", "col_sep"), m.Option("table.col_sep"))
-		compact := kit.Right(kit.Select(m.Conf("table", "compact"), m.Option("table.compact")))
-		cb = func(maps map[string]string, lists []string, line int) bool {
-			for i, v := range lists {
-				if k := m.Meta["append"][i]; compact {
-					v = maps[k]
-				}
-
-				if m.Echo(v); i < len(lists)-1 {
-					m.Echo(col)
-				}
+	rows := kit.Select(m.Conf("table", "row_sep"), m.Option("table.row_sep"))
+	cols := kit.Select(m.Conf("table", "col_sep"), m.Option("table.col_sep"))
+	compact := kit.Right(kit.Select(m.Conf("table", "compact"), m.Option("table.compact")))
+	cb := func(maps map[string]string, lists []string, line int) bool {
+		for i, v := range lists {
+			if k := m.Meta["append"][i]; compact {
+				v = maps[k]
 			}
-			m.Echo(row)
-			return true
+
+			if m.Echo(v); i < len(lists)-1 {
+				m.Echo(cols)
+			}
 		}
+		m.Echo(rows)
+		return true
 	}
 
 	// 输出表头
@@ -467,12 +387,6 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 	}
 
 	return m
-}
-func (m *Message) Echo(str string, arg ...interface{}) *Message {
-	if len(arg) > 0 {
-		return m.Add("result", fmt.Sprintf(str, arg...))
-	}
-	return m.Add("result", str)
 }
 func (m *Message) Copy(msg *Message, arg ...string) *Message {
 	if msg == nil || m == msg {
@@ -527,6 +441,12 @@ func (m *Message) Copy(msg *Message, arg ...string) *Message {
 
 	return m
 }
+func (m *Message) Echo(str string, arg ...interface{}) *Message {
+	if len(arg) > 0 {
+		return m.Add("result", fmt.Sprintf(str, arg...))
+	}
+	return m.Add("result", str)
+}
 
 func (m *Message) Cmdp(t time.Duration, head []string, prefix []string, suffix [][]string) *Message {
 	if head != nil && len(head) > 0 {
@@ -542,21 +462,6 @@ func (m *Message) Cmdp(t time.Duration, head []string, prefix []string, suffix [
 	m.Table()
 	return m
 }
-func (m *Message) Cmdm(args ...interface{}) *Message {
-	m.Log("info", "current: %v", m.Magic("session", "current"))
-
-	arg := []string{}
-	if pod := kit.Format(m.Magic("session", "current.pod")); pod != "" {
-		arg = append(arg, "context", "ssh", "remote", pod)
-	}
-	if ctx := kit.Format(m.Magic("session", "current.ctx")); ctx != "" {
-		arg = append(arg, "context", ctx)
-	}
-	arg = append(arg, kit.Trans(args...)...)
-
-	m.Spawn().Cmd(arg).CopyTo(m)
-	return m
-}
 func (m *Message) Cmdy(args ...interface{}) *Message {
 	m.Cmd(args...).CopyTo(m)
 	return m
@@ -569,7 +474,7 @@ func (m *Message) Cmdx(args ...interface{}) string {
 	return msg.Result(0)
 }
 func (m *Message) Cmds(args ...interface{}) bool {
-	return m.Cmd(args...).Results(0)
+	return kit.Right(m.Cmdx(args...))
 }
 func (m *Message) Cmd(args ...interface{}) *Message {
 	if m == nil {
@@ -604,27 +509,6 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 				msg.Log("cmd", "%s %s %v %v", c.Name, key, arg, msg.Meta["option"])
 				msg.Hand = true
 				x.Hand(msg, c, key, msg.Form(x, arg)...)
-				// msg.Log("cmd", "%s %s %v %v", c.Name, key, len(msg.Meta["result"]), msg.Meta["append"])
-				return
-
-				target := msg.target
-				msg.target = s
-
-				switch v := msg.Gdb("command", key, arg).(type) {
-				case string:
-					msg.Echo(v)
-				case nil:
-					if msg.Options("bio.cmd") {
-						if x.Auto != nil {
-							x.Auto(msg, c, key, arg...)
-						}
-					} else {
-						x.Hand(msg, c, key, arg...)
-					}
-				}
-				if msg.target == s {
-					msg.target = target
-				}
 			})
 		}
 		return msg.Hand
@@ -638,6 +522,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 
 func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} {
 	random := ""
+
 	var chain interface{}
 	if len(args) > 0 {
 		switch arg := args[0].(type) {
@@ -661,93 +546,7 @@ func (m *Message) Confm(key string, args ...interface{}) map[string]interface{} 
 	} else {
 		v = m.Confv(key, chain)
 	}
-
-	table, _ := v.([]interface{})
-	value, _ := v.(map[string]interface{})
-	if len(args) == 0 {
-		return value
-	}
-
-	switch fun := args[0].(type) {
-	case func(int, string):
-		for i, v := range table {
-			fun(i, kit.Format(v))
-		}
-	case func(int, string) bool:
-		for i, v := range table {
-			if fun(i, kit.Format(v)) {
-				break
-			}
-		}
-	case func(string, string):
-		for k, v := range value {
-			fun(k, kit.Format(v))
-		}
-	case func(string, string) bool:
-		for k, v := range value {
-			if fun(k, kit.Format(v)) {
-				break
-			}
-		}
-	case func(map[string]interface{}):
-		if len(value) == 0 {
-			return nil
-		}
-		fun(value)
-	case func(string, map[string]interface{}):
-		switch random {
-		case "%":
-			n, i := rand.Intn(len(value)), 0
-			for k, v := range value {
-				if val, ok := v.(map[string]interface{}); i == n && ok {
-					fun(k, val)
-					break
-				}
-				i++
-			}
-		case "*":
-			fallthrough
-		default:
-			for k, v := range value {
-				if val, ok := v.(map[string]interface{}); ok {
-					fun(k, val)
-				}
-			}
-		}
-	case func(string, int, map[string]interface{}):
-		keys := make([]string, 0, len(value))
-		for k, _ := range value {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		for _, k := range keys {
-			v := value[k]
-			if val, ok := v.([]interface{}); ok {
-				for i, v := range val {
-					if val, ok := v.(map[string]interface{}); ok {
-						fun(k, i, val)
-					}
-				}
-			}
-		}
-
-	case func(string, map[string]interface{}) bool:
-		for k, v := range value {
-			if val, ok := v.(map[string]interface{}); ok {
-				if fun(k, val) {
-					break
-				}
-			}
-		}
-	case func(int, map[string]interface{}):
-		for i := m.Optioni("page.begin"); i < len(table); i++ {
-			if val, ok := table[i].(map[string]interface{}); ok {
-				fun(i, val)
-			}
-		}
-	}
-	return value
+	return kit.Map(v, random, args...)
 }
 func (m *Message) Confx(key string, args ...interface{}) string {
 	value := kit.Select(m.Conf(key), m.Option(key))
@@ -782,12 +581,6 @@ func (m *Message) Confx(key string, args ...interface{}) string {
 	}
 
 	return kit.Format(arg...)
-}
-func (m *Message) Confs(key string, arg ...interface{}) bool {
-	return kit.Right(m.Confv(key, arg...))
-}
-func (m *Message) Confi(key string, arg ...interface{}) int {
-	return kit.Int(m.Confv(key, arg...))
 }
 func (m *Message) Confv(key string, args ...interface{}) interface{} {
 	if strings.Contains(key, ".") {
@@ -841,6 +634,12 @@ func (m *Message) Confv(key string, args ...interface{}) interface{} {
 	}
 
 	return config.Value
+}
+func (m *Message) Confs(key string, arg ...interface{}) bool {
+	return kit.Right(m.Confv(key, arg...))
+}
+func (m *Message) Confi(key string, arg ...interface{}) int {
+	return kit.Int(m.Confv(key, arg...))
 }
 func (m *Message) Conf(key string, args ...interface{}) string {
 	return kit.Format(m.Confv(key, args...))

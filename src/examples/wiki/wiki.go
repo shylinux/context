@@ -357,7 +357,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			return
 		}},
 		"/wx/": &ctx.Command{Name: "/wx/", Help: "微信", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if !m.Sess("aaa").Cmd("wx").Results(0) {
+			if !m.Sess("aaa").Cmds("wx") {
 				return
 			}
 			if m.Has("echostr") {

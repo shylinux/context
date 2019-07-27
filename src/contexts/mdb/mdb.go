@@ -476,7 +476,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 					}
 				}
 
-				arg, h := kit.Slice(arg)
+				h, arg := arg[0], arg[1:]
 				if h != "" {
 					if temp := m.Confm("temp", h); temp != nil {
 						m.Echo(h)

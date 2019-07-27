@@ -731,8 +731,14 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 			if len(arg) > 0 {
 				if code, e := strconv.Atoi(arg[0]); e == nil {
-					if msg = m.root.Tree(code); msg != nil {
-						arg = arg[1:]
+					ms := []*Message{m}
+					for i := 0; i < len(ms); i++ {
+						if ms[i].Code() == code {
+							msg = ms[i]
+							arg = arg[1:]
+							break
+						}
+						ms = append(ms, ms[i].messages...)
 					}
 				}
 			}
@@ -847,20 +853,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				}
 			}
 			m.Sort("key", "str").Table()
-			return
-		}},
-		"magic": &Command{Name: "magic", Help: "随机组员", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			switch len(arg) {
-			case 0:
-				m.Optionv("magic", m.Magic("bench", ""))
-			case 1:
-				m.Optionv("magic", m.Magic(arg[0], ""))
-			case 2:
-				m.Optionv("magic", m.Magic(arg[0], arg[1]))
-			case 3:
-				m.Optionv("magic", m.Magic(arg[0], arg[1], arg[2]))
-			}
-			m.Cmdy("ctx.trans", "magic")
 			return
 		}},
 		"result": &Command{Name: "result [index] [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {

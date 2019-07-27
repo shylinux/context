@@ -443,7 +443,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		})
 	}
 
-	m.Sess("tcp", false).Close()
+	msg = m.Sess("tcp", false)
+	msg.Target().Close(msg)
 	return true
 }
 func (nfs *NFS) Close(m *ctx.Message, arg ...string) bool {
