@@ -37,6 +37,18 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 
 	return m
 }
+func (m *Message) Gdb(arg ...interface{}) interface{} {
+	// if !m.Options("log.enable") {
+	// 	return ""
+	// }
+
+	if g := m.Sess("gdb", false); g != nil {
+		if gdb, ok := g.target.Server.(DEBUG); ok {
+			return gdb.Wait(m, arg...)
+		}
+	}
+	return ""
+}
 
 func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 	name, force := s.Name, false

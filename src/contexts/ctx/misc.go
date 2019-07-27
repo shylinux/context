@@ -495,14 +495,6 @@ func (m *Message) ToHTML(style string) string {
 	return strings.Join(result, "")
 }
 
-func (m *Message) Gdb(arg ...interface{}) interface{} {
-	if g := m.Sess("gdb", false); g != nil {
-		if gdb, ok := g.target.Server.(DEBUG); ok {
-			return gdb.Wait(m, arg...)
-		}
-	}
-	return nil
-}
 func (m *Message) Show(str string, args ...interface{}) *Message {
 	res := fmt.Sprintf(str, args...)
 

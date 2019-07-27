@@ -11,6 +11,7 @@ import (
 )
 
 type GDB struct {
+	feed map[string]chan interface{}
 	wait chan interface{}
 	goon chan os.Signal
 
@@ -37,9 +38,6 @@ func (gdb *GDB) Value(m *ctx.Message, arg ...interface{}) bool {
 	return false
 }
 func (gdb *GDB) Wait(msg *ctx.Message, arg ...interface{}) interface{} {
-	if !kit.EnableDebug {
-		return nil
-	}
 	m := gdb.Message()
 	if m.Cap("status") != "start" {
 		return nil
@@ -51,11 +49,17 @@ func (gdb *GDB) Wait(msg *ctx.Message, arg ...interface{}) interface{} {
 				m.Log("error", "done %d %v", len(arg[:i]), arg)
 				return result
 			}
-			if arg[0] == "trace" {
-				m.Log("error", "%s", m.Format("full"))
+
+			feed := kit.Select("web", kit.Format(kit.Chain(kit.Chain(gdb.Configs["debug"].Value, arg[:i]), []string{"value", "feed"})))
+
+			c, ok := gdb.feed[feed]
+			if !ok {
+				c = make(chan interface{})
+				gdb.feed[feed] = c
 			}
+
 			m.Log("error", "wait %d %v", len(arg[:i]), arg)
-			result := <-gdb.wait
+			result := <-c
 			m.Log("error", "done %d %v %v", len(arg[:i]), arg, result)
 			return result
 		}
@@ -68,17 +72,17 @@ func (gdb *GDB) Goon(result interface{}, arg ...interface{}) {
 		return
 	}
 
-	m.Log("error", "goon %v %v", arg, result)
+	if m.Log("error", "goon %v %v", arg, result); len(arg) > 0 {
+		if c, ok := gdb.feed[kit.Format(arg[0])]; ok {
+			c <- result
+			return
+		}
+	}
 	gdb.wait <- result
 }
 
 func (gdb *GDB) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{}
-
-	s := new(GDB)
-	s.Context = c
-	return s
+	return &GDB{Context: c}
 }
 func (gdb *GDB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return gdb
@@ -87,6 +91,7 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 	m.Cmd("nfs.save", m.Conf("logpid"), os.Getpid())
 	gdb.wait = make(chan interface{}, 10)
 	gdb.goon = make(chan os.Signal, 10)
+	gdb.feed = map[string]chan interface{}{}
 
 	m.Confm("signal", func(sig string, action string) {
 		m.Log("signal", "add %s: %s", action, sig)
@@ -98,6 +103,7 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 		case sig := <-gdb.goon:
 			action := m.Conf("signal", sig)
 			m.Log("signal", "%v: %v", action, sig)
+
 			switch action {
 			case "QUIT", "INT":
 				m.Cmd("cli.quit", 0)
@@ -110,12 +116,8 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 				m.Cmd("cli.upgrade", "system")
 			case "WINCH":
 				m.Cmd("nfs.term", "init")
-			case "TRAP":
-				kit.EnableDebug = true
 			case "CONT":
 				gdb.wait <- time.Now().Format("2006-01-02 15:04:05")
-			case "TSTP":
-				kit.EnableDebug = false
 			default:
 				// gdb.Goon(nil, "cache", "read", "value")
 			}
@@ -124,10 +126,6 @@ func (gdb *GDB) Start(m *ctx.Message, arg ...string) bool {
 	return true
 }
 func (gdb *GDB) Close(m *ctx.Message, arg ...string) bool {
-	switch gdb.Context {
-	case m.Target():
-	case m.Source():
-	}
 	return false
 }
 
@@ -136,14 +134,15 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 	Configs: map[string]*ctx.Config{
 		"logpid": &ctx.Config{Name: "logpid", Value: "var/run/bench.pid", Help: ""},
 		"signal": &ctx.Config{Name: "signal", Value: map[string]interface{}{
+			"2":  "INT",
 			"3":  "QUIT",
 			"15": "TERM",
 			"28": "WINCH",
 			"30": "restart",
 			"31": "upgrade",
+			"5":  "TRAP",
 
 			"1": "HUP",
-			"2": "INT",
 			// "9":  "KILL",
 			// "10": "BUS",
 			// "11": "SEGV",
@@ -151,7 +150,6 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 			// "23": "IO",
 			// "29": "INFO",
 
-			"5":  "TRAP",
 			"18": "TSTP",
 			"19": "CONT",
 
@@ -189,6 +187,7 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 					"ncontext": map[string]interface{}{"value": map[string]interface{}{"enable": false}},
 				},
 			},
+			"web": map[string]interface{}{"value": map[string]interface{}{"enable": true, "feed": "web"}},
 		}},
 	},
 	Commands: map[string]*ctx.Command{
@@ -196,23 +195,18 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 			m.Target().Start(m)
 			return
 		}},
-		"demo": &ctx.Command{Name: "wait arg...", Help: "等待调试", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo("hello world")
-			return
-		}},
 		"wait": &ctx.Command{Name: "wait arg...", Help: "等待调试", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if gdb, ok := m.Target().Server.(*GDB); m.Assert(ok) {
-				switch v := gdb.Wait(m, arg).(type) {
-				case string:
-					m.Echo(v)
-				case nil:
-				}
+				go func() {
+					m.Log("info", "wait %v", arg)
+					m.Log("info", "done %v", gdb.Wait(m, arg))
+				}()
 			}
 			return
 		}},
 		"goon": &ctx.Command{Name: "goon arg...", Help: "继续运行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if gdb, ok := m.Target().Server.(*GDB); m.Assert(ok) {
-				gdb.Goon(arg)
+				gdb.Goon(arg[0], arg[1])
 			}
 			return
 		}},
@@ -220,7 +214,5 @@ var Index = &ctx.Context{Name: "gdb", Help: "调试中心",
 }
 
 func init() {
-	gdb := &GDB{}
-	gdb.Context = Index
-	ctx.Index.Register(Index, gdb)
+	ctx.Index.Register(Index, &GDB{Context: Index})
 }

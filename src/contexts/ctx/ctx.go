@@ -47,6 +47,7 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	if m.Optionv("bio.ctx", Index); len(arg) == 0 {
 		m.Option("bio.modal", "active")
 		m.Option("log.disable", false)
+		m.Option("gdb.enable", true)
 		m.Cap("stream", "stdio")
 		m.Cmd("log._init")
 		m.Cmd("gdb._init")
