@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"math/rand"
 	"os"
 	"path"
@@ -79,16 +78,6 @@ func Hash(arg ...interface{}) (string, []string) {
 			args = append(args, Format(time.Now()))
 			args = append(args, Format(rand.Int()))
 		default:
-			if s, e := os.Stat(v); e == nil && !s.IsDir() {
-				if f, e := os.Open(v); e == nil {
-					defer f.Close()
-					m := md5.New()
-					io.Copy(m, f)
-					h := m.Sum(nil)
-					args = append(args, hex.EncodeToString(h[:]))
-					return hex.EncodeToString(h[:]), args
-				}
-			}
 			args = append(args, v)
 		}
 	}

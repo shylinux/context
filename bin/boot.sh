@@ -9,6 +9,8 @@ ctx_bin=${ctx_app} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}
 ctx_dev=${ctx_dev:="https://shylinux.com"}
 ctx_root=${ctx_root:=/usr/local/context}
 ctx_home=${ctx_home:=~/context}
+# node_cert=
+# node_key=
 # web_port=
 # ssh_port=
 # HOSTNAME=

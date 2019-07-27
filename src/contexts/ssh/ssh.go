@@ -1070,22 +1070,21 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			return
 		}},
 		"_exec": &ctx.Command{Name: "_exec", Help: "命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			access := kit.Hashs(
+			access := m.Option("access", kit.Hashs(
 				m.Option("node.route"),
 				m.Option("user.route"),
 				m.Option("work.route"),
 				m.Option("work.name"),
 				m.Option("user.name"),
 				m.Option("text.username"),
-			)
+			))
 
-			if m.Option("sessid", m.Cmd("aaa.auth", "access", access, "session").Append("key")); m.Option("username", m.Cmd("aaa.sess", "user").Append("meta")) != "" { // 历史会话
+			if m.Option("sessid", m.Cmd("aaa.auth", "access", access, "session").Append("key")) != "" &&
+				m.Option("username", m.Cmd("aaa.sess", "user").Append("meta")) != "" { // 历史会话
 				m.Log("warn", "access: %s", access)
 				m.Log("info", "sessid: %s", m.Option("sessid"))
 				m.Option("trust", m.Cmdx("aaa.auth", "access", access, "data", "trust"))
-				if m.Option("userrole", m.Cmdx("aaa.auth", "access", access, "data", "userrole")); !m.Options("userrole") {
-					m.Option("userrole", m.Cmd("aaa.user", "role").Append("meta"))
-				}
+				m.Option("userrole", m.Cmdx("aaa.auth", "access", access, "data", "userrole"))
 
 			} else if m.Option("username", m.Option("text.username")); !m.Confs("runtime", "user.route") && m.Confs("trust", "fresh") { // 免签节点
 				m.Log("warn", "trust fresh %s", m.Option("node.route"))
@@ -1116,7 +1115,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				return
 			}
 
-			m.Log("info", "username: %s", m.Option("username"))
+			// 用户角色
+			if m.Log("info", "username: %s", m.Option("username")); !m.Options("userrole") {
+				m.Option("userrole", kit.Select("void", m.Cmd("aaa.user", "role").Append("meta")))
+			}
 			m.Log("info", "userrole: %s", m.Option("userrole"))
 
 			// 创建会话
@@ -1127,13 +1129,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 
 			// 权限检查
-			if arg[0] != "tool" {
-				// 创建空间
-				m.Option("bench", m.Cmdx("aaa.sess", "bench", "select"))
-				if !m.Cmds("aaa.work", "right", "remote", arg[0]) {
-					m.Echo("no right %s %s", "remote", arg[0])
-					return
-				}
+			if !m.Cmds("aaa.role", m.Option("userrole"), "check", "remote", arg[0]) {
+				m.Echo("no right %s %s", "remote", arg[0])
+				return
 			}
 
 			// 执行命令
