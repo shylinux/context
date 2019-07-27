@@ -2,11 +2,41 @@ package ctx
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 	"toolkit"
 )
+
+func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
+	if action == "error" {
+		kit.Log("error", fmt.Sprintf("chain: %s", m.Format("chain")))
+		kit.Log("error", fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
+		kit.Log("error", fmt.Sprintf("stack: %s", m.Format("stack")))
+	}
+
+	if m.Options("log.disable") {
+		return m
+	}
+
+	if l := m.Sess("log", false); l != nil {
+		if log, ok := l.target.Server.(LOGGER); ok {
+			if action == "error" {
+				log.Log(m, "error", "chain: %s", m.Format("chain"))
+			}
+			if log.Log(m, action, str, arg...); action == "error" {
+				log.Log(m, "error", "stack: %s", m.Format("stack"))
+			}
+			return m
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, str, arg...)
+	}
+
+	return m
+}
 
 func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 	name, force := s.Name, false

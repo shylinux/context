@@ -14,13 +14,6 @@ import (
 
 var DisableLog = false
 
-func Pwd() string {
-	wd, _ := os.Getwd()
-	return wd
-}
-func Env(key string) {
-	os.Getenv(key)
-}
 func Log(action string, str string, args ...interface{}) {
 	if DisableLog {
 		return
@@ -30,6 +23,14 @@ func Log(action string, str string, args ...interface{}) {
 		str = fmt.Sprintf(str, args...)
 	}
 	fmt.Fprintf(os.Stderr, "%s: %s\n", action, str)
+}
+
+func Pwd() string {
+	wd, _ := os.Getwd()
+	return wd
+}
+func Env(key string) {
+	os.Getenv(key)
 }
 func Errorf(str string, args ...interface{}) {
 	Log("error", str, args...)

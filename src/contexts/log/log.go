@@ -15,6 +15,12 @@ type LOG struct {
 	*ctx.Context
 }
 
+func (log *LOG) Log(msg *ctx.Message, action string, str string, arg ...interface{}) {
+	if log.queue != nil {
+		log.queue <- map[string]interface{}{"action": action, "str": str, "arg": arg, "msg": msg}
+	}
+}
+
 func (log *LOG) Value(msg *ctx.Message, arg ...interface{}) []string {
 	args := append(kit.Trans(arg...))
 
@@ -30,39 +36,33 @@ func (log *LOG) Value(msg *ctx.Message, arg ...interface{}) []string {
 	}
 	return nil
 }
-func (log *LOG) Log(msg *ctx.Message, action string, str string, arg ...interface{}) {
-	if log.queue != nil {
-		log.queue <- map[string]interface{}{
-			"action": action,
-			"str":    str,
-			"arg":    arg,
-			"msg":    msg,
-		}
-	}
-}
 
 func (log *LOG) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
-	c.Caches = map[string]*ctx.Cache{}
-	c.Configs = map[string]*ctx.Config{}
-
-	s := new(LOG)
-	s.Context = c
-	return s
+	return &LOG{Context: c}
 }
 func (log *LOG) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return log
 }
 func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
+	// 创建文件
 	log.file = map[string]*os.File{}
+	m.Assert(os.MkdirAll(m.Conf("logdir"), 0770))
+	m.Confm("output", "file", func(key string, value string) {
+		switch value {
+		case "":
+		case "stderr":
+			log.file[key] = os.Stderr
+		case "stdout":
+			log.file[key] = os.Stdout
+		default:
+			if f, e := os.Create(path.Join(m.Conf("logdir"), value)); m.Assert(e) {
+				log.file[key] = f
+			}
+		}
+	})
 
-	os.MkdirAll(m.Conf("logdir"), 0770)
-	kit.Log("error", "make log dir %s", m.Conf("logdir"))
-
-	log.queue = make(chan map[string]interface{}, 1024)
-	// for _, v := range []string{"error", "bench", "debug"} {
-	// 	log.Log(m, v, "hello world\n")
-	// 	log.Log(m, v, "hello world")
-	// }
+	// 创建队列
+	log.queue = make(chan map[string]interface{}, m.Confi("logbuf"))
 	m.Cap("stream", m.Conf("output", []string{"bench", "value", "file"}))
 
 	for {
@@ -70,8 +70,8 @@ func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
 		case l := <-log.queue:
 			m.Capi("nlog", 1)
 			msg := l["msg"].(*ctx.Message)
-
 			args := kit.Trans(l["arg"].([]interface{})...)
+
 		loop:
 			for _, v := range []string{kit.Format(l["action"]), "bench"} {
 				for i := len(args); i >= 0; i-- {
@@ -79,29 +79,24 @@ func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
 					if !kit.Right(value) {
 						continue
 					}
-					p := kit.Chains(log.Configs["output"].Value, []string{"file", value[0]})
-					if p == "" {
-						continue
+
+					if value[0] == "debug" && !m.Options("log.debug") {
+						break loop
 					}
 
-					file, ok := os.Stdout, true
-					if p != "stdout" {
-						name := path.Join(m.Conf("logdir"), p)
-						file, ok = log.file[name]
-						if !ok {
-							if f, e := os.Create(name); e == nil {
-								file, log.file[name] = f, f
-								kit.Log("error", "%s log file %s", "open", name)
-							} else {
-								kit.Log("error", "%s log file %s %s", "open", name, e)
-								continue
-							}
-						}
+					// 日志文件
+					file := os.Stderr
+					if f, ok := log.file[value[0]]; ok {
+						file = f
+					} else {
+						break loop
 					}
 
+					// 日志格式
 					font := m.Conf("output", []string{"font", kit.Select("", value, 1)})
 					meta := msg.Format(m.Confv("output", []string{"meta", kit.Select("short", value, 2)}).([]interface{})...)
 
+					// 输出日志
 					fmt.Fprintln(file, fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), meta, font,
 						kit.Format(l["action"]), fmt.Sprintf(kit.Format(l["str"]), l["arg"].([]interface{})...),
 						kit.Select("", "\033[0m", font != "")))
@@ -110,13 +105,9 @@ func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
 			}
 		}
 	}
-	return false
+	return true
 }
 func (log *LOG) Close(m *ctx.Message, arg ...string) bool {
-	switch log.Context {
-	case m.Target():
-	case m.Source():
-	}
 	return false
 }
 
@@ -126,18 +117,19 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 		"nout": &ctx.Cache{Name: "nout", Value: "0", Help: "日志输出数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"logdir": &ctx.Config{Name: "logdir", Value: "var/log", Help: ""},
+		"logbuf": &ctx.Config{Name: "logbuf", Value: "1024", Help: "日志队列长度"},
+		"logdir": &ctx.Config{Name: "logdir", Value: "var/log", Help: "日志目录"},
+
 		"output": &ctx.Config{Name: "output", Value: map[string]interface{}{
 			"file": map[string]interface{}{
-				"bench": "bench.log",
 				"debug": "debug.log",
-				"error": "error.log",
+				"bench": "bench.log",
 				"right": "right.log",
+				"error": "error.log",
 			},
 			"font": map[string]interface{}{
 				"red":    "\033[31m",
 				"green":  "\033[32m",
-				"blue":   "\033[34m",
 				"yellow": "\033[33m",
 			},
 			"meta": map[string]interface{}{
@@ -145,22 +137,24 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 				"long":  []interface{}{"time", "ship"},
 			},
 
-			"error":  map[string]interface{}{"value": []interface{}{"error", "red"}},
-			"trace":  map[string]interface{}{"value": []interface{}{"error", "red"}},
 			"debug":  map[string]interface{}{"value": []interface{}{"debug"}},
 			"search": map[string]interface{}{"value": []interface{}{"debug"}},
 			"call":   map[string]interface{}{"value": []interface{}{"debug"}},
 			"back":   map[string]interface{}{"value": []interface{}{"debug"}},
-
-			"send": map[string]interface{}{"value": []interface{}{"debug"}},
-			"recv": map[string]interface{}{"value": []interface{}{"debug"}},
+			"send":   map[string]interface{}{"value": []interface{}{"debug"}},
+			"recv":   map[string]interface{}{"value": []interface{}{"debug"}},
 
 			"bench": map[string]interface{}{"value": []interface{}{"bench"}},
 			"begin": map[string]interface{}{"value": []interface{}{"bench", "red"}},
 			"start": map[string]interface{}{"value": []interface{}{"bench", "red"}},
 			"close": map[string]interface{}{"value": []interface{}{"bench", "red"}},
-			"warn":  map[string]interface{}{"value": []interface{}{"bench", "yellow"}},
 			"stack": map[string]interface{}{"value": []interface{}{"bench", "yellow"}},
+			"warn":  map[string]interface{}{"value": []interface{}{"bench", "yellow"}},
+
+			"right": map[string]interface{}{"value": []interface{}{"right"}},
+
+			"error": map[string]interface{}{"value": []interface{}{"error", "red"}},
+			"trace": map[string]interface{}{"value": []interface{}{"error", "red"}},
 
 			"cmd": map[string]interface{}{"value": []interface{}{"bench", "green"},
 				"lex": map[string]interface{}{"value": []interface{}{"debug", "green"}},
@@ -177,11 +171,10 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 					"rsa":  map[string]interface{}{"value": []interface{}{"debug", "red"}},
 				},
 			},
-			"right": map[string]interface{}{"value": []interface{}{"right"}},
 		}, Help: "日志输出配置"},
 	},
 	Commands: map[string]*ctx.Command{
-		"_init": &ctx.Command{Name: "_init", Help: "启动日志", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": &ctx.Command{Name: "_init", Help: "初始化", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Target().Start(m)
 			return
 		}},
@@ -195,7 +188,5 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 }
 
 func init() {
-	log := &LOG{}
-	log.Context = Index
-	ctx.Index.Register(Index, log)
+	ctx.Index.Register(Index, &LOG{Context: Index})
 }

@@ -2,7 +2,6 @@ package ctx
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"runtime"
 	"strings"
@@ -503,34 +502,6 @@ func (m *Message) Gdb(arg ...interface{}) interface{} {
 		}
 	}
 	return nil
-}
-func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
-	if m.Options("log.disable") {
-		return m
-	}
-
-	if l := m.Sess("log", false); l != nil {
-		if log, ok := l.target.Server.(LOGGER); ok {
-			if action == "error" {
-				log.Log(m, "error", "chain: %s", m.Format("chain"))
-			}
-			log.Log(m, action, str, arg...)
-			if action == "error" {
-				log.Log(m, "error", "stack: %s", m.Format("stack"))
-			}
-			return m
-		}
-	} else {
-		log.Printf(str, arg...)
-	}
-
-	if action == "error" {
-		kit.Log("error", fmt.Sprintf("chain: %s", m.Format("chain")))
-		kit.Log("error", fmt.Sprintf("%s %s %s", m.Format(), action, fmt.Sprintf(str, arg...)))
-		kit.Log("error", fmt.Sprintf("stack: %s", m.Format("stack")))
-	}
-
-	return m
 }
 func (m *Message) Show(str string, args ...interface{}) *Message {
 	res := fmt.Sprintf(str, args...)
