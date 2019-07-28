@@ -323,7 +323,6 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 		// 语句堆栈
 		stack := &kit.Stack{}
 		stack.Push(m.Option("stack.key", "source"), m.Options("stack.run", true), m.Optioni("stack.pos", 0))
-		m.Optionv("bio.ctx", m.Target())
 
 		input := make([]string, 0, 128)
 

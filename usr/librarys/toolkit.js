@@ -480,7 +480,7 @@ kit = toolkit = {
         text.querySelectorAll("table.wiki_list").forEach(function(value, index, array) {
             kit.OrderTable(value, "path", function(event) {
                 var text = event.target.innerText
-                ctx.Search({"wiki_class": text})
+                ctx.Search({"class": text})
             })
         })
     },
@@ -655,7 +655,7 @@ kit = toolkit = {
                                     if (document.referrer) {
                                         location.href = document.referrer
                                     } else {
-                                        ctx.Search("componet_group", "")
+                                        ctx.Search("group", "")
                                     }
                                 })
                                 return

@@ -55,22 +55,22 @@ var page = Page({
                 ctx.Runs(page, form, function(msg) {
                     ui.back.innerHTML = "", kit.AppendChild(ui.back, [
                         {"button": ["知识", function(event) {
-                            ctx.Search({"wiki_level": "", "wiki_class": "", "wiki_favor": ""})
+                            ctx.Search({"level": "", "class": "", "favor": ""})
                         }]},
-                    ].concat(ctx.Search("wiki_class").split("/").map(function(value, index, array) {
+                    ].concat(ctx.Search("class").split("/").map(function(value, index, array) {
                         return value && {"button": [value, function(event) {
-                            location.hash = "", ctx.Search({"wiki_class": array.slice(0, index+1).join("/")+"/", "wiki_favor":""})
+                            location.hash = "", ctx.Search({"class": array.slice(0, index+1).join("/")+"/", "favor":""})
                         }]}
                     })))
 
                     ui.tree.innerHTML = "", kit.AppendChild(ui.tree, ctx.Table(msg, function(value, index) {
                         return value.file.endsWith("/") && {"text": [value.file, "div"], click: function(event, target) {
-                            location.hash = "", ctx.Search({"wiki_class": ctx.Search("wiki_class")+value.file, "wiki_favor": ""})
+                            location.hash = "", ctx.Search({"class": ctx.Search("class")+value.file, "favor": ""})
                         }}
                     }))
                     ui.list.innerHTML = "", kit.AppendChild(ui.list, ctx.Table(msg, function(value, index) {
                         return !value.file.endsWith("/") && {"text": [value.time.substr(5, 5)+" "+value.file, "div"], click: function(event, target) {
-                            location.hash = "", ctx.Search("wiki_favor", value.file)
+                            location.hash = "", ctx.Search("favor", value.file)
                         }}
                     }))
                 })

@@ -311,6 +311,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "key", "hash": "key", "word": []interface{}{"[A-Za-z_][A-Za-z_0-9]*"}},
 			map[string]interface{}{"page": "str", "hash": "str", "word": []interface{}{"mul{", "\"[^\"]*\"", "'[^']*'", "}"}},
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"mul{", "$", "@", "}", "opt{", "key", "}"}},
+			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"mul{", "$", "@", "}", "opt{", "num", "}"}},
 
 			// 表达式语句
 			map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-", "+", "}"}},
@@ -332,7 +333,8 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "opt{", "=", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "if", "word": []interface{}{"if", "exp"}},
 			map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "rep{", "exp", "}"}},
-			map[string]interface{}{"page": "stm", "hash": "fun", "word": []interface{}{"fun", "key", "rep{", "key", "}"}},
+			map[string]interface{}{"page": "stm", "hash": "fun", "word": []interface{}{"fun", "key", "rep{", "exp", "}"}},
+			map[string]interface{}{"page": "stm", "hash": "kit", "word": []interface{}{"kit", "rep{", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "else", "word": []interface{}{"else", "opt{", "if", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "end", "word": []interface{}{"end"}},
 
@@ -358,6 +360,12 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			*/
 
 		}, Help: "语法集合的最大数量"},
+		"input": &ctx.Config{Name: "input", Value: map[string]interface{}{
+			"text":     true,
+			"button":   true,
+			"select":   true,
+			"textarea": true,
+		}, Help: "控件类型"},
 		"exec": &ctx.Config{Name: "info", Value: map[string]interface{}{
 			"disable": map[string]interface{}{
 				"void": true,
@@ -542,23 +550,43 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			case 1:
 				m.Echo(arg[0])
 			case 2:
+				bio := m.Optionv("bio.msg").(*ctx.Message)
 				msg := m.Spawn(m.Optionv("bio.ctx"))
 				switch arg[0] {
 				case "$":
+					// 局部变量
 					if stack, ok := m.Optionv("bio.stack").(*kit.Stack); ok {
 						if v, ok := stack.Hash(arg[1]); ok {
 							m.Echo("%v", v)
 							break
 						}
 					}
-					m.Echo(msg.Cap(arg[1]))
+
+					// 函数参数
+					if i, e := strconv.Atoi(arg[1]); e == nil {
+						m.Echo(bio.Detail(i))
+						break
+					}
+					// 函数选项
+					m.Echo(kit.Select(msg.Cap(arg[1]), bio.Option(arg[1])))
+
 				case "@":
-					value := msg.Option(arg[1])
-					if value == "" {
-						value = msg.Conf(arg[1])
+					// 局部变量
+					if stack, ok := m.Optionv("bio.stack").(*kit.Stack); ok {
+						if v, ok := stack.Hash(arg[1]); ok {
+							m.Echo("%v", v)
+							break
+						}
 					}
 
-					m.Echo(value)
+					// 函数参数
+					if i, e := strconv.Atoi(arg[1]); e == nil {
+						m.Echo(bio.Detail(i))
+						break
+					}
+					// 函数配置
+					m.Echo(kit.Select(msg.Conf(arg[1]), bio.Option(arg[1])))
+
 				default:
 					m.Echo(arg[0]).Echo(arg[1])
 				}
@@ -1028,13 +1056,74 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			p := m.Optionv("bio.stack").(*kit.Stack).Push(arg[0], false, m.Optioni("stack.pos"))
 			m.Log("stack", "push %v", p.String("\\"))
 
+			if len(arg) > 2 {
+				m.Cmd("kit", "kit", arg[5], arg[1:5], arg[1], arg[6:])
+			}
 			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
 			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				m.Goshy(self.Help.([]string), 0, nil, nil)
 				return
 			}
 			m.Target().Commands[arg[1]] = self
+			m.Log("info", "fun: %v %v", arg[1], arg)
 			p.Data = self
+			return
+		}},
+		"kit": &ctx.Command{Name: "kit type name help view init cmd arg... [input type name value [key val]...]...", Help: "kit", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Log("info", "_index: %v", arg)
+			args := []interface{}{}
+			inputs := []interface{}{}
+			for i := 7; i < len(arg); i++ {
+				if !m.Confs("input", arg[i]) {
+					args = append(args, arg[i])
+					continue
+				}
+
+				for j := i; j < len(arg); j++ {
+					if j < len(arg)-1 && !m.Confs("input", arg[j+1]) {
+						continue
+					}
+
+					args := arg[i : j+1]
+					input := map[string]interface{}{
+						"type":  kit.Select("", args, 0),
+						"value": kit.Select("", args, 1),
+					}
+					for k := 2; k < len(args)-1; k += 2 {
+						switch val := input[args[k]].(type) {
+						case nil:
+							input[args[k]] = args[k+1]
+						case string:
+							input[args[k]] = []interface{}{input[args[k]], args[k+1]}
+						case []interface{}:
+							input[args[k]] = append(val, args[k+1])
+						}
+					}
+					inputs = append(inputs, input)
+					i = j
+					break
+				}
+			}
+
+			if len(inputs) == 0 {
+				inputs = []interface{}{
+					map[string]interface{}{"type": "text", "name": "arg"},
+					map[string]interface{}{"type": "button", "value": "执行"},
+				}
+			}
+
+			m.Confv("_index", []interface{}{-2}, map[string]interface{}{
+				"componet_type": kit.Select("public", arg, 1),
+				"componet_name": kit.Select("", arg, 2),
+				"componet_help": kit.Select("", arg, 3),
+				"componet_view": kit.Select("componet", arg, 4),
+				"componet_init": kit.Select("", arg, 5),
+
+				"componet_ctx":  m.Cap("module"),
+				"componet_cmd":  kit.Select("", arg, 6),
+				"componet_args": args,
+				"inputs":        inputs,
+			})
 			return
 		}},
 		"else": &ctx.Command{Name: "else", Help: "条件语句", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

@@ -168,7 +168,7 @@ page = Page({
     initRiver: function(page, field, option, output) {
         return {
             Show: function() {
-                this.Update([], "text", ["name", "count"], "key", ctx.Search("river")||true)
+                this.Update([], "text", ["nick", "count"], "key", ctx.Search("river")||true)
             },
             Action: {
                 "创建": function(event) {
@@ -196,7 +196,7 @@ page = Page({
             Show: function(i) {
                 field.Pane.Back(river, output)
                 var pane = this, foot = page.footer.Pane
-                var cmds = ["brow", river, i||which[river]||0]
+                var cmds = [river, "brow", i||which[river]||0]
                 cmds[2] || (output.innerHTML = ""), pane.Times(page.conf.refresh, cmds, function(line, index, msg) {
                     pane.Append("", line, ["text"], "index", function(line, index, event, args, cbs) {
                         var text = JSON.parse(line.text)
@@ -209,7 +209,7 @@ page = Page({
             },
             Send: function(type, text, cb) {
                 var pane = this
-                pane.Run(["flow", river, type, text], function(msg) {
+                pane.Run([river, "flow", type, text], function(msg) {
                     pane.Show(), typeof cb == "function" && cb(msg)
                 })
             },

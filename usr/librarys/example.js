@@ -84,6 +84,9 @@ function Page(page) {
                     var text = JSON.parse(line.text)
 
                 case "plugin":
+                    if (!text.name) {
+                        return {}
+                    }
                     var id = "plugin"+page.ID()
                     list.push({view: [text.view+" item", "fieldset", "", "field"], data: {id: id, Run: cb}, list: [
                         {text: [text.name+"("+text.help+")", "legend"]},
@@ -378,7 +381,6 @@ function Page(page) {
                     })
                 }]},
                 {type: "br"},
-                {type: "img", data: {"src": "/chat/qrcode?text=hi"}}
             ])
             return {
                 Exit: function() {
@@ -420,7 +422,7 @@ function Pane(page, field) {
     var timer = ""
     var list = [], last = -1
     var conf = {}, conf_cb = {}
-    var name = option.dataset.componet_name
+    var name = option.dataset.name
     var pane = (page[field.dataset.init] || function() {
     })(page, field, option, output) || {}; pane.__proto__ = {
         __proto__: page,
@@ -520,8 +522,8 @@ function Pane(page, field) {
         },
         Share: function(objs) {
             objs = objs || {}
-            objs.componet_name = option.dataset.componet_name
-            objs.componet_group = option.dataset.componet_group
+            objs.name = option.dataset.name
+            objs.group = option.dataset.group
             return ctx.Share(objs)
         },
         Save: function(name, output) {

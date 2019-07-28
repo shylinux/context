@@ -440,7 +440,9 @@ func (m *Message) Match(key string, spawn bool, hand func(m *Message, s *Context
 	context := []*Context{m.target}
 	for _, v := range kit.Trans(m.Optionv("ctx.chain")) {
 		if msg := m.Sess(v, false); msg != nil && msg.target != nil {
-			context = append(context, msg.target)
+			if msg.target != m.target && msg.target != m.source {
+				context = append(context, msg.target)
+			}
 		}
 	}
 	context = append(context, m.source)
@@ -510,6 +512,7 @@ func (m *Message) Parse(arg interface{}) string {
 	return ""
 }
 func (m *Message) Goshy(input []string, index int, stack *kit.Stack, cb func(*Message)) bool {
+	m.Optionv("bio.msg", m)
 	if stack == nil {
 		stack = &kit.Stack{}
 		stack.Push("source", true, 0)
@@ -522,7 +525,7 @@ func (m *Message) Goshy(input []string, index int, stack *kit.Stack, cb func(*Me
 		m.Optioni("stack.pos", i)
 
 		// 执行语句
-		msg := m.Cmd("yac.parse", line+"\n")
+		msg := m.Sess("yac").Cmd("parse", line+"\n")
 		if cb != nil {
 			cb(msg)
 		}

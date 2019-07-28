@@ -106,8 +106,8 @@ ctx = context = {
 
     Current: function(key, value) {
         context.GET("", {
-            "componet_group": "index",
-            "componet_name": "cmd",
+            "group": "index",
+            "name": "cmd",
             "cmds": ["sess", "current", key, value],
         })
         return value

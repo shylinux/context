@@ -219,9 +219,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			case msg.Has("directory"):
 				http.ServeFile(w, r, msg.Append("directory"))
 
-			case msg.Has("componet"):
-				msg.Spawn().Add("option", "componet_group", msg.Meta["componet"]).Cmd("/render")
-
 			case msg.Has("qrcode"):
 				if qr, e := qrcode.New(msg.Append("qrcode"), qrcode.Medium); m.Assert(e) {
 					w.Header().Set("Content-Type", "image/png")
@@ -310,7 +307,8 @@ func (web *WEB) Begin(m *ctx.Message, arg ...string) ctx.Server {
 
 	web.ServeMux = http.NewServeMux()
 	web.Template = template.New("render").Funcs(ctx.CGI)
-	web.Template.ParseGlob(path.Join(m.Cap("directory"), m.Conf("serve", "template_dir"), m.Cap("route"), "/*.tmpl"))
+	web.Template.ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl"))
+	web.Template.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
 	return web
 }
 func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
@@ -410,8 +408,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}, Help: "服务配置"},
 		"route": &ctx.Config{Name: "route", Value: map[string]interface{}{
 			"index":          "/render",
-			"template_dir":   "template",
-			"template_debug": true,
+			"template_dir":   "usr/template",
+			"template_debug": false,
 			"componet_index": "index",
 			"toolkit_view": map[string]interface{}{
 				"top": 96, "left": 472, "width": 600, "height": 300,
@@ -766,7 +764,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			return
 		}},
-		"template": &ctx.Command{Name: "template [file [directory]]|[name [content]]", Help: "添加模板, content: 模板内容, directory: 模板目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"template": &ctx.Command{Name: "template [name [file...]]", Help: "模板管理, name: 模板名, file: 模板文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
 				if len(arg) == 0 {
 					for _, v := range web.Template.Templates() {
@@ -776,27 +774,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					return
 				}
 
-				if web.Template == nil {
-					web.Template = template.New("render").Funcs(ctx.CGI)
+				tmpl := web.Template
+				if len(arg) > 1 {
+					tmpl = template.Must(web.Template.Clone())
+					tmpl = template.Must(tmpl.ParseFiles(arg[1:]...))
 				}
 
-				dir := path.Join(m.Cap("directory"), m.Confx("template_dir", arg, 1), arg[0])
-				if t, e := web.Template.ParseGlob(dir); e == nil {
-					web.Template = t
-				} else {
-					m.Log("info", "%s", e)
-					if len(arg) > 1 {
-						web.Template = template.Must(web.Template.New(arg[0]).Parse(arg[1]))
-					} else {
-						tmpl, e := web.Template.Clone()
-						m.Assert(e)
-						tmpl.Funcs(ctx.CGI)
-
-						buf := bytes.NewBuffer(make([]byte, 1024))
-						tmpl.ExecuteTemplate(buf, arg[0], m)
-						m.Echo(string(buf.Bytes()))
-					}
-				}
+				buf := bytes.NewBuffer(make([]byte, 1024))
+				tmpl.ExecuteTemplate(buf, arg[0], m)
+				m.Echo(string(buf.Bytes()))
 			}
 			return
 		}},
@@ -841,145 +827,100 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		}},
 
 		"/render": &ctx.Command{Name: "/render template", Help: "渲染模板, template: 模板名称", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Options("toolkit") {
-				if kit, ok := m.Confv("toolkit", m.Option("toolkit")).(map[string]interface{}); ok {
-					m.Sess("cli").Cmd(kit["cmd"], m.Option("argument")).CopyTo(m)
-				}
-				return
-			}
-
 			// 权限检查
 			if m.Confs("login", "check") {
-				if m.Option("username") == "" { // 没有登录
-					m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
-				} else {
-					// 创建空间
-					if bench := m.Option("bench"); m.Option("bench", m.Cmdx("aaa.sess", "bench", "select")) != bench {
-						m.Append("redirect", merge(m, m.Option("index_url"), "bench", m.Option("bench")))
-						return
-					}
-					m.Optionv("bench_data", m.Confv("auth", []string{m.Option("bench"), "data"}))
-
-					if !m.Cmds("aaa.work", "right", m.Confx("componet_group")) { // 没有权限
-						m.Set("option", "componet_group", "login").Set("option", "componet_name", "").Set("option", "bench", "")
-					}
+				if !m.Options("sessid") || !m.Options("username") || !m.Cmds("aaa.role", m.Option("userrole"), "check", m.Confx("group")) {
+					m.Set("option", "group", "login").Set("option", "name", "")
 				}
 			}
 
 			// 响应类型
-			w := m.Optionv("response").(http.ResponseWriter)
 			accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
+			w := m.Optionv("response").(http.ResponseWriter)
 			if accept_json {
-				// w.Header().Add("Content-Type", "application/json")
-			} else {
-				w.Header().Add("Content-Type", "text/html")
+				w.Header().Set("Content-Type", "text/html")
 			}
 
-			if web, ok := m.Target().Server.(*WEB); m.Assert(ok) {
-				// 响应模板
-				tmpl := web.Template
-				if m.Confs("route", "template_debug") {
-					tmpl = template.New("render").Funcs(ctx.CGI)
-					tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), "/*.tmpl"))
-					tmpl.ParseGlob(path.Join(m.Cap("directory"), m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
+			web, ok := m.Target().Server.(*WEB)
+			m.Assert(ok)
+
+			// 响应模板
+			tmpl := web.Template
+			if m.Confs("route", "template_debug") {
+				tmpl = template.New("render").Funcs(ctx.CGI)
+				tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl"))
+				tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
+			}
+
+			// 响应数据
+			group, order := m.Option("group", kit.Select(m.Conf("route", "componet_index"), m.Option("group"))), m.Option("name")
+			list := []interface{}{}
+
+			for _, v := range m.Confv("componet", group).([]interface{}) {
+				val := v.(map[string]interface{})
+				if order != "" && val["name"].(string) != order {
+					continue
 				}
 
-				// 响应数据
-				list := []interface{}{}
+				// 查找模块
+				msg := m.Find(kit.Select(m.Cap("module"), val["ctx"]))
 
-				// 响应模板
-				group, order := m.Option("componet_group", kit.Select(m.Conf("route", "componet_index"), m.Option("componet_group"))), m.Option("componet_name")
-
-				for _, v := range m.Confv("componet", group).([]interface{}) {
-					val := v.(map[string]interface{})
-					if order != "" && val["componet_name"].(string) != order {
-						continue
+				// 默认变量
+				for k, v := range val {
+					switch value := v.(type) {
+					case []string:
+						msg.Set("option", k, value)
+					case string:
+						msg.Set("option", k, value)
+					default:
+						msg.Put("option", k, value)
 					}
+				}
 
-					// 查找模块
-					msg := m.Find(kit.Select(m.Cap("module"), val["componet_ctx"]))
-
-					// 默认变量
-					for k, v := range val {
-						if msg.Option(k) != "" {
-							continue
+				// 添加命令
+				if kit.Right(val["cmd"]) {
+					arg = append(arg, kit.Format(val["cmd"]))
+				}
+				// 添加参数
+				if m.Has("cmds") {
+					arg = append(arg, kit.Trans(m.Optionv("cmds"))...)
+				} else {
+					kit.Map(val["args"], "", func(index int, value map[string]interface{}) {
+						if value["name"] != nil {
+							arg = append(arg, kit.Select(msg.Option(value["name"].(string)), msg.Parse(value["value"])))
 						}
-						switch value := v.(type) {
-						case []string:
-							msg.Add("option", k, value)
-						case string:
-							msg.Add("option", k, value)
-						default:
-							msg.Put("option", k, value)
-						}
-					}
-					// 默认参数
-					if val["inputs"] != nil {
-						for _, v := range val["inputs"].([]interface{}) {
-							value := v.(map[string]interface{})
-							if value["name"] != nil && msg.Option(value["name"].(string)) == "" {
-								msg.Add("option", value["name"].(string), m.Parse(value["value"]))
-							}
-						}
-					}
+					})
+				}
 
-					// 添加设备
-					arg = arg[:0]
-					if kit.Right(val["componet_pod"]) {
-						arg = append(arg, "remote", kit.Format(m.Magic("session", "current.pod")))
-					}
-					// 添加命令
-					if kit.Right(val["componet_cmd"]) {
-						arg = append(arg, kit.Format(val["componet_cmd"]))
-					}
-					if m.Has("cmds") {
-						arg = append(arg, kit.Trans(m.Optionv("cmds"))...)
-					}
-					// 添加参数
-					for _, v := range kit.Trans(val["componet_args"]) {
-						arg = append(arg, msg.Parse(v))
-					}
-
-					if len(arg) > 0 {
+				if len(arg) > 0 {
+					if order != "" || kit.Right(val["pre_run"]) {
 						// 权限检查
-						if m.Options("bench") && m.Option("userrole", m.Cmdx("aaa.work", "right", m.Option("componet_group"), arg[0])) == "" {
+						if m.Confs("login", "check") && m.Cmds("aaa.role", m.Option("userrole"), "check", m.Option("componet_group"), arg[0]) {
 							continue
 						}
-
-						m.Option("remote", "true")
-
 						// 执行命令
-						if order != "" || kit.Right(val["pre_run"]) {
-							if msg.Cmd(arg); m.Options("bench") {
-								name_alias := "action." + kit.Select(msg.Option("componet_name"), msg.Option("componet_name_alias"))
-
-								// 命令历史
-								msg.Put("option", name_alias, map[string]interface{}{
-									"cmd": arg, "order": m.Option("componet_name_order"), "action_time": msg.Time(),
-								}).Cmd("aaa.work", m.Option("bench"), "data", "option", name_alias, "modify_time", msg.Time())
-							}
-						}
-					}
-
-					// 添加响应
-					if msg.Appends("qrcode") {
-						m.Append("qrcode", msg.Append("qrcode"))
-					} else if msg.Appends("directory") {
-						m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
-						return
-					} else if accept_json {
-						list = append(list, msg.Meta)
-					} else if val["componet_tmpl"] != nil {
-						m.Assert(tmpl.ExecuteTemplate(w, val["componet_tmpl"].(string), msg))
+						msg.Cmd(arg)
 					}
 				}
 
-				// 生成响应
-				if accept_json {
-					en := json.NewEncoder(w)
-					en.SetIndent("", "  ")
-					en.Encode(list)
+				// 添加响应
+				if msg.Appends("qrcode") {
+					m.Append("qrcode", msg.Append("qrcode"))
+				} else if msg.Appends("directory") {
+					m.Append("download_file", fmt.Sprintf("/download/%s", msg.Append("directory")))
+					return
+				} else if accept_json {
+					list = append(list, msg.Meta)
+				} else if val["tmpl"] != nil {
+					m.Assert(tmpl.ExecuteTemplate(w, val["tmpl"].(string), msg))
 				}
+			}
+
+			// 生成响应
+			if accept_json {
+				en := json.NewEncoder(w)
+				en.SetIndent("", "  ")
+				en.Encode(list)
 			}
 			return
 		}},

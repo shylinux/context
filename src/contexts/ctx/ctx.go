@@ -45,8 +45,11 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 }
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	if m.Optionv("bio.ctx", Index); len(arg) == 0 {
+		m.Optionv("bio.msg", m)
+		m.Optionv("bio.ctx", m.Target())
 		m.Option("bio.modal", "active")
 		m.Option("log.disable", false)
+		m.Option("log.debug", true)
 		m.Option("gdb.enable", true)
 		m.Cap("stream", "stdio")
 		m.Cmd("log._init")
@@ -725,11 +728,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 		"message": &Command{Name: "message [code] [cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			msg := m
-			if ms := m.Find(m.Cap("bio.ctx")); ms != nil {
-				msg = ms
-			}
-
 			if len(arg) > 0 {
+				msg = msg.root
 				if code, e := strconv.Atoi(arg[0]); e == nil {
 					ms := []*Message{m}
 					for i := 0; i < len(ms); i++ {
@@ -744,8 +744,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}
 
 			if len(arg) == 0 {
-				m.Format("summary", msg, "deep")
-				msg.CopyTo(m)
+				// m.Format("summary", msg, "deep")
+				// msg.CopyTo(m)
 				return
 			}
 
@@ -767,211 +767,84 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			return
 		}},
 		"detail": &Command{Name: "detail [index] [value...]", Help: "查看或添加参数", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			msg := m.message
+			msg := m.Optionv("bio.msg").(*Message)
 			if len(arg) == 0 {
 				for i, v := range msg.Meta["detail"] {
-					m.Add("append", "index", i)
-					m.Add("append", "value", v)
+					m.Push("index", i)
+					m.Push("value", v)
 				}
 				m.Table()
 				return
 			}
 
-			index := m.Confi("detail_index")
+			index := 0
 			if i, e := strconv.Atoi(arg[0]); e == nil {
 				index, arg = i, arg[1:]
 			}
 			m.Echo("%s", msg.Detail(index, arg))
 			return
 		}},
-		"option": &Command{Name: "option [all] [key [index] [value...]]", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			all := false
-			if len(arg) > 0 && arg[0] == "all" {
-				all, arg = true, arg[1:]
-			}
-
-			index := -100
-			if len(arg) > 1 {
-				if i, e := strconv.Atoi(arg[1]); e == nil {
-					index = i
-					for i := 1; i < len(arg)-1; i++ {
-						arg[i] = arg[i+1]
-					}
-					arg = arg[:len(arg)-1]
+		"copy": &Command{Name: "copy", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m.Optionv("bio.msg").(*Message)
+			msg.Cmdy(arg)
+			return
+		}},
+		"table": &Command{Name: "table", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m.Optionv("bio.msg").(*Message)
+			if len(msg.Meta["append"]) == 0 {
+				msg.Meta["append"] = arg
+			} else {
+				for i, k := range msg.Meta["append"] {
+					msg.Push(k, kit.Select("", arg, i))
 				}
 			}
-
-			msg := m.message
-			keys := map[string]bool{}
-			for msg = msg; msg != nil; msg = msg.message {
-				for _, k := range msg.Meta["option"] {
-					if len(arg) == 0 {
-						if keys[k] {
-							continue
-						}
-						keys[k] = true
-						m.Add("append", "key", k)
-						m.Add("append", "len", len(msg.Meta[k]))
-						if _, ok := msg.Data[k]; ok {
-							m.Add("append", "value", kit.Format(msg.Data[k]))
-						} else {
-							m.Add("append", "value", kit.Format(msg.Meta[k]))
-						}
-						continue
-					}
-
-					if k != arg[0] {
-						continue
-					}
-
-					if len(arg) > 1 {
-						msg.Meta[k] = kit.Array(msg.Meta[k], index, arg[1:])
-						m.Echo("%v", msg.Meta[k])
-						return
-					}
-
-					if index != -100 {
-						m.Echo(kit.Array(msg.Meta[k], index)[0])
-						return
-					}
-
-					if v, ok := msg.Data[k]; ok {
-						json.MarshalIndent(v, "", "  ")
-						m.Echo(kit.Formats(v))
-						return e
-					}
-					for i, v := range msg.Meta[k] {
-						m.Add("append", "index", i)
-						m.Add("append", "value", v)
-					}
-					m.Table()
-					return
-				}
-
-				if !all {
-					break
-				}
+			msg.Log("fuck", "waht %v", msg.Meta)
+			return
+		}},
+		"option": &Command{Name: "option", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m.Optionv("bio.msg").(*Message)
+			switch v := msg.Optionv(arg[0]).(type) {
+			case []string:
+				m.Echo(strings.Join(v, ""))
+			default:
+				m.Echo(kit.Format(v))
 			}
-			m.Sort("key", "str").Table()
+			return
+		}},
+		"append": &Command{Name: "append", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			msg := m.Optionv("bio.msg").(*Message)
+			if len(arg) == 0 {
+				m.Copy(msg, "append")
+				m.Table()
+				return
+			}
+			if len(arg) == 1 {
+				for i, v := range msg.Meta[arg[0]] {
+					m.Push("index", i)
+					m.Push("value", v)
+				}
+				m.Table()
+				return
+			}
+			msg.Push(arg[0], arg[1])
 			return
 		}},
 		"result": &Command{Name: "result [index] [value...]", Help: "查看或添加返回值", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			msg := m.message
+			msg := m.Optionv("bio.msg").(*Message)
 			if len(arg) == 0 {
 				for i, v := range msg.Meta["result"] {
-					m.Add("append", "index", i)
-					m.Add("append", "value", strings.Replace(v, "\n", "\\n", -1))
+					m.Push("index", i)
+					m.Push("value", strings.Replace(v, "\n", "\\n", -1))
 				}
 				m.Table()
 				return
 			}
 
-			index := m.Confi("result_index")
+			index := -2
 			if i, e := strconv.Atoi(arg[0]); e == nil {
 				index, arg = i, arg[1:]
 			}
 			m.Echo("%s", msg.Result(index, arg))
-			return
-		}},
-		"append": &Command{Name: "append [all] [key [index] [value...]]", Help: "查看或添加附加值", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			all := false
-			if len(arg) > 0 && arg[0] == "all" {
-				all, arg = true, arg[1:]
-			}
-
-			index := -100
-			if len(arg) > 1 {
-				if i, e := strconv.Atoi(arg[1]); e == nil {
-					index = i
-					for i := 1; i < len(arg)-1; i++ {
-						arg[i] = arg[i+1]
-					}
-					arg = arg[:len(arg)-1]
-				}
-			}
-
-			msg := m.message
-			for msg = msg; msg != nil; msg = msg.message {
-				for _, k := range msg.Meta["append"] {
-					if len(arg) == 0 {
-						m.Add("append", "key", k)
-						m.Add("append", "value", fmt.Sprintf("%v", msg.Meta[k]))
-						continue
-					}
-
-					if k != arg[0] {
-						continue
-					}
-
-					if len(arg) > 1 {
-						msg.Meta[k] = kit.Array(msg.Meta[k], index, arg[1:])
-						m.Echo("%v", msg.Meta[k])
-						return
-					}
-
-					if index != -100 {
-						m.Echo(kit.Array(msg.Meta[k], index)[0])
-						return
-					}
-
-					for i, v := range msg.Meta[k] {
-						m.Add("append", "index", i)
-						m.Add("append", "value", v)
-					}
-					m.Table()
-					return
-				}
-
-				if !all {
-					break
-				}
-			}
-			m.Table()
-			return
-		}},
-		"session": &Command{Name: "session [all] [key [module]]", Help: "查看或添加会话", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			all := false
-			if len(arg) > 0 && arg[0] == "all" {
-				all, arg = true, arg[1:]
-			}
-
-			msg := m.message
-			for msg = msg; msg != nil; msg = msg.message {
-				for k, v := range msg.Sessions {
-					if len(arg) > 1 {
-						msg.Sessions[arg[0]] = msg.Find(arg[1])
-						return
-					} else if len(arg) > 0 {
-						if k == arg[0] {
-							m.Echo("%d", v.code)
-							return
-						}
-						continue
-					}
-
-					m.Add("append", "key", k)
-					m.Add("append", "time", v.time.Format("15:04:05"))
-					m.Add("append", "code", v.code)
-					m.Add("append", "source", v.source.Name)
-					m.Add("append", "target", v.target.Name)
-					m.Add("append", "details", fmt.Sprintf("%v", v.Meta["detail"]))
-					m.Add("append", "options", fmt.Sprintf("%v", v.Meta["option"]))
-				}
-
-				if len(arg) == 0 && !all {
-					break
-				}
-			}
-			m.Table()
-			return
-		}},
-		"callback": &Command{Name: "callback", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
-			msg := m.message
-			for msg := msg; msg != nil; msg = msg.message {
-				m.Add("append", "msg", msg.code)
-				m.Add("append", "fun", msg.callback)
-			}
-			m.Table()
 			return
 		}},
 

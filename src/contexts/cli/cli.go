@@ -40,6 +40,7 @@ func (cli *CLI) schedule(m *ctx.Message) string {
 }
 
 func (cli *CLI) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
+	c.Configs["_index"] = &ctx.Config{Name: "_index", Value: []interface{}{}, Help: "_index"}
 	return &CLI{Context: c}
 }
 func (cli *CLI) Begin(m *ctx.Message, arg ...string) ctx.Server {
@@ -116,10 +117,10 @@ var Index = &ctx.Context{Name: "test", Help: "测试工具",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"_index": &ctx.Config{Name: "index", Value: []interface{}{
-			map[string]interface{}{"componet_name": "demo", "componet_help": "demo",
-				"componet_tmpl": "componet", "componet_view": "componet", "componet_init": "",
-				"componet_type": "public", "componet_ctx": "demo", "componet_cmd": "demo",
-				"componet_args": []interface{}{}, "inputs": []interface{}{
+			map[string]interface{}{"name": "demo", "help": "demo",
+				"tmpl": "componet", "view": "componet", "init": "",
+				"type": "public", "ctx": "demo", "cmd": "demo",
+				"args": []interface{}{}, "inputs": []interface{}{
 					map[string]interface{}{"type": "text", "name": "pod", "value": "hello world"},
 					map[string]interface{}{"type": "button", "value": "执行"},
 				},
@@ -141,7 +142,7 @@ func main() {
 {init: function(page, pane, field, option, output) {
     kit.Log("hello world")
 }}
-`}, map[string]interface{}{"name": "local.shy", "text": ` `},
+`}, map[string]interface{}{"name": "index.shy", "text": ` `}, map[string]interface{}{"name": "local.shy", "text": ` `},
 				},
 			}, "script": map[string]interface{}{
 				"path": "usr/script",
@@ -976,10 +977,9 @@ func main() {
 					m.Cmdy("cli.context")
 					break
 				}
-				fallthrough
-			default:
+
 				if p, e := plugin.Open(path.Join(m.Conf("publish", "path"), arg[0], "index.so")); e == nil {
-					if s, e := p.Lookup("Index"); m.Assert(e) {
+					if s, e := p.Lookup("Index"); false && m.Assert(e) {
 						msg := m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0])).Cmd("_init", arg[1:])
 						msg.Cap("stream", arg[0])
 						msg.Confm("_index", func(index int, value map[string]interface{}) {
@@ -992,11 +992,32 @@ func main() {
 						})
 						m.Table()
 					}
-					return e
-				} else {
-					m.Log("info", "open %v", e)
 				}
 
+				msg := m.Find(arg[0], false)
+				if msg == nil {
+					m.Start(arg[0], "shy")
+					msg = m
+				} else {
+					msg.Target().Configs["_index"].Value = []interface{}{}
+				}
+				msg.Optionv("bio.ctx", msg.Target())
+
+				if p := msg.Cmdx("nfs.path", path.Join(msg.Conf("publish", "path"), arg[0], "index.shy")); p != "" {
+					msg.Cmdy("nfs.source", p)
+					msg.Confv("ssh.componet", arg[0], msg.Confv("_index"))
+				}
+
+				m.Confm("ssh.componet", arg[0], func(index int, value map[string]interface{}) {
+					m.Push("index", index)
+					m.Push("name", value["componet_name"])
+					m.Push("help", value["componet_help"])
+					m.Push("ctx", value["componet_ctx"])
+					m.Push("cmd", value["componet_cmd"])
+				})
+				m.Table()
+
+			default:
 				restart := false
 				for _, link := range kit.View([]string{arg[0]}, m.Confm("upgrade")) {
 					file := kit.Select(link, m.Conf("upgrade", []string{"list", strings.Replace(link, ".", "_", -1)}))
