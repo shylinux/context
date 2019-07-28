@@ -2,10 +2,11 @@ package lex
 
 import (
 	"contexts/ctx"
+	"toolkit"
+
 	"fmt"
 	"strconv"
 	"strings"
-	"toolkit"
 )
 
 type Seed struct {

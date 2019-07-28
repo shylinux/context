@@ -1,12 +1,15 @@
 package web
 
 import (
-	"bytes"
-	"contexts/ctx"
-	"encoding/json"
-	"fmt"
 	"github.com/go-cas/cas"
 	"github.com/skip2/go-qrcode"
+
+	"contexts/ctx"
+	"toolkit"
+
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -18,7 +21,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"toolkit"
 )
 
 type MUX interface {

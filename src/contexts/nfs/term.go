@@ -1,13 +1,13 @@
 package nfs
 
 import (
+	"github.com/nsf/termbox-go"
+
 	"contexts/ctx"
 	"toolkit"
 
 	"fmt"
 	"strings"
-
-	"github.com/nsf/termbox-go"
 	"time"
 )
 

@@ -2,6 +2,8 @@ package tcp
 
 import (
 	"contexts/ctx"
+	"toolkit"
+
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -10,7 +12,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-	"toolkit"
 )
 
 type TCP struct {

@@ -2,12 +2,13 @@ package ssh
 
 import (
 	"contexts/ctx"
+	"toolkit"
+
 	"encoding/hex"
 	"io"
 	"os"
 	"path"
 	"strings"
-	"toolkit"
 )
 
 type SSH struct {
@@ -483,6 +484,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			case "serve":
 				m.Conf("runtime", "work.serve", true)
 				m.Conf("runtime", "work.route", m.Conf("runtime", "node.route"))
+				m.Conf("runtime", "work.name", m.Conf("runtime", "user.name"))
 				m.Conf("work", m.Conf("runtime", "user.name"), map[string]interface{}{
 					"create_time": m.Time(), "user": m.Cmd("ssh.user", "init").Append("user.route"),
 				})

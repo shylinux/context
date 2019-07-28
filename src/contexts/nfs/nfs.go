@@ -1,13 +1,11 @@
 package nfs
 
 import (
-	"github.com/skip2/go-qrcode"
-
 	"contexts/ctx"
-	"crypto/md5"
 	"toolkit"
 
 	"bufio"
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/csv"
 	"encoding/hex"
@@ -1020,15 +1018,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						w.Write(kit.Trans(v))
 					}
 					w.Flush()
-				}
-
-			case strings.HasSuffix(arg[0], ".png"):
-				if data == nil {
-					data = strings.Join(arg[1:], "")
-				}
-
-				if qr, e := qrcode.New(kit.Format(data), qrcode.Medium); m.Assert(e) {
-					m.Assert(qr.Write(256, f))
 				}
 
 			default:

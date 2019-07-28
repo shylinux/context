@@ -2,12 +2,12 @@ package gdb
 
 import (
 	"contexts/ctx"
-	"time"
 	"toolkit"
 
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 type GDB struct {

@@ -1,21 +1,21 @@
 package cli
 
 import (
+	"contexts/ctx"
+	"toolkit"
+
 	"bufio"
 	"bytes"
-	"contexts/ctx"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"os/user"
 	"path"
-	"reflect"
-	"toolkit"
-
-	"fmt"
-	"os"
 	"plugin"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
