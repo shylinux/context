@@ -365,6 +365,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			"button":   true,
 			"select":   true,
 			"textarea": true,
+			"exports":  true,
 		}, Help: "控件类型"},
 		"exec": &ctx.Config{Name: "info", Value: map[string]interface{}{
 			"disable": map[string]interface{}{
@@ -1073,6 +1074,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			m.Log("info", "_index: %v", arg)
 			args := []interface{}{}
 			inputs := []interface{}{}
+			exports := []interface{}{}
 			for i := 7; i < len(arg); i++ {
 				if !m.Confs("input", arg[i]) {
 					args = append(args, arg[i])
@@ -1083,23 +1085,28 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					if j < len(arg)-1 && !m.Confs("input", arg[j+1]) {
 						continue
 					}
-
 					args := arg[i : j+1]
-					input := map[string]interface{}{
-						"type":  kit.Select("", args, 0),
-						"value": kit.Select("", args, 1),
-					}
-					for k := 2; k < len(args)-1; k += 2 {
-						switch val := input[args[k]].(type) {
-						case nil:
-							input[args[k]] = args[k+1]
-						case string:
-							input[args[k]] = []interface{}{input[args[k]], args[k+1]}
-						case []interface{}:
-							input[args[k]] = append(val, args[k+1])
+					if arg[i] == "exports" {
+						for k := 1; k < len(args); k += 1 {
+							exports = append(exports, args[k])
 						}
+					} else {
+						input := map[string]interface{}{
+							"type":  kit.Select("", args, 0),
+							"value": kit.Select("", args, 1),
+						}
+						for k := 2; k < len(args)-1; k += 2 {
+							switch val := input[args[k]].(type) {
+							case nil:
+								input[args[k]] = args[k+1]
+							case string:
+								input[args[k]] = []interface{}{input[args[k]], args[k+1]}
+							case []interface{}:
+								input[args[k]] = append(val, args[k+1])
+							}
+						}
+						inputs = append(inputs, input)
 					}
-					inputs = append(inputs, input)
 					i = j
 					break
 				}
@@ -1123,6 +1130,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				"componet_cmd":  kit.Select("", arg, 6),
 				"componet_args": args,
 				"inputs":        inputs,
+				"exports":       exports,
 			})
 			return
 		}},

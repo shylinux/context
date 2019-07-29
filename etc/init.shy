@@ -3,7 +3,7 @@
 ~aaa
     config load tmp/auth.json auth
 ~ssh
-    config load tmp/cert.json work flow trust
+    config load tmp/cert.json work flow
 ~mdb
     config load tmp/data.json ktv
 ~wiki

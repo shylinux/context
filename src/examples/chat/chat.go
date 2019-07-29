@@ -363,13 +363,14 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			switch arg[0] {
 			// 创建命令
 			case "spawn":
+				if len(arg) == 2 {
+					self := m.Conf("runtime", "node.route")
+					m.Confm("ssh.componet", arg[1], func(index int, value map[string]interface{}) {
+						arg = append(arg, self, arg[1], kit.Format(index), kit.Format(value["name"]))
+					})
+				}
+
 				list := []interface{}{}
-
-				self := m.Conf("runtime", "node.route")
-				m.Confm("ssh.componet", arg[1], func(index int, value map[string]interface{}) {
-					arg = append(arg, self, arg[1], kit.Format(index), kit.Format(value["name"]))
-				})
-
 				for i := 2; i < len(arg)-3; i += 4 {
 					list = append(list, map[string]interface{}{
 						"node": arg[i], "group": arg[i+1], "index": arg[i+2], "name": arg[i+3],

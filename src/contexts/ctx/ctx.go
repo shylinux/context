@@ -48,9 +48,9 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 		m.Optionv("bio.msg", m)
 		m.Optionv("bio.ctx", m.Target())
 		m.Option("bio.modal", "active")
+		m.Option("log.debug", false)
 		m.Option("log.disable", false)
-		m.Option("log.debug", true)
-		m.Option("gdb.enable", true)
+		m.Option("gdb.enable", false)
 		m.Cap("stream", "stdio")
 		m.Cmd("log._init")
 		m.Cmd("gdb._init")
@@ -786,6 +786,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		}},
 		"copy": &Command{Name: "copy", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			msg := m.Optionv("bio.msg").(*Message)
+			for i := len(arg) - 1; i >= 0; i-- {
+				if arg[i] == "" {
+					arg = arg[:i]
+				} else {
+					break
+				}
+			}
 			msg.Cmdy(arg)
 			return
 		}},

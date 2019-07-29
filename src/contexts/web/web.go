@@ -557,14 +557,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							var data interface{}
 							for k, v := range uuu.Query() {
 								if len(v) == 1 {
-									if i, e := strconv.Atoi(v[0]); e == nil {
+									if i, e := strconv.Atoi(v[0]); e == nil && false {
 										data = kit.Chain(data, k, i)
 									} else {
 										data = kit.Chain(data, k, v[0])
 									}
 								} else {
 									for _, val := range v {
-										if i, e := strconv.Atoi(v[0]); e == nil {
+										if i, e := strconv.Atoi(v[0]); e == nil && false {
 											data = kit.Chain(data, []string{k, "-2"}, i)
 										} else {
 											data = kit.Chain(data, []string{k, "-2"}, val)
