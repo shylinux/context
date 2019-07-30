@@ -2,6 +2,7 @@ package ctx
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -58,7 +59,7 @@ func (c *Context) Plugin(s *Context, args []string) string {
 		m.Cmd(args)
 	}
 	for _, v := range m.Meta["result"] {
-		m.Show(v)
+		fmt.Printf(v)
 	}
 	return ""
 }
@@ -329,7 +330,11 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 	return nil
 }
 func (m *Message) Form(x *Command, arg []string) []string {
-	for _, form := range []map[string]int{m.Optionv("ctx.form").(map[string]int), x.Form} {
+	form, ok := m.Optionv("ctx.form").(map[string]int)
+	if !ok {
+		return arg
+	}
+	for _, form := range []map[string]int{form, x.Form} {
 
 		if args := []string{}; form != nil {
 			for i := 0; i < len(arg); i++ {
