@@ -574,6 +574,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Cmd("web.serve", "usr", m.Conf("runtime", "boot.web_port"))
 				}
 
+				switch m.Conf("runtime", "boot.ctx_type") {
+				case "work":
+					m.Cmd("ssh.work", "serve")
+				case "user":
+					m.Cmd("ssh.work", "create")
+				case "node":
+				}
+
 			// 监听连接
 			case "listen":
 				m.Cmd("ssh._node", "init")

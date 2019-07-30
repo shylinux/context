@@ -515,7 +515,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	})
 
 	if !msg.Hand {
-		msg.Log("error", "cmd run error %s", msg.Format())
+		// msg.Log("error", "cmd run error %s", msg.Format())
 	}
 	return msg
 }

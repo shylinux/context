@@ -9,6 +9,7 @@ ctx_bin=${ctx_app} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}
 ctx_dev=${ctx_dev:="https://shylinux.com"}
 ctx_root=${ctx_root:=/usr/local/context}
 ctx_home=${ctx_home:=~/context}
+# ctx_type=
 # node_cert=
 # node_key=
 # web_port=
@@ -40,7 +41,7 @@ install() {
     target=system && [ -n "$2" ] && target=$2
 
     wget -O ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} \
-        && ${md5} ${ctx_app} && ./${ctx_app} upgrade ${target} \
+        && ${md5} ${ctx_app} && ./${ctx_app} upgrade ${target} && ./${ctx_app} upgrade portal \
         && mv ${ctx_app} bin/${ctx_app}
 
     mkdir -p usr/script && touch usr/script/local.shy && cd etc && ln -s ../usr/script/local.shy .
@@ -53,7 +54,7 @@ main() {
     log "\nstarting..."
     while true; do
         date && ${ctx_bin} "$@" && break
-        log "\nrestarting..." && sleep 1
+        log "\n\nrestarting..." && sleep 1
     done
 }
 action() {
@@ -78,6 +79,6 @@ case $1 in
     restart) action 30;;
     upgrade) action 31;;
     quit) action QUIT;;
-    term) action TERM;;
+    term) action TERM
 esac
 

@@ -20,7 +20,7 @@ type TCP struct {
 	*ctx.Context
 }
 
-func (tcp *TCP) parse(m *ctx.Message, arg ...string) ([]string, []string) {
+func (tcp *TCP) parse(m *ctx.Message, arg ...string) ([]string, []string, bool) {
 	defer func() {
 		if e := recover(); e != nil {
 			m.Log("warn", "%v", e)
@@ -32,7 +32,9 @@ func (tcp *TCP) parse(m *ctx.Message, arg ...string) ([]string, []string) {
 		m.Cmd("web.get", arg[1], arg[2], "temp", "ports", "format", "object").Table(func(line map[string]string) {
 			address = append(address, line["value"])
 		})
-		m.Assert(len(address) > 0, "dial failure")
+		if len(address) == 0 {
+			return nil, nil, false
+		}
 
 		for i := 2; i < len(arg)-1; i++ {
 			arg[i] = arg[i+1]
@@ -43,7 +45,7 @@ func (tcp *TCP) parse(m *ctx.Message, arg ...string) ([]string, []string) {
 	} else {
 		address = append(address, m.Cap("address", m.Confx("address", arg, 1)))
 	}
-	return address, arg
+	return address, arg, true
 }
 func (tcp *TCP) retry(m *ctx.Message, address []string, action func(address string) (net.Conn, error)) net.Conn {
 	var count int32
@@ -107,8 +109,8 @@ func (tcp *TCP) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return tcp
 }
 func (tcp *TCP) Start(m *ctx.Message, arg ...string) bool {
-	address, arg := tcp.parse(m, arg...)
-	if len(address) == 0 {
+	address, arg, ok := tcp.parse(m, arg...)
+	if len(address) == 0 || !ok {
 		return true
 	}
 	m.Cap("security", m.Confx("security", arg, 2))

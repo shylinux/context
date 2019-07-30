@@ -322,7 +322,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "stm", "hash": "return", "word": []interface{}{"return", "rep{", "exp", "}"}},
 
 			// 命令语句
-			map[string]interface{}{"page": "word", "hash": "word", "word": []interface{}{"mul{", "~", "!", "\\?", "\\?\\?", "exe", "str", "[\\-a-zA-Z0-9_:/.]+", "=", "<", ">$", ">@", ">", "\\|", "%", "}"}},
+			map[string]interface{}{"page": "word", "hash": "word", "word": []interface{}{"mul{", "~", "!", "\\?", "\\?\\?", "exe", "str", "[\\-a-zA-Z0-9_:/.%*]+", "=", "<", ">$", ">@", ">", "\\|", "}"}},
 			map[string]interface{}{"page": "cmd", "hash": "cmd", "word": []interface{}{"rep{", "word", "}"}},
 			map[string]interface{}{"page": "com", "hash": "com", "word": []interface{}{"mul{", ";", "#[^\n]*\n?", "\n", "}"}},
 			map[string]interface{}{"page": "line", "hash": "line", "word": []interface{}{"opt{", "mul{", "stm", "cmd", "}", "}", "com"}},

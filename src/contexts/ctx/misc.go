@@ -222,7 +222,6 @@ func (m *Message) Find(name string, root ...bool) *Message {
 		} else if target.Name == v {
 			continue
 		} else {
-			m.Log("error", "context not find %s", name)
 			return nil
 		}
 	}

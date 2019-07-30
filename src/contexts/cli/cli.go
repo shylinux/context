@@ -62,6 +62,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"ctx_ups", "ctx_box", "ctx_dev",
 				"ctx_cas",
 				"ctx_root", "ctx_home",
+				"ctx_type",
 				"web_port", "ssh_port",
 			},
 			"boot": map[string]interface{}{
@@ -142,7 +143,14 @@ func main() {
 {init: function(page, pane, field, option, output) {
     kit.Log("hello world")
 }}
-`}, map[string]interface{}{"name": "index.shy", "text": ` `}, map[string]interface{}{"name": "local.shy", "text": ` `},
+`}, map[string]interface{}{"name": "index.shy", "text": `
+fun hello world "" "" \
+	public \
+	text "" \
+	button "执行"
+	copy pwd
+end
+`}, map[string]interface{}{"name": "local.shy", "text": ` `},
 				},
 			}, "script": map[string]interface{}{
 				"path": "usr/script",
@@ -163,6 +171,8 @@ func main() {
 		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
 			"path": "usr/publish", "list": map[string]interface{}{
 				"boot_sh":    "bin/boot.sh",
+				"zone_sh":    "bin/zone.sh",
+				"user_sh":    "bin/user.sh",
 				"node_sh":    "bin/node.sh",
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
@@ -177,12 +187,14 @@ func main() {
 			},
 		}, Help: "版本发布"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
-			"system": []interface{}{"boot.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
+			"system": []interface{}{"boot.sh", "zone.sh", "user.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
 			"portal": []interface{}{"template.tar.gz", "librarys.tar.gz"},
 			"script": []interface{}{"test.php"},
 			"list": map[string]interface{}{
 				"bench":      "bin/bench.new",
 				"boot_sh":    "bin/boot.sh",
+				"zone_sh":    "bin/zone.sh",
+				"user_sh":    "bin/user.sh",
 				"node_sh":    "bin/node.sh",
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
@@ -1003,7 +1015,11 @@ func main() {
 				}
 				msg.Optionv("bio.ctx", msg.Target())
 
-				if p := msg.Cmdx("nfs.path", path.Join(msg.Conf("publish", "path"), arg[0], "index.shy")); p != "" {
+				p := msg.Cmdx("nfs.path", path.Join(msg.Conf("project", "plugin.path"), arg[0], "index.shy"))
+				if p == "" {
+					p = msg.Cmdx("nfs.path", path.Join(msg.Conf("publish", "path"), arg[0], "index.shy"))
+				}
+				if p != "" {
 					msg.Cmdy("nfs.source", p)
 					msg.Confv("ssh.componet", arg[0], msg.Confv("_index"))
 				}
