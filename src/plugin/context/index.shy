@@ -1,0 +1,87 @@
+
+fun project "项目" "" "" \
+	private \
+    select "" values plugin values stat values init \
+	text "" \
+	button "执行" \
+    exports see name see
+
+	copy cli.project $1 $2
+end
+
+fun compile "编译" "" "" \
+	private \
+    select "" values plugin values windows values darwin values linux values self values all \
+	text "" name see imports plugin_see \
+	button "编译"
+
+	copy cli.compile $1 $2
+end
+
+fun publish "发布" "" "" \
+	private \
+	text "" name see imports plugin_see \
+	button "发布"
+
+	copy cli.publish $1
+end
+
+fun upgrade "升级" "" "" \
+	private \
+	text "" name pod imports plugin_pod \
+    select "" values script values restart values plugin values bench values portal values system \
+	text "" \
+	button "升级"
+
+	copy ssh._route $1 cli.upgrade $2 $3
+end
+
+fun missyou "任务" "" "" \
+	private \
+	text "" view long \
+	button "行动" action auto \
+    exports you "" you
+
+	copy cli.missyou $1
+end
+
+fun pod "设备" "" "" \
+	private \
+	text "" view long \
+	button "行动" action auto \
+    exports pod pod
+
+	copy ssh._route $1 ssh.remote $1
+end
+
+fun ctx "模块" "" "" \
+	private \
+	text "" name pod imports plugin_pod action auto view long \
+	text "nfs" name ctx imports plugin_ctx action auto \
+	button "行动" \
+    exports ctx names
+
+	copy ssh._route $1 context $2 list
+end
+
+fun cmd "命令" "" "" \
+	private \
+	text "" name pod imports plugin_pod view long \
+	text "" name ctx imports plugin_ctx \
+	text "pwd" \
+	button "执行"
+
+	copy ssh._route $1 context $2 command $3
+end
+
+fun dir "目录" "" "" \
+	private \
+	text "" name pod imports plugin_pod action auto view long \
+	text "usr/script" name dir imports plugin_dir action auto view long \
+	button "查看" action auto \
+	button "回退" click Back \
+    exports dir "" dir
+
+	copy ssh._route $1 nfs.dir $2 time size line path
+end
+

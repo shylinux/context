@@ -103,66 +103,18 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"github.com/PuerkitoBio/goquery",
 				"github.com/go-cas/cas",
 			}, "plugin": map[string]interface{}{
-				"path": "src/plugin", "list": []interface{}{
-					map[string]interface{}{"name": "index.go", "text": `package main
-
-import (
-    "contexts/cli"
-    "contexts/ctx"
-    "toolkit"
-    "fmt"
-    "os"
-)
-
-var Index = &ctx.Context{Name: "test", Help: "测试工具",
-	Caches: map[string]*ctx.Cache{},
-	Configs: map[string]*ctx.Config{
-		"_index": &ctx.Config{Name: "index", Value: []interface{}{
-			map[string]interface{}{"name": "demo", "help": "demo",
-				"tmpl": "componet", "view": "componet", "init": "",
-				"type": "public", "ctx": "demo", "cmd": "demo",
-				"args": []interface{}{}, "inputs": []interface{}{
-					map[string]interface{}{"type": "text", "name": "pod", "value": "hello world"},
-					map[string]interface{}{"type": "button", "value": "执行"},
-				},
-			},
-		}},
-	},
-	Commands: map[string]*ctx.Command{
-		"demo": {Name: "demo", Help: "demo", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-            m.Echo(kit.Select("hello world", arg, 0))
-            return
-		}},
-	},
-}
-
-func main() {
-	fmt.Print(cli.Index.Plugin(Index, os.Args[1:]))
-}
-`}, map[string]interface{}{"name": "index.js", "text": `
-{init: function(page, pane, field, option, output) {
-    kit.Log("hello world")
-}}
-`}, map[string]interface{}{"name": "index.shy", "text": `
-fun hello world "" "" \
-	public \
-	text "" \
-	button "执行"
-	copy pwd
-end
-`}, map[string]interface{}{"name": "local.shy", "text": ` `},
-				},
+				"path": "src/plugin", "list": Template,
 			}, "script": map[string]interface{}{
 				"path": "usr/script",
 			},
 		}, Help: "项目管理"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
 			"bench": "src/extend/bench.go", "list": []interface{}{
-				map[string]interface{}{"os": "linux", "cpu": "amd64"},
-				map[string]interface{}{"os": "linux", "cpu": "386"},
 				map[string]interface{}{"os": "linux", "cpu": "arm"},
-				map[string]interface{}{"os": "windows", "cpu": "amd64"},
+				map[string]interface{}{"os": "linux", "cpu": "386"},
+				map[string]interface{}{"os": "linux", "cpu": "amd64"},
 				map[string]interface{}{"os": "windows", "cpu": "386"},
+				map[string]interface{}{"os": "windows", "cpu": "amd64"},
 				map[string]interface{}{"os": "darwin", "cpu": "amd64"},
 			},
 			"env": []interface{}{"GOBIN", "GOPATH", "PATH"},
@@ -191,7 +143,8 @@ end
 			"portal": []interface{}{"template.tar.gz", "librarys.tar.gz"},
 			"script": []interface{}{"test.php"},
 			"list": map[string]interface{}{
-				"bench":      "bin/bench.new",
+				"bench": "bin/bench.new",
+
 				"boot_sh":    "bin/boot.sh",
 				"zone_sh":    "bin/zone.sh",
 				"user_sh":    "bin/user.sh",
@@ -897,7 +850,7 @@ end
 				})
 
 				if q == "" {
-					q = path.Join(m.Conf("publish", "path"), strings.Join([]string{"bench", goos, arch}, "_"))
+					q = path.Join(m.Conf("publish", "path"), strings.Join([]string{"bench", goos, arch}, "."))
 					p = m.Cmdx("nfs.path", m.Conf("compile", "bench"))
 				}
 
@@ -910,21 +863,17 @@ end
 			}
 			return
 		}},
-		"publish": &ctx.Command{Name: "publish", Help: "版本发布", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			dir := m.Conf("publish", "path")
-			m.Assert(os.MkdirAll(dir, 0777))
-
+		"publish": &ctx.Command{Name: "publish [item...]", Help: "版本发布", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			// 发布系统
 			if len(arg) == 0 {
-				list := [][]string{}
 				m.Confm("publish", "list", func(key string, value string) {
-					list = append(list, []string{key})
+					arg = append(arg, strings.Replace(key, "_", ".", -1))
 				})
-				m.Cmdp(0, []string{"copy"}, []string{"cli.publish"}, list)
-				return
 			}
-
 			p := path.Join(m.Conf("project", "plugin.path"), arg[0])
 			q := path.Join(m.Conf("publish", "path"), arg[0])
+
+			// 发布模块
 			if _, e := os.Stat(p); e == nil && m.Assert(os.MkdirAll(q, 0777)) {
 				m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
 					m.Cmd("nfs.copy", path.Join(q, kit.Format(value["name"])), path.Join(p, kit.Format(value["name"])))
@@ -936,21 +885,21 @@ end
 				return e
 			}
 
+			// 发布文件
 			for _, key := range arg {
-				key = kit.Key(key)
-				value := m.Conf("publish", []string{"list", key})
-				p := m.Cmdx("nfs.path", value)
-				q := path.Join(dir, key)
+				p := m.Cmdx("nfs.path", m.Conf("publish", []string{"list", kit.Key(key)}))
+				q := path.Join(m.Conf("publish", "path"), key)
 				if s, e := os.Stat(p); e == nil {
 					if s.IsDir() {
-						m.Cmd("cli.system", "tar", "-zcf", q, "-C", path.Dir(p), path.Base(value))
+						m.Cmd("cli.system", "tar", "-zcf", q, "-C", path.Dir(p), path.Base(p))
 					} else {
 						m.Cmd("nfs.copy", q, p)
 					}
-					m.Add("append", "time", s.ModTime())
-					m.Add("append", "size", s.Size())
-					m.Add("append", "hash", kit.Hashs(p)[:8])
-					m.Add("append", "file", q)
+
+					m.Push("time", s.ModTime())
+					m.Push("size", s.Size())
+					m.Push("hash", kit.Hashs(p)[:8])
+					m.Push("file", q)
 				}
 			}
 			m.Table()
@@ -990,40 +939,38 @@ end
 					break
 				}
 
+				// 加载模块
 				if p, e := plugin.Open(path.Join(m.Conf("publish", "path"), arg[0], "index.so")); e == nil {
-					if s, e := p.Lookup("Index"); false && m.Assert(e) {
-						msg := m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0])).Cmd("_init", arg[1:])
-						msg.Cap("stream", arg[0])
-						msg.Confm("_index", func(index int, value map[string]interface{}) {
-							value["componet_ctx"] = "cli." + arg[0]
-							m.Conf("ssh.componet", []interface{}{arg[0], index}, value)
-							m.Add("append", "componet", arg[0])
-							m.Add("append", "index", index)
-							m.Add("append", "name", value["componet_name"])
-							m.Add("append", "help", value["componet_help"])
-						})
-						m.Table()
+					if s, e := p.Lookup("Index"); m.Assert(e) {
+						m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0])).Cmd("_init", arg[1:])
 					}
 				}
 
+				// 查找模块
 				msg := m.Find(arg[0], false)
 				if msg == nil {
 					m.Start(arg[0], "shy")
 					msg = m
-				} else {
-					msg.Target().Configs["_index"].Value = []interface{}{}
 				}
-				msg.Optionv("bio.ctx", msg.Target())
 
+				// 查找脚本
 				p := msg.Cmdx("nfs.path", path.Join(msg.Conf("project", "plugin.path"), arg[0], "index.shy"))
 				if p == "" {
-					p = msg.Cmdx("nfs.path", path.Join(msg.Conf("publish", "path"), arg[0], "index.shy"))
+					p = m.Cmdx("nfs.hash", m.Cmdx("web.get", "dev", fmt.Sprintf("publish/%s", arg[0]),
+						"GOARCH", m.Conf("runtime", "host.GOARCH"),
+						"GOOS", m.Conf("runtime", "host.GOOS"),
+						"upgrade", "plugin"))
 				}
+
+				// 加载脚本
 				if p != "" {
+					msg.Target().Configs["_index"].Value = []interface{}{}
+					msg.Optionv("bio.ctx", msg.Target())
 					msg.Cmdy("nfs.source", p)
 					msg.Confv("ssh.componet", arg[0], msg.Confv("_index"))
 				}
 
+				// 组件列表
 				m.Confm("ssh.componet", arg[0], func(index int, value map[string]interface{}) {
 					m.Push("index", index)
 					m.Push("name", value["componet_name"])

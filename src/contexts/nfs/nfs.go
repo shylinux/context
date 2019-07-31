@@ -774,6 +774,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					h := md.Sum(nil)
 					m.Echo(hex.EncodeToString(h[:]))
 				}
+			} else if f, p, e := kit.Create(path.Join(m.Conf("dir", "temp"), kit.Hashs(arg[0]))); m.Assert(e) {
+				defer f.Close()
+				if n, e := f.WriteString(arg[0]); m.Assert(e) {
+					m.Log("info", "save %v %v", n, p)
+					m.Echo(p)
+				}
 			}
 			return
 		}},

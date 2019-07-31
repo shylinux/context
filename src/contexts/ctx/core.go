@@ -99,6 +99,7 @@ func (c *Context) Begin(m *Message, arg ...string) *Context {
 	if c.Server != nil {
 		c.Server.Begin(m, m.Meta["detail"]...)
 	}
+	m.root.Capi("ncontext", 1)
 	return c
 }
 func (c *Context) Start(m *Message, arg ...string) bool {
@@ -146,7 +147,6 @@ func (c *Context) Close(m *Message, arg ...string) bool {
 		for i := len(c.requests) - 1; i >= 0; i-- {
 			if msg := c.requests[i]; msg.code == m.code {
 				if c.Server == nil || c.Server.Close(m, arg...) {
-					m.Log("close", "request %d/%d", i, len(c.requests)-1)
 					msg.Free()
 					for j := i; j < len(c.requests)-1; j++ {
 						c.requests[j] = c.requests[j+1]

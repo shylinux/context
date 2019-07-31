@@ -557,14 +557,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							var data interface{}
 							for k, v := range uuu.Query() {
 								if len(v) == 1 {
-									if i, e := strconv.Atoi(v[0]); e == nil && false {
+									if i, e := strconv.Atoi(v[0]); e == nil {
 										data = kit.Chain(data, k, i)
 									} else {
 										data = kit.Chain(data, k, v[0])
 									}
 								} else {
 									for _, val := range v {
-										if i, e := strconv.Atoi(v[0]); e == nil && false {
+										if i, e := strconv.Atoi(v[0]); e == nil {
 											data = kit.Chain(data, []string{k, "-2"}, i)
 										} else {
 											data = kit.Chain(data, []string{k, "-2"}, val)
@@ -956,38 +956,38 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			return
 		}},
 
-		"/publish/": &ctx.Command{Name: "/publish/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"/publish/": &ctx.Command{Name: "/publish/filename [upgrade script|plugin]", Help: "下载项目", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			// 下载程序
 			key = strings.TrimPrefix(key, "/publish/")
 			if strings.HasSuffix(key, "bench") {
-				key = key + "." + m.Option("GOOS") + "." + m.Option("GOARCH")
+				key = key + "." + kit.Select(m.Conf("runtime", "host.GOOS"), m.Option("GOOS")) +
+					"." + kit.Select(m.Conf("runtime", "host.GOARCH"), m.Option("GOARCH"))
 			}
+
 			p := ""
-			if m.Option("upgrade") == "plugin" {
-				if !strings.HasSuffix(key, ".so") {
-					key += ".so"
-				}
-				p = m.Cmdx("nfs.path", path.Join("src/plugin", key))
-			}
 			if m.Option("upgrade") == "script" {
+				// 下载脚本
 				if m.Options("missyou") {
 					p = m.Cmdx("nfs.path", path.Join(m.Conf("missyou", "path"), m.Option("missyou"), "usr/script", key))
 				} else {
 					p = m.Cmdx("nfs.path", path.Join("usr/script", key))
 				}
-			}
-			key = strings.Replace(key, ".", "_", -1)
-			if p == "" {
-				p = m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key))
-			}
-			if p == "" {
-				p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", key}))
-			}
-			if s, e := os.Stat(p); e != nil || s.IsDir() {
-				return e
+			} else if m.Option("upgrade") == "plugin" {
+				// 下载插件
+				p = m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key, kit.Select("index.shy", m.Option("index"))))
+
+			} else {
+				// 下载系统
+				if p = m.Cmdx("nfs.path", path.Join(m.Conf("publish", "path"), key)); p == "" {
+					p = m.Cmdx("nfs.path", m.Conf("publish", []string{"list", kit.Key(key)}))
+				}
 			}
 
-			m.Log("info", "publish %s %s", kit.Hashs(p), p)
-			http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
+			// 下载文件
+			if s, e := os.Stat(p); e == nil && !s.IsDir() {
+				m.Log("info", "publish %s %s", kit.Hashs(p), p)
+				http.ServeFile(m.Optionv("response").(http.ResponseWriter), m.Optionv("request").(*http.Request), p)
+			}
 			return
 		}},
 		"/shadow": &ctx.Command{Name: "/shadow", Help: "暗网", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
