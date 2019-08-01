@@ -856,7 +856,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				if m.Cmdy("cli.system", env, "go", "build", o, "-o", q, p); m.Result(0) == "" {
 					m.Append("time", m.Time())
-					m.Append("hash", kit.Hashs(q)[:8])
+					m.Append("hash", m.Cmdx("nfs.hash", q)[:8])
 					m.Append("bin", q)
 					m.Table()
 				}
@@ -1048,7 +1048,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			p := path.Join(m.Conf("missyou", "path"), arg[0])
 			if _, e := os.Stat(p); e != nil {
-				m.Cmd("nfs.copy", path.Join(p, "etc/local.shy"), path.Join(m.Conf("publish", "path"), kit.Select("hello", arg, 1), "local.shy"))
 				m.Confm("missyou", "local", func(index string, local string) {
 					m.Cmd("nfs.git", "clone", local, path.Join(p, m.Conf("missyou", "local"), index))
 				})
@@ -1057,6 +1056,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			args := []string{
 				"daemon", "cmd_dir", p,
 				"cmd_env", "PATH", os.Getenv("PATH"),
+				"cmd_env", "ctx_type", kit.Select("hello", arg, 1),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),

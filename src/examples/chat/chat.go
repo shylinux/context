@@ -297,6 +297,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			default:
 				// 命令列表
 				m.Set("option", "name")
+				m.Set("option", "init")
 				if len(arg) == 1 {
 					m.Confm("flow", []string{rid, "tool", arg[0], "list"}, func(index int, tool map[string]interface{}) {
 						m.Push("river", rid)

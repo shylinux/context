@@ -34,34 +34,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	},
 	Configs: map[string]*ctx.Config{
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
-			"favor": []interface{}{
-				map[string]interface{}{"componet_name": "clip", "componet_help": "粘贴板",
-					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
-					"componet_type": "public", "componet_ctx": "ssh", "componet_cmd": "_route",
-					"componet_args": []interface{}{"$$", "context", "aaa", "clip"}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "you", "imports": "plugin_you", "action": "auto"},
-						map[string]interface{}{"type": "text", "name": "txt", "view": "long"},
-						map[string]interface{}{"type": "button", "value": "存储", "action": "auto"},
-					},
-				},
-				map[string]interface{}{"componet_name": "qrcode", "componet_help": "二维码",
-					"componet_tmpl": "componet", "componet_view": "QRCode", "componet_init": "initQRCode.js",
-					"componet_type": "public", "componet_ctx": "web.chat", "componet_cmd": "login",
-					"componet_args": []interface{}{"qrcode"}, "inputs": []interface{}{
-						map[string]interface{}{"type": "text", "name": "txt", "view": "long"},
-						map[string]interface{}{"type": "button", "value": "生成"},
-					},
-				},
-				map[string]interface{}{"componet_name": "salary", "componet_help": "工资单",
-					"componet_tmpl": "componet", "componet_view": "Salary", "componet_init": "",
-					"componet_type": "public", "componet_ctx": "web.chat", "componet_cmd": "salary",
-					"componet_args": []interface{}{}, "inputs": []interface{}{
-						map[string]interface{}{"label": "total", "type": "text", "name": "text"},
-						map[string]interface{}{"label": "base", "type": "text", "name": "total", "value": "9000"},
-						map[string]interface{}{"type": "button", "value": "计算"},
-					},
-				},
-			},
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "dir", "componet_help": "目录",
 					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
@@ -973,7 +945,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 
 			// 权限检查
-			if !m.Cmds("aaa.role", m.Option("userrole"), "check", "remote", arg[0]) {
+			if !m.Cmds("aaa.role", m.Option("userrole"), "check", arg) {
 				m.Echo("no right %s %s", "remote", arg[0])
 				return
 			}

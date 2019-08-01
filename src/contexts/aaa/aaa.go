@@ -456,20 +456,17 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 				// 检查权限
 				case "check":
-					if role == "root" {
-						// 超级权限
-						m.Echo("true")
-					} else if len(arg) == 1 {
-
-					} else if m.Cmds("aaa.auth", "userrole", role, "check", "componet", arg[1]) {
-						// 组件权限
-						m.Echo("true")
-					} else if len(arg) == 2 {
-
-					} else if m.Cmds("aaa.auth", "userrole", role, "componet", arg[1], "check", "command", arg[2]) {
-						// 命令权限
-						m.Echo("true")
+					switch len(arg) {
+					case 1: // 超级权限
+						m.Echo("%t", role == "root")
+					case 2: // 组件权限
+						m.Echo("%t", role == "root" || m.Cmds("aaa.auth", "userrole", role, "check", "componet", arg[1]))
+					case 3: // 命令权限
+						m.Echo("%t", role == "root" || m.Cmds("aaa.auth", "userrole", role, "componet", arg[1], "check", "command", arg[2]))
+					default: // 参数权限
+						m.Echo("%t", role == "root" || m.Cmds("aaa.auth", "userrole", role, "componet", arg[1], "check", "command", arg[2]))
 					}
+					m.Log("right", "%v %v: %v %v %v", m.Result(0), m.Option("sessid"), m.Option("username"), role, arg[1:])
 
 				// 用户管理
 				case "user":
@@ -746,8 +743,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					// 生成证书
 					template := x509.Certificate{
-						SerialNumber: big.NewInt(1),
-						IsCA:         true,
+						SerialNumber:          big.NewInt(1),
+						IsCA:                  true,
 						BasicConstraintsValid: true,
 						KeyUsage:              x509.KeyUsageCertSign,
 						Subject:               pkix.Name{CommonName: kit.Format(common)},

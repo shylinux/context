@@ -30,7 +30,7 @@ fun upgrade "升级" "" "" \
 	private \
 	text "" name pod imports plugin_pod \
     select "" values script values restart values plugin values bench values portal values system \
-	text "" \
+	text "" name see imports plugin_see \
 	button "升级"
 
 	copy ssh._route $1 cli.upgrade $2 $3
@@ -67,7 +67,7 @@ end
 fun cmd "命令" "" "" \
 	private \
 	text "" name pod imports plugin_pod view long \
-	text "" name ctx imports plugin_ctx \
+	text "nfs" name ctx imports plugin_ctx \
 	text "pwd" \
 	button "执行"
 

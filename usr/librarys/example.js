@@ -723,6 +723,12 @@ function Plugin(page, pane, field) {
             })
             return pane.View(field.parentNode, "plugin", field.Meta, [], field.Run).field.Plugin
         },
+        Share: function() {
+            location.href
+            option
+
+            return
+        },
 
         Check: function(target, cb) {
             option.querySelectorAll(".args").forEach(function(item, index, list) {
@@ -838,15 +844,6 @@ function Plugin(page, pane, field) {
             display.deal = arg
             plugin.ondaemon[display.deal||"table"](plugin.msg)
         },
-
-        Location: function(event) {
-            output.className = "output long"
-            page.getLocation(function(res) {
-                field.Run(event, [parseInt(res.latitude*1000000+1400)/1000000.0, parseInt(res.longitude*1000000+6250)/1000000.0].concat(
-                    kit.Selector(option, ".args", function(item) {return item.value}))
-                , plugin.ondaemon)
-            })
-        },
         init: function() {},
     }
 
@@ -856,7 +853,7 @@ function Plugin(page, pane, field) {
     var exports = JSON.parse(meta.exports||'["",""]')
     JSON.parse(meta.inputs || "[]").map(plugin.Append)
 
-    plugin.init(page, pane, field, option, output)
+    plugin.init(page, pane, plugin, field, option, output)
     return page[field.id] = pane[field.id] = plugin.Field = field, field.Plugin = plugin
 }
 function Editor(plugin, option, output, width, height, space, msg) {

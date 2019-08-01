@@ -729,9 +729,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"message": &Command{Name: "message [code] [cmd...]", Help: "查看消息", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			msg := m
 			if len(arg) > 0 {
-				msg = msg.root
 				if code, e := strconv.Atoi(arg[0]); e == nil {
-					ms := []*Message{m}
+					ms := []*Message{m.root}
 					for i := 0; i < len(ms); i++ {
 						if ms[i].Code() == code {
 							msg = ms[i]
@@ -742,6 +741,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					}
 				}
 			}
+			m.Optionv("bio.msg", msg)
 
 			if len(arg) == 0 {
 				// m.Format("summary", msg, "deep")
@@ -809,7 +809,40 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			return
 		}},
 		"option": &Command{Name: "option", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			all := false
+			if len(arg) > 0 && arg[0] == "all" {
+				all, arg = true, arg[1:]
+			}
+
 			msg := m.Optionv("bio.msg").(*Message)
+			if len(arg) == 0 {
+				vals := map[string]interface{}{}
+				list := []string{}
+
+				for back := msg; back != nil; back = back.message {
+					for _, k := range back.Meta["option"] {
+						if _, ok := vals[k]; !ok {
+							if _, ok := back.Data[k]; ok {
+								vals[k] = back.Data[k]
+							} else {
+								vals[k] = back.Meta[k]
+							}
+							list = append(list, k)
+						}
+					}
+					if !all {
+						break
+					}
+				}
+				sort.Strings(list)
+
+				for _, k := range list {
+					m.Push("key", k)
+					m.Push("val", kit.Format(vals[k]))
+				}
+				m.Table()
+				return
+			}
 			switch v := msg.Optionv(arg[0]).(type) {
 			case []string:
 				m.Echo(strings.Join(v, ""))

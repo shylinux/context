@@ -8,12 +8,13 @@ fun clip "粘贴板" "" "" \
 	copy ssh._route $1 aaa.clip $2
 end
 
-fun qrcode "二维码" "" "" \
+fun qrcode "二维码" "" "index.js" \
 	public \
 	text "" view long \
 	button "生成"
 
-    table qrcode $1
+    let url = $1 || $referer
+    append qrcode $url
 end
 
 fun salary "工资单" "" "" \

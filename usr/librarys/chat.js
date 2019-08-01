@@ -265,6 +265,13 @@ page = Page({
                 }
 
                 this.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
+                    if (args.length > 0 && args[0] == "share") {
+                        typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
+                            line.group, line.index,  args[1]||"",
+                        ]}))
+                        return
+                    }
+
                     var plugin = event.Plugin || {}
                     var meta = plugin && plugin.Field && plugin.Field.Meta || {}
                     event.shiftKey? page.target.Pane.Send("field", plugin.Format()):
