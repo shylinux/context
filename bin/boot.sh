@@ -1,5 +1,9 @@
 #! /bin/bash
 
+# ctx_log_debug=false
+# ctx_log_disable=false
+# ctx_gdb_enable=false
+
 ctx_log=${ctx_log:="var/log"}
 ctx_app=${ctx_app:="bench"}
 ctx_bin=${ctx_app} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}

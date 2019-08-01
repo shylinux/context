@@ -1,0 +1,79 @@
+
+fun clip "粘贴板" "" "" \
+	public \
+	text "" name you imports plugin_you action auto \
+	text "" view long \
+	button "存储"
+
+	copy ssh._route $1 aaa.clip $2
+end
+
+fun qrcode "二维码" "" "" \
+	public \
+	text "" view long \
+	button "生成"
+
+    table qrcode $1
+end
+
+fun salary "工资单" "" "" \
+	public \
+	text "9000" label total \
+	text "9000" label base \
+	button "计算"
+
+    let total = $1 || $2
+    let base = $2 || $1
+
+    let house = $base * 120 / 1000
+    let old = $base * 80 / 1000
+    let tread = $base * 20 / 1000
+    let job = $base * 2 / 1000
+    let get = $total - $house - $old - $tread - $job
+
+    let tax = 0
+    let rest = $get
+    if $rest > 85000
+        let tax = $tax + ($rest - 85000) * 45 / 100
+        let rest = 85000
+    end
+    if $rest > 60000
+        let tax = $tax + ($rest - 60000) * 35 / 100
+        let rest = 60000
+    end
+    if $rest > 40000
+        let tax = $tax + ($rest - 40000) * 30 / 100
+        let rest = 40000
+    end
+    if $rest > 30000
+        let tax = $tax + ($rest - 30000) * 25 / 100
+        let rest = 30000
+    end
+    if $rest > 17000
+        let tax = $tax + ($rest - 17000) * 20 / 100
+        let rest = 17000
+    end
+    if $rest > 8000
+        let tax = $tax + ($rest - 8000) * 10 / 100
+        let rest = 8000
+    end
+    if $rest > 5000
+        let tax = $tax + ($rest - 5000) * 3 / 100
+    end
+    let rest = $get - $tax
+
+
+    append "公积金" $house
+    append "养老保险" $old
+    append "医疗保险" $tread
+    append "失业保险" $job
+    append "个税" $tax
+    append "结余" $rest
+end
+
+fun hello world "" "" \
+	public \
+	text "" \
+	button "执行"
+	copy pwd
+end

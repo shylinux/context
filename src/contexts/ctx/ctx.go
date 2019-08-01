@@ -46,24 +46,24 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 func (ctx *CTX) Start(m *Message, arg ...string) bool {
 	if m.Optionv("bio.ctx", Index); len(arg) == 0 {
 		kit.DisableLog = false
-		m.Optionv("bio.msg", m)
-		m.Optionv("bio.ctx", m.Target())
-		m.Option("bio.modal", "active")
-		m.Option("log.debug", false)
-		m.Option("log.disable", false)
-		m.Option("gdb.enable", false)
-		m.Cap("stream", "stdio")
+		m.Option("log.debug", kit.Right(os.Getenv("ctx_log_debug")))
+		m.Option("log.disable", kit.Right(os.Getenv("ctx_log_disable")))
+		m.Option("gdb.enable", kit.Right(os.Getenv("ctx_gdb_enable")))
 		m.Cmd("log._init")
 		m.Cmd("gdb._init")
-
 		m.Cmd("ctx._init")
+		m.Option("bio.modal", "active")
+
+		m.Optionv("bio.ctx", m.Target())
+		m.Optionv("bio.msg", m)
+		m.Cap("stream", "stdio")
 		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.username")))
 		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
+
 		m.Cmd("nfs.source", m.Conf("cli.system", "script.init")).Cmd("nfs.source", "stdio").Cmd("nfs.source", m.Conf("cli.system", "script.exit"))
 	} else {
-		m.Option("bio.modal", "action")
-
 		m.Cmd("ctx._init")
+		m.Option("bio.modal", "action")
 		for _, v := range m.Sess("cli").Cmd(arg).Meta["result"] {
 			fmt.Printf("%s", v)
 		}

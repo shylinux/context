@@ -328,6 +328,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "line", "hash": "line", "word": []interface{}{"opt{", "mul{", "stm", "cmd", "}", "}", "com"}},
 
 			// 复合语句
+			map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "!", "}"}},
+			map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "&&", "||", "}"}},
+			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"(", "exp", ")"}},
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"$", "(", "cmd", ")"}},
 			map[string]interface{}{"page": "stm", "hash": "var", "word": []interface{}{"var", "key", "opt{", "=", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "opt{", "=", "exp", "}"}},
@@ -595,6 +598,8 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				switch arg[0] {
 				case "$", "@":
 					m.Result(0, arg[2:len(arg)-1])
+				case "(":
+					m.Echo(arg[1])
 				}
 			}
 			return
@@ -629,6 +634,8 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					if info, e := os.Stat(arg[1]); e == nil && info.IsDir() {
 						result = "true"
 					}
+				case "!":
+					result = kit.Format(!kit.Right(arg[1]))
 				case "+":
 					result = arg[1]
 				case "-":
@@ -712,6 +719,18 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 						result = fmt.Sprintf("%t", v1 != v2)
 					} else {
 						result = fmt.Sprintf("%t", arg[0] != arg[2])
+					}
+				case "&&":
+					if kit.Right(arg[0]) {
+						result = arg[2]
+					} else {
+						result = arg[0]
+					}
+				case "||":
+					if kit.Right(arg[0]) {
+						result = arg[0]
+					} else {
+						result = arg[2]
 					}
 
 				case "~":
