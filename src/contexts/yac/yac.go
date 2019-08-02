@@ -2,7 +2,8 @@ package yac
 
 import (
 	"contexts/ctx"
-	"toolkit"
+	"sort"
+	kit "toolkit"
 
 	"fmt"
 	"os"
@@ -334,7 +335,12 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"$", "(", "cmd", ")"}},
 			map[string]interface{}{"page": "stm", "hash": "var", "word": []interface{}{"var", "key", "opt{", "=", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "opt{", "=", "exp", "}"}},
+			map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "=", "\\[", "rep{", "exp", "}", "\\]"}},
+			map[string]interface{}{"page": "stm", "hash": "let", "word": []interface{}{"let", "key", "=", "\\{", "rep{", "exp", "}", "\\}"}},
 			map[string]interface{}{"page": "stm", "hash": "if", "word": []interface{}{"if", "exp"}},
+			map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "key", "key", "key", "in", "key"}},
+			map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "key", "key", "in", "key"}},
+			map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "key", "in", "key"}},
 			map[string]interface{}{"page": "stm", "hash": "for", "word": []interface{}{"for", "rep{", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "fun", "word": []interface{}{"fun", "key", "rep{", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "kit", "word": []interface{}{"kit", "rep{", "exp", "}"}},
@@ -993,8 +999,27 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		}},
 		"let": &ctx.Command{Name: "let a = exp", Help: "设置变量, a: 变量名, exp: 表达式", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if stack, ok := m.Optionv("bio.stack").(*kit.Stack); ok {
-				m.Log("stack", "%v = %v", arg[1], arg[3])
-				stack.Hash(arg[1], arg[3])
+				switch arg[3] {
+				case "[":
+					list := []interface{}{}
+					for i := 4; i < len(arg)-1; i++ {
+						list = append(list, arg[i])
+					}
+					m.Log("stack", "%v = %v", arg[1], list)
+					stack.Hash(arg[1], list)
+
+				case "{":
+					list := map[string]interface{}{}
+					for i := 4; i < len(arg)-2; i += 2 {
+						list[arg[i]] = arg[i+1]
+					}
+					m.Log("stack", "%v = %v", arg[1], list)
+					stack.Hash(arg[1], list)
+
+				default:
+					m.Log("stack", "%v = %v", arg[1], arg[3])
+					stack.Hash(arg[1], arg[3])
+				}
 			}
 			return
 		}},
@@ -1008,68 +1033,44 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 			return
 		}},
-		"for": &ctx.Command{Name: "for [[express ;] condition]|[index message meta value]",
-			Help: "循环语句, express: 每次循环运行的表达式, condition: 循环条件, index: 索引消息, message: 消息编号, meta: value: ",
+		"for": &ctx.Command{Name: "for exp | for index val... in list", Help: "循环语句",
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				stack := m.Optionv("bio.stack").(*kit.Stack)
 				m.Log("stack", "push %v", stack.Push(arg[0], stack.Peek().Run && kit.Right(arg[1]), m.Optioni("stack.pos")).String("\\"))
 
-				/*
-					if cli, ok := m.Target().Server.(*YAC); m.Assert(ok) {
-						run := m.Caps("parse")
-						defer func() { m.Caps("parse", run) }()
-
-						msg := m
-						if run {
-							if arg[1] == "index" {
-								if code, e := strconv.Atoi(arg[2]); m.Assert(e) {
-									msg = m.Target().Message().Tree(code)
-									run = run && msg != nil && msg.Meta != nil
-									switch len(arg) {
-									case 4:
-										run = run && len(msg.Meta) > 0
-									case 5:
-										run = run && len(msg.Meta[arg[3]]) > 0
-									}
-								}
-							} else {
-								run = run && kit.Right(arg[len(arg)-1])
-							}
-
-							if len(cli.stack) > 0 {
-								if frame := cli.stack[len(cli.stack)-1]; frame.key == "for" && frame.pos == m.Optioni("file_pos") {
-									if arg[1] == "index" {
-										frame.index++
-										if run = run && len(frame.list) > frame.index; run {
-											if len(arg) == 5 {
-												arg[3] = arg[4]
-											}
-											m.Cap(arg[3], frame.list[frame.index])
-										}
-									}
-									frame.run = run
-									return
-								}
-							}
-						}
-
-						cli.stack = append(cli.stack, &Frame{pos: m.Optioni("file_pos"), key: key, run: run, index: 0})
-						if m.Capi("level", 1); run && arg[1] == "index" {
-							frame := cli.stack[len(cli.stack)-1]
-							switch len(arg) {
-							case 4:
-								frame.list = []string{}
-								for k, _ := range msg.Meta {
-									frame.list = append(frame.list, k)
-								}
-							case 5:
-								frame.list = msg.Meta[arg[3]]
-								arg[3] = arg[4]
-							}
-							m.Cap(arg[3], arg[3], frame.list[0], "临时变量")
-						}
+				val, _ := stack.Hash(arg[len(arg)-1])
+				index := kit.Int(stack.FS[len(stack.FS)-2].Hash["_index"])
+				switch val := val.(type) {
+				case map[string]interface{}:
+					list := make([]string, 0, len(val))
+					for k, _ := range val {
+						list = append(list, k)
 					}
-				*/
+					sort.Strings(list)
+
+					if index < len(list) {
+						stack.Hash(arg[1], list[index])
+					}
+					stack.Peek().Run = false
+					for i, j := 2, index; i < len(arg)-2 && j < len(list); i, j = i+1, j+1 {
+						stack.Peek().Run = true
+						stack.Hash(arg[i], val[list[j]])
+						stack.FS[len(stack.FS)-2].Hash["_index"] = j + 1
+					}
+
+				case []interface{}:
+					stack.Hash(arg[1], index)
+					stack.Peek().Run = false
+					for i, j := 2, index; i < len(arg)-2 && j < len(val); i, j = i+1, j+1 {
+						stack.Peek().Run = true
+						stack.Hash(arg[i], val[j])
+						stack.FS[len(stack.FS)-2].Hash["_index"] = j + 1
+					}
+				default:
+				}
+				if !stack.Peek().Run {
+					stack.FS[len(stack.FS)-2].Hash["_index"] = 0
+				}
 				return
 			}},
 		"fun": &ctx.Command{Name: "fun", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

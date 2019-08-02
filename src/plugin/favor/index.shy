@@ -34,35 +34,14 @@ fun salary "工资单" "" "" \
 
     let tax = 0
     let rest = $get
-    if $rest > 85000
-        let tax = $tax + ($rest - 85000) * 45 / 100
-        let rest = 85000
-    end
-    if $rest > 60000
-        let tax = $tax + ($rest - 60000) * 35 / 100
-        let rest = 60000
-    end
-    if $rest > 40000
-        let tax = $tax + ($rest - 40000) * 30 / 100
-        let rest = 40000
-    end
-    if $rest > 30000
-        let tax = $tax + ($rest - 30000) * 25 / 100
-        let rest = 30000
-    end
-    if $rest > 17000
-        let tax = $tax + ($rest - 17000) * 20 / 100
-        let rest = 17000
-    end
-    if $rest > 8000
-        let tax = $tax + ($rest - 8000) * 10 / 100
-        let rest = 8000
-    end
-    if $rest > 5000
-        let tax = $tax + ($rest - 5000) * 3 / 100
+    let list = [85000 45 60000 35 40000 30 30000 25 17000 20 8000 10 5000 3]
+    for i amount percent in list
+        if $rest > $amount
+            let tax = $tax + ($rest - $amount) * $percent / 100
+            let rest = $amount
+        end
     end
     let rest = $get - $tax
-
 
     append "公积金" $house
     append "养老保险" $old

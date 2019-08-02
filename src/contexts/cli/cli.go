@@ -300,9 +300,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if len(cmd.Env) > 0 {
 				m.Log("info", "env %v", cmd.Env)
 			}
-			for _, k := range []string{"PATH", "HOME"} {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, os.Getenv(k)))
-			}
 
 			// 交互命令
 			if m.Options("cmd_active") || kit.Right(conf["active"]) {

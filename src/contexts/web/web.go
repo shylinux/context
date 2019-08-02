@@ -563,8 +563,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 										data = kit.Chain(data, k, v[0])
 									}
 								} else {
-									for _, val := range v {
-										if i, e := strconv.Atoi(v[0]); e == nil {
+									for i, val := range v {
+										if i, e := strconv.Atoi(v[i]); e == nil {
 											data = kit.Chain(data, []string{k, "-2"}, i)
 										} else {
 											data = kit.Chain(data, []string{k, "-2"}, val)

@@ -815,7 +815,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}
 
 			msg := m.Optionv("bio.msg").(*Message)
-			if len(arg) == 0 {
+			switch len(arg) {
+			case 0:
 				vals := map[string]interface{}{}
 				list := []string{}
 
@@ -841,13 +842,15 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					m.Push("val", kit.Format(vals[k]))
 				}
 				m.Table()
-				return
-			}
-			switch v := msg.Optionv(arg[0]).(type) {
-			case []string:
-				m.Echo(strings.Join(v, ""))
+			case 1:
+				switch v := msg.Optionv(arg[0]).(type) {
+				case []string:
+					m.Echo(strings.Join(v, ""))
+				default:
+					m.Echo(kit.Format(v))
+				}
 			default:
-				m.Echo(kit.Format(v))
+				m.Echo(m.Option(arg[0], arg[1]))
 			}
 			return
 		}},

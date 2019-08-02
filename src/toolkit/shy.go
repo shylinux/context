@@ -25,47 +25,47 @@ var bottom = &Frame{}
 
 type Stack struct {
 	Target interface{}
-	fs     []*Frame
+	FS     []*Frame
 }
 
 func (s *Stack) Push(key string, run bool, pos int) *Frame {
-	s.fs = append(s.fs, &Frame{Key: key, Run: run, Pos: pos, deep: len(s.fs), Hash: map[string]interface{}{}})
-	return s.fs[len(s.fs)-1]
+	s.FS = append(s.FS, &Frame{Key: key, Run: run, Pos: pos, deep: len(s.FS), Hash: map[string]interface{}{}})
+	return s.FS[len(s.FS)-1]
 }
 func (s *Stack) Peek() *Frame {
-	if len(s.fs) == 0 {
+	if len(s.FS) == 0 {
 		return bottom
 	}
-	return s.fs[len(s.fs)-1]
+	return s.FS[len(s.FS)-1]
 }
 func (s *Stack) Pop() *Frame {
-	if len(s.fs) == 0 {
+	if len(s.FS) == 0 {
 		return bottom
 	}
-	f := s.fs[len(s.fs)-1]
-	s.fs = s.fs[:len(s.fs)-1]
+	f := s.FS[len(s.FS)-1]
+	s.FS = s.FS[:len(s.FS)-1]
 	return f
 }
 func (s *Stack) Hash(key string, val ...interface{}) (interface{}, bool) {
-	for i := len(s.fs) - 1; i >= 0; i-- {
-		if v, ok := s.fs[i].Hash[key]; ok {
+	for i := len(s.FS) - 1; i >= 0; i-- {
+		if v, ok := s.FS[i].Hash[key]; ok {
 			if len(val) > 0 {
-				s.fs[i].Hash[key] = val[0]
+				s.FS[i].Hash[key] = val[0]
 			}
 			return v, ok
 		}
 	}
 
 	if len(val) > 0 {
-		s.fs[len(s.fs)-1].Hash[key] = val[0]
+		s.FS[len(s.FS)-1].Hash[key] = val[0]
 		return val[0], true
 	}
 	return nil, false
 }
 func (s *Stack) Label(key string) (int, bool) {
-	for i := len(s.fs) - 1; i >= 0; i-- {
-		if v, ok := s.fs[i].Label[key]; ok {
-			s.fs = s.fs[:i+1]
+	for i := len(s.FS) - 1; i >= 0; i-- {
+		if v, ok := s.FS[i].Label[key]; ok {
+			s.FS = s.FS[:i+1]
 			return v, ok
 		}
 	}
