@@ -1034,6 +1034,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			if m.Confs("ssh.node", arg[0]) {
+				m.Log("fuck", "waht %v", arg[1])
 				switch kit.Select("", arg, 1) {
 				case "stop":
 					m.Cmdy("ssh._route", arg[0], "context", "cli", "quit", 0)

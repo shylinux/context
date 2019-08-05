@@ -6,7 +6,7 @@ fun project "项目" "" "" \
 	button "执行" \
     exports see name see
 
-	copy cli.project $1 $2
+	copy cli.project __
 end
 
 fun compile "编译" "" "" \
@@ -15,7 +15,7 @@ fun compile "编译" "" "" \
 	text "" name see imports plugin_see \
 	button "编译"
 
-	copy cli.compile $1 $2
+	copy cli.compile __
 end
 
 fun publish "发布" "" "" \
@@ -23,7 +23,7 @@ fun publish "发布" "" "" \
 	text "" name see imports plugin_see \
 	button "发布"
 
-	copy cli.publish $1
+	copy cli.publish __
 end
 
 fun upgrade "升级" "" "" \
@@ -33,7 +33,7 @@ fun upgrade "升级" "" "" \
 	text "" name see imports plugin_see \
 	button "升级"
 
-	copy ssh._route $1 cli.upgrade $2 $3
+	copy ssh._route _ cli.upgrade __
 end
 
 fun missyou "任务" "" "" \
@@ -42,7 +42,7 @@ fun missyou "任务" "" "" \
 	button "行动" action auto \
     exports you "" you
 
-	copy cli.missyou $1
+	copy cli.missyou __
 end
 
 fun pod "设备" "" "" \
@@ -51,7 +51,7 @@ fun pod "设备" "" "" \
 	button "行动" action auto \
     exports pod pod
 
-	copy ssh._route $1 ssh.remote $1
+	copy ssh._route _ ssh.remote __
 end
 
 fun ctx "模块" "" "" \
@@ -61,7 +61,7 @@ fun ctx "模块" "" "" \
 	button "行动" \
     exports ctx names
 
-	copy ssh._route $1 context $2 list
+	copy ssh._route _ context _ list __
 end
 
 fun cmd "命令" "" "" \
@@ -82,6 +82,6 @@ fun dir "目录" "" "" \
 	button "回退" click Back \
     exports dir "" dir
 
-	copy ssh._route $1 nfs.dir $2 time size line path
+	copy ssh._route _ nfs.dir _ time size line path
 end
 

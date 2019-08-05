@@ -47,8 +47,6 @@ install() {
     wget -O ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} \
         && ${md5} ${ctx_app} && ./${ctx_app} upgrade ${target} && ./${ctx_app} upgrade portal \
         && mv ${ctx_app} bin/${ctx_app}
-
-    mkdir -p usr/script && touch usr/script/local.shy && cd etc && ln -s ../usr/script/local.shy .
 }
 hup() {
     echo "term hup"
