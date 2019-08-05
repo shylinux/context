@@ -275,6 +275,10 @@ func (lex *LEX) parse(m *ctx.Message, page int, line []byte) (hash int, rest []b
 	m.Log("debug", "%s %s hash: %v word: %v rest: %v", "parse", "lex", hash, word, rest)
 	return
 }
+func (lex *LEX) Parse(m *ctx.Message, line []byte, page string) (hash int, rest []byte, word []byte) {
+	hash, rest, word = lex.parse(m, lex.index(m, "npage", page), line)
+	return hash, rest, word
+}
 
 func (lex *LEX) Spawn(m *ctx.Message, c *ctx.Context, arg ...string) ctx.Server {
 	return &LEX{Context: c}

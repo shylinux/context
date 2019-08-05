@@ -41,6 +41,9 @@ type YAC struct {
 	label map[string]string
 	*ctx.Context
 }
+type Parser interface {
+	Parse(m *ctx.Message, line []byte, page string) (hash int, rest []byte, word []byte)
+}
 
 func (yac *YAC) name(page int) string {
 	if name, ok := yac.word[page]; ok {
@@ -193,30 +196,29 @@ func (yac *YAC) train(m *ctx.Message, page, hash int, word []string, level int) 
 	m.Log("debug", "%s %s/%d word: %d point: %d end: %d", "train", strings.Repeat("#", level), level, len(word), len(points), len(ends))
 	return len(word), points, ends
 }
-func (yac *YAC) parse(m *ctx.Message, msg *ctx.Message, stack *kit.Stack, page int, void int, line string, level int) (string, []string, int) {
-	m.Log("debug", "%s %s\\%d %s(%d): %s", "parse", strings.Repeat("#", level), level, yac.name(page), page, line)
+func (yac *YAC) parse(m *ctx.Message, msg *ctx.Message, stack *kit.Stack, page int, void int, line []byte, level int) (rest []byte, word []string, hash int) {
+	m.Log("debug", "%s %s\\%d %s(%d): %s", "parse", strings.Repeat("#", level), level, yac.name(page), page, string(line))
 
-	lex, hash, word := yac.lex, 0, []string{}
+	h, r, w := 0, []byte{}, []byte{}
+	p, _ := yac.lex.Target().Server.(Parser)
+
 	for star, s := 0, page; s != 0 && len(line) > 0; {
 		//解析空白
-		if lex = yac.lex.Spawn().Cmd("parse", line, yac.name(void)); lex.Result(0) == "-1" {
+		if h, r, _ = p.Parse(m, line, yac.name(void)); h == -1 {
 			break
 		}
-		line = lex.Result(1)
-
 		//解析单词
-		if lex = yac.lex.Spawn().Cmd("parse", line, yac.name(s)); lex.Result(0) == "-1" {
+		if h, r, w = p.Parse(m, r, yac.name(s)); h == -1 {
 			break
 		}
-		result := append([]string{}, lex.Meta["result"]...)
 
 		//解析状态
-		state := yac.mat[s][byte(kit.Int(result[0]))]
+		state := yac.mat[s][byte(h)]
 
 		//全局语法检查
 		if state != nil {
-			if key := yac.lex.Spawn().Cmd("parse", line, "key"); key.Result(0) == "0" || len(key.Result(2)) <= len(result[2]) {
-				line, word = result[1], append(word, result[2])
+			if hh, _, ww := p.Parse(m, line, "key"); hh == 0 || len(ww) <= len(w) {
+				line, word = r, append(word, string(w))
 			} else {
 				state = nil
 			}
@@ -225,7 +227,7 @@ func (yac *YAC) parse(m *ctx.Message, msg *ctx.Message, stack *kit.Stack, page i
 		if state == nil {
 			for i := 0; i < m.Confi("meta", "ncell"); i++ {
 				if x := yac.mat[s][byte(i)]; i < m.Confi("meta", "nlang") && x != nil {
-					if l, w, _ := yac.parse(m, msg, stack, i, void, line, level+1); l != line {
+					if l, w, _ := yac.parse(m, msg, stack, i, void, line, level+1); len(l) != len(line) {
 						line, word, state = l, append(word, w...), x
 						break
 					}
@@ -443,7 +445,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				m.Optioni("yac.page", yac.page[m.Conf("nline")])
 				m.Optioni("yac.void", yac.page[m.Conf("nvoid")])
 
-				_, word, _ := yac.parse(m, m, stack, m.Optioni("yac.page"), m.Optioni("yac.void"), arg[0], 1)
+				_, word, _ := yac.parse(m, m, stack, m.Optioni("yac.page"), m.Optioni("yac.void"), []byte(arg[0]), 1)
 				m.Result(word)
 			}
 			return

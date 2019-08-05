@@ -244,20 +244,22 @@ func (m *Message) Gos(msg *Message, hand ...func(msg *Message)) *Message {
 func (m *Message) Spawn(arg ...interface{}) *Message {
 	temp := false
 	c := m.target
-	if len(arg) > 0 {
-		switch v := arg[0].(type) {
+	for i := 0; i < len(arg); i++ {
+		switch v := arg[i].(type) {
 		case *Context:
 			c = v
 		case *Message:
 			c = v.target
 		case string:
 			temp = kit.Right(v)
+		case bool:
+			temp = v
 		}
 	}
 
 	msg := &Message{
 		time:    time.Now(),
-		code:    m.Capi("nmessage", 1),
+		code:    -1,
 		source:  m.target,
 		target:  c,
 		message: m,
@@ -268,6 +270,7 @@ func (m *Message) Spawn(arg ...interface{}) *Message {
 		return msg
 	}
 
+	msg.code = m.Capi("nmessage", 1)
 	m.messages = append(m.messages, msg)
 	return msg
 }
@@ -317,10 +320,18 @@ func (m *Message) Sess(key string, arg ...interface{}) *Message {
 		}
 	}
 
+	temp := false
+	if len(arg) > 0 {
+		switch v := arg[0].(type) {
+		case bool:
+			temp, arg = v, arg[1:]
+		}
+	}
+
 	for msg := m; msg != nil; msg = msg.message {
 		if x, ok := msg.Sessions[key]; ok {
 			if spawn {
-				x = m.Spawn(x.target)
+				x = m.Spawn(x.target, temp)
 				x.callback = func(sub *Message) *Message { return sub }
 			}
 			return x
@@ -530,7 +541,7 @@ func (m *Message) Goshy(input []string, index int, stack *kit.Stack, cb func(*Me
 		m.Optioni("stack.pos", i)
 
 		// 执行语句
-		msg := m.Sess("yac").Cmd("parse", line+"\n")
+		msg := m.Sess("yac", true, true).Cmd("parse", line+"\n")
 		if cb != nil {
 			cb(msg)
 		}

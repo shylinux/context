@@ -71,7 +71,7 @@ fun cmd "命令" "" "" \
 	text "pwd" \
 	button "执行"
 
-	copy ssh._route $1 context $2 command $3
+	copy ssh._route _ context _ command __
 end
 
 fun dir "目录" "" "" \

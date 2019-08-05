@@ -743,9 +743,28 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}
 			m.Optionv("bio.msg", msg)
 
+			m.Log("fuck", "what %v", arg)
 			if len(arg) == 0 {
-				// m.Format("summary", msg, "deep")
-				// msg.CopyTo(m)
+				ms := []*Message{msg.message, msg}
+				for i := 0; i < len(ms); i++ {
+					if ms[i] == nil {
+						continue
+					}
+					if m.Push("code", ms[i].code); ms[i].message != nil {
+						m.Push("message", ms[i].message.code)
+					} else {
+						m.Push("message", 0)
+					}
+
+					m.Push("time", ms[i].Time())
+					m.Push("source", ms[i].source.Name)
+					m.Push("target", ms[i].target.Name)
+					m.Push("detail", kit.Format(ms[i].Meta["detail"]))
+					if i > 0 {
+						ms = append(ms, ms[i].messages...)
+					}
+				}
+				m.Table()
 				return
 			}
 
@@ -786,6 +805,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		}},
 		"copy": &Command{Name: "copy", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			msg := m.Optionv("bio.msg").(*Message)
+			// 去年尾参
 			for i := len(arg) - 1; i >= 0; i-- {
 				if arg[i] == "" {
 					arg = arg[:i]
@@ -793,7 +813,22 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					break
 				}
 			}
-			msg.Cmdy(arg)
+			// 默认参数
+			args := make([]string, 0, len(arg))
+			for i, j := 0, 1; i < len(arg); i++ {
+				if strings.HasPrefix(arg[i], "__") {
+					if j < len(msg.Meta["detail"]) {
+						args = append(args, msg.Meta["detail"][j:]...)
+					}
+					j = len(msg.Meta["detail"])
+				} else if strings.HasPrefix(arg[i], "_") {
+					args = append(args, kit.Select(arg[i][1:], msg.Detail(j)))
+					j++
+				} else {
+					args = append(args, arg[i])
+				}
+			}
+			msg.Cmdy(args)
 			return
 		}},
 		"table": &Command{Name: "table", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {

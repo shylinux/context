@@ -347,7 +347,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Push("help", value["componet_help"])
 					m.Push("view", value["componet_view"])
 					if kit.Right(value["componet_init"]) {
-						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.publish", "path"), arg[0], kit.Format(value["componet_init"])), -1)
+						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["componet_init"])), -1)
 						if script == "" {
 							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1)
 						}
