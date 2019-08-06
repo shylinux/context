@@ -752,11 +752,13 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"temp": &ctx.Command{Name: "temp data", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if f, p, e := kit.Create(path.Join(m.Conf("dir", "temp"), kit.Hashs("uniq"))); m.Assert(e) {
+			if f, p, e := kit.Create(path.Join(m.Conf("dir", "temp"), kit.Hashs(arg[0]))); m.Assert(e) {
 				defer f.Close()
 
 				for _, v := range arg {
-					f.WriteString(v)
+					if n, e := f.WriteString(v); e == nil {
+						m.Log("info", "save %v %v", n, p)
+					}
 				}
 				m.Echo(p)
 			}
@@ -1044,14 +1046,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 		"open": &ctx.Command{Name: "open file", Help: "打开文件, file: 文件名", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Has("io") {
-			} else if p, f, e := open(m, arg[0], os.O_RDWR|os.O_CREATE); e == nil {
+			} else if p, f, e := open(m, arg[0], os.O_RDWR|os.O_CREATE|os.O_TRUNC); e == nil {
 				m.Put("option", "in", f).Put("option", "out", f)
 				arg[0] = p
 			} else {
 				return nil
 			}
 
-			m.Start(fmt.Sprintf("file%d", m.Capi("nfile")), fmt.Sprintf("file %s", arg[0]), "open", arg[0])
+			m.Start(fmt.Sprintf("file%d", m.Capi("nfile", 1)), fmt.Sprintf("file %s", arg[0]), "open", arg[0])
 			m.Append("bio.ctx1", m.Cap("module"))
 			m.Echo(m.Cap("module"))
 			return
@@ -1075,18 +1077,16 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 		"write": &ctx.Command{Name: "write string [pos]", Help: "写入文件, string: 写入内容, pos: 写入位置", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if nfs, ok := m.Target().Server.(*NFS); m.Assert(ok) && nfs.out != nil {
-				if len(arg) > 1 {
-					m.Cap("pos", arg[1])
-				}
-
 				if len(arg[0]) == 0 {
 					m.Assert(nfs.out.Truncate(int64(m.Capi("pos"))))
 					m.Cap("size", m.Cap("pos"))
 					m.Cap("pos", "0")
 				} else {
-					n, e := nfs.out.WriteAt([]byte(arg[0]), int64(m.Capi("pos")))
-					if m.Capi("nwrite", n); m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
-						m.Cap("size", m.Cap("pos"))
+					for _, v := range arg {
+						n, e := nfs.out.WriteAt([]byte(v), int64(m.Capi("pos")))
+						if m.Capi("nwrite", n); m.Assert(e) && m.Capi("pos", n) > m.Capi("size") {
+							m.Cap("size", m.Cap("pos"))
+						}
 					}
 					nfs.out.Sync()
 				}
@@ -1143,7 +1143,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 
 		"socket": &ctx.Command{Name: "remote listen|dial args...", Help: "启动文件服务, args: 参考tcp模块, listen命令的参数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) { //{{{
+			if _, ok := m.Target().Server.(*NFS); m.Assert(ok) {
 				m.Sess("tcp").Call(func(msg *ctx.Message) *ctx.Message {
 					if msg.Has("node.port") {
 						return msg

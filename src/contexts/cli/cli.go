@@ -485,8 +485,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if cmd, ok := m.Confm("daemon", pid)["sub"].(*exec.Cmd); ok {
 					switch arg[0] {
 					case "stop":
-						kit.Log("error", "kill: %s", cmd.Process.Pid)
-						m.Log("kill", "kill: %d", cmd.Process.Pid)
 						m.Echo("%s", cmd.Process.Signal(os.Interrupt))
 					default:
 						m.Echo("%v", cmd)
@@ -1034,7 +1032,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			if m.Confs("ssh.node", arg[0]) {
-				m.Log("fuck", "waht %v", arg[1])
 				switch kit.Select("", arg, 1) {
 				case "stop":
 					m.Cmdy("ssh._route", arg[0], "context", "cli", "quit", 0)

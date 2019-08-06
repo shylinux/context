@@ -471,7 +471,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						}
 
 						// 注册脚本
-						m.Cmd("nfs.source", m.Cmdx("nfs.hash", m.Append("work.script")))
+						m.Cmd("nfs.source", m.Cmdx("nfs.temp", m.Append("work.script")))
 						return nil
 					}, "send", "", "_add", m.Conf("runtime", "node.name"), m.Conf("runtime", "node.type"), m.Conf("runtime", "boot.ctx_type"))
 					return nil
@@ -673,7 +673,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					if m.Option("user.cert", m.Cmd("aaa.auth", "username", m.Option("username"), "cert").Append("meta")); !m.Options("user.cert") {
 						m.Option("user.cert", m.Cmd("ssh._route", m.Option("user.route"), "_check", "user").Append("user.cert"))
 						m.Cmd("aaa.auth", "username", m.Option("username"), "cert", m.Option("user.cert"))
-						m.Cmd("aaa.auth", "username", m.Option("username"), "userrole", "void")
 					}
 
 					if !m.Options("user.cert") || !m.Cmds("aaa.rsa", "verify", m.Option("user.cert"), m.Option("user.sign"), arg[2]) {

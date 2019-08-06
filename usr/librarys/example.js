@@ -576,7 +576,7 @@ function Plugin(page, pane, field) {
     var plugin = field.Script || {}; plugin.__proto__ = {
         __proto__: pane,
         Append: function(item, name) {
-            name = item.name || ""
+            name = item.name || "input"
 
             item.onfocus = function(event) {
                 page.pane = pane.Field, page.plugin = field, page.input = event.target

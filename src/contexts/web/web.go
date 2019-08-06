@@ -501,7 +501,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"get": &ctx.Command{Name: "get [which] name [method GET|POST] url arg...", Help: "访问服务, method: 请求方法, url: 请求地址, arg: 请求参数",
 			Form: map[string]int{
 				"which": 1, "method": 1, "args": 1, "headers": 2,
-				"content_type": 1, "body": 1, "file": 2,
+				"content_type": 1, "content_data": 1, "body": 1, "file": 2,
 				"parse": 1, "temp": -1, "temp_expire": 1, "save": 1,
 			}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				// 查看配置
@@ -687,10 +687,16 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				switch {
 				// 解析数据
 				case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
-					if json.NewDecoder(res.Body).Decode(&result); !m.Has("temp") {
-						m.Option("temp", "")
+					if json.NewDecoder(res.Body).Decode(&result); m.Options("temp_expire") {
+						if !m.Has("temp") {
+							m.Option("temp", "")
+						}
+						m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
+					} else {
+						if b, e := json.MarshalIndent(result, "", "  "); m.Assert(e) {
+							m.Echo(string(b))
+						}
 					}
-					m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
 
 				// 解析网页
 				case parse == "html":
