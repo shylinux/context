@@ -532,7 +532,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					uuu, e := url.Parse(uri)
 					m.Assert(e)
 
-					if m.Has("file") { // POST file
+					if m.Has("content_data") { // POST file
+						body = bytes.NewReader([]byte(m.Option("content_data")))
+
+					} else if m.Has("file") { // POST file
 						writer := multipart.NewWriter(&bytes.Buffer{})
 						defer writer.Close()
 
