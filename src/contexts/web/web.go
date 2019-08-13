@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type MUX interface {
@@ -158,6 +159,9 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 	web.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
 		m.TryCatch(m.Spawn(m.Conf("serve", "autofree")), true, func(msg *ctx.Message) {
+			defer func() {
+				msg.Log("time", "cost: %v", msg.Time(time.Now()))
+			}()
 			msg.Option("remote_addr", r.RemoteAddr)
 			msg.Option("remote_ip", r.Header.Get("remote_ip"))
 			msg.Option("index_url", r.Header.Get("index_url"))
