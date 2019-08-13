@@ -483,6 +483,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			return
 		}},
 		"_route": &ctx.Command{Name: "_route", Help: "路由", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Log("time", "exec: %v", m.Format("cost"))
 			if len(arg) == 0 {
 				return
 			}
@@ -555,6 +556,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				// 路由转发
 				for _, p := range ps {
 					m.Find(p, true).Copy(m, "option").CallBack(sync, func(sub *ctx.Message) *ctx.Message {
+						m.Log("time", "remote: %v", sub.Format("cost"))
 						return m.CopyFuck(sub, "append").CopyFuck(sub, "result")
 					}, "send", rest, arg)
 				}
@@ -563,6 +565,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			defer func() { m.Back(m) }()
 
+			m.Log("time", "exec: %v", m.Format("cost"))
 			if !m.Options("remote_code") {
 				// 本地调用
 				m.Cmdy(arg)
@@ -596,8 +599,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Echo("node error of %s", m.Option("node.route"))
 
 			} else {
+				m.Log("time", "exec: %v", m.Format("cost"))
 				// 执行命令
 				m.Cmd("_exec", arg)
+				m.Log("time", "exec: %v", m.Format("cost"))
 			}
 			return
 		}},
@@ -951,6 +956,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			// 执行命令
 			m.Cmdy(arg)
+			m.Log("time", "exec: %v", m.Format("cost"))
 			return
 		}},
 	},

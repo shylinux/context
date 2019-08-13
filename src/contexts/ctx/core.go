@@ -541,7 +541,7 @@ func (m *Message) Goshy(input []string, index int, stack *kit.Stack, cb func(*Me
 		m.Optioni("stack.pos", i)
 
 		// 执行语句
-		msg := m.Sess("yac", true, true).Cmd("parse", line+"\n")
+		msg := m.Sess("yac").Cmd("parse", line+"\n")
 		if cb != nil {
 			cb(msg)
 		}

@@ -73,3 +73,15 @@ func FmtSize(size uint64) string {
 
 	return fmt.Sprintf("%dB", size)
 }
+func FmtTime(time int64) string {
+	if time > 1000000000 {
+		return fmt.Sprintf("%d.%ds", time/1000000000, (time/1000000)%1000*100/1000)
+	}
+	if time > 1000000 {
+		return fmt.Sprintf("%d.%dms", time/1000000, (time/1000)%1000*100/1000)
+	}
+	if time > 1000 {
+		return fmt.Sprintf("%d.%dus", time/1000, (time/1000)%1000*100/1000)
+	}
+	return fmt.Sprintf("%dns", time)
+}

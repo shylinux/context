@@ -409,11 +409,11 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 				msg.Add(field, value)
 
 			case "":
-				m.Log("recv", "time %v", time.Now().Format(m.Conf("time", "format")))
 				if head == "detail" { // 接收请求
 					msg.Detail(-1, "_route")
 					msg.Option("remote_code", code)
 					m.Gos(msg, func(msg *ctx.Message) {
+						msg.Log("time", "parse %v", msg.Format("cost", "detail"))
 						msg.Call(func(msg *ctx.Message) *ctx.Message {
 							nfs.echo <- msg
 							return nil

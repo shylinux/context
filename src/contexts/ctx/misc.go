@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"sort"
 	"toolkit"
@@ -70,6 +71,9 @@ func (m *Message) Format(arg ...interface{}) string {
 	meta := []string{}
 	for _, v := range arg {
 		switch kit.Format(v) {
+		case "cost":
+			meta = append(meta, kit.FmtTime(time.Now().Sub(m.time).Nanoseconds()))
+
 		case "summary":
 			msg := arg[1].(*Message)
 			ms := make([]*Message, 0, 1024)

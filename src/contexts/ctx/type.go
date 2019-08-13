@@ -90,13 +90,8 @@ type DEBUG interface {
 func (m *Message) Time(arg ...interface{}) string {
 	t := m.time
 	if len(arg) > 0 {
-		switch v := arg[0].(type) {
-		case time.Time:
-			return fmt.Sprintf("%v", v.Sub(t))
-		default:
-			if d, e := time.ParseDuration(arg[0].(string)); e == nil {
-				arg, t = arg[1:], t.Add(d)
-			}
+		if d, e := time.ParseDuration(arg[0].(string)); e == nil {
+			arg, t = arg[1:], t.Add(d)
 		}
 	}
 

@@ -812,6 +812,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				if m.Cmdy("cli.system", env, "go", "build", "-o", q, p); m.Result(0) == "" {
 					m.Cmdy("cli.quit", 1)
 					m.Append("time", m.Time())
+					m.Append("cost", m.Format("cost"))
 					m.Append("hash", kit.Hashs(q)[:8])
 					m.Append("bin", q)
 					m.Table()
@@ -851,6 +852,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				if m.Cmdy("cli.system", env, "go", "build", o, "-o", q, p); m.Result(0) == "" {
 					m.Append("time", m.Time())
+					m.Append("cost", m.Format("cost"))
 					m.Append("hash", m.Cmdx("nfs.hash", q)[:8])
 					m.Append("bin", q)
 					m.Table()
@@ -994,9 +996,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						restart = true
 					}
 
-					m.Add("append", "time", m.Time())
-					m.Add("append", "file", file)
-					m.Add("append", "hash", kit.Hashs(file)[:8])
+					m.Push("time", m.Time())
+					m.Push("cost", m.Format("cost"))
+					m.Push("hash", kit.Hashs(file)[:8])
+					m.Push("file", file)
 
 					if strings.HasSuffix(link, ".tar.gz") {
 						m.Cmd("cli.system", "tar", "-xvf", file, "-C", path.Dir(file))
