@@ -1,9 +1,15 @@
-function Page(page) {
+function Meta(target, obj) {
+    var a = obj
+    for (var i = 2; i < arguments.length; i++) {
+        a.__proto__ = arguments[i], a = arguments[i]
+    }
+
     var id = 1
     var conf = {}, conf_cb = {}
     var sync = {}
-    page.__proto__ = {
-        __proto__: kit,
+    return {
+        __proto__: obj,
+        Target: target,
         ID: function() {
             return id++
         },
@@ -19,7 +25,7 @@ function Page(page) {
                 conf[key] = value
                 conf_cb[key] && conf_cb[key](value, old)
             }
-            return conf[key]
+            return conf[key] == undefined && obj && obj.Conf? obj.Conf(key): conf[key]
         },
         Sync: function(m) {
             var meta = m, data = "", list = []
@@ -53,7 +59,7 @@ function Page(page) {
                 },
             })
         },
-        View: function(parent, type, line, key, cb) {
+        View: function(output, type, line, key, cb) {
             var text = line, list = [], ui = {}
             switch (type) {
                 case "icon":
@@ -98,20 +104,27 @@ function Page(page) {
             }
 
             var item = []
-            parent.DisplayUser && item.push({view: ["user", "div", line.create_nick||line.create_user]})
-            parent.DisplayTime && (item.push({text: [line.create_time, "div", "time"]}))
+            output.DisplayUser && item.push({view: ["user", "div", line.create_nick||line.create_user]})
+            output.DisplayTime && (item.push({text: [line.create_time, "div", "time"]}))
             item.push({view: ["text"], list:list})
 
-            !parent.DisplayRaw && (list = [{view: ["item"], list:item}])
-            ui = kit.AppendChild(parent, list)
+            !output.DisplayRaw && (list = [{view: ["item"], list:item}])
+            ui = kit.AppendChild(output, list)
             ui.field && (ui.field.Meta = text)
             return ui
         },
         Include: function(src, cb) {
-            kit.AppendChild(document.body, [{include: [src[0], function(event) {
+            typeof src == "string" && (src = [src])
+            kit.AppendChild(target, [{include: [src[0], function(event) {
                 src.length == 1? cb(event): page.Include(src.slice(1), cb)
             }]}])
         },
+    }
+}
+
+function Page(page) {
+    page = Meta(document.body, page, {
+        __proto__: kit,
         ontoast: function(text, title, duration) {
             var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
             var toast = kit.ModifyView("fieldset.toast", {
@@ -164,17 +177,6 @@ function Page(page) {
             }, 10): setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
             page.toast = toast
             return true
-        },
-        ondebug: function() {
-            if (!this.debug) {
-                var pane = Pane(page)
-                pane.Field.style.position = "absolute"
-                pane.Field.style["background-color"] = "#ffffff00"
-                pane.Field.style["color"] = "red"
-                pane.ShowDialog(400, 400)
-                this.debug = pane
-            }
-            kit.AppendChild(this.debug.Field, [{text: [JSON.stringify(arguments.length==1? arguments[0]: arguments)]}])
         },
         oninput: function(event, local) {
             var target = event.target
@@ -391,7 +393,7 @@ function Page(page) {
             }
         },
         Pane: Pane,
-    }
+    })
     window.onload = function() {
         document.querySelectorAll("body>fieldset").forEach(function(field) {
             page.Pane(page, field)
@@ -414,6 +416,7 @@ function Page(page) {
 }
 function Pane(page, field) {
     field = field || kit.AppendChild(document.body, [{type: "fieldset", list: [{view: ["option", "form"]}, {view: ["output"]}]}]).last
+
     var option = field.querySelector("form.option")
     var action = field.querySelector("div.action")
     var output = field.querySelector("div.output")
@@ -421,25 +424,10 @@ function Pane(page, field) {
     var cache = []
     var timer = ""
     var list = [], last = -1
-    var conf = {}, conf_cb = {}
     var name = option.dataset.name
-    var pane = (page[field.dataset.init] || function() {
-    })(page, field, option, output) || {}; pane.__proto__ = {
+    var pane = Meta(field, (page[field.dataset.init] || function() {
+    })(page, field, option, output) || {}, {
         __proto__: page,
-        Conf: function(key, value, cb) {
-            if (key == undefined) {
-                return conf
-            }
-            if (cb != undefined) {
-                conf_cb[key] = cb
-            }
-            if (value != undefined) {
-                var old = conf[key]
-                conf[key] = value
-                conf_cb[key] && conf_cb[key](value, old)
-            }
-            return conf[key]
-        },
         ShowDialog: function(width, height) {
             if (field.style.display != "block") {
                 page.dialog && page.dialog != field && page.dialog.style.display == "block" && page.dialog.Show()
@@ -455,8 +443,8 @@ function Pane(page, field) {
             field.style.width = width+"px"
             field.style.height = height+"px"
         },
-        View: function(parent, type, line, key, cb) {
-            var ui = page.View(parent, type, line, key, cb)
+        Views: function(output, type, line, key, cb) {
+            var ui = page.View(output, type, line, key, cb)
             if (type == "plugin" || type == "field") {
                 pane.Plugin(page, pane, ui.field)
             }
@@ -500,7 +488,7 @@ function Pane(page, field) {
             last = index, list[index] && (list[index].className = "item select")
         },
         Append: function(type, line, key, which, cb) {
-            var index = list.length, ui = pane.View(output, line.type || type, line, key, function(event, cmds, cbs) {
+            var index = list.length, ui = pane.Views(output, line.type || type, line, key, function(event, cmds, cbs) {
                 pane.Select(index), pane.which.set(line[which])
                 typeof cb == "function" && cb(line, index, event, cmds, cbs)
             })
@@ -550,7 +538,7 @@ function Pane(page, field) {
         },
         which: page.Sync(name), Listen: {},
         Action: {}, Button: [], Plugin: Plugin,
-    }
+    })
 
     for (var k in pane.Listen) {
         page.Sync(k).change(pane.Listen[k])
@@ -563,6 +551,7 @@ function Pane(page, field) {
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
         }]}
     })).className="action "+name)
+
     option.onsubmit = function(event) {
         event.preventDefault()
     };
@@ -573,7 +562,7 @@ function Plugin(page, pane, field) {
     var output = field.querySelector("div.output")
 
     var count = 0
-    var plugin = field.Script || {}; plugin.__proto__ = {
+    var plugin = Meta(field, field.Script || {}, {
         __proto__: pane,
         Append: function(item, name) {
             name = item.name || "input"
@@ -721,7 +710,7 @@ function Plugin(page, pane, field) {
             field.Meta.args = kit.Selector(option, "input.args", function(item, index) {
                 return item.value
             })
-            return pane.View(field.parentNode, "plugin", field.Meta, [], field.Run).field.Plugin
+            return pane.Views(field.parentNode, "plugin", field.Meta, [], field.Run).field.Plugin
         },
         Share: function() {
             location.href
@@ -845,7 +834,7 @@ function Plugin(page, pane, field) {
             plugin.ondaemon[display.deal||"table"](plugin.msg)
         },
         init: function() {},
-    }
+    })
 
     var meta = field.Meta
     var args = meta.args || []
@@ -856,6 +845,9 @@ function Plugin(page, pane, field) {
     plugin.init(page, pane, plugin, field, option, output)
     return page[field.id] = pane[field.id] = plugin.Field = field, field.Plugin = plugin
 }
+function Action(pane, pane, plugin, item) {
+}
+
 function Editor(plugin, option, output, width, height, space, msg) {
     exports = ["dir", "path", "dir"]
     msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
