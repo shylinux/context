@@ -1,4 +1,5 @@
 var page = Page({
+    login: true,
     conf: {border: 4},
     onlayout: function(event, sizes) {
         var height = document.body.clientHeight-page.conf.border

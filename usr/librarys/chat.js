@@ -1,4 +1,5 @@
-page = Page({
+Page({
+    check: true,
     conf: {refresh: 1000, border: 4, layout: {header:30, river:120, action:180, source:60, storm:100, footer:30}},
     onlayout: function(event, sizes) {
         var page = this
@@ -78,6 +79,20 @@ page = Page({
                 break
         }
     },
+    onaction: {
+        title: function(event, item, value) {
+            ctx.Search({"river": page.river.Pane.which.get(), "storm": page.storm.Pane.which.get(), "layout": page.action.Pane.Layout()})
+        },
+        user: function(event, item, value) {
+            var name = kit.prompt("new name")
+            name && page.login.Pane.Run(["rename", name], function(msg) {
+                page.header.Pane.State("user", name)
+            })
+        },
+        logout: function(event, item, value) {
+            kit.confirm("logout?") && page.login.Pane.Exit()
+        },
+    },
 
     initOcean: function(page, field, option, output) {
         var table = kit.AppendChild(output, "table")
@@ -115,37 +130,35 @@ page = Page({
                 event.key == "Enter" && this.nextSibling.click()
 
             }]}, {button: ["create", function(event) {
-                if (!ui.name.value) {
-                    ui.name.focus()
-                    return
-                }
+                if (!ui.name.value) {ui.name.focus(); return}
 
-                var cmd = ["spawn", "", ui.name.value]
-                ui.list.querySelectorAll("pre").forEach(function(item) {
-                    cmd.push(item.innerText)
+                var list = kit.Selector(ui.list, "pre", function(item) {return item.innerText})
+                if (list.length == 0) {kit.alert("请添加组员"); return}
+
+                field.Pane.Create(ui.name.value, list)
+
+            }]}, {name: "list", view: ["list"]},
+        ]}])
+        return {
+            Append: function(msg) {
+                kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, row, i, tr, event) {
+                    tr.className = "hidden"
+                    var uis = kit.AppendChild(ui.list, [{text: [row.key], click: function(event) {
+                        tr.className = "normal", uis.last.parentNode.removeChild(uis.last)
+                    }}])
                 })
-                if (cmd.length == 3) {
-                    kit.alert("请添加组员")
-                    return
-                }
-
-                field.Pane.Run(cmd, function(msg) {
+            },
+            Clear: function(name) {
+                table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = name, ui.name.focus()
+            },
+            Create: function(name, list) {
+                field.Pane.Run(["spawn", "", name].concat(list), function(msg) {
                     page.river.Pane.Show()
                     field.Pane.Show()
                 })
-            }]}, {name: "list", view: ["list"]},
-        ]}])
-
-        return {
+            },
             Show: function() {
-                this.ShowDialog() && (table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = "good", ui.name.focus(), this.Run([], function(msg) {
-                    kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, row, i, tr, event) {
-                        tr.className = "hidden"
-                        var uis = kit.AppendChild(ui.list, [{text: [row.key], click: function(event) {
-                            tr.className = "normal", uis.last.parentNode.removeChild(uis.last)
-                        }}])
-                    })
-                }))
+                this.Dialog() && (this.Clear("good"), this.Run([], this.Append))
             },
             Action: {
                 "取消": function(event) {
@@ -179,39 +192,34 @@ page = Page({
         }
     },
     initTarget: function(page, field, option, output) {
-        var river = ""
-        var which = {}
+        var river = "", which = {}
         output.DisplayUser = true
         output.DisplayTime = true
         return {
+            Send: function(type, text, cb) {var pane = this
+                pane.Run([river, "flow", type, text], function(msg) {
+                    pane.Show(), typeof cb == "function" && cb(msg)
+                })
+            },
+            Stop: function() {
+                return field.style.display == "none"
+            },
+            Show: function(i) {var pane = this
+                field.Pane.Back(river, output)
+
+                var foot = page.footer.Pane, cmds = [river, "brow", i||which[river]||0]
+                cmds[2] || (output.innerHTML = ""), pane.Tickers(page.conf.refresh, cmds, function(line, index, msg) {
+                    pane.Append("", line, ["text"], "index", function(line, index, event, args, cbs) {
+                        page.action.Pane.Core(event, line, args, cbs)
+                    })
+                    foot.State("ntxt", which[river] = cmds[2] = parseInt(line.index)+1)
+                })
+            },
             Listen: {
                 river: function(value, old) {
                     field.Pane.Save(river, output)
                     river = value, field.Pane.Show()
                 },
-            },
-            Stop: function() {
-                return field.style.display == "none"
-            },
-            Show: function(i) {
-                field.Pane.Back(river, output)
-                var pane = this, foot = page.footer.Pane
-                var cmds = [river, "brow", i||which[river]||0]
-                cmds[2] || (output.innerHTML = ""), pane.Times(page.conf.refresh, cmds, function(line, index, msg) {
-                    pane.Append("", line, ["text"], "index", function(line, index, event, args, cbs) {
-                        var text = JSON.parse(line.text)
-                        page.action.Pane.Run([text.river, text.storm, text.action].concat(args), function(msg) {
-                            typeof cbs == "function" && cbs(msg)
-                        })
-                    })
-                    foot.State("text", which[river] = cmds[2] = parseInt(line.index)+1)
-                })
-            },
-            Send: function(type, text, cb) {
-                var pane = this
-                pane.Run([river, "flow", type, text], function(msg) {
-                    pane.Show(), typeof cb == "function" && cb(msg)
-                })
             },
         }
     },
@@ -222,8 +230,13 @@ page = Page({
         }, "onkeydown": function(event) {
             event.key == "Enter" && !event.shiftKey && event.preventDefault()
         }}}])
-
         return {
+            Select: function() {
+                ui.first.focus()
+            },
+            Clear: function(value) {
+                ui.first.value = ""
+            },
             Size: function(width, height) {
                 field.style.display = (width<=0 || height<=0)? "none": "block"
                 field.style.width = width+"px"
@@ -231,61 +244,58 @@ page = Page({
                 ui.first.style.width = (width-7)+"px"
                 ui.first.style.height = (height-7)+"px"
             },
-            Select: function() {
-                ui.first.focus()
-            },
-            Clear: function(value) {
-                ui.first.value = ""
-            },
         }
     },
     initAction: function(page, field, option, output) {
         var river = "", storm = 0, input = "", share = ""
-
         output.DisplayRaw = true
         return {
-            Listen: {
-                river: function(value, old) {
-                    river = value
-                },
-                storm: function(value, old) {
-                    field.Pane.Save(river+storm, output)
-                    storm = value, field.Pane.Show()
-                },
-                source: function(value, old) {
-                    input = value, kit.Log(value)
-                },
-                target: function(value, old) {
-                    share = value, kit.Log(value)
-                },
-            },
-            Show: function() {
-                if (field.Pane.Back(river+storm, output)) {
-                    return
-                }
-
-                this.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
-                    if (args.length > 0 && args[0] == "share") {
+            Core: function(event, line, args, cbs) {
+                var plugin = event.Plugin || {}, engine = {
+                    share: function(args) {
                         typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
-                            line.group, line.index,  args[1]||"",
+                            river, line.group, line.index,  args[1]||"",
                         ]}))
-                        return
-                    }
-
-                    var plugin = event.Plugin || {}
-                    var meta = plugin && plugin.Field && plugin.Field.Meta || {}
-                    event.shiftKey? page.target.Pane.Send("field", plugin.Format()):
-                        field.Pane.Run([meta.river||river, meta.storm||storm, meta.action||index].concat(args), function(msg) {
+                        return true
+                    },
+                    _msg: function(msg) {
+                        if (msg) {
                             var text = plugin? plugin.Reveal(msg): ""
                             text && event.ctrlKey && page.target.Pane.Send(text[0], text[1])
-                            typeof cbs == "function" && cbs(msg)
+                        } else {
+                            page.target.Pane.Send("field", plugin.Format())
+                        }
+                    },
+                    _run: function() {
+                        var meta = plugin && plugin.target && plugin.target.Meta || {}
+                        field.Pane.Run([meta.river||river, meta.storm||storm, meta.action||index].concat(args), function(msg) {
+                            engine._msg(msg), typeof cbs == "function" && cbs(msg)
                         })
+                    },
+                }
+                if (args.length > 0 && engine[args[0]] && engine[args[0]](args)) {return}
+                event.shiftKey? engine._msg(): engine._run()
+            },
+            Show: function() {var pane = this
+                if (field.Pane.Back(river+storm, output)) {return}
+
+                this.Clear(), this.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
+                    pane.Core(event, line, args, cbs)
                 })
             },
             Layout: function(name) {
                 var layout = field.querySelector("select.layout")
-                name && this.Action[layout.value = name](null, layout.value)
+                name && this.Action[layout.value = name](window.event, layout.value)
                 return layout.value
+            },
+            Listen: {
+                river: function(value, old) {river = value},
+                storm: function(value, old) {
+                    field.Pane.Save(river+storm, output)
+                    storm = value, field.Pane.Show()
+                },
+                source: function(value, old) {input = value},
+                target: function(value, old) {share = value},
             },
             Action: {
                 "聊天": function(event, value) {
@@ -359,23 +369,14 @@ page = Page({
             },
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"], "",
                 "刷新", "清空", "并行", "串行", "",
-                "添加", "删除", "加参", "减参", "",
 				["display", "表格", "编辑", "绘图"],
+                "添加", "删除", "加参", "减参", "",
             ],
         }
     },
     initStorm: function(page, field, option, output) {
         var river = ""
         return {
-            Listen: {
-                river: function(value, old) {
-                    field.Pane.which.set(""), river = value, field.Pane.Show()
-                },
-            },
-            Show: function(which) {
-                this.which.get("") == which && page.action.Pane.Show()
-                this.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
-            },
             Next: function() {
                 var next = output.querySelector("div.item.select").nextSibling
                 next? next.click(): output.firstChild.click()
@@ -383,6 +384,15 @@ page = Page({
             Prev: function() {
                 var prev = output.querySelector("div.item.select").previousSibling
                 prev? prev.click(): output.lastChild.click()
+            },
+            Show: function(which) {
+                this.which.get("") == which && page.action.Pane.Show()
+                output.innerHTML = "", this.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
+            },
+            Listen: {
+                river: function(value, old) {
+                    field.Pane.which.set(""), river = value, field.Pane.Show()
+                },
             },
             Action: {
                 "创建": function(event) {
@@ -434,141 +444,79 @@ page = Page({
                             td && td.click()
                             return true
                     }
-                })
-                event.key == "Enter" && this.nextSibling.click()
+                }), event.key == "Enter" && this.nextSibling.click()
+
             }]}, {button: ["create", function(event) {
-                if (!ui.name.value) {
-                    ui.name.focus()
-                    return
-                }
+                if (!ui.name.value) {ui.name.focus(); return}
 
-                var cmd = [river, "spawn", ui.name.value]
-                ui.list.querySelectorAll("tr").forEach(function(item) {
-                    cmd.push(item.dataset.pod)
-                    cmd.push(item.dataset.group)
-                    cmd.push(item.dataset.index)
-                    cmd.push(item.dataset.name)
+                var list = []
+                kit.Selector(ui.list, "tr", function(item) {
+                    list.push(item.dataset.pod)
+                    list.push(item.dataset.group)
+                    list.push(item.dataset.index)
+                    list.push(item.dataset.name)
                 })
+                if (list.length == 0) {kit.alert("请添加命令"); return}
 
-                if (cmd.length == 4) {
-                    kit.alert("请添加命令")
-                    return
-                }
+                field.Pane.Create(ui.name.value, list)
 
-                field.Pane.Run(cmd, function(msg) {
-                    field.Pane.Show()
-                    page.storm.Pane.Show(ui.name.value)
-                })
             }]}, {name: "list", view: ["list", "table"]},
         ]}])
 
         return {
-            Listen: {
-                river: function(value, old) {
-                    river = value
-                },
+            Append: function(com, pod) {var pane = field.Pane
+                var last = kit.AppendChild(ui.list, [{
+                    dataset: {pod: pod.node, group: com.key, index: com.index, name: com.name},
+                    row: [com.key, com.index, com.name, com.help],
+                    click: function(event) {last.parentNode.removeChild(last)},
+                }]).last
             },
-            Show: function() {
-                this.ShowDialog() && (table.innerHTML = "", ui.name.value = "nice", this.Run([river], function(msg) {
-                    kit.AppendTable(table, ctx.Table(msg), ["user", "node"], function(value, key, pod, i, tr, event) {
-                        var old = table.querySelector("tr.select")
-                        tr.className = "select", old && (old.className = "normal"), field.Pane.Run([river, pod.user, pod.node], function(msg) {
-                            device.innerHTML = "", kit.AppendTable(device, ctx.Table(msg), ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
-                                var last = kit.AppendChild(ui.list, [{type: "tr", list: [
-                                    {text: [com.key, "td"]}, {text: [com.index, "td"]}, {text: [com.name, "td"]}, {text: [com.help, "td"]},
-                                ], dataset: {pod: pod.node, group: com.key, index: com.index, name: com.name}, click: function(event) {
-                                    last.parentNode.removeChild(last)
-                                }}]).last
-                            })
-                        })
+            Update: function(list, pod) {var pane = field.Pane
+                device.innerHTML = "", kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
+                    pane.Append(com, pod)
+                })
+            },
+            Select: function(list) {var pane = field.Pane
+                table.innerHTML = "", kit.AppendTable(table, list, ["user", "node"], function(value, key, pod, i, tr, event) {
+                    var old = table.querySelector("tr.select")
+                    tr.className = "select", old && (old.className = "normal"), pane.Run([river, pod.user, pod.node], function(msg) {
+                        pane.Update(ctx.Table(msg), pod)
                     })
-                    table.querySelector("td").click()
-                    ui.name.focus()
-                }))
+                }), table.querySelector("td").click()
+                ui.name.value = "nice", ui.name.focus()
+            },
+            Create: function(name, list) {
+                field.Pane.Run([river, "spawn", name].concat(list), function(msg) {
+                    field.Pane.Show(), page.storm.Pane.Show(name)
+                })
+            },
+            Show: function() {var pane = field.Pane
+                pane.Dialog() && pane.Run([river], function(msg) {
+                    pane.Select(ctx.Table(msg))
+                })
+            },
+            Listen: {
+                river: function(value, old) {river = value},
             },
             Action: {
-                "取消": function(event) {
-                    field.Pane.Show()
-                },
+                "取消": function(event) {field.Pane.Show()},
+                "清空": function(event) {ui.list.innerHTML = ""},
                 "全选": function(event) {
                     ui.list.innerHTML = "", device.querySelectorAll("tr").forEach(function(item) {
                         item.firstChild.click()
                     })
                 },
-                "清空": function(event) {
-                    ui.list.innerHTML = ""
-                },
             },
-            Button: ["取消", "全选", "清空"],
+            Button: ["取消", "清空", "全选"],
         }
     },
     init: function(page) {
-        page.onlayout(null, page.conf.layout)
+        page.onlayout(window.event, page.conf.layout)
         page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.isMobile? "办公": "工作")
-        page.footer.Pane.Order({"ncmd": "", "text": "", ":":""}, kit.isMobile? ["ncmd", "text"]: ["ncmd", "text", ":"], function(event, item, value) {})
+        page.footer.Pane.Order({"ncmd": "", "ntxt": "", ":":""}, kit.isMobile? ["ncmd", "ntxt"]: ["ncmd", "ntxt", ":"], function(event, item, value) {})
         page.header.Pane.Order({"logout": "logout", "user": ""}, ["logout", "user"], function(event, item, value) {
-            switch (item) {
-                case "title":
-                    ctx.Search({"river": page.river.Pane.which.get(), "storm": page.storm.Pane.which.get(), "layout": page.action.Pane.Layout()})
-                    break
-                case "user":
-                    var name = kit.prompt("new name")
-                    name && page.login.Pane.Run(["rename", name], function(msg) {
-                        page.header.Pane.State("user", name)
-                    })
-                    break
-                case "logout":
-                    kit.confirm("logout?") && page.login.Pane.Exit()
-                    break
-                default:
-            }
+            page.onaction[item] && page.onaction[item](event, item, value)
         })
-        false && kit.isWeiXin && page.login.Pane.Run(["weixin"], function(msg) {
-            page.Include([
-                "https://res.wx.qq.com/open/js/jweixin-1.4.0.js",
-                "/static/librarys/weixin.js",
-            ], function(event) {
-                wx.error(function(res){})
-                wx.ready(function(){
-                    page.getLocation = function(cb) {
-                        wx.getLocation({success: function (res) {
-                            cb(res)
-                        }})
-                    }
-                    page.openLocation = function(latitude, longitude, name) {
-                        wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
-                    }
-
-                    wx.getNetworkType({success: function (res) {}})
-                    wx.getLocation({success: function (res) {
-                        page.footer.Pane.State("site", parseInt(res.latitude*10000)+","+parseInt(res.longitude*10000))
-                    }})
-                })
-                wx.config({
-                    appId: msg.appid[0],
-                    timestamp: msg.timestamp[0],
-                    nonceStr: msg.nonce[0],
-                    signature: msg.signature[0],
-                    jsApiList: [
-                        "scanQRCode",
-                        "chooseImage",
-                        "closeWindow",
-                        "openAddress",
-                        "getNetworkType",
-                        "getLocation",
-                        "openLocation",
-                    ]
-                })
-            })
-        })
-        page.login.Pane.Run([], function(msg) {
-            if (msg.result && msg.result[0]) {
-                page.header.Pane.State("user", msg.nickname[0])
-                page.footer.Pane.State("ip", msg.remote_ip[0])
-                page.river.Pane.Show()
-                return
-            }
-            page.login.Pane.ShowDialog(1, 1)
-        })
+        page.river.Pane.Show()
     },
 })

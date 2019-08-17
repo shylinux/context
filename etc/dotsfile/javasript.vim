@@ -1,4 +1,2 @@
-highlight shyNumber   ctermfg=magenta
-
-syn match shyNumber	    "-\=\<\d\+\>#\="
-
+highlight javaScriptComment        cterm=reverse ctermfg=yellow
+highlight Comment        cterm=reverse ctermfg=yellow

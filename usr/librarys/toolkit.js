@@ -121,7 +121,7 @@ kit = toolkit = {
         //
         // 按键: button select
         // 输入: input password
-        // 输出: label img
+        // 输出: label img row
         //
         // 树状结构: tree fork leaf
         // 普通视图: view text code
@@ -208,6 +208,10 @@ kit = toolkit = {
                 child.type = "img"
                 child.data["src"] = child.img[0]
                 child.img.length > 1 && (child.data["onload"] = child.img[1])
+
+            } else if (child.row) {
+                child.type = "tr"
+                child.list = child.row.map(function(item) {return {text: [item, "td"]}})
 
             } else if (child.tree) {
                 child.type = "ul"
@@ -545,9 +549,14 @@ kit = toolkit = {
     List: function(obj, cb) {
         var list = []
         for (var i = 0; i < obj.length; i++) {
-            list.push(typeof cb == "function"? cb(obj[i]): obj[i])
+            list.push(typeof cb == "function"? cb(obj[i], i): obj[i])
         }
         return list
+    },
+    Item: function(obj, cb) {
+        for (var k in obj) {
+            cb(k, obj[k])
+        }
     },
     alert: function(text) {
         alert(JSON.stringify(text))
