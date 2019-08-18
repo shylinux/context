@@ -72,8 +72,12 @@ Page({
                     break
                 } else {
                     switch (event.key) {
+                        case " ":
+                            page.footer.Pane.Select()
+                            break
                         case "Escape":
                             page.dialog && page.dialog.Pane.Show()
+                            break
                     }
                 }
                 break
@@ -157,8 +161,8 @@ Page({
                     field.Pane.Show()
                 })
             },
-            Show: function() {
-                this.Dialog() && (this.Clear("good"), this.Run([], this.Append))
+            Show: function() {var pane = field.Pane
+                pane.Dialog() && (pane.Clear("good"), pane.Run([], pane.Append))
             },
             Action: {
                 "取消": function(event) {
@@ -180,8 +184,8 @@ Page({
     },
     initRiver: function(page, field, option, output) {
         return {
-            Show: function() {
-                this.Update([], "text", ["nick", "count"], "key", ctx.Search("river")||true)
+            Show: function() {var pane = field.Pane
+                output.innerHTML = "", pane.Update([], "text", ["nick", "count"], "key", ctx.Search("river")||true)
             },
             Action: {
                 "创建": function(event) {
@@ -196,7 +200,7 @@ Page({
         output.DisplayUser = true
         output.DisplayTime = true
         return {
-            Send: function(type, text, cb) {var pane = this
+            Send: function(type, text, cb) {var pane = field.Pane
                 pane.Run([river, "flow", type, text], function(msg) {
                     pane.Show(), typeof cb == "function" && cb(msg)
                 })
@@ -204,7 +208,7 @@ Page({
             Stop: function() {
                 return field.style.display == "none"
             },
-            Show: function(i) {var pane = this
+            Show: function(i) {var pane = field.Pane
                 field.Pane.Back(river, output)
 
                 var foot = page.footer.Pane, cmds = [river, "brow", i||which[river]||0]
@@ -250,12 +254,62 @@ Page({
         var river = "", storm = 0, input = "", share = ""
         output.DisplayRaw = true
         return {
+            Tutor: function() {var pane = field.Pane
+                var event = window.event
+                function loop(list, index) {
+                    if (index >= list.length) {return}
+                    kit.Log(index, list[index])
+                    pane.Core(event, {}, ["_cmd", list[index]])
+                    setTimeout(function() {loop(list, index+1)}, 1000)
+                }
+                loop([
+                    "聊天", "help", "最高", "最大", "聊天",
+                    "工作", "串行", "清空", "并行", "help storm", "help storm list", "help action", "help action list",
+                    "聊天", "help target", "help target list",
+                ], 0)
+            },
             Core: function(event, line, args, cbs) {
                 var plugin = event.Plugin || {}, engine = {
                     share: function(args) {
                         typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
                             river, line.group, line.index,  args[1]||"",
                         ]}))
+                        return true
+                    },
+                    echo: function(one, two) {
+                        kit.Log(one, two)
+                    },
+                    _split: function(str) {return str.trim().split(" ")},
+                    help: function() {
+                        var args = kit.List(arguments)
+                        if (args.length > 1 && page[args[0]] && page[args[0]].Pane[args[1]]) {
+                            return kit._call(page[args[0]].Pane[args[1]].Plugin.Help, args.slice(2))
+                        }
+                        if (args.length > 0 && page[args[0]]) {
+                            return kit._call(page[args[0]].Pane.Help, args.slice(1))
+                        }
+                        return kit._call(page.Help, args)
+                    },
+                    _cmd: function(arg) {
+                        var args = engine._split(arg[1]);
+                        if (typeof engine[args[0]] == "function") {
+                            return kit._call(engine[args[0]], args.slice(1))
+                        }
+
+                        if (page.plugin && page.plugin.Plugin.Jshy(event, args)) {return true}
+                        if (page.dialog && page.dialog.Pane.Jshy(event, args)) {return true}
+                        if (page.pane && page.pane.Pane.Jshy(event, args)) {return true}
+                        if (page && page.Jshy(event, args)) {return true}
+
+                        if (page.plugin) {
+                            if (args.length > 1) {
+                                return kit._call(page.plugin.Plugin.Run, [window.event].concat(args.slice(1)))
+                            } else {
+                                return kit._call(page.plugin.Plugin.Runs, [window.event])
+                            }
+                        }
+
+                        kit.Log("not find", arg[1])
                         return true
                     },
                     _msg: function(msg) {
@@ -276,16 +330,16 @@ Page({
                 if (args.length > 0 && engine[args[0]] && engine[args[0]](args)) {return}
                 event.shiftKey? engine._msg(): engine._run()
             },
-            Show: function() {var pane = this
+            Show: function() {var pane = field.Pane
                 if (field.Pane.Back(river+storm, output)) {return}
 
-                this.Clear(), this.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
+                pane.Clear(), pane.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                     pane.Core(event, line, args, cbs)
                 })
             },
-            Layout: function(name) {
+            Layout: function(name) {var pane = field.Pane
                 var layout = field.querySelector("select.layout")
-                name && this.Action[layout.value = name](window.event, layout.value)
+                name && pane.Action[layout.value = name](window.event, layout.value)
                 return layout.value
             },
             Listen: {
@@ -385,9 +439,9 @@ Page({
                 var prev = output.querySelector("div.item.select").previousSibling
                 prev? prev.click(): output.lastChild.click()
             },
-            Show: function(which) {
-                this.which.get("") == which && page.action.Pane.Show()
-                output.innerHTML = "", this.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
+            Show: function(which) {var pane = field.Pane
+                pane.which.get("") == which && page.action.Pane.Show()
+                output.innerHTML = "", pane.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
             },
             Listen: {
                 river: function(value, old) {
@@ -518,5 +572,7 @@ Page({
             page.onaction[item] && page.onaction[item](event, item, value)
         })
         page.river.Pane.Show()
+        page.pane = page.action
+        page.plugin = kit.Selector(page.action, "fieldset")[0]
     },
 })

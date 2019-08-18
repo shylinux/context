@@ -571,6 +571,9 @@ kit = toolkit = {
         location.reload()
     },
 
+    distance: function(x0, y0, x1, y1) {
+        return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))
+    },
     number: function(d, n) {
         var result = []
         while (d>0) {
@@ -585,17 +588,6 @@ kit = toolkit = {
         result.reverse()
         return result.join("")
     },
-    time: function(t, fmt) {
-        var now = t? new Date(t): new Date()
-        fmt = fmt || "%y-%m-%d %H:%M:%S"
-        fmt = fmt.replace("%y", now.getFullYear())
-        fmt = fmt.replace("%m", kit.number(now.getMonth()+1, 2))
-        fmt = fmt.replace("%d", kit.number(now.getDate(), 2))
-        fmt = fmt.replace("%H", kit.number(now.getHours(), 2))
-        fmt = fmt.replace("%M", kit.number(now.getMinutes(), 2))
-        fmt = fmt.replace("%S", kit.number(now.getSeconds(), 2))
-        return fmt
-    },
     right: function(arg) {
         if (arg == "true") {
             return true
@@ -607,6 +599,17 @@ kit = toolkit = {
             return true
         }
         return false
+    },
+    time: function(t, fmt) {
+        var now = t? new Date(t): new Date()
+        fmt = fmt || "%y-%m-%d %H:%M:%S"
+        fmt = fmt.replace("%y", now.getFullYear())
+        fmt = fmt.replace("%m", kit.number(now.getMonth()+1, 2))
+        fmt = fmt.replace("%d", kit.number(now.getDate(), 2))
+        fmt = fmt.replace("%H", kit.number(now.getHours(), 2))
+        fmt = fmt.replace("%M", kit.number(now.getMinutes(), 2))
+        fmt = fmt.replace("%S", kit.number(now.getSeconds(), 2))
+        return fmt
     },
     format_date: function(arg) {
         var date = arg.getDate()
@@ -631,6 +634,24 @@ kit = toolkit = {
         }
         return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
     },
+    size: function(obj, width, height) {
+        obj.style.width = width+"px"
+        obj.style.height = height+"px"
+    },
+    _call: function(cb, arg) {
+        switch (arg.length) {
+            case 0: cb(); break
+            case 1: cb(arg[0]); break
+            case 2: cb(arg[0], arg[1]); break
+            case 3: cb(arg[0], arg[1], arg[2]); break
+            case 4: cb(arg[0], arg[1], arg[2], arg[3]); break
+            case 5: cb(arg[0], arg[1], arg[2], arg[3], arg[4]); break
+            case 6: cb(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]); break
+            case 7: cb(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]); break
+        }
+        return true
+    },
+
     OrderForm: function(page, field, option, append, result) {
         if (!option) {return}
         option.ondaemon = option.ondaemon || function(msg) {
@@ -696,9 +717,6 @@ kit = toolkit = {
                     }
             }
         })
-    },
-    distance: function(x0, y0, x1, y1) {
-        return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))
     },
 }
 

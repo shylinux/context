@@ -317,6 +317,9 @@ function Page(page) {
         },
         onscroll: function(event, target, action) {
             switch (event.key) {
+                case " ":
+                    page.footer.Pane.Select()
+                    break
                 case "h":
                     if (event.ctrlKey) {
                         target.scrollBy(-conf.scroll_x*10, 0)
@@ -360,6 +363,26 @@ function Page(page) {
             }
         },
 
+        Help: function(pane, type, action) {
+            if (pane == undefined) {
+                kit.Selector(document.body, "body>fieldset", function(field) {
+                    field.Pane.Help()
+                })
+                return true
+            }
+            page[pane].Pane.Help(type, action)
+        },
+        Jshy: function(event, args) {
+            if (page[args[0]] && page[args[0]].type == "fieldset") {
+                if (args.length > 1) {
+                    return page[args[0]].Pane.Jshy(event, args.slice(1))
+                } else {
+                    return page[args[0]].Pane.Show()
+                }
+            }
+            return typeof page[args[0]] == "function" && kit._call(page[args[0]], args.slice(1))
+        },
+
         initLogin: function(page, field, option, output) {
             var ui = kit.AppendChilds(option, [
                 {label: "username"}, {input: ["username"]}, {type: "br"},
@@ -376,7 +399,7 @@ function Page(page) {
             ])
             return {
                 Login: function(username, password, cb) {
-                    this.Run([username, password], function(msg) {cb(msg.result && msg.result[0] || "")})
+                    field.Pane.Run([username, password], function(msg) {cb(msg.result && msg.result[0] || "")})
                 },
                 Exit: function() {ctx.Cookie("sessid", ""), kit.reload()},
             }
@@ -386,10 +409,10 @@ function Page(page) {
             field.onclick = function(event) {page.pane && page.pane.scrollTo(0,0)}
             return {
                 Order: function(value, order, cbs) {
-                    state = value, list = order, cb = cbs || cb, this.Show()
+                    state = value, list = order, cb = cbs || cb, field.Pane.Show()
                 },
                 State: function(name, value) {
-                    value != undefined && (state[name] = value, this.Show())
+                    value != undefined && (state[name] = value, field.Pane.Show())
                     return name == undefined? state: state[name]
                 },
                 Show: function() {
@@ -406,22 +429,55 @@ function Page(page) {
         },
         initFooter: function(page, field, option, output) {
             var state = {}, list = [], cb = function(event, item, value) {}
-            field.onclick = function(event) {page.pane.scrollTo(0,page.pane.scrollHeight)}
+            field.onclick = function(event) {page.pane && page.pane.scrollTo(0,page.pane.scrollHeight)}
+            var ui, w = 0
             return {
+                Select: function() {
+                    ui.magic.focus()
+                },
                 Order: function(value, order, cbs) {
-                    state = value, list = order, cb = cbs || cb, this.Show()
+                    state = value, list = order, cb = cbs || cb, field.Pane.Show()
                 },
                 State: function(name, value) {
-                    value != undefined && (state[name] = value, this.Show())
+                    value != undefined && (state[name] = value, field.Pane.Show())
                     return name == undefined? state: state[name]
                 },
+                Size: function(width, height) {
+                    kit.size(field, width, height)
+                    ui && (w = width - ui.first.clientWidth - ui.last.clientWidth - 20) && kit.size(ui.magic, w, height-6)
+                },
                 Show: function() {
-                    output.innerHTML = "", kit.AppendChild(output, [
+                    output.innerHTML = "", ui = kit.AppendChild(output, [
                         {"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]},
+                        {"view": ["magic"], style: {"margin-top": "-4px"}, list: [{input: ["magic", function(event) {
+                            if (event.type != "keydown") {return}
+
+                            switch (event.key) {
+                                case " ":
+                                    return
+                                case "Enter":
+                                    page.action.Pane.Core(event, {}, ["_cmd", event.target.value]), event.target.value = ""
+                                    return
+                            }
+
+                            page.oninput(event, function(event) {
+                                switch (event.key) {
+                                    case "j":
+                                        page.action.Pane.Core(event, {}, ["_cmd", event.target.value]), event.target.value = ""
+                                        break
+                                    case "Enter":
+                                        kit.Log(event.target.value)
+                                        break
+                                }
+                            })
+                            return true
+
+                        }], style: {width: w, "margin-top": "-2px", "font-size": "16px"}}]},
                         {"view": ["state"], list: list.map(function(item) {return {text: [item+":"+state[item], "div"], click: function(item) {
                             cb(event, item, state[item])
                         }}})},
                     ])
+                    field.Pane.Size(field.clientWidth, field.clientHeight)
                 },
             }
         },
@@ -468,6 +524,46 @@ function Pane(page, field) {
             output.innerHTML = "", list = [], last = -1
         },
 
+        Help: function(type, action) {
+            if (kit.Selector(field, "div.Help", function(help) {
+                field.removeChild(help)
+                return help
+            }).length>0 || action == "hide") {return}
+
+            var text = [], delay = 30000
+            switch (type) {
+                case "name":
+                case undefined:
+                    text = [name]
+                    break
+                case "list":
+                    var list = []
+                    for (var k in pane) {list.push(k)}
+                    list.sort(), text = text.concat(list.map(function(item) {return "func: "+item+"\n"}))
+
+                    var list = []
+                    for (var k in pane.Action) {list.push(k)}
+                    list.sort(), text = text.concat(list.map(function(item) {return "action: "+item+"\n"}))
+                    break
+            }
+
+            kit.AppendChild(field, [{view: ["Help"], list: [{text: [text.join(""), "div"]}]}])
+            setTimeout(function() {pane.Help("", "hide")}, delay)
+        },
+        Jshy: function(event, args) {
+            if (pane[args[0]] && pane[args[0]].type == "fieldset") {
+                if (args.length > 1) {
+                    return kit._call(pane[args[0]].Plugin.Run, [event].concat(args.slice(1)))
+                } else {
+                    return kit._call(pane[args[0]].Plugin.Runs, [event])
+                }
+            }
+            if (typeof pane.Action[args[0]] == "function") {
+                return kit._call(pane.Action[args[0]], [event, args[0]])
+            }
+            return typeof pane[args[0]] == "function" && kit._call(pane[args[0]], args.slice(1))
+        },
+
         Tickers: function(time, cmds, cb) {
             pane.Ticker(time, cmds, function(msg) {
                 ctx.Table(msg, function(line, index) {
@@ -487,12 +583,12 @@ function Pane(page, field) {
         Runs: function(cmds, cb) {
             pane.Run(cmds, function(msg) {
                 ctx.Table(msg, function(line, index) {
-                    (cb||this.ondaemon)(line, index, msg)
+                    (cb||pane.ondaemon)(line, index, msg)
                 })
             })
         },
         Run: function(cmds, cb) {
-            ctx.Run(page, option.dataset, cmds, cb||this.ondaemon)
+            ctx.Run(page, option.dataset, cmds, cb||pane.ondaemon)
         },
 
         Size: function(width, height) {
@@ -599,7 +695,33 @@ function Plugin(page, pane, field, run) {
             return JSON.stringify(field.Meta)
         },
         Clone: function() {
-            return pane.Append("field", {text: plugin.Format()}, [], run).field.Plugin
+            return pane.Append("field", {text: plugin.Format()}, [], "", function(line, index, event, cmds, cbs) {
+                run(event, cmds, cbs)
+            }).field.Plugin
+        },
+
+        Help: function(type, action) {
+            if (kit.Selector(field, "div.Help", function(help) {
+                field.removeChild(help)
+                return help
+            }).length>0 || action == "hide") {return}
+
+            var text = [], delay = 30000
+            switch (type) {
+                case "name":
+                case undefined:
+                    text = [meta.name]
+                    break
+                case "help":
+                    text = [meta.help]
+                    break
+            }
+
+            kit.AppendChild(field, [{view: ["Help"], list: [{text: [text.join(""), "div"]}]}])
+            setTimeout(function() {plugin.Help("", "hide")}, delay)
+        },
+        Jshy: function(event, args) {
+            return typeof plugin[args[0]] == "function" && kit._call(plugin[args[0]], args.slice(1))
         },
 
         Delay: function(time, event, text) {
@@ -610,11 +732,12 @@ function Plugin(page, pane, field, run) {
         },
         Check: function(target, cb) {
             option.querySelectorAll(".args").forEach(function(item, index, list) {
-                item == target && (index == list.length-1? plugin.Runs(event, cb): page.plugin == field && list[index+1].focus())
+                target == undefined && index == list.length-1 && plugin.Runs(window.event, cb)
+                item == target && (index == list.length-1? plugin.Runs(window.event, cb): page.plugin == field && list[index+1].focus())
             })
         },
         Runs: function(event, cb) {
-            this.Run(event, kit.Selector(option, ".args", function(item, index) {return item.value}), cb)
+            plugin.Run(event, kit.Selector(option, ".args", function(item, index) {return item.value}), cb)
         },
         Run: function(event, args, cb) {
             var show = true
@@ -655,11 +778,12 @@ function Plugin(page, pane, field, run) {
                 return value.split("/")[0]
             },
             you: function(value, name, line) {
-                window.event.Plugin = plugin
+                var event = window.event
+                event.Plugin = plugin
                 line.you && name == "status" && (line.status == "start"? function() {
-                    plugin.Delay(3000, window.event, line.you+" stop...") && field.Run(window.event, [line.you, "stop"])
-                }(): field.Run(window.event, [line.you], function(msg) {
-                    plugin.Delay(3000, window.event, line.you+" start...")
+                    plugin.Delay(3000, event, line.you+" stop...") && field.Run(event, [line.you, "stop"])
+                }(): field.Run(event, [line.you], function(msg) {
+                    plugin.Delay(3000, event, line.you+" start...")
                 }))
                 return name == "status" || line.status == "stop" ? undefined: line.you
             },
@@ -756,11 +880,12 @@ function Plugin(page, pane, field, run) {
     })
 
     var meta = field.Meta
+    var name = meta.name
     var args = meta.args || []
     var display = JSON.parse(meta.display||'{}')
     var exports = JSON.parse(meta.exports||'["",""]')
     JSON.parse(meta.inputs || "[]").map(plugin.Append)
-    return page[field.id] = pane[field.id] = field, field.Plugin = plugin
+    return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
 }
 function Editor(plugin, option, output, width, height, space, msg) {
     exports = ["dir", "path", "dir"]
