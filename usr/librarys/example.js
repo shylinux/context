@@ -187,6 +187,17 @@ function Page(page) {
             }, document.body.onkeydown = function(event) {
                 if (page.localMap && page.localMap(event)) {return}
                 page.oncontrol && page.oncontrol(event, document.body, "control")
+                if (event.ctrlKey && kit.isWindows) {
+                    event.stopPropagation()
+                    event.preventDefault()
+                    return true
+                }
+            }, document.body.onkeyup = function(event) {
+                if (event.ctrlKey && kit.isWindows) {
+                    event.stopPropagation()
+                    event.preventDefault()
+                    return true
+                }
             }
         },
         ontoast: function(text, title, duration) {
@@ -253,7 +264,7 @@ function Page(page) {
                     return true
                 }
                 var his = target.History
-                var pos = target.Current
+                var pos = target.Current || -1
                 switch (event.key) {
                     case "p":
                         if (!his) { break }
@@ -298,6 +309,7 @@ function Page(page) {
 
                 }
                 event.stopPropagation()
+				event.preventDefault()
                 return true
             }
             switch (event.key) {
@@ -425,12 +437,12 @@ function Page(page) {
                         }}})},
                     ])
                 },
+				Help: function() {},
             }
         },
         initFooter: function(page, field, option, output) {
             var state = {}, list = [], cb = function(event, item, value) {}
-            field.onclick = function(event) {page.pane && page.pane.scrollTo(0,page.pane.scrollHeight)}
-            var ui, w = 0
+            var ui, w = 0, history
             return {
                 Select: function() {
                     ui.magic.focus()
@@ -450,35 +462,41 @@ function Page(page) {
                     output.innerHTML = "", ui = kit.AppendChild(output, [
                         {"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]},
                         {"view": ["magic"], style: {"margin-top": "-4px"}, list: [{input: ["magic", function(event) {
-                            if (event.type != "keydown") {return}
+                            if (event.key == "Enter" || event.ctrlKey && event.key == "j") {
+                                ui.magic.History.push(event.target.value)
+                                page.action.Pane.Core(event, {}, ["_cmd", event.target.value]), event.target.value = ""
+                                event.stopPropagation()
+                                event.preventDefault()
+                                return
+                            }
 
                             switch (event.key) {
                                 case " ":
-                                    return
-                                case "Enter":
-                                    page.action.Pane.Core(event, {}, ["_cmd", event.target.value]), event.target.value = ""
-                                    return
+                                    return true
                             }
 
                             page.oninput(event, function(event) {
                                 switch (event.key) {
                                     case "j":
-                                        page.action.Pane.Core(event, {}, ["_cmd", event.target.value]), event.target.value = ""
                                         break
                                     case "Enter":
                                         kit.Log(event.target.value)
                                         break
+                                    default:
+                                        return false
                                 }
+                                return true
                             })
-                            return true
 
                         }], style: {width: w, "margin-top": "-2px", "font-size": "16px"}}]},
                         {"view": ["state"], list: list.map(function(item) {return {text: [item+":"+state[item], "div"], click: function(item) {
                             cb(event, item, state[item])
                         }}})},
                     ])
+                    ui.magic.History = []
                     field.Pane.Size(field.clientWidth, field.clientHeight)
                 },
+				Help: function() {},
             }
         },
         Pane: Pane,
@@ -491,15 +509,16 @@ function Pane(page, field) {
     var output = field.querySelector("div.output")
 
     var timer = ""
-    var list = [], last = -1
+    var list = [], last = -1, member = {}
     var name = option.dataset.name
     var pane = Meta(field, (page[field.dataset.init] || function() {
     })(page, field, option, output) || {}, {
         Append: function(type, line, key, which, cb) {
             type = type || line.type
             var index = list.length, ui = pane.View(output, type, line, key, function(event, cmds, cbs) {
-                pane.Select(index), pane.which.set(line[which])
+                pane.Select(index, line[which])
             })
+			key && key.length > 0 && (member[line[which]] = member[line[key[0]]] = {index:index, key:line[which]})
             list.push(ui.last), field.scrollBy(0, field.scrollHeight+100);
             (type == "plugin" || type == "field") && pane.Plugin(page, pane, ui.field, function(event, cmds, cbs) {
                 typeof cb == "function" && cb(line, index, event, cmds, cbs)
@@ -516,9 +535,10 @@ function Pane(page, field) {
                 }
             })
         },
-        Select: function(index) {
+        Select: function(index, key) {
             -1 < last && last < list.length && (list[last].className = "item")
             last = index, list[index] && (list[index].className = "item select")
+			key && pane.which.set(key)
         },
         Clear: function() {
             output.innerHTML = "", list = [], last = -1
@@ -552,15 +572,15 @@ function Pane(page, field) {
         },
         Jshy: function(event, args) {
             if (pane[args[0]] && pane[args[0]].type == "fieldset") {
-                if (args.length > 1) {
-                    return kit._call(pane[args[0]].Plugin.Run, [event].concat(args.slice(1)))
-                } else {
-                    return kit._call(pane[args[0]].Plugin.Runs, [event])
-                }
+                return pane[args[0]].Plugin.Jshy(event, args.slice(1))
             }
             if (typeof pane.Action[args[0]] == "function") {
                 return kit._call(pane.Action[args[0]], [event, args[0]])
             }
+			if (member[args[0]] != undefined) {
+				pane.Select(member[args[0]].index, member[args[0]].key)
+				return true
+			}
             return typeof pane[args[0]] == "function" && kit._call(pane[args[0]], args.slice(1))
         },
 
@@ -631,7 +651,6 @@ function Plugin(page, pane, field, run) {
     var action = field.querySelector("div.action")
     var output = field.querySelector("div.output")
 
-    var count = 0
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
         Append: function(item, name, value) {
@@ -641,9 +660,10 @@ function Plugin(page, pane, field, run) {
                 }: cb)
             })
 
+            var count = kit.Selector(option, "args").length
             args && count < args.length && (item.value = value||args[count++]||item.value||"")
-            name = item.name || "input"
 
+            name = item.name || "input"
             var input = {type: "input", name: name, data: item}
             switch (item.type) {
                 case "select":
@@ -676,8 +696,8 @@ function Plugin(page, pane, field, run) {
             return action
         },
         Remove: function() {
-            var list = option.querySelectorAll(".args")
-            list.length > 0 && (option.removeChild(list[list.length-1].parentNode), count--)
+            var list = option.querySelectorAll("input.temp")
+            list.length > 0 && (option.removeChild(list[list.length-1].parentNode))
         },
         Delete: function() {
             page.plugin = field.previousSibling
@@ -721,7 +741,13 @@ function Plugin(page, pane, field, run) {
             setTimeout(function() {plugin.Help("", "hide")}, delay)
         },
         Jshy: function(event, args) {
-            return typeof plugin[args[0]] == "function" && kit._call(plugin[args[0]], args.slice(1))
+            if (typeof plugin[args[0]] == "function") {
+                return kit._call(plugin[args[0]], args.slice(1))
+            }
+            if (args.length > 1) {
+                return kit._call(plugin.Run, [event].concat(args.slice(1)))
+            }
+            return kit._call(plugin.Runs, [event])
         },
 
         Delay: function(time, event, text) {
@@ -822,8 +848,15 @@ function Plugin(page, pane, field, run) {
                 plugin.Check(action)
             },
             onkeyup: function(event, action, type, name, item) {
+                switch (event.key) {
+                    case " ":
+                        event.stopPropagation()
+                        return true
+                }
+
                 page.oninput(event, function(event) {
                     switch (event.key) {
+                        case " ":
                         case "w":
                             break
                         default:
@@ -835,8 +868,15 @@ function Plugin(page, pane, field, run) {
                 })
             },
             onkeydown: function(event, action, type, name, item) {
+                switch (event.key) {
+                    case " ":
+                        event.stopPropagation()
+                        return true
+                }
+
                 page.oninput(event, function(event) {
                     switch (event.key) {
+                        case " ":
                         case "w":
                             break
                         case "p":

@@ -17,26 +17,28 @@ legend {
     margin-left:10px;
 }
 
-fieldset>div.Help {
-    position:absolute;
-    left:0px;
-    top:0px;
-    width:calc(100% - 4px);
-    height:calc(100% - 4px);
+.hidden {
+    display:none;
 }
-fieldset>div.Help>div{
-    border:solid 2px red;
-    background-color:cyan;
-    color:blue;
-    opacity:0.7;
-    overflow:auto;
+.normal {
 }
+.choice {
+}
+.select {
+}
+
 fieldset>form.option div {
     margin-right:6px;
     float:left;
 }
 fieldset>form.option div.hide {
     display:none;
+}
+fieldset>form.option div.clear {
+    clear:both;
+}
+fieldset>form.option label {
+    margin-right:6px;
 }
 fieldset>form.option div input.args {
     width:80px;
@@ -46,19 +48,13 @@ fieldset>form.option div.cmd input.args {
     background-color: black;
     width:160px;
 }
-fieldset>form.option div.clear {
-    clear:both;
-}
 fieldset>form.option div.long input.args {
     width:240px;
-}
-fieldset>form.option label {
-    margin-right:6px;
 }
 fieldset>div.action {
     padding:6px;
 }
-fieldset>div.action>div.space {
+fieldset>div.action div.space {
     display:inline-block;
     width:10px;
 }
@@ -98,17 +94,31 @@ fieldset>div.output table td {
     word-break:keep-all;
     min-width:40px;
 }
-fieldset>div.output>table.edit {
+fieldset>div.output table.edit {
 }
-fieldset>div.output>table.edit td {
+fieldset>div.output table.edit td {
     min-width:4px;
     padding:0px;
 }
-fieldset>div.output>table.edit td>input {
+fieldset>div.output table.edit td>input {
     width:600px;
     padding:0px;
 }
 fieldset>div.output table.edit {
+}
+fieldset>div.Help {
+    position:absolute;
+    width:calc(100% - 4px);
+    height:calc(100% - 4px);
+    left:0px;
+    top:0px;
+}
+fieldset>div.Help>div {
+    color:blue;
+    opacity:0.7;
+    background-color:cyan;
+    border:solid 2px red;
+    overflow:auto;
 }
 
 fieldset.toast {
@@ -116,6 +126,7 @@ fieldset.toast {
     background-color:#ffffff;
     position:absolute;
     display:none;
+    z-index:100;
 }
 fieldset.toast>div.output {
     padding:0 10px;
@@ -139,6 +150,7 @@ fieldset.dialog {
     padding:10px;
     display:none;
     position:absolute;
+    z-index:10;
 }
 fieldset.dialog>div.output {
     padding:10px;
@@ -157,12 +169,26 @@ fieldset.dialog>div.create {
     float:left;
 }
 
+fieldset.Login {
+    font-size:28px;
+    z-index:20;
+}
+fieldset.Login>form.option input {
+    font-size:18px;
+    height:28px;
+}
+fieldset.Login>form.option button {
+    font-size:18px;
+    height:28px;
+}
 fieldset.Header {
     height:32px;
     clear:both;
+    min-width:640px;
 }
 fieldset.Header>div.output div.title {
     float:left;
+    cursor:pointer;
 }
 fieldset.Header>div.output div.state {
     float:right;
@@ -174,6 +200,7 @@ fieldset.Header>div.output div.state div {
 }
 fieldset.Footer {
     clear:both;
+    overflow:hidden;
     height:32px;
 }
 fieldset.Footer>div.output div.title {
@@ -193,16 +220,9 @@ fieldset.Footer>div.output div.state div {
     margin-left:5px;
     float:right;
 }
-fieldset.Login {
-    font-size:28px;
-}
-fieldset.Login>form.option input {
-    font-size:18px;
-    height:28px;
-}
-fieldset.Login>form.option button {
-    font-size:18px;
-    height:28px;
+
+fieldset.Source {
+    overflow:hidden;
 }
 
 fieldset.item {
@@ -233,14 +253,6 @@ fieldset.item>div.output>div.status>input.cmd {
     color:lightgreen;;
     font-size:16px;
     width:250px;
-}
-
-.hidden {
-    display:none;
-}
-.normal {
-}
-.choice {
 }
 
 fieldset table {

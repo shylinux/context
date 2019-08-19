@@ -189,7 +189,7 @@ kit = toolkit = {
             } else if (child.input) {
                 child.type = "input"
                 child.data["name"] = child.input[0]
-                child.data["onkeyup"] = child.input[1]
+                // child.data["onkeyup"] = child.input[1]
                 child.data["onkeydown"] = child.input[1]
                 child.name = child.name || child.input[0]
 

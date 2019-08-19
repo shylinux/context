@@ -84,16 +84,16 @@ Page({
         }
     },
     onaction: {
-        title: function(event, item, value) {
+        title: function(event, item, value, page) {
             ctx.Search({"river": page.river.Pane.which.get(), "storm": page.storm.Pane.which.get(), "layout": page.action.Pane.Layout()})
         },
-        user: function(event, item, value) {
+        user: function(event, item, value, page) {
             var name = kit.prompt("new name")
             name && page.login.Pane.Run(["rename", name], function(msg) {
                 page.header.Pane.State("user", name)
             })
         },
-        logout: function(event, item, value) {
+        logout: function(event, item, value, page) {
             kit.confirm("logout?") && page.login.Pane.Exit()
         },
     },
@@ -279,7 +279,6 @@ Page({
                     echo: function(one, two) {
                         kit.Log(one, two)
                     },
-                    _split: function(str) {return str.trim().split(" ")},
                     help: function() {
                         var args = kit.List(arguments)
                         if (args.length > 1 && page[args[0]] && page[args[0]].Pane[args[1]]) {
@@ -290,25 +289,23 @@ Page({
                         }
                         return kit._call(page.Help, args)
                     },
+                    _split: function(str) {return str.trim().split(" ")},
                     _cmd: function(arg) {
                         var args = engine._split(arg[1]);
                         if (typeof engine[args[0]] == "function") {
                             return kit._call(engine[args[0]], args.slice(1))
                         }
-
-                        if (page.plugin && page.plugin.Plugin.Jshy(event, args)) {return true}
-                        if (page.dialog && page.dialog.Pane.Jshy(event, args)) {return true}
-                        if (page.pane && page.pane.Pane.Jshy(event, args)) {return true}
-                        if (page && page.Jshy(event, args)) {return true}
-
-                        if (page.plugin) {
-                            if (args.length > 1) {
-                                return kit._call(page.plugin.Plugin.Run, [window.event].concat(args.slice(1)))
-                            } else {
-                                return kit._call(page.plugin.Plugin.Runs, [window.event])
-                            }
+                        if (page.plugin && typeof page.plugin[args[0]] == "function") {
+                            return kit._call(page.plugin[args[0]], args.slice(1))
                         }
 
+                        if (page.dialog && page.dialog.Pane.Jshy(event, args)) {return true}
+                        if (page.pane && page.pane.Pane.Jshy(event, args)) {return true}
+                        if (page.storm && page.storm.Pane.Jshy(event, args)) {return true}
+                        if (page.river && page.river.Pane.Jshy(event, args)) {return true}
+
+                        if (page && page.Jshy(event, args)) {return true}
+                        if (page.plugin && page.plugin.Plugin.Jshy(event, args)) {return true}
                         kit.Log("not find", arg[1])
                         return true
                     },
@@ -405,7 +402,7 @@ Page({
                     page.input && page.plugin.Plugin.Delete()
                 },
                 "加参": function(event, value) {
-                    page.plugin && page.plugin.Plugin.Append({})
+                    page.plugin && page.plugin.Plugin.Append({className: "args temp"})
                 },
                 "减参": function(event, value) {
                     page.plugin && page.plugin.Plugin.Remove()
@@ -421,10 +418,10 @@ Page({
                     page.plugin && page.plugin.Plugin.display("canvas")
                 },
             },
-            Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"], "",
-                "刷新", "清空", "并行", "串行", "",
-				["display", "表格", "编辑", "绘图"],
-                "添加", "删除", "加参", "减参", "",
+            Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"],
+                "", "刷新", "清空", "并行", "串行",
+				"", ["display", "表格", "编辑", "绘图"],
+                "", "添加", "删除", "加参", "减参",
             ],
         }
     },
@@ -565,14 +562,11 @@ Page({
         }
     },
     init: function(page) {
-        page.onlayout(window.event, page.conf.layout)
-        page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.isMobile? "办公": "工作")
-        page.footer.Pane.Order({"ncmd": "", "ntxt": "", ":":""}, kit.isMobile? ["ncmd", "ntxt"]: ["ncmd", "ntxt", ":"], function(event, item, value) {})
+        page.footer.Pane.Order({"ncmd": "", "ntxt": ""}, ["ncmd", "ntxt"], function(event, item, value) {})
         page.header.Pane.Order({"logout": "logout", "user": ""}, ["logout", "user"], function(event, item, value) {
-            page.onaction[item] && page.onaction[item](event, item, value)
+            page.onaction[item] && page.onaction[item](event, item, value, page)
         })
-        page.river.Pane.Show()
-        page.pane = page.action
-        page.plugin = kit.Selector(page.action, "fieldset")[0]
+        page.river.Pane.Show(), page.pane = page.action, page.plugin = kit.Selector(page.action, "fieldset")[0]
+        page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.isMobile? "办公": "工作")
     },
 })
