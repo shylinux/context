@@ -1,4 +1,4 @@
-Page({
+var page = Page({
     check: true,
     conf: {refresh: 1000, border: 4, layout: {header:30, river:120, action:180, source:60, storm:100, footer:30}},
     onlayout: function(event, sizes) {
@@ -100,7 +100,7 @@ Page({
 
     initOcean: function(page, field, option, output) {
         var table = kit.AppendChild(output, "table")
-        var ui = kit.AppendChild(field, [{view: ["create ocean"], list: [
+        var ui = kit.AppendChild(field, [{view: ["create"], list: [
             {input: ["name", function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
@@ -279,19 +279,36 @@ Page({
                     echo: function(one, two) {
                         kit.Log(one, two)
                     },
+                    helps: function() {
+                        engine.help("river")
+                        engine.help("action")
+                        engine.help("storm")
+                    },
                     help: function() {
-                        var args = kit.List(arguments)
-                        if (args.length > 1 && page[args[0]] && page[args[0]].Pane[args[1]]) {
-                            return kit._call(page[args[0]].Pane[args[1]].Plugin.Help, args.slice(2))
+                        var args = kit.List(arguments), cb, target
+                        if (args.length > 0 && page.pane && page.pane.Pane[args[0]] && page.pane.Pane[args[0]].Plugin) {
+                            cb = page.pane.Pane[args[0]].Plugin.Help, target = page.pane.Pane[args[0]], args = args.slice(1)
+                        } else if (args.length > 1 && page[args[0]] && page[args[0]].Pane[args[1]]) {
+                            cb = page[args[0]].Pane[args[1]].Plugin.Help, target = page[args[0]].Pane[args[1]], args = args.slice(2)
+                        } else if (args.length > 0 && page[args[0]]) {
+                            cb = page[args[0]].Pane.Help, target = page[args[0]], args = args.slice(1)
+                        } else {
+                            cb = page.Help, target = document.body, args
                         }
-                        if (args.length > 0 && page[args[0]]) {
-                            return kit._call(page[args[0]].Pane.Help, args.slice(1))
-                        }
-                        return kit._call(page.Help, args)
+
+                        if (kit.Selector(target, "div.Help", function(help) {
+                            target.removeChild(help)
+                            return help
+                        }).length > 0) {return}
+
+                        var text = kit._call(cb, args)
+                        var ui = kit.AppendChild(target, [{view: ["Help"], list: [{text: [text.join(""), "div"]}]}])
+                        setTimeout(function() {target.removeChild(ui.last)}, 30000)
                     },
                     _split: function(str) {return str.trim().split(" ")},
                     _cmd: function(arg) {
-                        var args = engine._split(arg[1]);
+                        var args = typeof arg[1] == "string"? engine._split(arg[1]): arg[1];
+                        page.script("record", args)
                         if (typeof engine[args[0]] == "function") {
                             return kit._call(engine[args[0]], args.slice(1))
                         }
@@ -399,7 +416,7 @@ Page({
                     page.plugin && page.plugin.Plugin.Clone().Select()
                 },
                 "删除": function(event, value) {
-                    page.input && page.plugin.Plugin.Delete()
+                    page.plugin && page.plugin.Plugin.Delete()
                 },
                 "加参": function(event, value) {
                     page.plugin && page.plugin.Plugin.Append({className: "args temp"})
@@ -457,7 +474,7 @@ Page({
         var river = ""
         var table = kit.AppendChild(output, "table")
         var device = kit.AppendChild(field, [{"view": ["device", "table"]}]).last
-        var ui = kit.AppendChild(field, [{view: ["create steam"], list: [
+        var ui = kit.AppendChild(field, [{view: ["create"], list: [
             {input: ["name", function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {

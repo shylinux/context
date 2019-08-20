@@ -51,6 +51,17 @@ fun salary "工资单" "" "" \
     append "结余" $rest
 end
 
+fun macro "脚本宏" "" "macro.js" \
+	public \
+	text "" name mac imports plugin_mac action auto \
+	button "查看" \
+	button "全部" click "all" \
+	button "录制" click "Record" \
+	button "运行" click "Replay" \
+    exports mac name
+
+end
+
 fun hello world "" "" \
 	public \
 	text "" \

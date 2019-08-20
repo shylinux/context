@@ -128,6 +128,7 @@ function Meta(target, obj) {
     }
 }
 function Page(page) {
+    var script = {}, record = ""
     page = Meta(document.body, page, {
         onload: function() {
             var sessid = ctx.Cookie("sessid")
@@ -184,31 +185,42 @@ function Page(page) {
             }
             window.onresize = function(event) {
                 page.onlayout && page.onlayout(event)
+
             }, document.body.onkeydown = function(event) {
                 if (page.localMap && page.localMap(event)) {return}
                 page.oncontrol && page.oncontrol(event, document.body, "control")
-                if (event.ctrlKey && kit.isWindows) {
+
+                if (kit.isWindows && event.ctrlKey) {
                     event.stopPropagation()
                     event.preventDefault()
-                    return true
                 }
+
             }, document.body.onkeyup = function(event) {
-                if (event.ctrlKey && kit.isWindows) {
+                if (kit.isWindows && event.ctrlKey) {
                     event.stopPropagation()
                     event.preventDefault()
-                    return true
                 }
+
+            }, document.body.oncontextmenu = function(event) {
+                event.stopPropagation()
+                event.preventDefault()
+
+            }, document.body.onmousewheel = function(event) {
+
+            }, document.body.onmousedown = function(event) {
+
+            }, document.body.onmouseup = function(event) {
+
             }
         },
         ontoast: function(text, title, duration) {
+            // {text, title, duration, inputs, buttons}
+
             var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
             var toast = kit.ModifyView("fieldset.toast", {
                 display: "block", dialog: [args.width||text.length*10+100, args.height||60], padding: 10,
             })
-            if (!text) {
-                toast.style.display = "none"
-                return
-            }
+            if (!text) {toast.style.display = "none"; return}
 
             var list = [{text: [title||"", "div", "title"]}, {text: [args.text||"", "div", "content"]}]
             args.inputs && args.inputs.forEach(function(input) {
@@ -240,7 +252,6 @@ function Page(page) {
             })
             list.push({view: ["tick"], name: "tick"})
 
-            // kit.ModifyNode(toast.querySelector("legend"), args.title||"tips")
             var ui = kit.AppendChild(kit.ModifyNode(toast.querySelector("div.output"), ""), list)
             var tick = 1
             var begin = kit.time(0,"%H:%M:%S")
@@ -263,6 +274,7 @@ function Page(page) {
                     event.preventDefault()
                     return true
                 }
+
                 var his = target.History
                 var pos = target.Current || -1
                 switch (event.key) {
@@ -282,8 +294,12 @@ function Page(page) {
                     case "e":
                     case "f":
                     case "b":
+                        break
                     case "h":
+                        kit.DelText(target, target.selectionStart-1, target.selectionStart)
+                        break
                     case "d":
+                        kit.DelText(target, 0, target.selectionStart)
                         break
                     case "k":
                         kit.DelText(target, target.selectionStart)
@@ -306,26 +322,25 @@ function Page(page) {
                         break
                     default:
                         return false
-
                 }
-                event.stopPropagation()
-				event.preventDefault()
-                return true
-            }
-            switch (event.key) {
-                case "Escape":
-                    target.blur()
-                    event.stopPropagation()
-                    return true
-                default:
-                    if (kit.HitText(target, "jk")) {
-                        kit.DelText(target, target.selectionStart-2, 2)
+            } else {
+                switch (event.key) {
+                    case "Escape":
                         target.blur()
-                        event.stopPropagation()
-                        return true
-                    }
+                        break
+                    default:
+                        if (kit.HitText(target, "jk")) {
+                            kit.DelText(target, target.selectionStart-2, 2)
+                            target.blur()
+                            break
+                        }
+                        return false
+                }
             }
-            return false
+
+            event.stopPropagation()
+            event.preventDefault()
+            return true
         },
         onscroll: function(event, target, action) {
             switch (event.key) {
@@ -375,14 +390,39 @@ function Page(page) {
             }
         },
 
-        Help: function(pane, type, action) {
-            if (pane == undefined) {
-                kit.Selector(document.body, "body>fieldset", function(field) {
-                    field.Pane.Help()
-                })
-                return true
+        script: function(action, name, time) {
+            switch (action) {
+                case "create":
+                    record = name, script[name] = []
+                    kit.Log("script", action, name)
+                    break
+                case "record":
+                    record && kit.Log("script", action, record, name)
+                    record && script[record].push(name)
+                    break
+                case "finish":
+                    kit.Log("script", action, record)
+                    record = ""
+                    break
+                case "replay":
+                    kit.Log("script", action, name)
+                    record = ""
+
+                    var event = window.event
+                    kit.List(script[name], function(item) {
+                        kit.Log("script", action, name, item)
+                        page.action.Pane.Core(event, {}, ["_cmd", item]);
+                    }, time||1000, function() {
+                        page.ontoast("run "+name+" done")
+                    })
+                    break
+                default:
+                    return script
             }
-            page[pane].Pane.Help(type, action)
+            return true
+        },
+        Help: function(pane, type, action) {
+            return []
         },
         Jshy: function(event, args) {
             if (page[args[0]] && page[args[0]].type == "fieldset") {
@@ -392,9 +432,13 @@ function Page(page) {
                     return page[args[0]].Pane.Show()
                 }
             }
+            if (script[args[0]]) {
+                return page.script("replay", args[0])
+            }
             return typeof page[args[0]] == "function" && kit._call(page[args[0]], args.slice(1))
         },
 
+        initToast: function() {},
         initLogin: function(page, field, option, output) {
             var ui = kit.AppendChilds(option, [
                 {label: "username"}, {input: ["username"]}, {type: "br"},
@@ -437,16 +481,43 @@ function Page(page) {
                         }}})},
                     ])
                 },
-				Help: function() {},
+				Help: function() {return []},
             }
         },
         initFooter: function(page, field, option, output) {
             var state = {}, list = [], cb = function(event, item, value) {}
-            var ui, w = 0, history
+            var ui = kit.AppendChild(output, [
+                {"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]},
+                {"view": ["magic"], style: {"margin-top": "-4px"}, list: [{text: ["0", "label"], name: "count"}, {input: ["magic", function(event) {
+                    if (event.key == "Enter" || event.ctrlKey && event.key == "j") {
+                        page.action.Pane.Core(event, {}, ["_cmd", event.target.value]);
+                        (ui.magic.History.length == 0 || ui.magic.History[ui.magic.History.length-1] != event.target.value) && ui.magic.History.push(event.target.value)
+                        ui.magic.Current = ui.magic.History.length
+                        ui.count.innerHTML = ui.magic.Current
+                        event.target.value = ""
+                    } else {
+                        page.oninput(event, function(event) {
+                            switch (event.key) {
+                                case "Enter":
+                                    kit.Log(event.target.value)
+                                    break
+                                default:
+                                    return false
+                            }
+                            return true
+                        })
+                    }
+                    ui.count.innerHTML = ui.magic.Current || 0
+                    field.Pane.Show()
+
+                }], style: {"margin-top": "-2px", "font-size": "16px"}}]},
+                {"view": ["state"]},
+            ])
+
+            ui.magic.History = []
+
             return {
-                Select: function() {
-                    ui.magic.focus()
-                },
+                Select: function() {ui.magic.focus()},
                 Order: function(value, order, cbs) {
                     state = value, list = order, cb = cbs || cb, field.Pane.Show()
                 },
@@ -456,48 +527,15 @@ function Page(page) {
                 },
                 Size: function(width, height) {
                     kit.size(field, width, height)
-                    ui && (w = width - ui.first.clientWidth - ui.last.clientWidth - 20) && kit.size(ui.magic, w, height-6)
+                    ui && kit.size(ui.magic, (width - ui.count.offsetWidth - ui.first.offsetWidth - ui.last.offsetWidth - 20), height-6)
                 },
                 Show: function() {
-                    output.innerHTML = "", ui = kit.AppendChild(output, [
-                        {"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]},
-                        {"view": ["magic"], style: {"margin-top": "-4px"}, list: [{input: ["magic", function(event) {
-                            if (event.key == "Enter" || event.ctrlKey && event.key == "j") {
-                                ui.magic.History.push(event.target.value)
-                                page.action.Pane.Core(event, {}, ["_cmd", event.target.value]), event.target.value = ""
-                                event.stopPropagation()
-                                event.preventDefault()
-                                ui.magic.focus()
-                                return
-                            }
-
-                            switch (event.key) {
-                                case " ":
-                                    return true
-                            }
-
-                            page.oninput(event, function(event) {
-                                switch (event.key) {
-                                    case "j":
-                                        break
-                                    case "Enter":
-                                        kit.Log(event.target.value)
-                                        break
-                                    default:
-                                        return false
-                                }
-                                return true
-                            })
-
-                        }], style: {width: w, "margin-top": "-2px", "font-size": "16px"}}]},
-                        {"view": ["state"], list: list.map(function(item) {return {text: [item+":"+state[item], "div"], click: function(item) {
-                            cb(event, item, state[item])
-                        }}})},
-                    ])
-                    ui.magic.History = []
+                    ui.last.innerHTML = "", kit.AppendChild(ui.last, list.map(function(item) {return {text: [item+":"+state[item], "div"], click: function(item) {
+                        cb(event, item, state[item])
+                    }}}))
                     field.Pane.Size(field.clientWidth, field.clientHeight)
                 },
-				Help: function() {},
+                Help: function() {return []},
             }
         },
         Pane: Pane,
@@ -517,10 +555,13 @@ function Pane(page, field) {
         Append: function(type, line, key, which, cb) {
             type = type || line.type
             var index = list.length, ui = pane.View(output, type, line, key, function(event, cmds, cbs) {
-                pane.Select(index, line[which])
+                (type != "plugin" && type != "field") && pane.Select(index, line[which])
+                page.script("record", [name, line[key[0]]])
+                typeof cb == "function" && cb(line, index, event, cmds, cbs)
             })
-			key && key.length > 0 && (member[line[which]] = member[line[key[0]]] = {index:index, key:line[which]})
-            list.push(ui.last), field.scrollBy(0, field.scrollHeight+100);
+
+            list.push(ui.last), field.scrollBy(0, field.scrollHeight+100)
+			key && key.length > 0 && (member[line[which]] = member[line[key[0]]] = {index:index, key:line[which]});
             (type == "plugin" || type == "field") && pane.Plugin(page, pane, ui.field, function(event, cmds, cbs) {
                 typeof cb == "function" && cb(line, index, event, cmds, cbs)
             })
@@ -546,12 +587,7 @@ function Pane(page, field) {
         },
 
         Help: function(type, action) {
-            if (kit.Selector(field, "div.Help", function(help) {
-                field.removeChild(help)
-                return help
-            }).length>0 || action == "hide") {return}
-
-            var text = [], delay = 30000
+            var text = []
             switch (type) {
                 case "name":
                 case undefined:
@@ -567,13 +603,11 @@ function Pane(page, field) {
                     list.sort(), text = text.concat(list.map(function(item) {return "action: "+item+"\n"}))
                     break
             }
-
-            kit.AppendChild(field, [{view: ["Help"], list: [{text: [text.join(""), "div"]}]}])
-            setTimeout(function() {pane.Help("", "hide")}, delay)
+            return text
         },
         Jshy: function(event, args) {
             if (pane[args[0]] && pane[args[0]].type == "fieldset") {
-                pane[args[0]].Plugin.Select()
+                pane[args[0]].scrollIntoView(), pane[args[0]].Plugin.Select(true)
                 return pane[args[0]].Plugin.Jshy(event, args.slice(1))
             }
             if (typeof pane.Action[args[0]] == "function") {
@@ -638,8 +672,10 @@ function Pane(page, field) {
     pane.Button && pane.Button.length > 0 && (kit.InsertChild(field, output, "div", pane.Button.map(function(value) {
         return typeof value == "object"? {className: value[0], select: [value.slice(1), function(value, event) {
             value = event.target.value
+            page.script("record", [name, value])
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
         }]}: value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, function(value, event) {
+            page.script("record", [name, value])
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
         }]}
     })).className="action")
@@ -652,6 +688,12 @@ function Plugin(page, pane, field, run) {
     var option = field.querySelector("form.option")
     var action = field.querySelector("div.action")
     var output = field.querySelector("div.output")
+
+    var meta = field.Meta
+    var name = meta.name
+    var args = meta.args || []
+    var display = JSON.parse(meta.display||'{}')
+    var exports = JSON.parse(meta.exports||'["",""]')
 
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
@@ -695,21 +737,20 @@ function Plugin(page, pane, field, run) {
                 var td = output.querySelector("td")
                 td && td.click()
             })
-            return action
+            return action.target
         },
         Remove: function() {
             var list = option.querySelectorAll("input.temp")
             list.length > 0 && (option.removeChild(list[list.length-1].parentNode))
         },
         Delete: function() {
-            page.plugin = field.previousSibling
+            field.previousSibling.Plugin.Select()
             field.parentNode.removeChild(field)
         },
-        Select: function(focus) {
-            field.scrollIntoView()
+        Select: function(silent) {
             page.plugin && (page.plugin.className = "item")
             page.plugin = field, field.className = "item select"
-            focus && option.querySelectorAll("input")[1].focus()
+            !silent && (option.querySelectorAll("input")[1].focus())
         },
         Reveal: function(msg) {
             return msg.append && msg.append[0]? ["table", JSON.stringify(ctx.Tables(msg))]: ["code", msg.result? msg.result.join(""): ""]
@@ -726,24 +767,31 @@ function Plugin(page, pane, field, run) {
         },
 
         Help: function(type, action) {
-            if (kit.Selector(field, "div.Help", function(help) {
-                field.removeChild(help)
-                return help
-            }).length>0 || action == "hide") {return}
-
-            var text = [], delay = 30000
+            var text = []
             switch (type) {
                 case "name":
                 case undefined:
                     text = [meta.name]
                     break
-                case "help":
-                    text = [meta.help]
+                case "list":
+                    var list = []
+                    for (var k in plugin) {list.push(k)}
+                    list.sort(), text = text.concat(list.map(function(item) {return "func: "+item+"\n"}))
+
+                    var list = []
+                    for (var k in plugin.ondaemon) {list.push(k)}
+                    list.sort(), text = text.concat(list.map(function(item) {return "daemon: "+item+"\n"}))
+
+                    var list = []
+                    for (var k in plugin.onexport) {list.push(k)}
+                    list.sort(), text = text.concat(list.map(function(item) {return "export: "+item+"\n"}))
+
+                    var list = []
+                    for (var k in plugin.onaction) {list.push(k)}
+                    list.sort(), text = text.concat(list.map(function(item) {return "action: "+item+"\n"}))
                     break
             }
-
-            kit.AppendChild(field, [{view: ["Help"], list: [{text: [text.join(""), "div"]}]}])
-            setTimeout(function() {plugin.Help("", "hide")}, delay)
+            return text
         },
         Jshy: function(event, args) {
             if (typeof plugin[args[0]] == "function") {
@@ -773,6 +821,7 @@ function Plugin(page, pane, field, run) {
             plugin.Run(event, kit.Selector(option, ".args", function(item, index) {return item.value}), cb)
         },
         Run: function(event, args, cb) {
+            page.script("record", ["action", name].concat(args))
             var show = true
             setTimeout(function() {
                 show && page.ontoast(kit.Format(args||["running..."]), meta.name, -1)
@@ -838,10 +887,13 @@ function Plugin(page, pane, field, run) {
             onfocus: function(event, action, type, name, item) {
                 page.input = event.target
             },
+            onblur: function(event, action, type, name, item) {
+                page.input = undefined
+            },
             onclick: function(event, action, type, name, item) {
                 switch (type) {
                     case "button":
-                        plugin.Select()
+                        plugin.Select(true)
                         action[item.click]? action[item.click](event, item, option, field):
                             plugin[item.click]? plugin[item.click](event, item, option, field): plugin.Runs(event)
                         break
@@ -853,7 +905,7 @@ function Plugin(page, pane, field, run) {
                 }
             },
             ondblclick: function(event, action, type, name, item) {
-                action.value = kit.History.get("txt", -1).data.trim()
+                action.target.value = kit.History.get("txt", -1).data.trim()
             },
             onchange: function(event, action, type, name, item) {
                 plugin.Check(action)
@@ -873,8 +925,6 @@ function Plugin(page, pane, field, run) {
                         default:
                             return false
                     }
-                    event.stopPropagation()
-                    event.preventDefault()
                     return true
                 })
             },
@@ -913,7 +963,7 @@ function Plugin(page, pane, field, run) {
                             page.action.scrollTo(0, field.offsetTop)
                             break
                         case "b":
-                            plugin.Append(item).focus()
+                            plugin.Append({className: "args temp"}).focus()
                             break
                         case "m":
                             plugin.Clone().Select()
@@ -921,774 +971,16 @@ function Plugin(page, pane, field, run) {
                         default:
                             return false
                     }
-                    event.stopPropagation()
-                    event.preventDefault()
                     return true
                 })
                 item.type != "textarea" && event.key == "Enter" && plugin.Check(action.target)
             },
-        }
+        },
+        exports: JSON.parse(meta.exports||'["",""]'),
     })
 
-    var meta = field.Meta
-    var name = meta.name
-    var args = meta.args || []
-    var display = JSON.parse(meta.display||'{}')
-    var exports = JSON.parse(meta.exports||'["",""]')
-    JSON.parse(meta.inputs || "[]").map(plugin.Append)
+    JSON.parse(meta.inputs || "[]").map(function(item) {
+        plugin.Append(item, item.name, item.value)
+    })
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
 }
-function Editor(plugin, option, output, width, height, space, msg) {
-    exports = ["dir", "path", "dir"]
-    msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
-        page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
-    });
-
-    var args = [option.pod.value, option.dir.value]
-
-    if (msg.file) {
-        var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
-            "追加", "提交", "取消",
-        ], function(value, event) {
-            switch (value) {
-                case "追加":
-                    field.Run(event, args.concat(["dir_sed", "add"]))
-                    break
-                case "提交":
-                    field.Run(event, args.concat(["dir_sed", "put"]))
-                    break
-                case "取消":
-                    break
-            }
-        })
-
-        kit.AppendChild(output, [{view: ["edit", "table"], list: (msg.result||[]).map(function(value, index) {
-            return {view: ["line", "tr"], list: [{view: ["num", "td", index+1]}, {view: ["txt", "td"], list: [{value: value, style: {width: width+"px"}, input: [value, function(event) {
-                if (event.key == "Enter") {
-                    field.Run(event, args.concat(["dir_sed", "set", index, event.target.value]))
-                }
-            }]}]}]}
-        })}])
-    }
-}
-function Canvas(plugin, option, output, width, height, space, msg) {
-    var keys = [], data = {}, max = {}, nline = 0
-    var nrow = msg[msg.append[0]].length
-    var step = width / (nrow - 1)
-    msg.append.forEach(function(key, index) {
-        var list = []
-        msg[key].forEach(function(value, index) {
-            var v = parseInt(value)
-            !isNaN(v) && (list.push((value.indexOf("-") == -1)? v: value), v > (max[key]||0) && (max[key] = v))
-        })
-        list.length == nrow && (keys.push(key), data[key] = list, nline++)
-    })
-
-    var conf = {
-        font: "monospace", text: "hi", tool: "stroke", style: "black",
-        type: "trend", shape: "drawText", means: "drawPoint",
-        limits: {scale: 3, drawPoint: 1, drawPoly: 3},
-
-        axies: {style: "black", width: 2},
-        xlabel: {style: "red", width: 2, height: 5},
-        plabel: {style: "red", font: "16px monospace", offset: 10, height: 20, length: 20},
-        data: {style: "black", width: 1},
-
-        mpoint: 10,
-        play: 500,
-    }
-
-    var view = [], ps = [], point = [], now = {}, index = 0
-    var trap = false, label = false
-
-    var what = {
-        reset: function(x, y) {
-            canvas.resetTransform()
-            canvas.setTransform(1, 0, 0, -1, space+(x||0), height+space-(y||0))
-            canvas.strokeStyle = conf.data.style
-            canvas.fillStyle = conf.data.style
-            return what
-        },
-        clear: function() {
-            var p0 = what.transform({x:-width, y:-height})
-            var p1 = what.transform({x:2*width, y:2*height})
-            canvas.clearRect(p0.x, p0.y, p1.x-p0.x, p1.y-p0.y)
-            return what
-        },
-
-        move: function(meta) {
-            var p0 = meta.ps[0] || {x:0, y:0}
-            var p1 = meta.ps[1] || now
-            canvas.save(), what.clear().drawLine(meta)
-            canvas.translate(p1.x-p0.x, p1.y-p0.y)
-            what.drawData().drawView()
-            meta.ps.length < 2 && canvas.restore()
-        },
-        scale: function(meta) {
-            var ps = meta.ps
-            var p0 = ps[0] || {x:0, y:0}
-            var p1 = ps[1] || now
-            var p2 = ps[2] || now
-
-            if (ps.length > 1) {
-                canvas.save(), what.clear()
-                what.drawLine({ps: [p0, {x: p1.x, y: p0.y}]})
-                what.drawLine({ps: [{x: p1.x, y: p0.y}, p1]})
-                what.drawLine({ps: [p0, {x: p2.x, y: p0.y}]})
-                what.drawLine({ps: [{x: p2.x, y: p0.y}, p2]})
-                canvas.scale((p2.x-p0.x)/(p1.x-p0.x), (p2.y-p0.y)/(p1.y-p0.y))
-                what.drawData().drawView()
-                meta.ps.length < 3 && canvas.restore()
-            }
-        },
-        rotate: function(meta) {
-            var p0 = meta.ps[0] || {x:0, y:0}
-            var p1 = meta.ps[1] || now
-            canvas.save(), what.clear().drawLine(meta)
-            canvas.rotate(Math.atan2(p1.y-p0.y, p1.x-p0.x))
-            what.drawData().drawView()
-            meta.ps.length < 2 && canvas.restore()
-        },
-
-        draw: function(meta) {
-            function trans(value) {
-                if (value == "random") {
-                    return ["black", "red", "green", "yellow", "blue", "purple", "cyan", "white"][parseInt(Math.random()*8)]
-                }
-                return value
-            }
-            canvas.strokeStyle = trans(meta.style || conf.style)
-            canvas.fillStyle = trans(meta.style || conf.style)
-            canvas[meta.tool||conf.tool]()
-            return meta
-        },
-        drawText: function(meta) {
-            var p0 = meta.ps[0] || {x:0, y:0}
-            var p1 = meta.ps[1] || now
-            var t = meta.text||status.cmd.value||conf.text
-
-            canvas.save()
-            canvas.translate(p0.x, p0.y)
-            canvas.scale(1, -1)
-            canvas.rotate(-Math.atan2(p1.y-p0.y, p1.x-p0.x))
-            what.draw(meta)
-            canvas.font=kit.distance(p0.x, p0.y, p1.x, p1.y)/t.length*2+"px "+conf.font
-            canvas[(meta.tool||conf.tool)+"Text"](t, 0, 0)
-            canvas.restore()
-            return meta
-        },
-        drawPoint: function(meta) {
-            meta.ps.concat(now).forEach(function(p) {
-                canvas.save()
-                canvas.translate(p.x, p.y)
-                canvas.beginPath()
-                canvas.moveTo(-conf.mpoint, 0)
-                canvas.lineTo(conf.mpoint, 0)
-                canvas.moveTo(0, -conf.mpoint)
-                canvas.lineTo(0, conf.mpoint)
-                what.draw(meta)
-                canvas.restore()
-            })
-            return meta
-        },
-        drawLine: function(meta) {
-            var p0 = meta.ps[0] || {x:0, y:0}
-            var p1 = meta.ps[1] || now
-            canvas.save()
-            canvas.beginPath()
-            canvas.moveTo(p0.x, p0.y)
-            canvas.lineTo(p1.x, p1.y)
-            what.draw(meta)
-            canvas.restore()
-            return meta
-        },
-        drawPoly: function(meta) {
-            var ps = meta.ps
-            canvas.save()
-            canvas.beginPath()
-            canvas.moveTo(ps[0].x, ps[0].y)
-            for (var i = 1; i < ps.length; i++) {
-                canvas.lineTo(ps[i].x, ps[i].y)
-            }
-            ps.length < conf.limits.drawPoly && canvas.lineTo(now.x, now.y)
-            what.draw(meta)
-            canvas.restore()
-            return meta
-        },
-        drawRect: function(meta) {
-            var p0 = meta.ps[0] || {x:0, y:0}
-            var p1 = meta.ps[1] || now
-            canvas.save()
-            what.draw(meta)
-            canvas[(meta.tool||conf.tool)+"Rect"](p0.x, p0.y, p1.x-p0.x, p1.y-p0.y)
-            canvas.restore()
-            return meta
-        },
-        drawCircle: function(meta) {
-            var p0 = meta.ps[0] || {x:0, y:0}
-            var p1 = meta.ps[1] || now
-            canvas.save()
-            canvas.beginPath()
-            canvas.arc(p0.x, p0.y, kit.distance(p0.x, p0.y, p1.x, p1.y), 0, Math.PI*2, true)
-            what.draw(meta)
-            canvas.restore()
-            return meta
-        },
-        drawEllipse: function(meta) {
-            var p0 = meta.ps[0] || {x:0, y:0}
-            var p1 = meta.ps[1] || now
-            var r0 = Math.abs(p1.x-p0.x)
-            var r1 = Math.abs(p1.y-p0.y)
-
-            canvas.save()
-            canvas.beginPath()
-            canvas.translate(p0.x, p0.y)
-            r1 > r0? (canvas.scale(r0/r1, 1), r0 = r1): canvas.scale(1, r1/r0)
-            canvas.arc(0, 0, r0, 0, Math.PI*2, true)
-            what.draw(meta)
-            canvas.restore()
-            return meta
-        },
-
-        drawAxies: function() {
-            canvas.beginPath()
-            canvas.moveTo(-space, 0)
-            canvas.lineTo(width+space, 0)
-            canvas.moveTo(0, -space)
-            canvas.lineTo(0, height+space)
-            canvas.strokeStyle = conf.axies.style
-            canvas.lineWidth = conf.axies.width
-            canvas.stroke()
-            return what
-        },
-        drawXLabel: function(step) {
-            canvas.beginPath()
-            for (var pos = step; pos < width; pos += step) {
-                canvas.moveTo(pos, 0)
-                canvas.lineTo(pos, -conf.xlabel.height)
-            }
-            canvas.strokeStyle = conf.xlabel.style
-            canvas.lineWidth = conf.xlabel.width
-            canvas.stroke()
-            return what
-        },
-
-        figure: {
-            trend: {
-                draw: function() {
-                    what.drawAxies().drawXLabel(step)
-                    canvas.beginPath()
-                    for (var key in data) {
-                        data[key].forEach(function(value, i) {
-                            i == 0? canvas.moveTo(0, value/max[key]*height): canvas.lineTo(step*i, value/max[key]*height)
-                            i == index && (canvas.moveTo(step*i, 0), canvas.lineTo(step*i, value/max[key]*height))
-                        })
-                    }
-                    canvas.strokeStyle = conf.data.style
-                    canvas.lineWidth = conf.data.width
-                    canvas.stroke()
-                },
-                show: function(p) {
-                    index = parseInt(p.x/step)
-                    canvas.moveTo(p.x, -space)
-                    canvas.lineTo(p.x, height)
-                    canvas.moveTo(-space, p.y)
-                    canvas.lineTo(width, p.y)
-                    return p
-                },
-            },
-            ticket: {
-                draw: function() {
-                    what.drawAxies().drawXLabel(step)
-                    if (keys.length < 3) {
-                        return
-                    }
-                    canvas.beginPath()
-
-                    var sum = 0, total = 0
-                    for (var i = 0; i < nrow; i++) {
-                        sum += data[keys[1]][i]
-                        sum > total && (total = sum)
-                        sum -= data[keys[2]||keys[1]][i]
-                    }
-                    if (!data["sum"]) {
-                        var sum = 0, max = 0, min = 0, end = 0
-                        keys = keys.concat(["sum", "max", "min", "end"])
-                        data["sum"] = []
-                        data["max"] = []
-                        data["min"] = []
-                        data["end"] = []
-                        for (var i = 0; i < nrow; i++) {
-                            max = sum + data[keys[1]][i]
-                            min = sum - data[keys[2||keys[1]]][i]
-                            end = sum + data[keys[1]][i] - data[keys[2]||keys[1]][i]
-                            data["sum"].push(sum)
-                            data["max"].push(max)
-                            data["min"].push(min)
-                            data["end"].push(end)
-                            sum = end
-                        }
-                        msg.append.push("sum")
-                        msg.sum = data.sum
-                        msg.append.push("max")
-                        msg.max = data.max
-                        msg.append.push("min")
-                        msg.min = data.min
-                        msg.append.push("end")
-                        msg.end = data.end
-                    }
-
-                    for (var i = 0; i < nrow; i++) {
-                        if (data["sum"][i] < data["end"][i]) {
-                            canvas.moveTo(step*i, data["min"][i]/total*height)
-                            canvas.lineTo(step*i, data["sum"][i]/total*height)
-
-                            canvas.moveTo(step*i, data["max"][i]/total*height)
-                            canvas.lineTo(step*i, data["end"][i]/total*height)
-                        } else {
-                            canvas.moveTo(step*i, data["min"][i]/total*height)
-                            canvas.lineTo(step*i, data["end"][i]/total*height)
-
-                            canvas.moveTo(step*i, data["max"][i]/total*height)
-                            canvas.lineTo(step*i, data["sum"][i]/total*height)
-                        }
-                    }
-                    canvas.strokeStyle = conf.data.style
-                    canvas.lineWidth = conf.data.width
-                    canvas.stroke()
-                },
-                show: function(p) {
-                    index = parseInt(p.x/step)
-                    canvas.moveTo(p.x, -space)
-                    canvas.lineTo(p.x, height)
-                    canvas.moveTo(-space, p.y)
-                    canvas.lineTo(width, p.y)
-                    return p
-                },
-            },
-            stick: {
-                draw: function() {
-                    what.drawAxies().drawXLabel(step)
-                    canvas.beginPath()
-
-                    var total = 0
-                    for (var key in max) {
-                        total += max[key]
-                    }
-
-                    for (var i = 0; i < nrow; i++) {
-                        canvas.moveTo(step*i, 0)
-                        for (var key in data) {
-                            canvas.lineTo(step*i, data[key][i]/total*height)
-                            canvas.moveTo(step*i-step/2, data[key][i]/total*height)
-                            canvas.lineTo(step*i+step/2, data[key][i]/total*height)
-                            canvas.moveTo(step*i, data[key][i]/total*height)
-                        }
-                    }
-                    canvas.strokeStyle = conf.data.style
-                    canvas.lineWidth = conf.data.width
-                    canvas.stroke()
-                },
-                show: function(p) {
-                    index = parseInt(p.x/step)
-                    canvas.moveTo(p.x, -space)
-                    canvas.lineTo(p.x, height)
-                    canvas.moveTo(-space, p.y)
-                    canvas.lineTo(width, p.y)
-                    return p
-                },
-            },
-            weight: {
-                conf: {
-                    space: 20,
-                    focus: "white",
-                    style: "black",
-                    width: 1,
-                    least: 0.01,
-                },
-                draw: function() {
-                    var that = this
-                    var space = width / (nline+1)
-
-                    canvas.translate(0, height/2)
-                    for (var key in data) {
-                        var total = 0
-                        data[key].forEach(function(value) {
-                            total += value
-                        })
-
-                        var sum = 0
-                        canvas.translate(space, 0)
-                        data[key].forEach(function(value, i) {
-                            if (value/total < that.conf.least) {
-                                return
-                            }
-
-                            var a = sum/total*Math.PI*2
-                            var b = (sum+value)/total*Math.PI*2
-                            sum+=value
-
-                            canvas.beginPath()
-                            canvas.moveTo(0, 0)
-                            canvas.arc(0, 0, (space/2)-that.conf.space, a, b, false)
-                            canvas.closePath()
-
-                            if (i == index) {
-                                canvas.fillStyle = that.conf.focus
-                                canvas.fill()
-                            } else {
-                                canvas.strokeStyle = that.conf.style
-                                canvas.lineWidth = that.conf.width
-                                canvas.stroke()
-                            }
-                        })
-                    }
-                },
-                show: function(p) {
-                    var nspace = width / (nline+1)
-                    var which = parseInt((p.x-nspace/2)/nspace)
-                    which >= nline && (which = nline-1), which < 0 && (which = 0)
-
-                    var q = what.reverse(p)
-                    canvas.translate((which+1)*nspace, height/2)
-                    var p = what.transform(q)
-
-                    var a = Math.atan2(p.y, p.x)
-                    a < 0 && (a += Math.PI*2)
-                    var pos = a/2/Math.PI
-
-                    var total = 0
-                    data[keys[which]].forEach(function(value) {
-                        total += value
-                    })
-                    var sum = 0, weight = 0
-                    data[keys[which]].forEach(function(value, i) {
-                        sum += value, sum / total < pos && (index = i+1)
-                        index == i && (weight = parseInt(value/total*100))
-                    })
-
-                    canvas.moveTo(0, 0)
-                    canvas.lineTo(p.x, p.y)
-                    canvas.lineTo(p.x+conf.plabel.length, p.y)
-
-                    canvas.scale(1, -1)
-                    canvas.fillText("weight: "+weight+"%", p.x+conf.plabel.offset, -p.y+conf.plabel.offset)
-                    canvas.scale(1, -1)
-                    return p
-                },
-            },
-        },
-
-        drawData: function() {
-            canvas.save()
-            what.figure[conf.type].draw()
-            canvas.restore()
-            return what
-        },
-        drawView: function() {
-            view.forEach(function(view) {
-                view.meta && what[view.type](view.meta)
-            })
-            return what
-        },
-        drawLabel: function() {
-            if (!label) { return what }
-
-            index = 0
-            canvas.save()
-            canvas.font = conf.plabel.font || conf.font
-            canvas.fillStyle = conf.plabel.style || conf.style
-            canvas.strokeStyle = conf.plabel.style || conf.style
-            var p = what.figure[conf.type].show(now)
-            canvas.stroke()
-
-            canvas.scale(1, -1)
-            p.x += conf.plabel.offset
-            p.y -= conf.plabel.offset
-
-            if (width - p.x < 200) {
-                p.x -= 200
-            }
-            canvas.fillText("index: "+index, p.x, -p.y+conf.plabel.height)
-            msg.append.forEach(function(key, i) {
-                msg[key][index] && canvas.fillText(key+": "+msg[key][index], p.x, -p.y+(i+2)*conf.plabel.height)
-            })
-            canvas.restore()
-            return what
-        },
-        drawShape: function() {
-            point.length > 0 && (what[conf.shape]({ps: point}), what[conf.means]({ps: point, tool: "stroke", style: "red"}))
-            return what
-        },
-
-        refresh: function() {
-            return what.clear().drawData().drawView().drawLabel().drawShape()
-        },
-        cancel: function() {
-            point = [], what.refresh()
-            return what
-        },
-        play: function() {
-            function cb() {
-                view[i] && what[view[i].type](view[i].meta) && (t = kit.Delay(view[i].type == "drawPoint"? 10: conf.play, cb))
-                i++
-                status.nshape.innerText = i+"/"+view.length
-            }
-            var i = 0
-            what.clear().drawData()
-            kit.Delay(10, cb)
-            return what
-        },
-        back: function() {
-            view.pop(), status.nshape.innerText = view.length
-            return what.refresh()
-        },
-        push: function(item) {
-            item.meta && item.meta.ps < (conf.limits[item.type]||2) && ps.push(item)
-            status.nshape.innerText = view.push(item)
-            return what
-        },
-        wait: function() {
-            status.cmd.focus()
-            return what
-        },
-        trap: function(value, event) {
-            event.target.className = (trap = !trap)? "trap": "normal"
-            page.localMap = trap? what.input: undefined
-        },
-        label: function(value, event) {
-            event.target.className = (label = !label)? "trap": "normal"
-        },
-
-        movePoint: function(p) {
-            now = p, status.xy.innerHTML = p.x+","+p.y;
-            (point.length > 0 || ps.length > 0 || label) && what.refresh()
-        },
-        pushPoint: function(p) {
-            if (ps.length > 0) {
-                ps[0].meta.ps.push(p) > 1 && ps.pop(), what.refresh()
-                return
-            }
-
-            point.push(p) >= (conf.limits[conf.shape]||2) && what.push({type: conf.shape,
-                meta: what[conf.shape]({ps: point, text: status.cmd.value||conf.text, tool: conf.tool, style: conf.style}),
-            }) && (point = [])
-            conf.means == "drawPoint" && what.push({type: conf.means, meta: what[conf.means]({ps: [p], tool: "stroke", style: "red"})})
-        },
-        transform: function(p) {
-            var t = canvas.getTransform()
-            return {
-                x: (p.x-t.c/t.d*p.y+t.c*t.f/t.d-t.e)/(t.a-t.c*t.b/t.d),
-                y: (p.y-t.b/t.a*p.x+t.b*t.e/t.a-t.f)/(t.d-t.b*t.c/t.a),
-            }
-        },
-        reverse: function(p) {
-            var t = canvas.getTransform()
-            return {
-                x: t.a*p.x+t.c*p.y+t.e,
-                y: t.b*p.x+t.d*p.y+t.f,
-            }
-        },
-
-        check: function() {
-            view.forEach(function(item, index, view) {
-                item && item.send && plugin.Run(window.event||{}, item.send.concat(["type", item.type]), function(msg) {
-                    msg.text && msg.text[0] && (item.meta.text = msg.text[0])
-                    msg.style && msg.style[0] && (item.meta.style = msg.style[0])
-                    msg.ps && msg.ps[0] && (item.meta.ps = JSON.parse(msg.ps[0]))
-                    what.refresh()
-                })
-                index == view.length -1 && kit.Delay(1000, what.check)
-            })
-        },
-        parse: function(txt) {
-            var meta = {}, cmds = [], rest = -1, send = []
-            txt.trim().split(" ").forEach(function(item) {
-                switch (item) {
-                    case "stroke":
-                    case "fill":
-                        meta.tool = item
-                        break
-                    case "black":
-                    case "white":
-                    case "red":
-                    case "yellow":
-                    case "green":
-                    case "cyan":
-                    case "blue":
-                    case "purple":
-                        meta.style = item
-                        break
-                    case "cmds":
-                        rest = cmds.length
-                    default:
-                        cmds.push(item)
-                }
-            }), rest != -1 && (send = cmds.slice(rest+1), cmds = cmds.slice(0, rest))
-
-            var cmd = {
-                "t": "drawText",
-                "l": "drawLine",
-                "p": "drawPoly",
-                "r": "drawRect",
-                "c": "drawCircle",
-                "e": "drawEllipse",
-            }[cmds[0]] || cmds[0]
-            cmds = cmds.slice(1)
-
-            var args = []
-            switch (cmd) {
-                case "send":
-                    plugin.Run(window.event, cmds, function(msg) {
-                        kit.Log(msg)
-                    })
-                    return
-                default:
-                    meta.ps = []
-                    for (var i = 0; i < cmds.length; i+=2) {
-                        var x = parseInt(cmds[i])
-                        var y = parseInt(cmds[i+1])
-                        !isNaN(x) && !isNaN(y) && meta.ps.push({x: x, y: y}) || (args.push(cmds[i]), i--)
-                    }
-            }
-            meta.args = args
-
-            switch (cmd) {
-                case "drawText":
-                    meta.text = args.join(" "), delete(meta.args)
-                case "drawLine":
-                case "drawPoly":
-                case "drawRect":
-                case "drawCircle":
-                case "drawEllipse":
-                    what.push({type: cmd, meta: what[cmd](meta), send:send})
-            }
-
-            return (what[cmd] || function() {
-                return what
-            })(meta)
-        },
-        input: function(event) {
-            var map = what.trans[event.key]
-            map && action[map[0]] && (action[map[0]].value = map[1])
-            map && what.trans[map[0]] && (map = what.trans[map[1]]) && (conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]]())
-            what.refresh()
-        },
-        trans: {
-            "折线图": ["type", "trend"],
-            "股价图": ["type", "ticket"],
-            "柱状图": ["type", "stick"],
-            "饼状图": ["type", "weight"],
-
-            "移动": ["shape", "move"],
-            "旋转": ["shape", "rotate"],
-            "缩放": ["shape", "scale"],
-
-            "文本": ["shape", "drawText"],
-            "直线": ["shape", "drawLine"],
-            "折线": ["shape", "drawPoly"],
-            "矩形": ["shape", "drawRect"],
-            "圆形": ["shape", "drawCircle"],
-            "椭圆": ["shape", "drawEllipse"],
-
-            "辅助点": ["means", "drawPoint"],
-            "辅助线": ["means", "drawRect"],
-
-            "画笔": ["tool", "stroke"],
-            "画刷": ["tool", "fill"],
-
-            "黑色": ["style", "black"],
-            "红色": ["style", "red"],
-            "绿色": ["style", "green"],
-            "黄色": ["style", "yellow"],
-            "蓝色": ["style", "blue"],
-            "紫色": ["style", "purple"],
-            "青色": ["style", "cyan"],
-            "白色": ["style", "white"],
-            "随机色": ["style", "random"],
-            "默认色": ["style", "default"],
-
-            "清屏": ["clear"],
-            "刷新": ["refresh"],
-            "取消": ["cancel"],
-            "播放": ["play"],
-            "回退": ["back"],
-            "输入": ["wait"],
-
-            "标签": ["label"],
-            "快捷键": ["trap"],
-
-            "x": ["折线图", "折线图"],
-            "y": ["折线图", "饼状图"],
-
-            "a": ["移动", "旋转"],
-            "m": ["移动", "移动"],
-            "z": ["移动", "缩放"],
-
-            "t": ["文本", "文本"],
-            "l": ["文本", "直线"],
-            "v": ["文本", "折线"],
-            "r": ["文本", "矩形"],
-            "c": ["文本", "圆形"],
-            "e": ["文本", "椭圆"],
-
-            "s": ["画笔", "画笔"],
-            "f": ["画笔", "画刷"],
-
-            "0": ["黑色", "黑色"],
-            "1": ["黑色", "红色"],
-            "2": ["黑色", "绿色"],
-            "3": ["黑色", "黄色"],
-            "4": ["黑色", "蓝色"],
-            "5": ["黑色", "紫色"],
-            "6": ["黑色", "青色"],
-            "7": ["黑色", "白色"],
-            "8": ["黑色", "随机色"],
-            "9": ["黑色", "默认色"],
-
-            "j": ["刷新", "刷新"],
-            "g": ["播放", "播放"],
-            "b": ["回退", "回退"],
-            "q": ["清空", "清空"],
-
-            "Escape": ["取消", "取消"],
-            " ": ["输入", "输入"],
-        },
-    }
-
-    var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
-        ["折线图", "股价图", "柱状图", "饼状图"],
-        ["移动", "旋转", "缩放"],
-        ["文本", "直线", "折线", "矩形", "圆形", "椭圆"],
-        ["辅助点", "辅助线"],
-        ["画笔", "画刷"],
-        ["黑色", "红色", "绿色", "黄色", "蓝色", "紫色", "青色", "白色", "随机色", "默认色"],
-        "", "清屏", "刷新", "播放", "回退",
-        "", "标签", "快捷键",
-    ], function(value, event) {
-        var map = what.trans[value]
-        conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]](value, event)
-        what.refresh()
-    })
-
-    var canvas = kit.AppendChild(output, [{view: ["draw", "canvas"], data: {width: width+20, height: height+20,
-        onclick: function(event) {
-            what.pushPoint(what.transform({x: event.offsetX, y: event.offsetY}), event.clientX, event.clientY)
-        }, onmousemove: function(event) {
-            what.movePoint(what.transform({x: event.offsetX, y: event.offsetY}), event.clientX, event.clientY)
-        },
-    }}]).last.getContext("2d")
-
-    var status = kit.AppendStatus(kit.AppendChild(output, [{view: ["status"]}]).last, [{name: "nshape"}, {"className": "cmd", style: {width: (output.clientWidth - 100)+"px"}, data: {autocomplete: "off"}, input: ["cmd", function(event) {
-        var target = event.target
-        event.type == "keyup" && event.key == "Enter" && what.parse(target.value) && (!target.History && (target.History=[]),
-            target.History.push(target.value), target.Current=target.History.length, target.value = "")
-        event.type == "keyup" && page.oninput(event), event.stopPropagation()
-
-    }]}, {name: "xy"}], function(value, name, event) {
-
-    })
-
-    return what.reset().refresh()
-}
-

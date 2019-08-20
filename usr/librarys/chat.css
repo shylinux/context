@@ -30,6 +30,9 @@ fieldset.Target>div.output>div.item>div.user {
     float:left;
     padding:6px;
 }
+fieldset.Source {
+    overflow:hidden;
+}
 fieldset.Source div.output {
     padding:0;
 }

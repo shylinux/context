@@ -221,10 +221,6 @@ fieldset.Footer>div.output div.state div {
     float:right;
 }
 
-fieldset.Source {
-    overflow:hidden;
-}
-
 fieldset.item {
     float:left;
 }
