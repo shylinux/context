@@ -525,9 +525,9 @@ kit = toolkit = {
 
     Selector: function(obj, item, cb) {
         var list = []
-        obj.querySelectorAll(item).forEach(function(item, index) {
+        obj.querySelectorAll(item).forEach(function(item, index, array) {
             if (typeof cb == "function") {
-                var value = cb(item)
+                var value = cb(item, index, array)
                 value != undefined && list.push(value)
             } else {
                 list.push(item)

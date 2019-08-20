@@ -152,7 +152,7 @@ Page({
                     }}])
                 })
             },
-            Clear: function(name) {
+            clear: function(name) {
                 table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = name, ui.name.focus()
             },
             Create: function(name, list) {
@@ -162,7 +162,7 @@ Page({
                 })
             },
             Show: function() {var pane = field.Pane
-                pane.Dialog() && (pane.Clear("good"), pane.Run([], pane.Append))
+                pane.Dialog() && (pane.clear("good"), pane.Run([], pane.Append))
             },
             Action: {
                 "取消": function(event) {
@@ -230,7 +230,7 @@ Page({
     initSource: function(page, field, option, output) {
         var ui = kit.AppendChild(field, [{"view": ["input", "textarea"], "data": {"onkeyup": function(event){
             page.oninput(event), kit.isSpace(event.key) && field.Pane.which.set(event.target.value)
-            event.key == "Enter" && !event.shiftKey && page.target.Pane.Send("text", event.target.value, field.Pane.Clear)
+            event.key == "Enter" && !event.shiftKey && page.target.Pane.Send("text", event.target.value, field.Pane.clear)
         }, "onkeydown": function(event) {
             event.key == "Enter" && !event.shiftKey && event.preventDefault()
         }}}])
@@ -238,7 +238,7 @@ Page({
             Select: function() {
                 ui.first.focus()
             },
-            Clear: function(value) {
+            clear: function(value) {
                 ui.first.value = ""
             },
             Size: function(width, height) {
@@ -295,8 +295,8 @@ Page({
                         if (typeof engine[args[0]] == "function") {
                             return kit._call(engine[args[0]], args.slice(1))
                         }
-                        if (page.plugin && typeof page.plugin[args[0]] == "function") {
-                            return kit._call(page.plugin[args[0]], args.slice(1))
+                        if (page.plugin && typeof page.plugin.Plugin[args[0]] == "function") {
+                            return kit._call(page.plugin.Plugin[args[0]], args.slice(1))
                         }
 
                         if (page.dialog && page.dialog.Pane.Jshy(event, args)) {return true}
@@ -330,7 +330,7 @@ Page({
             Show: function() {var pane = field.Pane
                 if (field.Pane.Back(river+storm, output)) {return}
 
-                pane.Clear(), pane.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
+                pane.clear(), pane.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                     pane.Core(event, line, args, cbs)
                 })
             },
@@ -507,7 +507,7 @@ Page({
                     list.push(item.dataset.index)
                     list.push(item.dataset.name)
                 })
-                if (list.length == 0) {kit.alert("请添加命令"); return}
+                // if (list.length == 0) {kit.alert("请添加命令"); return}
 
                 field.Pane.Create(ui.name.value, list)
 

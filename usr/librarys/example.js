@@ -467,6 +467,7 @@ function Page(page) {
                                 page.action.Pane.Core(event, {}, ["_cmd", event.target.value]), event.target.value = ""
                                 event.stopPropagation()
                                 event.preventDefault()
+                                ui.magic.focus()
                                 return
                             }
 
@@ -540,7 +541,7 @@ function Pane(page, field) {
             last = index, list[index] && (list[index].className = "item select")
 			key && pane.which.set(key)
         },
-        Clear: function() {
+        clear: function() {
             output.innerHTML = "", list = [], last = -1
         },
 
@@ -572,6 +573,7 @@ function Pane(page, field) {
         },
         Jshy: function(event, args) {
             if (pane[args[0]] && pane[args[0]].type == "fieldset") {
+                pane[args[0]].Plugin.Select()
                 return pane[args[0]].Plugin.Jshy(event, args.slice(1))
             }
             if (typeof pane.Action[args[0]] == "function") {
@@ -703,8 +705,11 @@ function Plugin(page, pane, field, run) {
             page.plugin = field.previousSibling
             field.parentNode.removeChild(field)
         },
-        Select: function() {
-            option.querySelectorAll("input")[1].focus()
+        Select: function(focus) {
+            field.scrollIntoView()
+            page.plugin && (page.plugin.className = "item")
+            page.plugin = field, field.className = "item select"
+            focus && option.querySelectorAll("input")[1].focus()
         },
         Reveal: function(msg) {
             return msg.append && msg.append[0]? ["table", JSON.stringify(ctx.Tables(msg))]: ["code", msg.result? msg.result.join(""): ""]
@@ -744,8 +749,10 @@ function Plugin(page, pane, field, run) {
             if (typeof plugin[args[0]] == "function") {
                 return kit._call(plugin[args[0]], args.slice(1))
             }
-            if (args.length > 1) {
-                return kit._call(plugin.Run, [event].concat(args.slice(1)))
+            if (args.length > 0) {
+                kit.Selector(option, ".args", function(item, index) {
+                    index < args.length && (item.value = args[index])
+                })
             }
             return kit._call(plugin.Runs, [event])
         },
@@ -777,6 +784,9 @@ function Plugin(page, pane, field, run) {
             })
         },
 
+        clear: function() {
+            output.innerHTML = ""
+        },
         display: function(arg, cb) {
             display.deal = arg, plugin.ondaemon[display.deal||"table"](plugin.msg, cb)
         },
@@ -826,11 +836,12 @@ function Plugin(page, pane, field, run) {
         },
         onaction: {
             onfocus: function(event, action, type, name, item) {
-                page.pane = pane.target, page.plugin = plugin.target, page.input = event.target
+                page.input = event.target
             },
             onclick: function(event, action, type, name, item) {
                 switch (type) {
                     case "button":
+                        plugin.Select()
                         action[item.click]? action[item.click](event, item, option, field):
                             plugin[item.click]? plugin[item.click](event, item, option, field): plugin.Runs(event)
                         break

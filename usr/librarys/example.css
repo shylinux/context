@@ -255,6 +255,10 @@ fieldset.item>div.output>div.status>input.cmd {
     width:250px;
 }
 
+fieldset.item.select {
+    background-color:gold;
+}
+
 fieldset table {
     font-size:14px;
     overflow: auto;
