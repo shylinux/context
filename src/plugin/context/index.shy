@@ -1,7 +1,7 @@
 
 fun project "项目" "" "" \
 	private \
-    select "" values plugin values stat values init \
+    select "" values plugin values submit values trend values stat values init \
 	text "" \
 	button "执行" \
     exports see name see
