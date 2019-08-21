@@ -555,7 +555,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"trash":  "var/tmp/trash",
 		}, Help: "目录管理"},
 		"pwd": &ctx.Config{Name: "pwd", Value: []interface{}{
-			"var", "usr", "bin", "etc", "",
+			"var", "usr", "usr/local", "bin", "etc", "",
 		}, Help: "当前目录"},
 	},
 	Commands: map[string]*ctx.Command{
