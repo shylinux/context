@@ -754,6 +754,18 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			case "stat":
 				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r").CopyTo(m, "append")
 
+			case "trend":
+				m.Cmdy("nfs.git", "sum").CopyTo(m, "append")
+
+			case "submit":
+				if len(arg) > 1 {
+					m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
+						[]string{"stash"}, []string{"pull"}, []string{"stash", "pop"},
+						[]string{"commit", "-am", arg[1]}, []string{"push"},
+					})
+				}
+				m.Cmdy("nfs.git", "status")
+
 			case "import":
 				list := [][]string{}
 				m.Confm("project", "import", func(index int, value string) {
@@ -768,8 +780,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
 
 			case "plugin":
-				arg = arg[1:]
-				if len(arg) == 0 {
+				if arg = arg[1:]; len(arg) == 0 {
 					m.Cmdy("nfs.dir", m.Conf("project", "plugin.path"), "time", "line", "name")
 					break
 				}

@@ -852,7 +852,7 @@ function Plugin(page, pane, field, run) {
                 (output.innerHTML = "", Editor(plugin, option, output, output.clientWidth-40, 400, 10, msg))
             },
             canvas: function(msg, cb) {
-                typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, option, output, output.clientWidth-40, 400, 10, msg))
+                typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, option, output, pane.target.clientWidth-45, pane.target.clientHeight-175, 10, msg))
             },
         },
         onexport: {
