@@ -494,6 +494,7 @@ kit = toolkit = {
     Color: function(s) {
         s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
         s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
+        s = s.replace(/\033\[33m/g, "<span style='color:#ff0'>")
         s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
         s = s.replace(/\033\[32;1m/g, "<span style='color:#0f0'>")
         s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
@@ -997,7 +998,6 @@ function Canvas(plugin, option, output, width, height, space, msg) {
                     if (keys.length < 3) {
                         return
                     }
-                    canvas.beginPath()
 
                     var sum = 0, total = 0
                     for (var i = 0; i < nrow; i++) {
@@ -1033,23 +1033,22 @@ function Canvas(plugin, option, output, width, height, space, msg) {
                     }
 
                     for (var i = 0; i < nrow; i++) {
+                        canvas.beginPath()
+                        canvas.moveTo(step*i, data["min"][i]/total*height)
                         if (data["sum"][i] < data["end"][i]) {
-                            canvas.moveTo(step*i, data["min"][i]/total*height)
-                            canvas.lineTo(step*i, data["sum"][i]/total*height)
-
-                            canvas.moveTo(step*i, data["max"][i]/total*height)
-                            canvas.lineTo(step*i, data["end"][i]/total*height)
+                            canvas.strokeStyle = "white", canvas.lineTo(step*i, data["sum"][i]/total*height), canvas.stroke()
+                            canvas.fillStyle = "white", canvas.fillRect(step*i-step/3, data["sum"][i]/total*height, step/3*2, (data["end"][i]-data["sum"][i])/total*height)
+                            canvas.moveTo(step*i, data["end"][i]/total*height)
                         } else {
-                            canvas.moveTo(step*i, data["min"][i]/total*height)
-                            canvas.lineTo(step*i, data["end"][i]/total*height)
-
-                            canvas.moveTo(step*i, data["max"][i]/total*height)
-                            canvas.lineTo(step*i, data["sum"][i]/total*height)
+                            canvas.strokeStyle = "black", canvas.lineTo(step*i, data["end"][i]/total*height), canvas.stroke()
+                            canvas.fillStyle = "black", canvas.fillRect(step*i-step/3, data["sum"][i]/total*height, step/3*2, (data["end"][i]-data["sum"][i])/total*height)
+                            canvas.moveTo(step*i, data["sum"][i]/total*height)
                         }
+                        canvas.lineTo(step*i, data["max"][i]/total*height), canvas.stroke()
                     }
-                    canvas.strokeStyle = conf.data.style
-                    canvas.lineWidth = conf.data.width
-                    canvas.stroke()
+                    // canvas.strokeStyle = conf.data.style
+                    // canvas.lineWidth = conf.data.width
+                    // canvas.stroke()
                 },
                 show: function(p) {
                     index = parseInt(p.x/step)

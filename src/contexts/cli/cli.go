@@ -240,13 +240,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_error: 输出错误",
 		}, Form: map[string]int{
 			"cmd_timeout": 1,
-			"cmd_daemon":  1,
 			"cmd_active":  1,
+			"cmd_daemon":  1,
 			"cmd_dir":     1,
 			"cmd_env":     2,
 			"cmd_log":     1,
 			"cmd_temp":    -1,
-			"cmd_parse":   1,
+			"cmd_parse":   2,
 			"cmd_error":   0,
 			"app_log":     1,
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -426,7 +426,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				case "cut":
 					bio := bufio.NewScanner(out)
 					bio.Scan()
-					for heads := kit.Split(bio.Text(), -1); bio.Scan(); {
+					for heads := kit.Split(bio.Text(), kit.Int(kit.Select("-1", m.Optionv("cmd_parse"), 1))); bio.Scan(); {
 						for i, v := range kit.Split(bio.Text(), len(heads)) {
 							m.Add("append", heads[i], v)
 						}
@@ -752,19 +752,21 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				})
 
 			case "stat":
-				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r").CopyTo(m, "append")
+				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
 
 			case "trend":
-				m.Cmdy("nfs.git", "sum").CopyTo(m, "append")
+				m.Cmdy("nfs.git", "sum", "-n", kit.Select("20", arg, 1))
+
+			case "review":
+				m.Cmdy("nfs.git", "diff")
 
 			case "submit":
 				if len(arg) > 1 {
-					m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
-						[]string{"stash"}, []string{"pull"}, []string{"stash", "pop"},
+					m.Cmdp(0, []string{"git submit"}, []string{"cli.system", "git"}, [][]string{
 						[]string{"commit", "-am", arg[1]}, []string{"push"},
 					})
 				}
-				m.Cmdy("nfs.git", "status")
+				m.Cmdy("nfs.git", "logs", "table.limit", "3")
 
 			case "import":
 				list := [][]string{}

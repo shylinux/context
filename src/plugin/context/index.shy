@@ -1,8 +1,8 @@
 
 fun project "项目" "" "" \
 	private \
-    select "" values plugin values submit values trend values stat values init \
-	text "" \
+    select "" values plugin values submit values review values trend values stat values init \
+	text "" imports plugin_see action auto \
 	button "执行" \
     exports see name see
 

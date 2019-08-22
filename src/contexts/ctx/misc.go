@@ -158,8 +158,8 @@ func (m *Message) Format(arg ...interface{}) string {
 				if len(msg.Meta["option"]) > 0 {
 					meta = append(meta, fmt.Sprintf("  option: %d %v\n", len(msg.Meta["option"]), msg.Meta["option"]))
 					for _, k := range msg.Meta["option"] {
-						if v, ok := msg.Data[k]; ok {
-							meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
+						if _, ok := msg.Data[k]; ok {
+							// meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
 						} else if v, ok := msg.Meta[k]; ok {
 							meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
 						}
@@ -168,8 +168,8 @@ func (m *Message) Format(arg ...interface{}) string {
 				if len(msg.Meta["append"]) > 0 {
 					meta = append(meta, fmt.Sprintf("  append: %d %v\n", len(msg.Meta["append"]), msg.Meta["append"]))
 					for _, k := range msg.Meta["append"] {
-						if v, ok := msg.Data[k]; ok {
-							meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
+						if _, ok := msg.Data[k]; ok {
+							// meta = append(meta, fmt.Sprintf("    %s: %v\n", k, kit.Format(v)))
 						} else if v, ok := msg.Meta[k]; ok {
 							meta = append(meta, fmt.Sprintf("    %s: %d %v\n", k, len(v), v))
 						}

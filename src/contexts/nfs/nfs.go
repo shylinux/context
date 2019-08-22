@@ -542,7 +542,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"commit": map[string]interface{}{"args": []interface{}{"commit", "-am"}},
 			"branch": map[string]interface{}{"args": []interface{}{"branch", "-v"}},
 			"status": map[string]interface{}{"args": []interface{}{"status", "-sb"}},
-			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "@table.limit", "--skip", "@table.offset", "pretty", "date"}},
+			"log":    map[string]interface{}{"args": []interface{}{"log", "-n", "@table.limit", "--skip", "@table.offset", "pretty", "cmd_parse", "cut", "5", "date"}},
+			"logs":   map[string]interface{}{"args": []interface{}{"log", "-n", "@table.limit", "--skip", "@table.offset", "--stat"}},
 			"trans": map[string]interface{}{
 				"date":   "--date=format:%m/%d %H:%M",
 				"pretty": "--pretty=format:%h %ad %an %s",
@@ -669,13 +670,29 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return
 			}},
 		"git": &ctx.Command{Name: "git sum", Help: "版本控制", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 0 && arg[0] == "sum" || len(arg) > 1 && arg[1] == "sum" {
-				args := []string{"log"}
-				if len(arg) > 1 && arg[1] == "sum" && arg[0] != "" {
-					args = append(args, "-C", arg[0])
+			if len(arg) == 0 {
+				m.Cmdy("nfs.config", "git")
+				return
+			}
+
+			if p := m.Cmdx("nfs.path", arg[0]); p != "" && !m.Confs("git", arg[0]) {
+				m.Option("git_dir", p)
+				arg = arg[1:]
+			} else {
+				wd, e := os.Getwd()
+				m.Assert(e)
+				m.Option("git_dir", wd)
+			}
+
+			if len(arg) > 0 && arg[0] == "sum" {
+				args := []string{"-C", m.Option("git_dir"), "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d %H:%M"}
+				if len(arg) > 1 {
+					args = append(args, arg[1:]...)
+				} else {
+					args = append(args, "--reverse")
 				}
-				args = append(args, "--reverse", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d %H:%M")
-				if out, e := exec.Command("git", args...).CombinedOutput(); m.Assert(e) {
+
+				if out, e := exec.Command("git", args...).CombinedOutput(); e == nil {
 					for _, v := range strings.Split(string(out), "commit: ") {
 						if l := strings.Split(v, "\n"); len(l) > 2 {
 							fs := strings.Split(strings.TrimSpace(l[2]), ", ")
@@ -703,22 +720,10 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						}
 					}
 					m.Table()
+				} else {
+					m.Log("warn", "%v", string(out))
 				}
 				return
-			}
-
-			if len(arg) == 0 {
-				m.Cmdy("nfs.config", "git")
-				return
-			}
-
-			if p := m.Cmdx("nfs.path", arg[0]); p != "" && !m.Confs("git", arg[0]) {
-				m.Option("git_dir", p)
-				arg = arg[1:]
-			} else {
-				wd, e := os.Getwd()
-				m.Assert(e)
-				m.Option("git_dir", wd)
 			}
 
 			cmds := []string{}
@@ -738,8 +743,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				args = append(args, arg[1:]...)
 
 				for i, _ := range args {
-					v := m.Parse(args[i])
-					if v == args[i] || v == "" {
+					if v := m.Parse(args[i]); v == args[i] || v == "" {
 						args[i] = kit.Select(args[i], m.Conf("git", []string{"trans", args[i]}))
 					} else {
 						args[i] = v
