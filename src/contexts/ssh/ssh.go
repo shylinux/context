@@ -959,6 +959,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Log("time", "exec: %v", m.Format("cost"))
 			return
 		}},
+		"relay": &ctx.Command{Name: "relay address", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			return
+		}},
 	},
 }
 

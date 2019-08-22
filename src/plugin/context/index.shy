@@ -1,7 +1,7 @@
 
 fun project "项目" "" "" \
 	private \
-    select "" values plugin values submit values review values trend values stat values init \
+    select "" values plugin values submit values review values trend values stat values init action auto \
 	text "" imports plugin_see action auto \
 	button "执行" \
     exports see name see
@@ -11,7 +11,7 @@ end
 
 fun compile "编译" "" "" \
 	private \
-    select "" values plugin values windows values darwin values linux values self values all \
+    select "" values plugin values restart values windows values darwin values linux values self values all \
 	text "" name see imports plugin_see \
 	button "编译"
 
@@ -38,6 +38,7 @@ end
 
 fun missyou "任务" "" "" \
 	private \
+	text "" imports plugin_see \
 	text "" view long \
 	button "行动" action auto \
     exports you "" you
@@ -66,7 +67,7 @@ end
 
 fun cmd "命令" "" "" \
 	private \
-	text "" name pod imports plugin_pod view long \
+	text "" name pod imports plugin_pod \
 	text "nfs" name ctx imports plugin_ctx \
 	text "pwd" \
 	button "执行"
@@ -76,12 +77,22 @@ end
 
 fun dir "目录" "" "" \
 	private \
-	text "" name pod imports plugin_pod action auto view long \
+	text "" name pod imports plugin_pod action auto \
 	text "usr/script" name dir imports plugin_dir action auto view long \
 	button "查看" action auto \
 	button "回退" click Back \
     exports dir "" dir
 
 	copy ssh._route _ nfs.dir _ time size line path
+end
+
+fun git "版本" "" "" \
+	private \
+	text "" name pod imports plugin_pod action auto \
+    select "" values diff values status commit values values log values init action auto \
+	text "" name txt action auto \
+	button "查看" action auto
+
+	copy ssh._route _ nfs.git __
 end
 

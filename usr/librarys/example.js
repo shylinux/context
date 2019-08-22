@@ -191,14 +191,14 @@ function Page(page) {
                 page.oncontrol && page.oncontrol(event, document.body, "control")
 
                 if (kit.isWindows && event.ctrlKey) {
-                    event.stopPropagation()
-                    event.preventDefault()
+                    // event.stopPropagation()
+                    // event.preventDefault()
                 }
 
             }, document.body.onkeyup = function(event) {
                 if (kit.isWindows && event.ctrlKey) {
-                    event.stopPropagation()
-                    event.preventDefault()
+                    // event.stopPropagation()
+                    // event.preventDefault()
                 }
 
             }, document.body.oncontextmenu = function(event) {
@@ -473,7 +473,7 @@ function Page(page) {
                 },
                 Show: function() {
                     output.innerHTML = "", kit.AppendChild(output, [
-                        {"view": ["title", "div", "shycontext"], click: function(event) {
+                        {"view": ["title", "div", "github.com/shylinux/context"], click: function(event) {
                             cb(event, "title", "shycontext")
                         }},
                         {"view": ["state"], list: list.map(function(item) {return {text: [state[item], "div"], click: function(event) {
@@ -717,7 +717,7 @@ function Plugin(page, pane, field, run) {
                     })
                     break
                 case "textarea":
-                    input.type = "textarea", item.style = "height:300px;"+"width:"+(option.clientWidth-20)+"px"
+                    input.type = "textarea", item.style = "height:100px;"+"width:"+(pane.target.clientWidth-30)+"px"
                     item.className = "args"
                 case "text":
                     item.className = "args"

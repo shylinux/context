@@ -343,9 +343,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 执行命令
 				m.Gos(m, func(m *ctx.Message) {
 					if e := cmd.Start(); e != nil {
-						m.Echo("error: ").Echo("%s\n", e)
+						m.Log("warn", "%v", e).Echo("error: ").Echo("%s\n", e)
 					} else if e := cmd.Wait(); e != nil {
-						m.Echo("error: ").Echo("%s\n", e)
+						m.Log("warn", "%v", e).Echo("error: ").Echo("%s\n", e)
 					}
 					m.Conf("daemon", []string{h, "finish_time"}, time.Now().Format(m.Conf("time", "format")))
 				})
@@ -434,6 +434,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Table()
 
 				default:
+					var data interface{}
+					if json.Unmarshal(out.Bytes(), &data) == nil {
+						if b, e := json.MarshalIndent(data, "", "  "); e == nil {
+							m.Echo(string(b))
+							break
+						}
+					}
 					m.Echo(out.String())
 				}
 			})
@@ -831,6 +838,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Table()
 				}
 
+			case "restart":
+				m.Cmdy("cli.quit", "1")
+
 			case "plugin":
 				arg = arg[1:]
 				if len(arg) == 0 {
@@ -1027,6 +1037,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 		"missyou": &ctx.Command{Name: "missyou [name [stop]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			topic := "hello"
+			if len(arg) > 0 && (arg[0] == "" || m.Cmds("nfs.path", path.Join(m.Conf("cli.project", "plugin.path"), arg[0]))) {
+				topic, arg = arg[0], arg[1:]
+			}
+
 			if len(arg) == 0 {
 				m.Option("dir_root", "")
 				m.Cmd("nfs.dir", m.Conf("missyou", "path"), "time", "name").Table(func(value map[string]string) {
@@ -1067,13 +1082,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			args := []string{
 				"daemon", "cmd_dir", p,
 				"cmd_env", "PATH", os.Getenv("PATH"),
-				"cmd_env", "ctx_type", kit.Select("hello", arg, 1),
+				"cmd_env", "ctx_type", kit.Select(topic, arg, 1),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
 				"cmd_daemon", "true",
 			}
-			if m.Conf("runtime", "host.GOOS") == "windows" {
+			if m.Assert(os.MkdirAll(p, 0666)); m.Conf("runtime", "host.GOOS") == "windows" {
 				m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "start", args)
 			} else {
 				m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), args)

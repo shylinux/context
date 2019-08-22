@@ -62,9 +62,18 @@ fun macro "脚本宏" "" "macro.js" \
 
 end
 
+fun sys "命令行" "" "" \
+	public \
+	textarea "" view long \
+	button "运行" \
+    exports mac name
+
+    copy nfs.source system __
+end
+
 fun hello world "" "" \
 	public \
-	text "" \
+	textarea "" \
 	button "执行"
 
 	copy pwd
