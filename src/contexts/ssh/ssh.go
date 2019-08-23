@@ -1,7 +1,11 @@
 package ssh
 
 import (
+	"bufio"
 	"contexts/ctx"
+	"fmt"
+	"os/exec"
+	"time"
 	"toolkit"
 
 	"encoding/hex"
@@ -12,6 +16,7 @@ import (
 )
 
 type SSH struct {
+	relay chan *ctx.Message
 	*ctx.Context
 }
 
@@ -22,7 +27,49 @@ func (ssh *SSH) Begin(m *ctx.Message, arg ...string) ctx.Server {
 	return ssh
 }
 func (ssh *SSH) Start(m *ctx.Message, arg ...string) bool {
-	return true
+	ir, iw := io.Pipe()
+	or, ow := io.Pipe()
+	er, ew := io.Pipe()
+	cmd := exec.Command("ssh", arg[0])
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = ir, ow, ew
+	cmd.Start()
+
+	relay := m
+	done := false
+	ssh.relay = make(chan *ctx.Message, 10)
+	m.Gos(m.Spawn(), func(msg *ctx.Message) {
+		for relay = range ssh.relay {
+			done = false
+			for _, v := range relay.Meta["detail"][1:] {
+				msg.Log("info", "%v", v)
+				fmt.Fprint(iw, v, " ")
+			}
+			fmt.Fprintln(iw)
+
+			ticker, delay := kit.Duration(msg.Conf("ssh.login", "ticker")), kit.Duration(msg.Conf("ssh.login", "ticker"))
+			for i := 0; i < msg.Confi("ssh.login", "count"); i++ {
+				msg.Log("done", "%d %v", i, done)
+				if time.Sleep(ticker); done {
+					time.Sleep(delay)
+					relay.Back(relay)
+					break
+				}
+			}
+		}
+	})
+	m.Gos(m.Spawn(), func(msg *ctx.Message) {
+		for bio := bufio.NewScanner(er); bio.Scan(); {
+			msg.Log("warn", "what %v", bio.Text())
+			relay.Echo(bio.Text()).Echo("\n")
+			done = true
+		}
+	})
+	for bio := bufio.NewScanner(or); bio.Scan(); {
+		m.Log("info", "what %v", bio.Text())
+		relay.Echo(bio.Text()).Echo("\n")
+		done = true
+	}
+	return false
 }
 func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
 	return false
@@ -127,6 +174,11 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{
 			"renew": true, "fresh": false, "user": true, "up": true,
 		}, Help: "可信节点"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
+			"ticker": "10ms",
+			"count":  100,
+			"delay":  "10ms",
+		}, Help: "聊天群组"},
 	},
 	Commands: map[string]*ctx.Command{
 		"_init": &ctx.Command{Name: "_init", Help: "启动初始化", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -959,7 +1011,22 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Log("time", "exec: %v", m.Format("cost"))
 			return
 		}},
-		"relay": &ctx.Command{Name: "relay address", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+
+		"login": &ctx.Command{Name: "login address", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				arg = append(arg, "shy@shylinux.com")
+			}
+			m.Start(arg[0], arg[0], arg...)
+			time.Sleep(1000 * time.Millisecond)
+			return
+		}},
+		"run": {Name: "run cmd", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if ssh, ok := m.Target().Server.(*SSH); ok && ssh.relay != nil {
+				ssh.relay <- m
+				m.CallBack(true, func(msg *ctx.Message) (res *ctx.Message) {
+					return nil
+				}, append([]string{"_"}, arg...))
+			}
 			return
 		}},
 	},

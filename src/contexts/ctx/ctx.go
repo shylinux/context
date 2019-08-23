@@ -743,7 +743,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			}
 			m.Optionv("bio.msg", msg)
 
-			m.Log("fuck", "what %v", arg)
 			if len(arg) == 0 {
 				ms := []*Message{msg.message, msg}
 				for i := 0; i < len(ms); i++ {
@@ -759,7 +758,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					m.Push("time", ms[i].Time())
 					m.Push("source", ms[i].source.Name)
 					m.Push("target", ms[i].target.Name)
-					m.Push("detail", kit.Format(ms[i].Meta["detail"]))
+					m.Push("details", kit.Format(ms[i].Meta["detail"]))
 					if i > 0 {
 						ms = append(ms, ms[i].messages...)
 					}

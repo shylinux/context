@@ -485,6 +485,9 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 		m.Set("detail", kit.Trans(args...))
 	}
 	key, arg := m.Meta["detail"][0], m.Meta["detail"][1:]
+	if key == "_" {
+		return m
+	}
 
 	msg := m
 	if strings.Contains(key, ":") {
@@ -513,10 +516,6 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 		}
 		return msg.Hand
 	})
-
-	if !msg.Hand {
-		// msg.Log("error", "cmd run error %s", msg.Format())
-	}
 	return msg
 }
 
