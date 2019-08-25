@@ -318,6 +318,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 
 			// 表达式语句
 			map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-", "+", "}"}},
+			map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "~", "!~", "}"}},
 			map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "+", "-", "*", "/", "%", "}"}},
 			map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "<", "<=", ">", ">=", "==", "!=", "}"}},
 			map[string]interface{}{"page": "val", "hash": "val", "word": []interface{}{"opt{", "op1", "}", "mul{", "num", "key", "str", "exe", "}"}},
@@ -354,7 +355,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-z", "-n", "}"}},
 				map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-e", "-f", "-d", "}"}},
 				map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", ":=", "=", "+=", "}"}},
-				map[string]interface{}{"page": "op2", "hash": "op2", "word": []interface{}{"mul{", "~", "!~", "}"}},
 
 				map[string]interface{}{"page": "exp", "hash": "exp", "word": []interface{}{"\\{", "rep{", "map", "}", "\\}"}},
 				map[string]interface{}{"page": "val", "hash": "val", "word": []interface{}{"opt{", "op1", "}", "(", "exp", ")"}},
@@ -374,6 +374,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			"button":   true,
 			"select":   true,
 			"textarea": true,
+			"feature":  true,
 			"exports":  true,
 		}, Help: "控件类型"},
 		"exec": &ctx.Config{Name: "info", Value: map[string]interface{}{
@@ -770,7 +771,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 
 			pre := map[string]int{
-				"=": -1,
+				"=":  -1,
+				"||": 0,
+				"==": 1, "~": 1,
 				"+": 2, "-": 2,
 				"*": 3, "/": 3, "%": 3,
 			}
@@ -1094,6 +1097,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			m.Log("info", "_index: %v", arg)
 			args := []interface{}{}
 			inputs := []interface{}{}
+			feature := map[string]interface{}{}
 			exports := []interface{}{}
 			for i := 7; i < len(arg); i++ {
 				if !m.Confs("input", arg[i]) {
@@ -1106,7 +1110,10 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 						continue
 					}
 					args := arg[i : j+1]
-					if arg[i] == "exports" {
+					if arg[i] == "feature" {
+						feature[arg[i+1]] = arg[i+2]
+
+					} else if arg[i] == "exports" {
 						for k := 1; k < len(args); k += 1 {
 							exports = append(exports, args[k])
 						}
@@ -1150,6 +1157,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				"componet_cmd":  kit.Select("", arg, 6),
 				"componet_args": args,
 				"inputs":        inputs,
+				"feature":       feature,
 				"exports":       exports,
 			})
 			return

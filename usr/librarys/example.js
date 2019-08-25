@@ -684,7 +684,11 @@ function Pane(page, field) {
     };
     return page[name] = field, pane.Field = field, field.Pane = pane
 }
-function Plugin(page, pane, field, run) {
+function Plugin(page, pane, field, runs) {
+    var run = function(event, cmds, cbs) {
+        event.Plugin = plugin, runs(event, cmds, cbs)
+    }
+
     var option = field.querySelector("form.option")
     var action = field.querySelector("div.action")
     var output = field.querySelector("div.output")
@@ -693,7 +697,9 @@ function Plugin(page, pane, field, run) {
     var name = meta.name
     var args = meta.args || []
     var display = JSON.parse(meta.display||'{}')
+    var feature = JSON.parse(meta.feature||'{}')
     var exports = JSON.parse(meta.exports||'["",""]')
+    var deal = (feature && feature.display) || "table"
 
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
@@ -707,6 +713,8 @@ function Plugin(page, pane, field, run) {
             var count = kit.Selector(option, "args").length
             args && count < args.length && (item.value = value||args[count++]||item.value||"")
 
+            item.title = item.title || item.name || ""
+            item.placeholder = item.title
             name = item.name || "input"
             var input = {type: "input", name: name, data: item}
             switch (item.type) {
@@ -725,7 +733,7 @@ function Plugin(page, pane, field, run) {
                     break
             }
 
-            var ui = kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])
+            var ui = kit.AppendChild(option, [{view: [item.view||""], data: {title: item.title}, list: [{type: "label", inner: item.label||""}, input]}])
             var action = Meta(ui[name] || {}, item, plugin.onaction, plugin);
 
             (typeof item.imports == "object"? item.imports: typeof item.imports == "string"? [item.imports]: []).forEach(function(imports) {
@@ -812,7 +820,7 @@ function Plugin(page, pane, field, run) {
             }, time)
         },
         Check: function(target, cb) {
-            option.querySelectorAll(".args").forEach(function(item, index, list) {
+            plugin.Select(true), option.querySelectorAll(".args").forEach(function(item, index, list) {
                 target == undefined && index == list.length-1 && plugin.Runs(window.event, cb)
                 item == target && (index == list.length-1? plugin.Runs(window.event, cb): page.plugin == field && list[index+1].focus())
             })
@@ -828,7 +836,7 @@ function Plugin(page, pane, field, run) {
             }, 1000)
             event.Plugin = plugin, run(event, args, function(msg) {
                 page.footer.Pane.State("ncmd", kit.History.get("cmd").length)
-                plugin.msg = msg, plugin.display(display.deal, cb)
+                plugin.msg = msg, plugin.display(deal, cb)
                 show = false, page.ontoast("")
             })
         },
@@ -837,9 +845,17 @@ function Plugin(page, pane, field, run) {
             output.innerHTML = ""
         },
         display: function(arg, cb) {
-            display.deal = arg, plugin.ondaemon[display.deal||"table"](plugin.msg, cb)
+            deal = arg, plugin.ondaemon[deal||"table"](plugin.msg, cb)
         },
         ondaemon: {
+            inner: function(msg, cb) {
+                output.style.maxWidth = pane.target.clientWidth-20+"px"
+                output.style.maxHeight = pane.target.clientHeight-60+"px"
+                output.innerHTML = "", msg.append? kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
+                    page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
+                }): (output.innerHTML = msg.result.join(""))
+                typeof cb == "function" && cb(msg)
+            },
             table: function(msg, cb) {
                 output.innerHTML = ""
                 !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
@@ -849,7 +865,7 @@ function Plugin(page, pane, field, run) {
                 typeof cb == "function" && cb(msg)
             },
             editor: function(msg, cb) {
-                (output.innerHTML = "", Editor(plugin, option, output, output.clientWidth-40, 400, 10, msg))
+                (output.innerHTML = "", Editor(run, plugin, option, output, output.clientWidth-40, 400, 10, msg))
             },
             canvas: function(msg, cb) {
                 typeof cb == "function" && !cb(msg) || (output.innerHTML = "", Canvas(plugin, option, output, pane.target.clientWidth-45, pane.target.clientHeight-175, 10, msg))
@@ -882,6 +898,9 @@ function Plugin(page, pane, field, run) {
                 name != "path" && (value = line.path)
                 return value
             },
+            tip: function(value, name, line) {
+                return option.tip.value + value
+            },
         },
         onaction: {
             onfocus: function(event, action, type, name, item) {
@@ -893,9 +912,8 @@ function Plugin(page, pane, field, run) {
             onclick: function(event, action, type, name, item) {
                 switch (type) {
                     case "button":
-                        plugin.Select(true)
                         action[item.click]? action[item.click](event, item, option, field):
-                            plugin[item.click]? plugin[item.click](event, item, option, field): plugin.Runs(event)
+                            plugin[item.click]? plugin[item.click](event, item, option, field): plugin.Check()
                         break
                     case "text":
                         if (event.ctrlKey) {
@@ -908,7 +926,7 @@ function Plugin(page, pane, field, run) {
                 action.target.value = kit.History.get("txt", -1).data.trim()
             },
             onchange: function(event, action, type, name, item) {
-                plugin.Check(action)
+                plugin.Check(item.action == "auto"? undefined: action)
             },
             onkeyup: function(event, action, type, name, item) {
                 switch (event.key) {

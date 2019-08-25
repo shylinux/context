@@ -5,7 +5,6 @@ import (
 
 	"contexts/ctx"
 	"contexts/web"
-	"toolkit"
 
 	"bytes"
 	"html/template"
@@ -47,16 +46,17 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		}, Help: "组件列表"},
 
 		"level": &ctx.Config{Name: "level", Value: "local/wiki/自然/编程", Help: "路由数量"},
+		"class": &ctx.Config{Name: "class", Value: "", Help: "路由数量"},
 		"favor": &ctx.Config{Name: "favor", Value: "index.md", Help: "路由数量"},
 	},
 	Commands: map[string]*ctx.Command{
 		"tree": &ctx.Command{Name: "tree", Help: "目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmdy("nfs.dir", path.Join(m.Confx("level"), kit.Select(m.Option("class"), arg, 0)),
+			m.Cmdy("nfs.dir", path.Join(m.Confx("level"), m.Confx("class", arg, 0)),
 				"time", "size", "line", "file", "dir_sort", "time", "time_r")
 			return
 		}},
 		"text": &ctx.Command{Name: "text", Help: "文章", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			which := m.Cmdx("nfs.path", path.Join(m.Confx("level"), m.Option("class"), m.Confx("favor", arg, 0)))
+			which := m.Cmdx("nfs.path", path.Join(m.Confx("level"), m.Confx("class", arg, 1), m.Confx("favor", arg, 0)))
 
 			buffer := bytes.NewBuffer([]byte{})
 			template.Must(template.ParseFiles(which)).Funcs(ctx.CGI).Execute(buffer, m)

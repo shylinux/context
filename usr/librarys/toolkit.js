@@ -733,7 +733,7 @@ kit = toolkit = {
     },
 }
 
-function Editor(plugin, option, output, width, height, space, msg) {
+function Editor(run, plugin, option, output, width, height, space, msg) {
     exports = ["dir", "path", "dir"]
     msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
         page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
@@ -747,10 +747,10 @@ function Editor(plugin, option, output, width, height, space, msg) {
         ], function(value, event) {
             switch (value) {
                 case "追加":
-                    field.Run(event, args.concat(["dir_sed", "add"]))
+                    run(event, args.concat(["dir_sed", "add"]))
                     break
                 case "提交":
-                    field.Run(event, args.concat(["dir_sed", "put"]))
+                    run(event, args.concat(["dir_sed", "put"]))
                     break
                 case "取消":
                     break

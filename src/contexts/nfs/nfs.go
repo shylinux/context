@@ -619,6 +619,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					return sed(m, arg[0], args)
 				}
 
+				skip, find := false, false
 				m.Confm("pwd", func(index int, value string) bool {
 					// p := path.Join(value, m.Option("dir_root"), arg[0])
 					p := path.Join(value, arg[0])
@@ -650,11 +651,24 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							m.Append("file", p)
 							m.Append("size", s.Size())
 							m.Append("time", s.ModTime().Format(m.Conf("time", "format")))
+							skip = true
 						}
+
+						find = true
 						return true
 					}
 					return false
 				})
+
+				if !find && arg[0] != "" {
+					if strings.HasSuffix(arg[0], "/") {
+						m.Assert(os.MkdirAll(arg[0], 0777))
+						m.Echo(arg[0])
+					} else if f, p, e := kit.Create(arg[0]); m.Assert(e) {
+						f.Close()
+						m.Echo(p)
+					}
+				}
 
 				if m.Has("dir_sort") {
 					m.Sort(m.Meta["dir_sort"][0], m.Meta["dir_sort"][1:]...)
@@ -664,7 +678,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					for _, v := range m.Meta[m.Meta["append"][0]] {
 						m.Echo(v).Echo(" ")
 					}
-				} else {
+				} else if !skip {
 					m.Table()
 				}
 				return

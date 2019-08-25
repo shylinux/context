@@ -408,6 +408,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Push("init", "")
 					}
 					m.Push("inputs", kit.Format(value["inputs"]))
+					m.Push("feature", kit.Format(value["feature"]))
 					m.Push("exports", kit.Format(value["exports"]))
 					m.Push("display", kit.Format(value["display"]))
 				})
