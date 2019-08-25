@@ -34,9 +34,10 @@ func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 }
 func (c *Context) Plugin(s *Context, args []string) string {
 	c.Register(s, nil)
-	m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}
-	kit.DisableLog = true
-	m.Option("log.disable", true)
+	m := Pulse.Spawn(s)
+	// m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}
+	// kit.DisableLog = true
+	// m.Option("log.disable", true)
 	m.Option("bio.modal", "action")
 
 	if len(args) == 0 {

@@ -1088,7 +1088,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
 				"cmd_daemon", "true",
 			}
-			if m.Assert(os.MkdirAll(p, 0666)); m.Conf("runtime", "host.GOOS") == "windows" {
+			if m.Assert(os.MkdirAll(p, 0777)); m.Conf("runtime", "host.GOOS") == "windows" {
 				m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "start", args)
 			} else {
 				m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), args)

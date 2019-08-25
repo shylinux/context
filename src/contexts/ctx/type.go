@@ -118,6 +118,9 @@ func (m *Message) Target() *Context {
 }
 
 func (m *Message) Insert(meta string, index int, arg ...interface{}) string {
+	if m == nil {
+		return ""
+	}
 	if m.Meta == nil {
 		m.Meta = make(map[string][]string)
 	}
@@ -498,8 +501,9 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 
 	} else if strings.Contains(key, ".") {
 		arg := strings.Split(key, ".")
-		msg, key = msg.Sess(arg[0]), arg[1]
-		msg.Option("remote_code", "")
+		if msg, key = msg.Sess(arg[0]), arg[1]; msg != nil {
+			msg.Option("remote_code", "")
+		}
 	}
 	if msg == nil {
 		return msg

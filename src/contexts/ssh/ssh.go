@@ -435,6 +435,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				if m.Confs("runtime", "boot.ctx_ups") {
 					m.Cmd("ssh.remote", "dial", m.Conf("runtime", "boot.ctx_ups"))
+					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "boot.ssh_port"))
+					m.Cmd("web.serve", "usr", m.Conf("runtime", "boot.web_port"))
 
 				} else if m.Cmd("ssh.remote", "dial", "dev", "/shadow"); !m.Confs("runtime", "boot.ctx_box") {
 					m.Cmd("ssh.remote", "listen", m.Conf("runtime", "boot.ssh_port"))
