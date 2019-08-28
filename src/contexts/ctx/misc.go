@@ -55,7 +55,7 @@ func (m *Message) Show(str string, args ...interface{}) *Message {
 	res := fmt.Sprintf(str, args...)
 
 	if m.Option("bio.modal") == "action" {
-		fmt.Printf(res)
+		fmt.Fprintf(os.Stderr, res)
 	} else if kit.STDIO != nil {
 		kit.STDIO.Show(res)
 	} else {

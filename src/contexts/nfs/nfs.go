@@ -574,6 +574,12 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return
 			}
 
+			p := path.Join("src/plugin", m.Option("plugin"), arg[0])
+			if _, e := os.Stat(p); e == nil {
+				m.Echo(p)
+				return e
+			}
+
 			m.Confm("pwd", func(index int, value string) bool {
 				p := path.Join(value, arg[0])
 				if _, e := os.Stat(p); e == nil {
@@ -609,7 +615,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"dir": &ctx.Command{Name: "dir [path [fields...]]", Help: []string{
 			"查看目录, path: 路径, fields...: 查询字段, time|type|full|path|name|tree|size|line|hash|hashs",
 			"dir_deep: 递归查询", "dir_type both|file|dir|all: 文件类型", "dir_reg reg: 正则表达式", "dir_sort field order: 排序"},
-			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2, "dir_sed": -1},
+			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2, "dir_sed": -1, "dir_select": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if len(arg) == 0 {
 					arg = append(arg, "")
@@ -679,7 +685,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						m.Echo(v).Echo(" ")
 					}
 				} else if !skip {
-					m.Table()
+					if m.Has("dir_select") {
+						m.Cmd("select", m.Meta["dir_select"])
+					} else {
+						m.Table()
+					}
 				}
 				return
 			}},

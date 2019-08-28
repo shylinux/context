@@ -203,12 +203,12 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Append("NumCPU", runtime.NumCPU())
 				m.Append("NumGo", runtime.NumGoroutine())
 				m.Append("NumGC", mem.NumGC)
-				m.Append("other", kit.FmtSize(mem.OtherSys))
-				m.Append("stack", kit.FmtSize(mem.StackSys))
-				m.Append("heapsys", kit.FmtSize(mem.HeapSys))
-				m.Append("heapidle", kit.FmtSize(mem.HeapIdle))
-				m.Append("heapinuse", kit.FmtSize(mem.HeapInuse))
-				m.Append("heapalloc", kit.FmtSize(mem.HeapAlloc))
+				m.Append("other", kit.FmtSize(int64(mem.OtherSys)))
+				m.Append("stack", kit.FmtSize(int64(mem.StackSys)))
+				m.Append("heapsys", kit.FmtSize(int64(mem.HeapSys)))
+				m.Append("heapidle", kit.FmtSize(int64(mem.HeapIdle)))
+				m.Append("heapinuse", kit.FmtSize(int64(mem.HeapInuse)))
+				m.Append("heapalloc", kit.FmtSize(int64(mem.HeapAlloc)))
 				m.Append("objects", mem.HeapObjects)
 				m.Append("lookups", mem.Lookups)
 				m.Table()
@@ -248,6 +248,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_temp":    -1,
 			"cmd_parse":   2,
 			"cmd_error":   0,
+			"cmd_select":   -1,
 			"app_log":     1,
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 管道参数
@@ -442,6 +443,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						}
 					}
 					m.Echo(out.String())
+				}
+				if m.Has("cmd_select") {
+					m.Cmd("select", m.Meta["cmd_select"])
 				}
 			})
 
@@ -962,7 +966,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 加载模块
 				if p, e := plugin.Open(path.Join(m.Conf("publish", "path"), arg[0], "index.so")); e == nil {
 					if s, e := p.Lookup("Index"); m.Assert(e) {
-						m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0])).Cmd("_init", arg[1:])
+						m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0]).Begin(m, arg[1:]...)).Cmd("_init", arg[1:])
 					}
 				}
 
@@ -974,7 +978,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				// 查找脚本
-				p := msg.Cmdx("nfs.path", path.Join(msg.Conf("project", "plugin.path"), arg[0], "index.shy"))
+				p := m.Cmdx("nfs.path", path.Join(msg.Conf("project", "plugin.path"), arg[0], "index.shy"))
 				if p == "" {
 					p = m.Cmdx("nfs.hash", m.Cmdx("web.get", "dev", fmt.Sprintf("publish/%s", arg[0]),
 						"GOARCH", m.Conf("runtime", "host.GOARCH"),

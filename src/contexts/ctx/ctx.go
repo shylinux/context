@@ -26,7 +26,7 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	m.Option("log.disable", true)
 	m.Option("ctx.chain", "aaa", "ssh", "cli", "nfs")
 
-	m.Option("table.limit", 10)
+	m.Option("table.limit", 30)
 	m.Option("table.offset", 0)
 	m.Optionv("ctx.form", map[string]int{
 		"table.limit": 1, "table.offset": 1,
@@ -89,7 +89,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		}, Help: "时间参数"},
 		"table": &Config{Name: "table", Value: map[string]interface{}{
 			"space": " ", "compact": "false", "col_sep": " ", "row_sep": "\n",
-			"offset": 0, "limit": 10,
+			"offset": 0, "limit": 30,
 		}, Help: "制表"},
 		"call_timeout": &Config{Name: "call_timeout", Value: "60s", Help: "回调超时"},
 	},
@@ -839,7 +839,6 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					msg.Push(k, kit.Select("", arg, i))
 				}
 			}
-			msg.Log("fuck", "waht %v", msg.Meta)
 			return
 		}},
 		"option": &Command{Name: "option", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {

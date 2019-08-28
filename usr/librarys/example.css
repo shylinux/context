@@ -48,6 +48,9 @@ fieldset>form.option div.cmd input.args {
     background-color: black;
     width:160px;
 }
+fieldset>form.option div.tiny input.args {
+    width:20px;
+}
 fieldset>form.option div.long input.args {
     width:240px;
 }

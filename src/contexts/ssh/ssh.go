@@ -275,7 +275,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			case "trust":
 				if len(arg) > 1 {
-					m.Conf("trust", arg[1], kit.Right(arg[2]))
+					m.Conf("trust", arg[1], kit.Right(kit.Select("true", arg, 2)))
 				}
 				if len(arg) > 1 {
 					m.Cmdy("ctx.config", "trust", arg[1])
@@ -352,6 +352,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			switch arg[0] {
 			case "run":
+				m.Option("plugin", arg[1])
 				tool := m.Confm("componet", []string{arg[1], arg[2]})
 				if m.Option("userrole") != "root" {
 					switch kit.Format(tool["componet_type"]) {
@@ -376,10 +377,15 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				arg = arg[4:]
 				args := []string{}
 				for _, v := range kit.Trans(tool["componet_args"]) {
-					if v == "$$" {
+					if strings.HasPrefix(v, "__") {
 						if len(arg) > 0 {
-							args = append(args, arg[0])
-							arg = arg[1:]
+							args, arg = append(args, arg...), nil
+						} else {
+							args = append(args, "")
+						}
+					} else if strings.HasPrefix(v, "_") {
+						if len(arg) > 0 {
+							args, arg = append(args, arg[0]), arg[1:]
 						} else {
 							args = append(args, "")
 						}

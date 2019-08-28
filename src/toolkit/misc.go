@@ -58,7 +58,7 @@ func Split(str string, n int) []string {
 	}
 	return res
 }
-func FmtSize(size uint64) string {
+func FmtSize(size int64) string {
 	if size > 1<<30 {
 		return fmt.Sprintf("%d.%dG", size>>30, (size>>20)%1024*100/1024)
 	}
@@ -73,15 +73,19 @@ func FmtSize(size uint64) string {
 
 	return fmt.Sprintf("%dB", size)
 }
-func FmtTime(time int64) string {
+func FmtTime(t int64) string {
+	sign, time := "", t
+	if time < 0 {
+		sign, time = "-", -t
+	}
 	if time > 1000000000 {
-		return fmt.Sprintf("%d.%ds", time/1000000000, (time/1000000)%1000*100/1000)
+		return fmt.Sprintf("%s%d.%ds", sign, time/1000000000, (time/1000000)%1000*100/1000)
 	}
 	if time > 1000000 {
-		return fmt.Sprintf("%d.%dms", time/1000000, (time/1000)%1000*100/1000)
+		return fmt.Sprintf("%s%d.%dms", sign, time/1000000, (time/1000)%1000*100/1000)
 	}
 	if time > 1000 {
-		return fmt.Sprintf("%d.%dus", time/1000, (time/1000)%1000*100/1000)
+		return fmt.Sprintf("%s%d.%dus", sign, time/1000, (time/1000)%1000*100/1000)
 	}
-	return fmt.Sprintf("%dns", time)
+	return fmt.Sprintf("%s%dns", sign, time)
 }

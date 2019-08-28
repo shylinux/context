@@ -1081,7 +1081,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			m.Log("stack", "push %v", p.String("\\"))
 
 			if len(arg) > 2 {
-				m.Cmd("kit", "kit", arg[5], arg[1:5], arg[1], arg[6:])
+				m.Cmd("kit", "kit", arg[1:6], arg[1], arg[6:])
 			}
 			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
 			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -1147,11 +1147,11 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 
 			m.Confv("_index", []interface{}{-2}, map[string]interface{}{
-				"componet_type": kit.Select("public", arg, 1),
-				"componet_name": kit.Select("", arg, 2),
-				"componet_help": kit.Select("", arg, 3),
-				"componet_view": kit.Select("componet", arg, 4),
-				"componet_init": kit.Select("", arg, 5),
+				"componet_type": kit.Select("public", arg, 5),
+				"componet_name": kit.Select("", arg, 1),
+				"componet_help": kit.Select("", arg, 2),
+				"componet_view": kit.Select("componet", arg, 3),
+				"componet_init": kit.Select("", arg, 4),
 
 				"componet_ctx":  m.Cap("module"),
 				"componet_cmd":  kit.Select("", arg, 6),
