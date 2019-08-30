@@ -37,10 +37,12 @@ syn match shyCommand    "\(^\|\t\|  \|$(\)[a-zA-Z0-9_\.]\+\>"
 
 syn match shyOperator    "option"
 
+call Keys("Statment", ["fun", "kit"])
+call Keys("SubCommand", ["private", "protected", "public"])
+
 call Keys("Statment", ["config", "cache"])
 call Keys("Statment", ["return", "source"])
 call Keys("Statment", ["var", "let"])
-call Keys("Statment", ["fun", "kit"])
 call Keys("Statment", ["if", "else", "else if", "for", "end"])
 call Keys("Statment", ["label", "goto"])
 " context nfs

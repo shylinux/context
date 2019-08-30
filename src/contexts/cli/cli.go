@@ -93,32 +93,31 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
 			"github":  "https://github.com/shylinux/context",
-			"goproxy": "https://goproxy.cn", "import": []interface{}{
-				"github.com/nsf/termbox-go",
-				"github.com/gomodule/redigo/redis",
-				"github.com/go-sql-driver/mysql",
-				"github.com/gomarkdown/markdown",
-				"gopkg.in/gomail.v2",
-				"github.com/skip2/go-qrcode",
-				"github.com/PuerkitoBio/goquery",
-				"github.com/go-cas/cas",
-			}, "plugin": map[string]interface{}{
+			"goproxy": "https://goproxy.cn",
+			"plugin": map[string]interface{}{
 				"path": "src/plugin", "list": Template,
 			}, "script": map[string]interface{}{
 				"path": "usr/script",
+			}, "trash": map[string]interface{}{
+				"path": "usr/trash",
 			},
 		}, Help: "项目管理"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
-			"bench": "src/extend/bench.go", "list": []interface{}{
+			"name": "bench", "bench": "src/extend/bench.go", "list": []interface{}{
 				map[string]interface{}{"os": "linux", "cpu": "arm"},
 				map[string]interface{}{"os": "linux", "cpu": "386"},
 				map[string]interface{}{"os": "linux", "cpu": "amd64"},
 				map[string]interface{}{"os": "windows", "cpu": "386"},
 				map[string]interface{}{"os": "windows", "cpu": "amd64"},
 				map[string]interface{}{"os": "darwin", "cpu": "amd64"},
+			}, "tmp": "var/tmp/go", "dep": []interface{}{
+				"github.com/nfs/termbox-go",
+				"github.com/go-sql-driver/mysql",
+				"github.com/redigo/redis",
+				"github.com/gomarkdown/markdown",
+				"github.com/skip2/go-qrcode",
+				"gopkg.in//gomail.v2",
 			},
-			"env": []interface{}{"GOBIN", "GOPATH", "PATH"},
-			"tmp": "var/tmp/go",
 		}, Help: "源码编译"},
 		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
 			"path": "usr/publish", "list": map[string]interface{}{
@@ -126,6 +125,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"zone_sh":    "bin/zone.sh",
 				"user_sh":    "bin/user.sh",
 				"node_sh":    "bin/node.sh",
+
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
 				"exit_shy":   "etc/exit.shy",
@@ -149,6 +149,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"zone_sh":    "bin/zone.sh",
 				"user_sh":    "bin/user.sh",
 				"node_sh":    "bin/node.sh",
+
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
 				"exit_shy":   "etc/exit.shy",
@@ -158,7 +159,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "服务升级"},
 		"missyou": &ctx.Config{Name: "missyou", Value: map[string]interface{}{
-			"path": "usr/local/work", "local": "usr/local",
+			"path": "usr/local/work",
 		}, Help: "任务管理"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -166,7 +167,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Conf("runtime", "host.GOARCH", runtime.GOARCH)
 			m.Conf("runtime", "host.GOOS", runtime.GOOS)
 			m.Conf("runtime", "host.pid", os.Getpid())
-			runtime.GOMAXPROCS(1)
 
 			m.Confm("runtime", "init", func(index int, key string) {
 				if value := os.Getenv(key); value != "" {
@@ -747,136 +747,139 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 
-		"project": &ctx.Command{Name: "project init|stat|import|plugin", Help: "项目管理, ", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"project": &ctx.Command{Name: "project init|stat|trend|submit|review|plugin [args...]", Help: "项目管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "init":
 				if _, e := os.Stat(".git"); e == nil {
+					// 更新代码
 					m.Cmdp(0, []string{"git update"}, []string{"cli.system", "git"}, [][]string{
-						[]string{"git", "stash"}, []string{"git", "pull"}, []string{"git", "stash", "pop"},
+						[]string{"stash"}, []string{"pull"}, []string{"stash", "pop"},
 					})
-					m.Cmdy("nfs.git", "status")
+
+					// 更新依赖
+					list := [][]string{}
+					m.Confm("compile", "dep", func(index int, value string) {
+						list = append(list, []string{value})
+					})
+					m.Cmdp(0, []string{"go build"}, []string{"cli.system", "go", "get"}, list)
+
+					// 代码状态
+					m.Cmdy("cli.system", "git", "status", "-sb", "cmd_parse", "cut")
 					return e
 				}
+
+				// 创建项目
 				m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
 					[]string{"init"}, []string{"remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
 					[]string{"stash"}, []string{"pull"}, []string{"checkout", "-f", "master"}, []string{"stash", "pop"},
 				})
 
 			case "stat":
+				// 代码统计
 				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
 
 			case "trend":
+				// 提交记录
 				m.Cmdy("nfs.git", "sum", "-n", kit.Select("20", arg, 1))
 
-			case "review":
-				m.Cmdy("nfs.git", "diff")
-
 			case "submit":
+				// 提交代码
 				if len(arg) > 1 {
 					m.Cmdp(0, []string{"git submit"}, []string{"cli.system", "git"}, [][]string{
 						[]string{"commit", "-am", arg[1]}, []string{"push"},
 					})
 				}
+				// 提交记录
 				m.Cmdy("nfs.git", "logs", "table.limit", "3")
 
-			case "import":
-				list := [][]string{}
-				m.Confm("project", "import", func(index int, value string) {
-					list = append(list, []string{value})
-					m.Add("append", "time", m.Time())
-					m.Add("append", "package", value)
-				})
-				m.Table()
-
-				m.Cmdp(time.Second, []string{"go init"}, []string{"cli.system", "go", "get",
-					"cmd_env", "GOPROXY", m.Conf("project", "goproxy"),
-					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_path")}, list)
+			case "review":
+				// 代码修改
+				m.Cmdy("cli.system", "git", "diff")
 
 			case "plugin":
+				// 查看插件
 				if arg = arg[1:]; len(arg) == 0 {
 					m.Cmdy("nfs.dir", m.Conf("project", "plugin.path"), "time", "line", "name")
 					break
 				}
 				fallthrough
 			default:
+				// 创建插件
 				p := path.Join(m.Conf("project", "plugin.path"), arg[0])
 				if _, e := os.Stat(p); os.IsNotExist(e) && m.Assert(os.MkdirAll(p, 0777)) {
 					m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
 						ioutil.WriteFile(path.Join(p, kit.Format(value["name"])), []byte(kit.Format(value["text"])), 0666)
 					})
 				}
+				// 插件列表
 				m.Cmdy("nfs.dir", p, "time", "line", "hashs", "path")
 			}
 			return
 		}},
-		"compile": &ctx.Command{Name: "compile all|self|[[[plugin] name] [OS [ARCH]]]", Help: "源码编译", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			wd, _ := os.Getwd()
+		"compile": &ctx.Command{Name: "compile all|self|linux|windows|darwin|restart|plugin", Help: "项目编译", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "all":
+				// 所有版本
 				list := [][]string{}
 				m.Confm("compile", "list", func(index int, value map[string]interface{}) {
 					list = append(list, []string{kit.Format(value["os"]), kit.Format(value["cpu"])})
 				})
 				m.Cmdp(0, []string{"go build"}, []string{"cli.compile"}, list)
-				m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_reg", "bench")
 
 			case "self":
-				env := []string{
-					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),
-					"cmd_env", "GOCACHE", path.Join(wd, m.Conf("compile", "tmp")),
-				}
-				m.Confm("compile", "env", func(index int, key string) {
-					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
-				})
-
+				// 编译版本
 				m.Cmd("cli.version", "create")
-				os.MkdirAll(m.Conf("compile", "tmp"), 0777)
 
-				p, q := path.Join(m.Conf("runtime", "boot.ctx_home"), m.Conf("compile", "bench")), path.Join(kit.Select(os.Getenv("GOBIN"), ""), "bench")
-				if m.Cmdy("cli.system", env, "go", "build", "-o", q, p); m.Result(0) == "" {
-					m.Cmdy("cli.quit", 1)
-					m.Append("time", m.Time())
-					m.Append("cost", m.Format("cost"))
-					m.Append("hash", kit.Hashs(q)[:8])
-					m.Append("bin", q)
-					m.Table()
+				// 编译项目
+				if m.Cmdy("cli.compile", ""); m.Has("bin") {
+					target := path.Join(kit.Select(os.Getenv("GOBIN"), ""), m.Conf("compile", "name"))
+					os.Remove(target)
+					m.Append("bin", m.Cmdx("nfs.copy", target, m.Append("bin")))
+					os.Chmod(target, 0777)
+					m.Cmd("cli.quit", 1)
 				}
 
 			case "restart":
+				// 重启项目
 				m.Cmdy("cli.quit", "1")
 
 			case "plugin":
-				arg = arg[1:]
-				if len(arg) == 0 {
+				// 插件列表
+				if arg = arg[1:]; len(arg) == 0 {
 					m.Cmdy("nfs.dir", m.Conf("publish", "path"), "dir_deep", "dir_reg", ".*\\.so", "time", "size", "hashs", "path")
 					break
 				}
 				fallthrough
 			default:
+				// 编译插件
 				p, q, o := path.Join(m.Conf("project", "plugin.path"), arg[0], "index.go"), "", []string{}
 				if _, e := os.Stat(p); e == nil {
 					q = path.Join(m.Conf("publish", "path"), arg[0], "index.so")
-					o = []string{"-buildmode=plugin"}
+					o = append(o, "-buildmode=plugin")
 					arg = arg[1:]
 				}
 
+				// 目标系统
 				goos := kit.Select(m.Conf("runtime", "host.GOOS"), arg, 0)
 				arch := kit.Select(m.Conf("runtime", "host.GOARCH"), arg, 1)
 
+				// 编译环境
+				tmp := path.Join(kit.Pwd(), m.Conf("compile", "tmp"))
 				os.MkdirAll(m.Conf("compile", "tmp"), 0777)
-				env := []string{"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch,
-					"cmd_env", "GOTMPDIR", path.Join(wd, m.Conf("compile", "tmp")),
-					"cmd_env", "GOCACHE", path.Join(wd, m.Conf("compile", "tmp")),
+				env := []string{
+					"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch,
+					"cmd_env", "GOTMPDIR", tmp, "cmd_env", "GOCACHE", tmp,
+					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_home")+":"+os.Getenv("GOPATH"),
+					"cmd_env", "PATH", os.Getenv("PATH"),
 				}
-				m.Confm("compile", "env", func(index int, key string) {
-					env = append(env, "cmd_env", key, kit.Select(os.Getenv(key), m.Option(key)))
-				})
 
+				// 编译目标
 				if q == "" {
-					q = path.Join(m.Conf("publish", "path"), strings.Join([]string{"bench", goos, arch}, "."))
+					q = path.Join(m.Conf("publish", "path"), strings.Join([]string{m.Conf("compile", "name"), goos, arch}, "."))
 					p = m.Cmdx("nfs.path", m.Conf("compile", "bench"))
 				}
 
+				// 编译项目
 				if m.Cmdy("cli.system", env, "go", "build", o, "-o", q, p); m.Result(0) == "" {
 					m.Append("time", m.Time())
 					m.Append("cost", m.Format("cost"))
@@ -887,17 +890,16 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
-		"publish": &ctx.Command{Name: "publish [item...]", Help: "版本发布", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			// 发布系统
+		"publish": &ctx.Command{Name: "publish [args...]", Help: "项目发布", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("publish", "list", func(key string, value string) {
 					arg = append(arg, strings.Replace(key, "_", ".", -1))
 				})
 			}
+
+			// 发布插件
 			p := path.Join(m.Conf("project", "plugin.path"), arg[0])
 			q := path.Join(m.Conf("publish", "path"), arg[0])
-
-			// 发布模块
 			if _, e := os.Stat(p); e == nil && m.Assert(os.MkdirAll(q, 0777)) {
 				m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
 					m.Cmd("nfs.copy", path.Join(q, kit.Format(value["name"])), path.Join(p, kit.Format(value["name"])))
@@ -929,35 +931,41 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Table()
 			return
 		}},
-		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|plugin|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|plugin|restart|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "upgrade")
 				return
 			}
-			switch arg[0] {
-			case "restart":
-				m.Cmd("cli.quit", "1")
 
+			switch arg[0] {
 			case "project":
 				m.Cmd("cli.project", "init")
 				m.Cmd("cli.compile", "all")
 				m.Cmd("cli.publish")
 
 			case "script":
+				// 脚本列表
 				if len(arg) == 1 {
 					m.Cmdy("nfs.dir", m.Conf("project", "script.path"), "time", "line", "hashs", "path")
 					break
 				}
+
+				// 局部脚本
 				miss := ""
 				if len(arg) > 2 {
 					miss, arg = arg[1], arg[1:]
 				}
+				// 下载脚本
 				for _, v := range arg[1:] {
-					m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", v),
-						"upgrade", "script", "missyou", miss, "save", path.Join("usr/script", v))
+					m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", v), "upgrade", "script",
+						"missyou", miss, "save", path.Join(m.Conf("project", "script.path"), v))
 				}
 
+			case "restart":
+				m.Cmdy("cli.quit", "1")
+
 			case "plugin":
+				// 模块列表
 				if arg = arg[1:]; len(arg) == 0 {
 					m.Cmdy("cli.context")
 					break
@@ -1009,11 +1017,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				for _, link := range kit.View([]string{arg[0]}, m.Confm("upgrade")) {
 					file := kit.Select(link, m.Conf("upgrade", []string{"list", strings.Replace(link, ".", "_", -1)}))
 
+					// 下载文件
 					m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", link),
 						"GOARCH", m.Conf("runtime", "host.GOARCH"),
 						"GOOS", m.Conf("runtime", "host.GOOS"),
 						"upgrade", arg[0], "save", file)
 
+					// 执行文件
 					if strings.HasPrefix(file, "bin/") {
 						if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
 							m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
@@ -1023,49 +1033,51 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 						restart = true
 					}
 
+					// 输出信息
 					m.Push("time", m.Time())
 					m.Push("cost", m.Format("cost"))
 					m.Push("hash", kit.Hashs(file)[:8])
 					m.Push("file", file)
 
+					// 压缩文件
 					if strings.HasSuffix(link, ".tar.gz") {
 						m.Cmd("cli.system", "tar", "-xvf", file, "-C", path.Dir(file))
+						os.Remove(file)
 					}
 				}
 
+				// 重启服务
 				if m.Table(); restart {
 					m.Cmd("cli.quit", 1)
 				}
 			}
-
 			return
 		}},
-		"missyou": &ctx.Command{Name: "missyou [name [stop]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"missyou": &ctx.Command{Name: "missyou [topic] [name [action]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			// 任务主题
 			topic := "hello"
 			if len(arg) > 0 && (arg[0] == "" || m.Cmds("nfs.path", path.Join(m.Conf("cli.project", "plugin.path"), arg[0]))) {
 				topic, arg = arg[0], arg[1:]
 			}
 
+			// 任务列表
 			if len(arg) == 0 {
-				m.Option("dir_root", "")
 				m.Cmd("nfs.dir", m.Conf("missyou", "path"), "time", "name").Table(func(value map[string]string) {
 					name := strings.TrimSuffix(value["name"], "/")
-					m.Add("append", "create_time", value["time"])
-					m.Add("append", "you", name)
-					if m.Confs("nfs.node", name) {
-						m.Add("append", "status", "start")
-					} else {
-						m.Add("append", "status", "stop")
-					}
+					m.Push("create_time", value["time"])
+					m.Push("you", name)
+					m.Push("status", kit.Select("stop", "start", m.Confs("nfs.node", name)))
 				})
 				m.Sort("you", "str_r").Sort("status").Table()
 				return
 			}
 
+			// 任务命名
 			if !strings.Contains(arg[0], "-") {
 				arg[0] = m.Time("20060102-") + arg[0]
 			}
 
+			// 任务管理
 			if m.Confs("ssh.node", arg[0]) {
 				switch kit.Select("", arg, 1) {
 				case "stop":
@@ -1076,27 +1088,24 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}
 
+			// 启动目录
 			p := path.Join(m.Conf("missyou", "path"), arg[0])
-			if _, e := os.Stat(p); e != nil {
-				m.Confm("missyou", "local", func(index string, local string) {
-					m.Cmd("nfs.git", "clone", local, path.Join(p, m.Conf("missyou", "local"), index))
-				})
-			}
+			m.Assert(os.MkdirAll(p, 0777))
 
+			// 启动参数
 			args := []string{
-				"daemon", "cmd_dir", p,
+				"daemon",
+				"cmd_dir", p,
+				"cmd_daemon", "true",
 				"cmd_env", "PATH", os.Getenv("PATH"),
 				"cmd_env", "ctx_type", kit.Select(topic, arg, 1),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
-				"cmd_daemon", "true",
 			}
-			if m.Assert(os.MkdirAll(p, 0777)); m.Conf("runtime", "host.GOOS") == "windows" {
-				m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "start", args)
-			} else {
-				m.Cmdy("cli.system", m.Conf("runtime", "boot.ctx_bin"), args)
-			}
+
+			// 启动服务
+			m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "start", args)
 			return
 		}},
 		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

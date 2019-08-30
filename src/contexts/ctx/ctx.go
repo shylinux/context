@@ -1,6 +1,7 @@
 package ctx
 
 import (
+	"runtime"
 	"toolkit"
 
 	"encoding/json"
@@ -1346,6 +1347,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 }
 
 func Start(args ...string) bool {
+	runtime.GOMAXPROCS(1)
+
 	if len(args) == 0 {
 		args = append(args, os.Args[1:]...)
 	}

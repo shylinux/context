@@ -376,7 +376,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			return
 		}},
 		"mux": &ctx.Command{Name: "mux [session [window [pane]]] args...", Help: "终端管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 { // 会话列表
+			// 会话列表
+			if len(arg) == 0 {
 				view := kit.View([]string{"session"}, m.Confm("mux", "view"))
 				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-sessions", "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
 					for j, col := range strings.Split(row, ",") {
@@ -391,7 +392,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				return
 			}
 
-			if len(arg) == 1 { //窗口列表
+			//窗口列表
+			if len(arg) == 1 {
 				view := kit.View([]string{"window"}, m.Confm("mux", "view"))
 				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-windows", "-t", arg[0], "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
 					for j, col := range strings.Split(row, ",") {
@@ -403,13 +405,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 
 			switch arg[1] {
-			case "create": // 创建会话
+			// 创建会话
+			case "create":
 				m.Cmdy("cli.system", "tmux", "new-session", "-s", arg[0], arg[2:], "-d", "cmd_env", "TMUX", "")
 				return
-			case "exist": // 创建会话
+			// 检查会话
+			case "exist":
 				m.Cmdy("cli.system", "tmux", "has-session", "-t", arg[0])
 				return
-			default: // 会话操作
+			// 会话操作
+			default:
 				if v := m.Confv("mux", []string{"bind", "1", arg[1]}); v != nil {
 					m.Cmdy("cli.system", "tmux", v, "-t", arg[0], arg[2:])
 					return
@@ -417,7 +422,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 
 			target := fmt.Sprintf("%s:%s", arg[0], arg[1])
-			if len(arg) == 2 { // 面板列表
+			// 面板列表
+			if len(arg) == 2 {
 				view := kit.View([]string{"pane"}, m.Confm("mux", "view"))
 				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-panes", "-t", target, "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
 					for j, col := range strings.Split(row, ",") {
@@ -429,19 +435,45 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 
 			switch arg[2] {
-			case "create": // 创建窗口
+			// 创建窗口
+			case "create":
 				m.Cmdy("cli.system", "tmux", "new-window", "-t", arg[0], "-n", arg[1], arg[3:])
 				return
-			default: // 窗口操作
+			// 窗口操作
+			default:
 				if v := m.Confv("mux", []string{"bind", "2", arg[2]}); v != nil {
 					m.Cmdy("cli.system", "tmux", v, arg[3:], "-t", target)
 					return
 				}
 			}
 
-			target = fmt.Sprintf("%s:%s.%s", arg[0], arg[1], arg[2])
-			if len(arg) == 3 {
+			// 面板内容
+			if target = fmt.Sprintf("%s:%s.%s", arg[0], arg[1], arg[2]); len(arg) == 3 {
 				m.Cmdy("cli.system", "tmux", "capture-pane", "-t", target, "-p")
+				return
+			}
+
+			switch arg[3] {
+			case "run":
+				m.Cmd("cli.system", "tmux", "send-keys", "-t", target, "clear", "Enter")
+				time.Sleep(kit.Duration(m.Conf("mux", "cmd_timeout")))
+				prompt := strings.TrimSpace(m.Cmdx("cli.system", "tmux", "capture-pane", "-t", target, "-p"))
+				m.Log("info", "wait for prompt %v", prompt)
+
+				m.Cmd("cli.system", "tmux", "send-keys", "-t", target, strings.Join(arg[4:], " "), "Enter")
+				for i := 0; i < 1000; i++ {
+					time.Sleep(kit.Duration(m.Conf("mux", "cmd_timeout")))
+					list := strings.Split(m.Cmdx("cli.system", "tmux", "capture-pane", "-t", target, "-p"), "\n")
+					m.Log("info", "current %v", list)
+					for j := len(list)-1; j >= 0; j-- {
+						if list[j] != "" {
+							if list[j] == prompt {
+								i = 1000
+							}
+							break
+						}
+					}
+				}
 				return
 			}
 

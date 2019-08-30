@@ -314,7 +314,6 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "key", "hash": "key", "word": []interface{}{"[A-Za-z_][A-Za-z_0-9]*"}},
 			map[string]interface{}{"page": "str", "hash": "str", "word": []interface{}{"mul{", "\"[^\"]*\"", "'[^']*'", "}"}},
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"mul{", "$", "@", "}", "opt{", "key", "}"}},
-			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"mul{", "$", "@", "}", "opt{", "num", "}"}},
 
 			// 表达式语句
 			map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-", "+", "}"}},
@@ -371,11 +370,11 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 		}, Help: "语法集合的最大数量"},
 		"input": &ctx.Config{Name: "input", Value: map[string]interface{}{
 			"text":     true,
-			"button":   true,
 			"select":   true,
+			"button":   true,
 			"textarea": true,
-			"feature":  true,
 			"exports":  true,
+			"feature":  true,
 		}, Help: "控件类型"},
 		"exec": &ctx.Config{Name: "info", Value: map[string]interface{}{
 			"disable": map[string]interface{}{
@@ -1093,18 +1092,38 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			p.Data = self
 			return
 		}},
-		"kit": &ctx.Command{Name: "kit type name help view init cmd arg... [input type name value [key val]...]...", Help: "kit", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"kit": &ctx.Command{Name: "kit name help [view [init]] [public|protected|private] cmd arg... [input value [key val]...]...", Help: "小功能", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Log("info", "_index: %v", arg)
+
 			args := []interface{}{}
 			inputs := []interface{}{}
-			feature := map[string]interface{}{}
 			exports := []interface{}{}
-			for i := 7; i < len(arg); i++ {
+			feature := map[string]interface{}{}
+
+			view, init, show, cmd := "", "", "", ""
+			begin := 3
+
+			switch arg[3] {
+			case "private", "protected", "public":
+				begin, show, cmd = 5, arg[3], arg[4]
+			default:
+				switch arg[4] {
+				case "private", "protected", "public":
+					begin, view, show, cmd = 6, arg[3], arg[4], arg[5]
+				default:
+					begin, view, init, show, cmd = 7, arg[3], arg[4], arg[5], arg[6]
+				}
+			}
+
+			if m.Confs("input", cmd) {
+				cmd, begin = arg[1], begin - 1
+			}
+
+			for i := begin; i < len(arg); i++ {
 				if !m.Confs("input", arg[i]) {
 					args = append(args, arg[i])
 					continue
 				}
-
 				for j := i; j < len(arg); j++ {
 					if j < len(arg)-1 && !m.Confs("input", arg[j+1]) {
 						continue
@@ -1147,18 +1166,18 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 
 			m.Confv("_index", []interface{}{-2}, map[string]interface{}{
-				"componet_type": kit.Select("public", arg, 5),
 				"componet_name": kit.Select("", arg, 1),
 				"componet_help": kit.Select("", arg, 2),
-				"componet_view": kit.Select("componet", arg, 3),
-				"componet_init": kit.Select("", arg, 4),
+				"componet_view": view,
+				"componet_init": init,
+				"componet_type": show,
 
 				"componet_ctx":  m.Cap("module"),
-				"componet_cmd":  kit.Select("", arg, 6),
+				"componet_cmd":  cmd,
 				"componet_args": args,
 				"inputs":        inputs,
-				"feature":       feature,
 				"exports":       exports,
+				"feature":       feature,
 			})
 			return
 		}},

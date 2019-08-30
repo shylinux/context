@@ -535,7 +535,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"list": []interface{}{},
 		}, Help: "文件搜索"},
 		"git": &ctx.Config{Name: "git", Value: map[string]interface{}{
-			"args":   []interface{}{"-C", "@git_dir"},
+			"args":   []interface{}{},
 			"info":   map[string]interface{}{"cmds": []interface{}{"log", "status", "branch"}},
 			"update": map[string]interface{}{"cmds": []interface{}{"stash", "pull", "pop"}},
 			"pop":    map[string]interface{}{"args": []interface{}{"stash", "pop"}},
@@ -627,7 +627,6 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 				skip, find := false, false
 				m.Confm("pwd", func(index int, value string) bool {
-					// p := path.Join(value, m.Option("dir_root"), arg[0])
 					p := path.Join(value, arg[0])
 					if s, e := os.Stat(p); e == nil {
 						if s.IsDir() {
@@ -702,15 +701,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			if p := m.Cmdx("nfs.path", arg[0]); p != "" && !m.Confs("git", arg[0]) {
 				m.Option("git_dir", p)
 				arg = arg[1:]
-			} else {
-				wd, e := os.Getwd()
-				m.Assert(e)
-				m.Option("git_dir", wd)
 			}
 
 			if len(arg) > 0 && arg[0] == "sum" {
-				args := []string{"-C", m.Option("git_dir"), "log", "--shortstat", "--pretty=commit: %ad", "--date=format:%Y-%m-%d %H:%M"}
-				if len(arg) > 1 {
+				args := []string{}
+				if m.Options("git_dir") {
+					args = append(args, "-C", m.Option("git_dir"))
+				}
+				if args = append(args, "log", "--shortstat", "--pretty=commit: %ad", "--date=iso"); len(arg) > 1 {
 					args = append(args, arg[1:]...)
 				} else {
 					args = append(args, "--reverse")
@@ -734,12 +732,14 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								m.Add("append", "adds", "0")
 								m.Add("append", "dels", adds[0])
 							}
+							m.Add("append", "hour", strings.Split(hs[1], ":")[0])
 							m.Add("append", "time", hs[1])
 						} else if len(l[0]) > 0 {
 							hs := strings.Split(l[0], " ")
 							m.Add("append", "date", hs[0])
 							m.Add("append", "adds", 0)
 							m.Add("append", "dels", 0)
+							m.Add("append", "hour", strings.Split(hs[1], ":")[0])
 							m.Add("append", "time", hs[1])
 						}
 					}
@@ -759,6 +759,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 			for _, cmd := range cmds {
 				args := append([]string{}, kit.Trans(m.Confv("git", "args"))...)
+				if m.Options("git_dir") {
+					args = append(args, "-C", m.Option("git_dir"))
+				}
 				if v := m.Confv("git", []string{cmd, "args"}); v != nil {
 					args = append(args, kit.Trans(v)...)
 				} else {

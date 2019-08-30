@@ -55,7 +55,7 @@ main() {
     trap HUP hup
     log "\nstarting..."
     while true; do
-        date && ${ctx_bin} "$@" 2>var/log/boot.log && break
+        date && ${ctx_bin} "$@" && break
         log "\n\nrestarting..." && sleep 1
     done
 }

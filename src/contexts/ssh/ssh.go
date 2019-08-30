@@ -380,8 +380,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					if strings.HasPrefix(v, "__") {
 						if len(arg) > 0 {
 							args, arg = append(args, arg...), nil
-						} else {
-							args = append(args, "")
 						}
 					} else if strings.HasPrefix(v, "_") {
 						if len(arg) > 0 {

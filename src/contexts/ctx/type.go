@@ -453,7 +453,7 @@ func (m *Message) Echo(str string, arg ...interface{}) *Message {
 
 func (m *Message) Cmdp(t time.Duration, head []string, prefix []string, suffix [][]string) *Message {
 	if head != nil && len(head) > 0 {
-		m.Show(strings.Join(head, " "), "...\n")
+		m.Show(fmt.Sprintf("[%s]...\n", strings.Join(head, " ")))
 	}
 
 	for i, v := range suffix {

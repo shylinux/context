@@ -1,6 +1,7 @@
 package ctx
 
 import (
+	"runtime"
 	"errors"
 	"fmt"
 	"io"
@@ -33,6 +34,8 @@ func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 	return s
 }
 func (c *Context) Plugin(s *Context, args []string) string {
+	runtime.GOMAXPROCS(8)
+
 	c.Register(s, nil)
 	m := Pulse.Spawn(s)
 	// m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}

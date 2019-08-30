@@ -1,98 +1,58 @@
 
-fun project "项目" "" "" \
-	private \
-    select "" values plugin values submit values review values trend values stat values init action auto \
+kit project "项目" private \
+    select "" values plugin values review values submit values trend values stat values init action auto \
 	text "" name see imports plugin_see action auto \
 	button "执行" \
     exports see name see
 
-	copy cli.project __
-end
-
-fun compile "编译" "" "" \
-	private \
+kit compile "编译" private \
     select "" values plugin values restart values windows values darwin values linux values self values all action auto \
 	text "" name see imports plugin_see \
 	button "编译"
 
-	copy cli.compile __
-end
-
-fun publish "发布" "" "" \
-	private \
+kit publish "发布" private \
 	text "" name see imports plugin_see \
 	button "发布"
 
-	copy cli.publish __
-end
-
-fun upgrade "升级" "" "" \
-	private \
+kit upgrade "升级" private "ssh._route" _ "cli.upgrade" \
 	text "" name pod imports plugin_pod \
     select "" values script values restart values plugin values bench values portal values system action auto \
 	text "" name see imports plugin_see \
 	button "升级"
 
-	copy ssh._route _ cli.upgrade __
-end
-
-fun missyou "任务" "" "" \
-	private \
+kit missyou "任务" private \
 	text "" name see imports plugin_see \
 	text "" name you view long \
 	button "行动" action auto \
     exports you "" you
 
-	copy cli.missyou __
-end
-
-fun pod "设备" "" "" \
-	private \
+kit pod "设备" private "ssh._route" _ "ssh.remote" __ \
 	text "" name pod view long \
 	button "行动" action auto \
     exports pod pod
 
-	copy ssh._route _ ssh.remote __
-end
-
-fun ctx "模块" "" "" \
-	private \
+kit ctx "模块" private "ssh._route" _ context _ list __ \
 	text "" name pod imports plugin_pod action auto view long \
 	text "nfs" name ctx imports plugin_ctx action auto \
 	button "行动" \
     exports ctx names
 
-	copy ssh._route _ context _ list __
-end
-
-fun cmd "命令" "" "" \
-	private \
+kit cmd "命令" private "ssh._route" _ context _ command __ \
 	text "" name pod imports plugin_pod \
 	text "nfs" name ctx imports plugin_ctx \
 	text "pwd" name cmd \
 	button "执行"
 
-	copy ssh._route _ context _ command __
-end
-
-fun dir "目录" "" "" \
-	private \
+kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
 	text "" name pod imports plugin_pod action auto \
 	text "usr/script" name dir imports plugin_dir action auto view long \
 	button "浏览" action auto \
     feature display "editor" \
     exports dir "" dir
 
-	copy ssh._route _ nfs.dir _ time size line path
-end
-
-fun git "版本" "" "" \
-	private \
+kit git "版本" private "ssh._route" _ "nfs.git" __ \
 	text "" name pod imports plugin_pod action auto \
     select "" values status values diff commit values values log values init action auto \
 	text "" name txt action auto \
 	button "查看" action auto
-
-	copy ssh._route _ nfs.git __
-end
 

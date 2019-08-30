@@ -1,7 +1,6 @@
 package web
 
 import (
-	"github.com/go-cas/cas"
 	"github.com/skip2/go-qrcode"
 
 	"contexts/ctx"
@@ -100,29 +99,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	// defer func() {
 	// msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
 	// }()
-	if msg.Confs("login", "cas") {
-		if !cas.IsAuthenticated(r) {
-			r.URL, _ = r.URL.Parse(r.Header.Get("index_url"))
-			msg.Log("info", "cas_login %v %v", r.URL, msg.Conf("spide", "cas.client.url"))
-			cas.RedirectToLogin(w, r)
-			return false
-		}
-
-		for k, v := range cas.Attributes(r) {
-			for _, val := range v {
-				msg.Add("option", k, val)
-			}
-		}
-
-		msg.Log("info", "cas_login %v", msg.Option("ticket"))
-		if msg.Options("ticket") {
-			msg.Option("username", cas.Username(r))
-			msg.Log("info", "login: %s", msg.Option("username"))
-			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
-			http.Redirect(w, r, merge(msg, r.Header.Get("index_url"), "ticket", ""), http.StatusTemporaryRedirect)
-			return false
-		}
-	} else if msg.Options("username") && msg.Options("password") {
+if msg.Options("username") && msg.Options("password") {
 		if msg.Cmds("aaa.auth", "username", msg.Option("username"), "password", msg.Option("password")) {
 			msg.Log("info", "login: %s", msg.Option("username"))
 			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("aaa.user", "session", "select"), Path: "/"})
@@ -360,20 +337,9 @@ func (web *WEB) Start(m *ctx.Message, arg ...string) bool {
 		return false
 	})
 
-	// SSO认证
-	var handler http.Handler
-	if cas_url, e := url.Parse(m.Cmdx("web.spide", "cas", "client", "url")); e == nil && cas_url.Host != "" {
-		m.Log("info", "cas url: %s", cas_url)
-		m.Conf("login", "cas", "true")
-		client := cas.NewClient(&cas.Options{URL: cas_url})
-		handler = client.Handle(web)
-	} else {
-		handler = web
-	}
-
 	// 启动服务
 	m.Log("info", "web: %s", m.Cap("address"))
-	web.Server = &http.Server{Addr: m.Cap("address"), Handler: handler}
+	web.Server = &http.Server{Addr: m.Cap("address"), Handler: web}
 	if m.Caps("master", true); m.Cap("protocol") == "https" {
 		web.Server.ListenAndServeTLS(m.Conf("runtime", "node.cert"), m.Conf("runtime", "node.key"))
 	} else {
