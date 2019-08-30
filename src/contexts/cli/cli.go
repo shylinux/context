@@ -776,7 +776,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			case "stat":
 				// 代码统计
-				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
+				m.Cmdy("nfs.dir", kit.Select("src", arg, 1), "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
+
+			case "stats":
+				// 代码统计
+				m.Cmdy("nfs.dir", kit.Select("src", arg, 1), "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r", "dir_select", "group", "")
 
 			case "trend":
 				// 提交记录
