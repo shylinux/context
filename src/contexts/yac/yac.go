@@ -314,6 +314,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "key", "hash": "key", "word": []interface{}{"[A-Za-z_][A-Za-z_0-9]*"}},
 			map[string]interface{}{"page": "str", "hash": "str", "word": []interface{}{"mul{", "\"[^\"]*\"", "'[^']*'", "}"}},
 			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"mul{", "$", "@", "}", "opt{", "key", "}"}},
+			map[string]interface{}{"page": "exe", "hash": "exe", "word": []interface{}{"mul{", "$", "@", "}", "opt{", "num", "}"}},
 
 			// 表达式语句
 			map[string]interface{}{"page": "op1", "hash": "op1", "word": []interface{}{"mul{", "-", "+", "}"}},
@@ -1075,12 +1076,12 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				}
 				return
 			}},
-		"fun": &ctx.Command{Name: "fun", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"fun": &ctx.Command{Name: "fun name help", Help: "小函数", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			p := m.Optionv("bio.stack").(*kit.Stack).Push(arg[0], false, m.Optioni("stack.pos"))
 			m.Log("stack", "push %v", p.String("\\"))
 
 			if len(arg) > 2 {
-				m.Cmd("kit", "kit", arg[1:6], arg[1], arg[6:])
+				m.Cmd("kit", "kit", arg[1:])
 			}
 			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
 			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -1092,7 +1093,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			p.Data = self
 			return
 		}},
-		"kit": &ctx.Command{Name: "kit name help [view [init]] [public|protected|private] cmd arg... [input value [key val]...]...", Help: "小功能", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"kit": &ctx.Command{Name: "kit name help [init [show]] [public|protected|private] cmd arg... [input value [key val]...]...", Help: "小功能", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Log("info", "_index: %v", arg)
 
 			args := []interface{}{}
@@ -1109,14 +1110,14 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			default:
 				switch arg[4] {
 				case "private", "protected", "public":
-					begin, view, show, cmd = 6, arg[3], arg[4], arg[5]
+					begin, init, show, cmd = 6, arg[3], arg[4], arg[5]
 				default:
-					begin, view, init, show, cmd = 7, arg[3], arg[4], arg[5], arg[6]
+					begin, init, view, show, cmd = 7, arg[3], arg[4], arg[5], arg[6]
 				}
 			}
 
 			if m.Confs("input", cmd) {
-				cmd, begin = arg[1], begin - 1
+				cmd, begin = arg[1], begin-1
 			}
 
 			for i := begin; i < len(arg); i++ {

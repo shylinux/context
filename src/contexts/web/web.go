@@ -99,7 +99,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	// defer func() {
 	// msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
 	// }()
-if msg.Options("username") && msg.Options("password") {
+	if msg.Options("username") && msg.Options("password") {
 		if msg.Cmds("aaa.auth", "username", msg.Option("username"), "password", msg.Option("password")) {
 			msg.Log("info", "login: %s", msg.Option("username"))
 			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("aaa.user", "session", "select"), Path: "/"})
@@ -657,25 +657,23 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				m.Log("info", "parse: %s content: %s", parse, ct)
 
 				switch {
-				// 解析数据
 				case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
+					// 解析数据
 					if json.NewDecoder(res.Body).Decode(&result); m.Options("temp_expire") {
 						if !m.Has("temp") {
 							m.Option("temp", "")
 						}
 						m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
-					} else {
+						break
+					} else if result != nil {
 						if b, e := json.MarshalIndent(result, "", "  "); m.Assert(e) {
 							m.Echo(string(b))
 						}
+						break
 					}
-
-				// 解析网页
-				case parse == "html":
-					parseHTML()
-
-				// 输出数据
+					fallthrough
 				default:
+					// 输出数据
 					if buf, e := ioutil.ReadAll(res.Body); m.Assert(e) {
 						m.Echo(string(buf))
 					}

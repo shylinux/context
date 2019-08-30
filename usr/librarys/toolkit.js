@@ -339,7 +339,7 @@ kit = toolkit = {
         var kit = this
         var tr = kit.AppendChild(table, "tr")
         fields.forEach(function(key, j) {
-            var td = kit.AppendChild(tr, "th", key)
+            var td = kit.AppendChild(tr, "th", kit.Color(key))
         })
         data.forEach(function(row, i) {
             var tr = kit.AppendChild(table, "tr", {className: "normal"})

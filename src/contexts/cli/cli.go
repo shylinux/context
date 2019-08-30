@@ -121,10 +121,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}, Help: "源码编译"},
 		"publish": &ctx.Config{Name: "publish", Value: map[string]interface{}{
 			"path": "usr/publish", "list": map[string]interface{}{
-				"boot_sh":    "bin/boot.sh",
-				"zone_sh":    "bin/zone.sh",
-				"user_sh":    "bin/user.sh",
-				"node_sh":    "bin/node.sh",
+				"boot_sh": "bin/boot.sh",
+				"zone_sh": "bin/zone.sh",
+				"user_sh": "bin/user.sh",
+				"node_sh": "bin/node.sh",
 
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
@@ -145,10 +145,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"list": map[string]interface{}{
 				"bench": "bin/bench.new",
 
-				"boot_sh":    "bin/boot.sh",
-				"zone_sh":    "bin/zone.sh",
-				"user_sh":    "bin/user.sh",
-				"node_sh":    "bin/node.sh",
+				"boot_sh": "bin/boot.sh",
+				"zone_sh": "bin/zone.sh",
+				"user_sh": "bin/user.sh",
+				"node_sh": "bin/node.sh",
 
 				"init_shy":   "etc/init.shy",
 				"common_shy": "etc/common.shy",
@@ -248,7 +248,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_temp":    -1,
 			"cmd_parse":   2,
 			"cmd_error":   0,
-			"cmd_select":   -1,
+			"cmd_select":  -1,
 			"app_log":     1,
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 管道参数
@@ -706,8 +706,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}},
 		"proc": &ctx.Command{Name: "proc", Help: "进程管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Cmdy("cli.system", "cmd_parse", "cut", "ps", kit.Select("ax", arg, 0))
-			if len(arg) > 0 {
+			m.Cmdy("cli.system", "ps", kit.Select("ax", arg, 0), "cmd_parse", "cut")
+			if len(arg) > 1 {
 				m.Cmd("select", "reg", "COMMAND", arg[1])
 			}
 			return
@@ -869,7 +869,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				env := []string{
 					"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch,
 					"cmd_env", "GOTMPDIR", tmp, "cmd_env", "GOCACHE", tmp,
-					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_home")+":"+os.Getenv("GOPATH"),
+					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_home") + ":" + os.Getenv("GOPATH"),
 					"cmd_env", "PATH", os.Getenv("PATH"),
 				}
 

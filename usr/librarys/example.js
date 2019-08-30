@@ -711,10 +711,11 @@ function Plugin(page, pane, field, runs) {
             })
 
             var count = kit.Selector(option, "args").length
-            args && count < args.length && (item.value = value||args[count++]||item.value||"")
+            args && count < args.length && (item.value = value||args[count++]||item.value||"");
 
-            item.title = item.title || item.name || ""
-            item.placeholder = item.title
+            (item.title || item.name) && (item.title = item.title || item.name)
+            item.title && (item.placeholder = item.title)
+
             name = item.name || "input"
             var input = {type: "input", name: name, data: item}
             switch (item.type) {
@@ -820,10 +821,11 @@ function Plugin(page, pane, field, runs) {
             }, time)
         },
         Check: function(target, cb) {
-            plugin.Select(true), option.querySelectorAll(".args").forEach(function(item, index, list) {
+            plugin.Select(true), kit.Selector(option, ".args", function(item, index, list) {
                 target == undefined && index == list.length-1 && plugin.Runs(window.event, cb)
                 item == target && (index == list.length-1? plugin.Runs(window.event, cb): page.plugin == field && list[index+1].focus())
-            })
+                return item
+            }).length == 0 && plugin.Runs(window.event, cb)
         },
         Runs: function(event, cb) {
             plugin.Run(event, kit.Selector(option, ".args", function(item, index) {return item.value}), cb)

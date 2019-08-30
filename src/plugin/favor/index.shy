@@ -1,24 +1,43 @@
 
-fun clip "粘贴板" "" "" \
-	public \
-	text "" name you imports plugin_you action auto \
-	text "" view long \
-	button "存储"
-
-	copy ssh._route $1 aaa.clip $2
-end
-
-fun qrcode "二维码" "" "index.js" \
-	public \
-	text "" view long \
+fun qrcode "二维码" "index.js" public \
+	text "" name txt view long \
 	button "生成"
 
-    let url = $1 || $referer
-    append qrcode $url
+    append qrcode ($1 || $referer)
 end
 
-fun salary "工资单" "" "" \
-	public \
+kit clip "粘贴板" public "ssh._route" _ "aaa.clip" \
+	text "" name you imports plugin_you action auto \
+	text "" name txt view long \
+	button "保存"
+
+kit macro "脚本宏" "macro.js" public \
+	text "" name mac imports plugin_mac action auto \
+	button "查看" \
+	button "全部" click "all" \
+	button "录制" click "Record" \
+	button "运行" click "Replay" \
+    exports mac name
+
+kit sys "命令行" public "nfs.source" \
+	textarea "" view long \
+	button "运行" \
+    exports mac name
+
+fun note "记事本" public \
+	text "" name tip imports plugin_tip view long action auto \
+	button "创建" action auto \
+    exports tip file tip \
+    feature display inner
+
+    if $1 == "" || $1 ~ ".*/$"
+        copy context wiki tree __
+    else
+        copy context wiki text __
+    end
+end
+
+fun salary "工资单" public \
 	text "9000" label total \
 	text "9000" label base \
 	button "计算"
@@ -49,47 +68,5 @@ fun salary "工资单" "" "" \
     append "失业保险" $job
     append "个税" $tax
     append "结余" $rest
-end
-
-fun macro "脚本宏" "" "macro.js" \
-	public \
-	text "" name mac imports plugin_mac action auto \
-	button "查看" \
-	button "全部" click "all" \
-	button "录制" click "Record" \
-	button "运行" click "Replay" \
-    exports mac name
-
-end
-
-fun sys "命令行" "" "" \
-	public \
-	textarea "" view long \
-	button "运行" \
-    exports mac name
-
-    copy nfs.source system __
-end
-
-fun note "记事本" "" "" \
-	public \
-	text "" name tip imports plugin_tip view long action auto \
-	button "创建" action auto \
-    feature display inner \
-    exports tip file tip
-
-    if $1 == "" || $1 ~ ".*/$"
-        copy context wiki tree __
-    else
-        copy context wiki text __
-    end
-end
-
-fun hello world "" "" \
-	public \
-	textarea "" \
-	button "执行"
-
-	copy pwd
 end
 
