@@ -231,8 +231,10 @@ var page = Page({
         var ui = kit.AppendChild(field, [{"view": ["input", "textarea"], "data": {"onkeyup": function(event){
             page.oninput(event), kit.isSpace(event.key) && field.Pane.which.set(event.target.value)
             event.key == "Enter" && !event.shiftKey && page.target.Pane.Send("text", event.target.value, field.Pane.clear)
+            event.stopPropagation()
         }, "onkeydown": function(event) {
-            event.key == "Enter" && !event.shiftKey && event.preventDefault()
+            event.key == "Enter" && !event.shiftKey
+            event.stopPropagation()
         }}}])
         return {
             Select: function() {

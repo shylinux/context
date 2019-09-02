@@ -700,6 +700,7 @@ function Plugin(page, pane, field, runs) {
     var feature = JSON.parse(meta.feature||'{}')
     var exports = JSON.parse(meta.exports||'["",""]')
     var deal = (feature && feature.display) || "table"
+    var history = []
 
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
@@ -739,6 +740,7 @@ function Plugin(page, pane, field, runs) {
 
             (typeof item.imports == "object"? item.imports: typeof item.imports == "string"? [item.imports]: []).forEach(function(imports) {
                 page.Sync(imports).change(function(value) {
+                    history.push({target: action.target, value: action.target.value});
                     (action.target.value = value) && item.action == "auto" && plugin.Runs(window.event)
                 })
             })
@@ -773,6 +775,10 @@ function Plugin(page, pane, field, runs) {
             return pane.Append("field", {text: plugin.Format()}, [], "", function(line, index, event, cmds, cbs) {
                 run(event, cmds, cbs)
             }).field.Plugin
+        },
+        Last: function() {
+            var list = history.pop()
+            list && (list.target.value = list.value, plugin.Check())
         },
 
         Help: function(type, action) {

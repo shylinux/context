@@ -1,9 +1,13 @@
 package kit
 
 import (
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 )
 
 type TERM interface {
@@ -88,4 +92,66 @@ func FmtTime(t int64) string {
 		return fmt.Sprintf("%s%d.%dus", sign, time/1000, (time/1000)%1000*100/1000)
 	}
 	return fmt.Sprintf("%s%dns", sign, time)
+}
+
+func Marshal(data interface{}, arg ...interface{}) string {
+	if len(arg) > 0 {
+		switch arg := arg[0].(type) {
+		case string:
+			if f, p, e := Create(arg); e == nil {
+				defer f.Close()
+
+				switch {
+				case strings.HasSuffix(arg, ".json"):
+					b, _ := json.MarshalIndent(data, "", "  ")
+					if n, e := f.Write(b); e == nil && n == len(b) {
+						return p
+					}
+
+				case strings.HasSuffix(arg, ".csv"):
+					switch data := data.(type) {
+					case []interface{}:
+						w := csv.NewWriter(f)
+						head := []string{}
+						for _, v := range data {
+							switch v := v.(type) {
+							case map[string]interface{}:
+								if len(head) == 0 {
+									for k, _ := range v {
+										head = append(head, k)
+									}
+									w.Write(head)
+								}
+
+								fields := []string{}
+								for _, k := range head {
+									fields = append(fields, Format(v[k]))
+								}
+								w.Write(fields)
+							}
+						}
+						w.Flush()
+					}
+				}
+			}
+		}
+	}
+
+	b, _ := json.MarshalIndent(data, "", "  ")
+	return string(b)
+}
+func UnMarshal(data string) interface{} {
+	var res interface{}
+	if strings.HasSuffix(data, ".json") {
+		if b, e := ioutil.ReadFile(data); e == nil {
+			json.Unmarshal(b, &res)
+		}
+	} else {
+		json.Unmarshal([]byte(data), &res)
+	}
+	return res
+}
+func UnMarshalm(data string) map[string]interface{} {
+	res, _ := UnMarshal(data).(map[string]interface{})
+	return res
 }

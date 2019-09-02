@@ -1,0 +1,50 @@
+
+kit xiao "数据库" public "ssh.data" show \
+	text "" name table imports plugin_table action auto view long \
+	text "" name index action auto \
+	button "查看" action auto \
+	button "返回" click Last \
+    exports table table
+
+fun meet "第一眼" public \
+	text "" name table imports plugin_table \
+	text "" name when \
+	text "" name where \
+	button "添加"
+
+    if $2 == ""
+        return "time miss"
+    end
+    if $3 == ""
+        return "meet miss"
+    end
+    copy ssh.data insert _ when _ where __
+end
+
+fun clip "粘贴板" public \
+	text "" name you imports plugin_you action auto \
+	text "" name txt view long \
+	button "保存" action auto
+
+    if $2 == ""
+        copy ssh._route _ data show clip
+    else
+        copy ssh._route _ data insert clip txt $2
+    end
+end
+
+fun note "记事本" public \
+	text "" name you imports plugin_you action auto \
+	text "" name tip imports plugin_tip view long action auto \
+	button "查看" action auto \
+	button "返回" click Last \
+    exports tip file tip \
+    feature display inner
+
+    if $2 == "" || $2 ~ ".*/$"
+        copy ssh._route _ context wiki tree __
+    else
+        copy ssh._route _ context wiki text __
+    end
+end
+

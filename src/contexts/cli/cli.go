@@ -624,7 +624,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				format := kit.Select(m.Conf("time", "format"), m.Option("time_format"))
 				t, stamp := time.Now(), true
 				if len(arg) > 0 {
-					if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
+					if arg[0] == "show" {
+						stamp = false
+					} else if i, e := strconv.ParseInt(arg[0], 10, 64); e == nil {
 						t, stamp, arg = time.Unix(int64(i/int64(m.Confi("time", "unit"))), 0), false, arg[1:]
 					} else if n, e := time.ParseInLocation(format, arg[0], time.Local); e == nil {
 						t, arg = n, arg[1:]

@@ -5,6 +5,7 @@ import (
 	"contexts/ctx"
 	"fmt"
 	"os/exec"
+	"sort"
 	"time"
 	"toolkit"
 
@@ -77,10 +78,10 @@ func (ssh *SSH) Close(m *ctx.Message, arg ...string) bool {
 
 var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Caches: map[string]*ctx.Cache{
-		"nnode": &ctx.Cache{Name: "nnode", Value: "0", Help: "节点数量"},
+		"nnode": {Name: "nnode", Value: "0", Help: "节点数量"},
 	},
 	Configs: map[string]*ctx.Config{
-		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+		"componet": {Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"componet_name": "ifconfig", "componet_help": "ifconfig",
 					"componet_tmpl": "componet", "componet_view": "", "componet_init": "",
@@ -132,21 +133,21 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			},
 		}, Help: "组件列表"},
 
-		"flow":  &ctx.Config{Name: "flow", Value: map[string]interface{}{}, Help: "聊天群组"},
-		"work":  &ctx.Config{Name: "work", Value: map[string]interface{}{}, Help: "工作信息"},
-		"node":  &ctx.Config{Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
-		"timer": &ctx.Config{Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
-		"trust": &ctx.Config{Name: "trust", Value: map[string]interface{}{
+		"flow":  {Name: "flow", Value: map[string]interface{}{}, Help: "聊天群组"},
+		"work":  {Name: "work", Value: map[string]interface{}{}, Help: "工作信息"},
+		"node":  {Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
+		"timer": {Name: "timer", Value: map[string]interface{}{"interval": "10s", "timer": ""}, Help: "断线重连"},
+		"trust": {Name: "trust", Value: map[string]interface{}{
 			"renew": true, "fresh": false, "user": true, "up": true,
 		}, Help: "可信节点"},
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
+		"login": {Name: "login", Value: map[string]interface{}{
 			"ticker": "10ms",
 			"count":  100,
 			"delay":  "10ms",
 		}, Help: "聊天群组"},
 	},
 	Commands: map[string]*ctx.Command{
-		"_init": &ctx.Command{Name: "_init", Help: "启动初始化", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_init": {Name: "_init", Help: "启动初始化", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if m.Confs("runtime", "boot.ctx_box") {
 				m.Conf("runtime", "node.type", "worker")
 				m.Conf("runtime", "node.name", m.Conf("runtime", "boot.pathname"))
@@ -161,7 +162,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Cmd("aaa.role", "tech", "componet", "source", "command", "tool")
 			return
 		}},
-		"_node": &ctx.Command{Name: "_node [init|create name type module|delete name]", Help: "节点", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_node": {Name: "_node [init|create name type module|delete name]", Help: "节点", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("ssh.node", func(key string, value map[string]interface{}) {
 					m.Push("create_time", value["create_time"])
@@ -205,7 +206,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"user": &ctx.Command{Name: "user [init|create|trust [node]]", Help: "用户管理, init: 用户节点, create: 用户创建, trust: 用户授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"user": {Name: "user [init|create|trust [node]]", Help: "用户管理, init: 用户节点, create: 用户创建, trust: 用户授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Echo(m.Conf("runtime", "user.route"))
 				return
@@ -251,7 +252,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			m.Append("user.route", m.Conf("runtime", "user.route"))
 			return
 		}},
-		"work": &ctx.Command{Name: "work [serve|create|search]", Help: "工作管理, serve: 创建组织, create: 创建员工, search: 搜索员工", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"work": {Name: "work [serve|create|search]", Help: "工作管理, serve: 创建组织, create: 创建员工, search: 搜索员工", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("work", func(key string, value map[string]interface{}) {
 					m.Add("append", "key", key)
@@ -299,7 +300,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"tool": &ctx.Command{Name: "tool [group index][run group index chatid arg...]", Help: "工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"tool": {Name: "tool [group index][run group index chatid arg...]", Help: "工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
 					if kit.Format(value["componet_type"]) != "public" && m.Option("userrole") != "root" {
@@ -338,6 +339,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						msg.Option(k, v)
 					}
 				}
+
+				msg.Option("river", arg[3])
+				msg.Option("storm", arg[1])
 
 				arg = arg[4:]
 				args := []string{}
@@ -385,8 +389,130 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
+		"data": {Name: "data show|save|create|insert", Help: "数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				arg = append(arg, "show")
+			}
 
-		"remote": &ctx.Command{Name: "remote auto|dial|listen args...", Help: "连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch arg[0] {
+			case "show":
+				switch len(arg) {
+				case 1: // 数据库
+					m.Confm("flow", []string{m.Option("river"), "data"}, func(key string, value map[string]interface{}) {
+						m.Push("create_time", kit.Chains(value, "meta.create_time"))
+						m.Push("create_user", kit.Chains(value, "meta.create_user"))
+						m.Push("table", key)
+						m.Push("count", len(value["list"].([]interface{})))
+					})
+
+				case 2: // 关系表
+					hide := map[string]bool{"create_time": true, "update_time": true, "extra": true}
+					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list"}, func(index int, value map[string]interface{}) {
+						for k := range value {
+							if !hide[k] {
+								hide[k] = false
+							}
+						}
+					})
+
+					keys := []string{}
+					for k, hide := range hide {
+						if !hide {
+							keys = append(keys, k)
+						}
+					}
+					sort.Strings(keys)
+
+					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list"}, func(index int, value map[string]interface{}) {
+						for _, k := range keys {
+							m.Push(k, kit.Format(value[k]))
+						}
+					})
+
+				default: // 记录值
+					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", arg[2]}, func(key string, value string) {
+						m.Push("key", key)
+						m.Push("value", value)
+					})
+				}
+				m.Table()
+
+			case "save":
+				if len(arg) == 1 {
+					m.Confm("flow", []string{m.Option("river"), "data"}, func(key string, value map[string]interface{}) {
+						arg = append(arg, key)
+					})
+				}
+
+				for _, v := range arg[1:] {
+					data := m.Confm("flow", []string{m.Option("river"), "data", v})
+					kit.Marshal(data["meta"], path.Join("var/data", m.Option("river"), v, "/meta.json"))
+					kit.Marshal(data["list"], path.Join("var/data", m.Option("river"), v, "/list.csv"))
+
+					l := len(data["list"].([]interface{}))
+					m.Push("table", v).Push("count", l)
+					m.Log("info", "save table %s:%s %d", m.Option("river"), v, l)
+				}
+				m.Table()
+
+			case "create":
+				if m.Confs("flow", []string{m.Option("river"), "data", arg[1]}) {
+					break
+				}
+
+				tmpl := map[string]interface{}{"create_time": m.Time(), "update_time": m.Time(), "extra": "{}", "id": 0}
+				for i := 2; i < len(arg)-1; i += 2 {
+					tmpl[arg[i]] = arg[i+1]
+				}
+
+				m.Confv("flow", []string{m.Option("river"), "data", arg[1]}, map[string]interface{}{
+					"meta": map[string]interface{}{
+						"create_user": m.Option("username"),
+						"create_time": m.Time(),
+						"create_tmpl": tmpl,
+					},
+					"list": []interface{}{},
+				})
+				m.Log("info", "create table %s:%s", m.Option("river"), arg[1])
+
+			case "insert":
+				if len(arg) == 2 {
+					m.Cmd("ssh.data", "show", arg[1])
+					break
+				}
+				if !m.Confs("flow", []string{m.Option("river"), "data", arg[1]}) {
+					m.Cmd("ssh.data", "create", arg[1:])
+				}
+
+				id := m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "count"}) + 1
+				m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "count"}, id)
+
+				data := map[string]interface{}{}
+				extra := map[string]interface{}{}
+				tmpl := m.Confm("flow", []string{m.Option("river"), "data", arg[1], "meta", "create_tmpl"})
+				for k, v := range tmpl {
+					data[k] = v
+				}
+				for i := 2; i < len(arg)-1; i += 2 {
+					if _, ok := tmpl[arg[i]]; ok {
+						data[arg[i]] = arg[i+1]
+					} else {
+						extra[arg[i]] = arg[i+1]
+					}
+				}
+				data["create_time"] = m.Time()
+				data["update_time"] = m.Time()
+				data["extra"] = extra
+				data["id"] = id
+
+				m.Log("info", "insert %s:%s %s", m.Option("river"), arg[1], kit.Format(data))
+				m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", "-2"}, data)
+				m.Cmdy("ssh.data", "save", arg[1])
+			}
+			return
+		}},
+
+		"remote": {Name: "remote auto|dial|listen args...", Help: "连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmd("_node")
 				return
@@ -506,7 +632,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"_route": &ctx.Command{Name: "_route", Help: "路由", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_route": {Name: "_route", Help: "路由", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Log("time", "exec: %v", m.Format("cost"))
 			if len(arg) == 0 {
 				return
@@ -630,7 +756,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"_right": &ctx.Command{Name: "_right [node|user|work]", Help: []string{"认证",
+		"_right": {Name: "_right [node|user|work]", Help: []string{"认证",
 			"node [check text|trust node]",
 			"user [create|check text|share role node...|proxy node|trust node]",
 			"work [create node name|check node name]",
@@ -821,7 +947,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"_check": &ctx.Command{Name: "_check node|user|work", Help: []string{"验签",
+		"_check": {Name: "_check node|user|work", Help: []string{"验签",
 			"node", "user [node text]", "work name [node cert]",
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
@@ -906,7 +1032,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"_exec": &ctx.Command{Name: "_exec", Help: "命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"_exec": {Name: "_exec", Help: "命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			access := m.Option("access", kit.Hashs(
 				m.Option("node.route"),
 				m.Option("user.route"),
@@ -984,7 +1110,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			return
 		}},
 
-		"login": &ctx.Command{Name: "login address", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"login": {Name: "login address", Help: "网络连接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				arg = append(arg, "shy@shylinux.com")
 			}
