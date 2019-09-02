@@ -42,9 +42,9 @@ fun note "记事本" public \
     feature display inner
 
     if $2 == "" || $2 ~ ".*/$"
-        copy ssh._route _ context wiki tree __
+        copy ssh._route _ context wiki tree __ level local/wiki
     else
-        copy ssh._route _ context wiki text __
+        copy ssh._route _ context wiki text __ level local/wiki
     end
 end
 

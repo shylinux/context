@@ -186,6 +186,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			}
 
 			// 用户登录
+			msg.Log("time", "parse: %v", msg.Format("cost"))
 			if msg.Put("option", "request", r).Put("option", "response", w).Sess("web", msg); web.Login(msg, w, r) {
 				msg.Log("cmd", "%s [] %v", key, msg.Meta["option"])
 				cmd.Hand(msg, msg.Target(), msg.Option("path"))
@@ -875,6 +876,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 							continue
 						}
 						// 执行命令
+						m.Log("time", "check: %v", m.Format("cost"))
 						msg.Cmd(arg)
 					}
 				}

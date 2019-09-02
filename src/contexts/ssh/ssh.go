@@ -360,6 +360,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						args = append(args, msg.Parse(v))
 					}
 				}
+				m.Log("time", "check: %v", m.Format("cost"))
 				msg.Cmd(tool["componet_cmd"], args, arg).CopyTo(m)
 
 			default:
@@ -633,7 +634,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			return
 		}},
 		"_route": {Name: "_route", Help: "路由", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Log("time", "exec: %v", m.Format("cost"))
 			if len(arg) == 0 {
 				return
 			}
@@ -662,6 +662,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if rest := kit.Select("", names, 1); names[0] != "" {
 				// 数字签名
 				if !m.Options("remote_code") && arg[0] != "_check" {
+					for _, k := range []string{"river"}{
+						m.Option(k, m.Option(k))
+					}
+
 					hash, meta := kit.Hash("rand",
 						m.Option("text.time", m.Time("stamp")),
 						m.Option("text.cmd", strings.Join(arg, " ")),
@@ -715,7 +719,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			defer func() { m.Back(m) }()
 
-			m.Log("time", "exec: %v", m.Format("cost"))
 			if !m.Options("remote_code") {
 				// 本地调用
 				m.Cmdy(arg)
@@ -749,8 +752,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Echo("node error of %s", m.Option("node.route"))
 
 			} else {
-				m.Log("time", "exec: %v", m.Format("cost"))
 				// 执行命令
+				m.Log("time", "check: %v", m.Format("cost"))
 				m.Cmd("_exec", arg)
 				m.Log("time", "exec: %v", m.Format("cost"))
 			}
@@ -1105,8 +1108,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 
 			// 执行命令
+			m.Log("time", "right: %v", m.Format("cost"))
 			m.Cmdy(arg)
-			m.Log("time", "exec: %v", m.Format("cost"))
 			return
 		}},
 

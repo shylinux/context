@@ -1086,6 +1086,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			self := &ctx.Command{Name: strings.Join(arg[1:], " "), Help: []string{"pwd", "ls"}}
 			self.Hand = func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				m.Goshy(self.Help.([]string), 0, nil, nil)
+				m.Log("time", "parse: %v", m.Format("cost"))
 				return
 			}
 			m.Target().Commands[arg[1]] = self

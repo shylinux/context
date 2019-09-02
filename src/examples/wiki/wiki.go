@@ -14,8 +14,8 @@ import (
 var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "用户登录"},
-		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
+		"login": {Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "用户登录"},
+		"componet": {Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"name": "wiki",
 					"tmpl": "head", "metas": []interface{}{map[string]interface{}{
@@ -45,17 +45,17 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			},
 		}, Help: "组件列表"},
 
-		"level": &ctx.Config{Name: "level", Value: "local/wiki/自然/编程", Help: "路由数量"},
-		"class": &ctx.Config{Name: "class", Value: "", Help: "路由数量"},
-		"favor": &ctx.Config{Name: "favor", Value: "index.md", Help: "路由数量"},
+		"level": {Name: "level", Value: "local/wiki/自然/编程", Help: "路由数量"},
+		"class": {Name: "class", Value: "", Help: "路由数量"},
+		"favor": {Name: "favor", Value: "index.md", Help: "路由数量"},
 	},
 	Commands: map[string]*ctx.Command{
-		"tree": &ctx.Command{Name: "tree", Help: "目录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"tree": {Name: "tree", Help: "目录", Form: map[string]int{"level": 1, "class": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmdy("nfs.dir", path.Join(m.Confx("level"), m.Confx("class", arg, 0)),
 				"time", "size", "line", "file", "dir_sort", "time", "time_r")
 			return
 		}},
-		"text": &ctx.Command{Name: "text", Help: "文章", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"text": {Name: "text", Help: "文章", Form: map[string]int{"level": 1, "class": 1, "favor": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			which := m.Cmdx("nfs.path", path.Join(m.Confx("level"), m.Confx("class", arg, 1), m.Confx("favor", arg, 0)))
 
 			buffer := bytes.NewBuffer([]byte{})
