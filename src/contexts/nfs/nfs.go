@@ -711,8 +711,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				if args = append(args, "log", "--shortstat", "--pretty=commit: %ad", "--date=iso"); len(arg) > 1 {
 					args = append(args, arg[1:]...)
 				} else {
-					args = append(args, "--reverse")
+					// args = append(args, "--reverse")
 				}
+				args = append(args, "--reverse")
 
 				if out, e := exec.Command("git", args...).CombinedOutput(); e == nil {
 					for _, v := range strings.Split(string(out), "commit: ") {

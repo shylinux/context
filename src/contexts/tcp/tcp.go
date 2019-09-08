@@ -29,7 +29,7 @@ func (tcp *TCP) parse(m *ctx.Message, arg ...string) ([]string, []string, bool) 
 
 	address := []string{}
 	if arg[1] == "dev" {
-		m.Cmd("web.get", arg[1], arg[2], "temp", "ports", "format", "object").Table(func(line map[string]string) {
+		m.Cmd("web.get", arg[1], arg[2], "temp", "ports", "format", "object", "temp_expire", "10").Table(func(line map[string]string) {
 			address = append(address, line["value"])
 		})
 		if len(address) == 0 {
