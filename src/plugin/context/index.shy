@@ -29,7 +29,8 @@ kit missyou "任务" private \
 kit pod "设备" private "ssh._route" _ "ssh.remote" __ \
 	text "" name pod view long \
 	button "行动" action auto \
-    exports pod pod
+	button "返回" click Back \
+    exports pod pod pod
 
 kit ctx "模块" private "ssh._route" _ context _ list __ \
 	text "" name pod imports plugin_pod action auto view long \

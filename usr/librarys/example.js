@@ -696,8 +696,8 @@ function Plugin(page, pane, field, runs) {
     var meta = field.Meta
     var name = meta.name
     var args = meta.args || []
-    var display = JSON.parse(meta.display||'{}')
     var feature = JSON.parse(meta.feature||'{}')
+    var display = JSON.parse(meta.display||'{}')
     var exports = JSON.parse(meta.exports||'["",""]')
     var deal = (feature && feature.display) || "table"
     var history = []
@@ -711,7 +711,7 @@ function Plugin(page, pane, field, runs) {
                 }: cb)
             })
 
-            var count = kit.Selector(option, "args").length
+            var count = kit.Selector(option, ".args").length
             args && count < args.length && (item.value = value||args[count++]||item.value||"");
 
             (item.title || item.name) && (item.title = item.title || item.name)
@@ -725,6 +725,7 @@ function Plugin(page, pane, field, runs) {
                     input.type = "select", input.list = item.values.map(function(value) {
                         return {type: "option", value: value, inner: value}
                     })
+                    input.value = item.value
                     break
                 case "textarea":
                     input.type = "textarea", item.style = "height:100px;"+"width:"+(pane.target.clientWidth-30)+"px"
@@ -897,10 +898,7 @@ function Plugin(page, pane, field, runs) {
                 return name == "status" || line.status == "stop" ? undefined: line.you
             },
             pod: function(value, name, line) {
-                if (option[exports[0]].value) {
-                    return option[exports[0]].value+"."+line.pod
-                }
-                return line.pod
+                return (option[exports[0]].value? option[exports[0]].value+".": "")+line.pod
             },
             dir: function(value, name, line) {
                 name != "path" && (value = line.path)
@@ -1006,7 +1004,7 @@ function Plugin(page, pane, field, runs) {
     })
 
     JSON.parse(meta.inputs || "[]").map(function(item) {
-        plugin.Append(item, item.name, item.value)
+        plugin.Append(item, item.name)
     })
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
 }
