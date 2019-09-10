@@ -14,7 +14,8 @@ kit macro "脚本宏" "macro.js" public \
 	button "运行" click "Replay" \
     exports mac name
 
-kit sys "命令行" public "nfs.source" \
+kit sys "命令行" public "ssh._route" _ "nfs.source" \
+    text "" name pod imports plugin_pod \
 	textarea "" view long \
 	button "运行" \
     exports mac name
