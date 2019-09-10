@@ -548,6 +548,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				"date":   "--date=format:%m/%d %H:%M",
 				"pretty": "--pretty=format:%h %ad %an %s",
 			},
+			"local": "usr/local",
 		}, Help: "版本管理"},
 		"dir": &ctx.Config{Name: "dir", Value: map[string]interface{}{
 			"fields": "time size line path",
@@ -703,51 +704,57 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				arg = arg[1:]
 			}
 
-			if len(arg) > 0 && arg[0] == "sum" {
-				args := []string{}
-				if m.Options("git_dir") {
-					args = append(args, "-C", m.Option("git_dir"))
-				}
-				if args = append(args, "log", "--shortstat", "--pretty=commit: %ad", "--date=iso"); len(arg) > 1 {
-					args = append(args, arg[1:]...)
-				} else {
-					args = append(args, "--reverse")
-				}
-
-				if out, e := exec.Command("git", args...).CombinedOutput(); e == nil {
-					for _, v := range strings.Split(string(out), "commit: ") {
-						if l := strings.Split(v, "\n"); len(l) > 2 {
-							fs := strings.Split(strings.TrimSpace(l[2]), ", ")
-							hs := strings.Split(l[0], " ")
-							m.Add("append", "date", hs[0])
-
-							if adds := strings.Split(fs[1], " "); len(fs) > 2 {
-								dels := strings.Split(fs[2], " ")
-								m.Add("append", "adds", adds[0])
-								m.Add("append", "dels", dels[0])
-							} else if adds[1] == "insertions(+)" {
-								m.Add("append", "adds", adds[0])
-								m.Add("append", "dels", "0")
-							} else {
-								m.Add("append", "adds", "0")
-								m.Add("append", "dels", adds[0])
-							}
-							m.Add("append", "hour", strings.Split(hs[1], ":")[0])
-							m.Add("append", "time", hs[1])
-						} else if len(l[0]) > 0 {
-							hs := strings.Split(l[0], " ")
-							m.Add("append", "date", hs[0])
-							m.Add("append", "adds", 0)
-							m.Add("append", "dels", 0)
-							m.Add("append", "hour", strings.Split(hs[1], ":")[0])
-							m.Add("append", "time", hs[1])
-						}
+			if len(arg) > 0 {
+				switch arg[0] {
+				case "local":
+					m.Cmd("cli.system", "git", "clone", arg[1], "cmd_dir", m.Conf("git", "local"))
+					return
+				case "sum":
+					args := []string{}
+					if m.Options("git_dir") {
+						args = append(args, "-C", m.Option("git_dir"))
 					}
-					m.Table()
-				} else {
-					m.Log("warn", "%v", string(out))
+					if args = append(args, "log", "--shortstat", "--pretty=commit: %ad", "--date=iso"); len(arg) > 1 {
+						args = append(args, arg[1:]...)
+					} else {
+						args = append(args, "--reverse")
+					}
+
+					if out, e := exec.Command("git", args...).CombinedOutput(); e == nil {
+						for _, v := range strings.Split(string(out), "commit: ") {
+							if l := strings.Split(v, "\n"); len(l) > 2 {
+								fs := strings.Split(strings.TrimSpace(l[2]), ", ")
+								hs := strings.Split(l[0], " ")
+								m.Add("append", "date", hs[0])
+
+								if adds := strings.Split(fs[1], " "); len(fs) > 2 {
+									dels := strings.Split(fs[2], " ")
+									m.Add("append", "adds", adds[0])
+									m.Add("append", "dels", dels[0])
+								} else if adds[1] == "insertions(+)" {
+									m.Add("append", "adds", adds[0])
+									m.Add("append", "dels", "0")
+								} else {
+									m.Add("append", "adds", "0")
+									m.Add("append", "dels", adds[0])
+								}
+								m.Add("append", "hour", strings.Split(hs[1], ":")[0])
+								m.Add("append", "time", hs[1])
+							} else if len(l[0]) > 0 {
+								hs := strings.Split(l[0], " ")
+								m.Add("append", "date", hs[0])
+								m.Add("append", "adds", 0)
+								m.Add("append", "dels", 0)
+								m.Add("append", "hour", strings.Split(hs[1], ":")[0])
+								m.Add("append", "time", hs[1])
+							}
+						}
+						m.Table()
+					} else {
+						m.Log("warn", "%v", string(out))
+					}
+					return
 				}
-				return
 			}
 
 			cmds := []string{}

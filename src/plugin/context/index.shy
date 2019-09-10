@@ -3,6 +3,7 @@ kit project "项目" private \
     select "" values plugin values review values submit values trend values stats values stat values init action auto \
 	text "" name see imports plugin_see action auto \
 	button "执行" \
+	button "返回" click Last \
     exports see name see
 
 kit compile "编译" private \

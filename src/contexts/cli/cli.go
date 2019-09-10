@@ -246,7 +246,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_env":     2,
 			"cmd_log":     1,
 			"cmd_temp":    -1,
-			"cmd_parse":   2,
+			"cmd_parse":   3,
 			"cmd_error":   0,
 			"cmd_select":   -1,
 			"app_log":     1,
@@ -427,8 +427,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				case "cut":
 					bio := bufio.NewScanner(out)
 					bio.Scan()
-					for heads := kit.Split(bio.Text(), kit.Int(kit.Select("-1", m.Optionv("cmd_parse"), 1))); bio.Scan(); {
-						for i, v := range kit.Split(bio.Text(), len(heads)) {
+					c := byte(kit.Select(" ", m.Optionv("cmd_parse"), 2)[0])
+					for heads := kit.Split(bio.Text(), c, kit.Int(kit.Select("-1", m.Optionv("cmd_parse"), 1))); bio.Scan(); {
+						for i, v := range kit.Split(bio.Text(), c, len(heads)) {
 							m.Add("append", heads[i], v)
 						}
 					}
@@ -869,7 +870,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				env := []string{
 					"cmd_env", "GOOS", goos, "cmd_env", "GOARCH", arch,
 					"cmd_env", "GOTMPDIR", tmp, "cmd_env", "GOCACHE", tmp,
-					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_home")+":"+os.Getenv("GOPATH"),
+					"cmd_env", "GOPATH", m.Conf("runtime", "boot.ctx_home")+string(os.PathListSeparator)+os.Getenv("GOPATH"),
 					"cmd_env", "PATH", os.Getenv("PATH"),
 				}
 
@@ -907,7 +908,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				for _, v := range arg[1:] {
 					m.Cmd("nfs.copy", path.Join(q, v), path.Join(p, v))
 				}
-				m.Cmdy("nfs.dir", q, "time", "size", "hashs", "path")
+				m.Cmdy("nfs.dir", q, "time", "size", "hashs", "path", "dir_sort", "path", "str")
 				return e
 			}
 
@@ -928,7 +929,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Push("file", q)
 				}
 			}
-			m.Table()
+			m.Sort("file").Table()
 			return
 		}},
 		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|plugin|restart|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -996,7 +997,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				// 加载脚本
 				if p != "" {
-					msg.Target().Configs["_index"].Value = []interface{}{}
+					msg.Target().Configs["_index"] = &ctx.Config{Name: "_index", Value: []interface{}{}}
 					msg.Optionv("bio.ctx", msg.Target())
 					msg.Cmdy("nfs.source", p)
 					msg.Confv("ssh.componet", arg[0], msg.Confv("_index"))
@@ -1102,6 +1103,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
+				"cmd_env", "ctx_bin", m.Conf("runtime", "boot.ctx_bin"),
 			}
 
 			// 启动服务

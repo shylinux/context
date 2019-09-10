@@ -1,0 +1,38 @@
+
+kit buffer "粘贴板" public buf \
+	text "0" name index imports plugin_tmux_bindex action auto \
+	text "" name txt action auto \
+	button "查看" action auto \
+	button "返回" click Last \
+    exports tmux_bindex cur
+
+kit session "会话" private mux \
+	button "查看" action auto \
+    exports tmux_sess session_name
+
+kit windows "窗口" private mux \
+	text "" imports plugin_tmux_sess action auto \
+	button "查看" \
+    exports tmux_wins window_name
+
+kit pane "面板" private mux \
+	text "" imports plugin_tmux_sess \
+	text "" imports plugin_tmux_wins action auto \
+	button "查看" \
+    exports tmux_pane pane_index
+
+kit view "内容" private mux \
+	text "" imports plugin_tmux_sess \
+	text "" imports plugin_tmux_wins \
+	text "" imports plugin_tmux_pane action auto \
+	button "查看" \
+    exports tmux_pane pane_index
+
+kit cmd "命令" private mux _ _ _ r \
+	text "" imports plugin_tmux_sess \
+	text "" imports plugin_tmux_wins \
+	text "" imports plugin_tmux_pane \
+	text "pwd" view long \
+	button "执行" \
+    exports tmux_pane pane_index
+

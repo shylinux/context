@@ -115,6 +115,8 @@ func (m *Message) Format(arg ...interface{}) string {
 			m.Table()
 		case "time":
 			meta = append(meta, m.Time())
+		case "mill":
+			meta = append(meta, fmt.Sprintf("%d", int64(m.time.UnixNano())/1000%1000000))
 		case "code":
 			meta = append(meta, kit.Format(m.code))
 		case "ship":

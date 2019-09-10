@@ -44,14 +44,14 @@ func Create(p string) (*os.File, string, error) {
 	return f, p, e
 }
 
-func Split(str string, n int) []string {
+func Split(str string, c byte, n int) []string {
 	res := []string{}
 	for i, j := 0, 0; i < len(str); i++ {
-		if str[i] == ' ' {
+		if str[i] == c {
 			continue
 		}
 		for j = i; j < len(str); j++ {
-			if str[j] == ' ' {
+			if str[j] == c {
 				break
 			}
 		}

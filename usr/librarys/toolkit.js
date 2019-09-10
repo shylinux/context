@@ -410,6 +410,12 @@ kit = toolkit = {
             var target = event.target
             var dataset = target.dataset
             var head = target.parentElement.parentElement.querySelector("tr")
+            kit.Selector(table, "tr.select", function(item) {
+                item.className = ""
+            })
+            kit.Selector(table, "td.select", function(item) {
+                item.className = ""
+            })
             target.parentElement.childNodes.forEach(function(item, i) {
                 if (item != target) {
                     return
@@ -421,6 +427,8 @@ kit = toolkit = {
                 }
                 var name = head.childNodes[i].innerText
                 if (name.startsWith(field)) {
+                    item.className = "select"
+                    item.parentElement.className = "select"
                     typeof cb == "function" && cb(event, item.innerText, name,item.parentNode.Meta)
                 }
                 kit.CopyText()

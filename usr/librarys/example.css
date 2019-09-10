@@ -271,6 +271,9 @@ fieldset table caption {
 fieldset table tr:hover {
     background-color:lightgreen;
 }
+fieldset table tr.select {
+    background-color:lightgreen;
+}
 fieldset table th {
     font-family:monospace;
     background-color:lightgreen;
@@ -290,6 +293,9 @@ fieldset table td.clip {
     background-color:red;
 }
 fieldset table td:hover {
+    background-color:red;
+}
+fieldset table td.select {
     background-color:red;
 }
 fieldset pre code, fieldset code pre {

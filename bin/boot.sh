@@ -6,7 +6,7 @@
 
 ctx_log=${ctx_log:="var/log"}
 ctx_app=${ctx_app:="bench"}
-ctx_bin=${ctx_app} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}
+ctx_bin=${ctx_bin:=`which ${ctx_app}`} && [ -f bin/${ctx_app} ] && ctx_bin=$(pwd)/bin/${ctx_app}
 # ctx_cas=
 # ctx_ups=
 # ctx_box=

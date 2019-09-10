@@ -135,7 +135,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 			"meta": map[string]interface{}{
 				"short": []interface{}{"time", "ship"},
 				"long":  []interface{}{"time", "ship"},
-				"cost":  []interface{}{"time", "ship", "cost"},
+				"cost":  []interface{}{"time", "ship", "mill"},
 			},
 
 			"debug":  map[string]interface{}{"value": []interface{}{"debug"}},
@@ -158,7 +158,7 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 			"error": map[string]interface{}{"value": []interface{}{"error", "red"}},
 			"trace": map[string]interface{}{"value": []interface{}{"error", "red"}},
 
-			"cmd": map[string]interface{}{"value": []interface{}{"bench", "green", "cost"},
+			"cmd": map[string]interface{}{"value": []interface{}{"bench", "green"},
 				"lex": map[string]interface{}{"value": []interface{}{"debug", "green"}},
 				"yac": map[string]interface{}{"value": []interface{}{"debug", "green"}},
 				"cli": map[string]interface{}{

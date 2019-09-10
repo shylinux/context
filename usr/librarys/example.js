@@ -696,6 +696,7 @@ function Plugin(page, pane, field, runs) {
     var meta = field.Meta
     var name = meta.name
     var args = meta.args || []
+    var inputs = JSON.parse(meta.inputs || "[]")
     var display = JSON.parse(meta.display||'{}')
     var feature = JSON.parse(meta.feature||'{}')
     var exports = JSON.parse(meta.exports||'["",""]')
@@ -777,8 +778,11 @@ function Plugin(page, pane, field, runs) {
             }).field.Plugin
         },
         Last: function() {
+            console.log(meta)
             var list = history.pop()
-            list && (list.target.value = list.value, plugin.Check())
+            list? (list.target.value = list.value): inputs.map(function(item) {
+                option[item.name].value = item.value
+            }), plugin.Check()
         },
 
         Help: function(type, action) {
@@ -999,13 +1003,16 @@ function Plugin(page, pane, field, runs) {
                     }
                     return true
                 })
-                item.type != "textarea" && event.key == "Enter" && plugin.Check(action.target)
+                if (item.type != "textarea" && event.key == "Enter") {
+                    history.push({target: action.target, value: action.target.value});
+                    plugin.Check(action.target)
+                }
             },
         },
         exports: JSON.parse(meta.exports||'["",""]'),
     })
 
-    JSON.parse(meta.inputs || "[]").map(function(item) {
+    inputs.map(function(item) {
         plugin.Append(item, item.name, item.value)
     })
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
