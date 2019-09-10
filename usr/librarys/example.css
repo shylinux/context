@@ -253,6 +253,9 @@ fieldset.item>div.output>div.status>input.cmd {
     font-size:16px;
     width:250px;
 }
+fieldset.item div.output.full table td {
+    height:16px;
+}
 
 fieldset.item.select {
     background-color:gold;
@@ -284,6 +287,7 @@ fieldset table th.order {
     cursor:pointer;
 }
 fieldset table td {
+    min-height:16px;
     max-width:1200px;
     font-family:monospace;
     padding-left: 10px;

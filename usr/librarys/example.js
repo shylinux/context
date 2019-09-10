@@ -702,6 +702,7 @@ function Plugin(page, pane, field, runs) {
     var exports = JSON.parse(meta.exports||'["",""]')
     var deal = (feature && feature.display) || "table"
     var history = []
+    output.className = feature.style || "item"
 
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {

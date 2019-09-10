@@ -390,7 +390,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"data": {Name: "data show|save|create|insert", Help: "数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"data": {Name: "data show|save|create|insert", Help: "数据", Form: map[string]int{"format": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				arg = append(arg, "show")
 			}
@@ -431,10 +431,18 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					})
 
 				default: // 记录值
-					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", arg[2]}, func(key string, value string) {
-						m.Push("key", key)
-						m.Push("value", value)
-					})
+					index := kit.Int(arg[2]) - 1
+					switch m.Option("format") {
+					case "object":
+						m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index)}, func(key string, value string) {
+							m.Push(key, value)
+						})
+					default:
+						m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index)}, func(key string, value string) {
+							m.Push("key", key)
+							m.Push("value", value)
+						})
+					}
 				}
 				m.Table()
 
@@ -509,6 +517,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Log("info", "insert %s:%s %s", m.Option("river"), arg[1], kit.Format(data))
 				m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", "-2"}, data)
 				m.Cmdy("ssh.data", "save", arg[1])
+
+			case "update":
+				index := kit.Int(arg[2]) - 1
+				for i := 3; i < len(arg) - 1; i += 2 {
+					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index), arg[i]}, arg[i+1])
+				}
 			}
 			return
 		}},

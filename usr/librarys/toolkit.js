@@ -407,19 +407,17 @@ kit = toolkit = {
     OrderTable: function(table, field, cb) {
         if (!table) {return}
         table.onclick = function(event) {
+            var index = 0
             var target = event.target
             var dataset = target.dataset
             var head = target.parentElement.parentElement.querySelector("tr")
-            kit.Selector(table, "tr.select", function(item) {
-                item.className = ""
-            })
-            kit.Selector(table, "td.select", function(item) {
-                item.className = ""
-            })
+            kit.Selector(table, "tr.select", function(item) {item.className = ""})
+            kit.Selector(table, "td.select", function(item) {item.className = ""})
+            kit.Selector(table, "tr", function(item, i) {item == target.parentElement && (index = i)})
+
             target.parentElement.childNodes.forEach(function(item, i) {
-                if (item != target) {
-                    return
-                }
+                if (item != target) {return}
+
                 if (target.tagName == "TH") {
                     dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
                     kit.RangeTable(table, i, dataset["sort_asc"] == "1")
@@ -429,7 +427,7 @@ kit = toolkit = {
                 if (name.startsWith(field)) {
                     item.className = "select"
                     item.parentElement.className = "select"
-                    typeof cb == "function" && cb(event, item.innerText, name,item.parentNode.Meta)
+                    typeof cb == "function" && cb(event, item.innerText, name, item.parentNode.Meta, index)
                 }
                 kit.CopyText()
             })
