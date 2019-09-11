@@ -1094,7 +1094,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			p.Data = self
 			return
 		}},
-		"kit": &ctx.Command{Name: "kit name help [init [show]] [public|protected|private] cmd arg... [input value [key val]...]...", Help: "小功能", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"kit": &ctx.Command{Name: "kit name help [init [view]] [public|protected|private] cmd arg... [input value [key val]...]...", Help: "小功能", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Log("info", "_index: %v", arg)
 
 			args := []interface{}{}
@@ -1102,18 +1102,18 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			exports := []interface{}{}
 			feature := map[string]interface{}{}
 
-			view, init, show, cmd := "", "", "", ""
+			init, view, right, cmd := "", "", "", ""
 			begin := 3
 
 			switch arg[3] {
 			case "private", "protected", "public":
-				begin, show, cmd = 5, arg[3], arg[4]
+				begin, right, cmd = 5, arg[3], arg[4]
 			default:
 				switch arg[4] {
 				case "private", "protected", "public":
-					begin, init, show, cmd = 6, arg[3], arg[4], arg[5]
+					begin, init, right, cmd = 6, arg[3], arg[4], arg[5]
 				default:
-					begin, init, view, show, cmd = 7, arg[3], arg[4], arg[5], arg[6]
+					begin, init, view, right, cmd = 7, arg[3], arg[4], arg[5], arg[6]
 				}
 			}
 
@@ -1172,7 +1172,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				"componet_help": kit.Select("", arg, 2),
 				"componet_view": view,
 				"componet_init": init,
-				"componet_type": show,
+				"componet_type": right,
 
 				"componet_ctx":  m.Cap("module"),
 				"componet_cmd":  cmd,

@@ -1,15 +1,7 @@
-
-kit doc "文档" private \
-	text "" name title imports plugin_doc_id action auto \
-	text "" name content \
-	button "执行" \
-	button "返回" click Last \
-    exports doc_id id
-
-kit xls "表格" "index.js" private \
+kit xls "表格" "index.js" "index.css" private \
 	text "" name title imports plugin_xls_id action auto \
 	text "" name content \
 	button "执行" \
 	button "返回" click Last \
-    feature style "output full" \
+    feature style "mind" \
     exports xls_id id

@@ -347,7 +347,10 @@ func (m *Message) Set(meta string, arg ...interface{}) *Message {
 		}
 	case "option", "append":
 		if len(arg) > 0 {
-			delete(m.Meta, kit.Format(arg[0]))
+			for _, k := range arg {
+				delete(m.Data, kit.Format(k))
+				delete(m.Meta, kit.Format(k))
+			}
 		} else {
 			for _, k := range m.Meta[meta] {
 				delete(m.Data, k)

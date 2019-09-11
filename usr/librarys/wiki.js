@@ -94,7 +94,7 @@ var page = Page({
                 page.Conf("menu.display", value || (page.Conf("menu.display")? "": "none"))
             },
             Size: function(width, height) {
-                if (kit.isMobile) {
+                if (kit.device.isMobile) {
                     return
                 }
                 if (page.Conf("menu.float")) {
@@ -120,7 +120,7 @@ var page = Page({
                 page.Conf("menu.display", "", function(value, old) {
                     ui.menu.style.display = value
                 })
-                page.Conf("menu.float", !kit.isMobile, function(value, old) {
+                page.Conf("menu.float", !kit.device.isMobile, function(value, old) {
                     page.onlayout()
                 })
                 page.Conf("menu.scroll", true, function(value, old) {

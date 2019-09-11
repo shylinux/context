@@ -1,11 +1,35 @@
 kit = toolkit = {
-    isMobile: navigator.userAgent.indexOf("Mobile") > -1,
-    isWeiXin: navigator.userAgent.indexOf("MicroMessenger") > -1,
-    isMacOSX: navigator.userAgent.indexOf("Mac OS X") > -1,
-    isWindows: navigator.userAgent.indexOf("Windows") > -1,
-    isIPhone: navigator.userAgent.indexOf("iPhone") > -1,
-    isSpace: function(c) {
-        return c == " " || c == "Enter"
+    // 用户终端
+    device: {
+        isWeiXin: navigator.userAgent.indexOf("MicroMessenger") > -1,
+        isMobile: navigator.userAgent.indexOf("Mobile") > -1,
+        isIPhone: navigator.userAgent.indexOf("iPhone") > -1,
+        isMacOSX: navigator.userAgent.indexOf("Mac OS X") > -1,
+        isWindows: navigator.userAgent.indexOf("Windows") > -1,
+    },
+    alert: function(text) {
+        alert(JSON.stringify(text))
+    },
+    prompt: function(text) {
+        return prompt(text)
+    },
+    confirm: function(text) {
+        return confirm(text)
+    },
+    reload: function() {
+        location.reload()
+    },
+    // 操作日志
+    Log: function() {
+        var args = []
+        for (var i = 0; i < arguments.length; i++) {
+            args.push(arguments[i])
+        }
+        console.log(arguments.length == 1? args[0]: args)
+        return args
+    },
+    Delay: function(time, cb) {
+        return setTimeout(cb, time)
     },
     History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [], lay: [],
         add: function(type, data) {
@@ -20,18 +44,28 @@ kit = toolkit = {
             return index == undefined? this[type]: this[type][(index+len)%len]
         },
     },
-    Log: function() {
-        var args = []
-        for (var i = 0; i < arguments.length; i++) {
-            args.push(arguments[i])
-        }
-        console.log(arguments.length == 1? args[0]: args)
-        return args
-    },
-    Delay: function(time, cb) {
-        return setTimeout(cb, time)
-    },
 
+    // HTML节点操作
+    classList: {
+        add: function(obj) {
+            var list = obj.className.split(" ")
+            for (var i = 1; i < arguments.length; i++) {
+                list.push(arguments[i])
+            }
+            return obj.className = list.join(" ")
+        },
+        del: function(obj) {
+            var res = []
+            var list = arguments
+            obj.className.split(" ").forEach(function(item) {
+                for (var i = 1; i < list.length; i++) {
+                    if (item == list[i]) {return}
+                }
+                res.push(item)
+            })
+            return obj.className = res.join(" ")
+        },
+    },
     ModifyView: function(which, args) {
         var height = document.body.clientHeight-4
         var width = document.body.clientWidth-4
@@ -267,16 +301,20 @@ kit = toolkit = {
 
             } else if (child.styles) {
                 var str = []
-                for (var key in child.styles) {
-                    str.push(key)
-                    str.push(" {")
-                    for (var k in child.styles[key]) {
-                        str.push(k)
-                        str.push(":")
-                        str.push(child.styles[key][k] + (typeof child.styles[key][k] == "number"? "px": ""))
-                        str.push(";")
+                if (typeof child.styles == "string") {
+                    str.push(child.styles)
+                } else {
+                    for (var key in child.styles) {
+                        str.push(key)
+                        str.push(" {")
+                        for (var k in child.styles[key]) {
+                            str.push(k)
+                            str.push(":")
+                            str.push(child.styles[key][k] + (typeof child.styles[key][k] == "number"? "px": ""))
+                            str.push(";")
+                        }
+                        str.push("}\n")
                     }
-                    str.push("}\n")
                 }
                 child.data["innerHTML"] = str.join("")
                 child.data["type"] = "text/css"
@@ -301,7 +339,7 @@ kit = toolkit = {
         this.AppendChild(elm, children)
         return parent.insertBefore(elm, position || parent.firstElementChild)
     },
-
+    // HTML控件操作
     AppendAction: function(parent, list, cb) {
         var result = []
         list.forEach(function(item, index) {
@@ -411,8 +449,8 @@ kit = toolkit = {
             var target = event.target
             var dataset = target.dataset
             var head = target.parentElement.parentElement.querySelector("tr")
-            kit.Selector(table, "tr.select", function(item) {item.className = ""})
-            kit.Selector(table, "td.select", function(item) {item.className = ""})
+            // kit.Selector(table, "tr.select", function(item) {item.className = ""})
+            // kit.Selector(table, "td.select", function(item) {item.className = ""})
             kit.Selector(table, "tr", function(item, i) {item == target.parentElement && (index = i)})
 
             target.parentElement.childNodes.forEach(function(item, i) {
@@ -425,8 +463,8 @@ kit = toolkit = {
                 }
                 var name = head.childNodes[i].innerText
                 if (name.startsWith(field)) {
-                    item.className = "select"
-                    item.parentElement.className = "select"
+                    // item.className = "select"
+                    // item.parentElement.className = "select"
                     typeof cb == "function" && cb(event, item.innerText, name, item.parentNode.Meta, index)
                 }
                 kit.CopyText()
@@ -434,6 +472,18 @@ kit = toolkit = {
         }
     },
 
+    // HTML显示文本
+    Color: function(s) {
+        s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
+        s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
+        s = s.replace(/\033\[33m/g, "<span style='color:#ff0'>")
+        s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
+        s = s.replace(/\033\[32;1m/g, "<span style='color:#0f0'>")
+        s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
+        s = s.replace(/\033\[0m/g, "</span>")
+        s = s.replace(/\033\[m/g, "</span>")
+        return s
+    },
     OrderCode: function(code) {
         if (!code) {return}
 
@@ -497,18 +547,7 @@ kit = toolkit = {
     Position: function(which) {
         return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
     },
-    Color: function(s) {
-        s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
-        s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
-        s = s.replace(/\033\[33m/g, "<span style='color:#ff0'>")
-        s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
-        s = s.replace(/\033\[32;1m/g, "<span style='color:#0f0'>")
-        s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
-        s = s.replace(/\033\[0m/g, "</span>")
-        s = s.replace(/\033\[m/g, "</span>")
-        return s
-    },
-
+    // HTML输入文本
     CopyText: function(text) {
         text = window.getSelection().toString()
         if (text == "") {return}
@@ -530,6 +569,7 @@ kit = toolkit = {
         return true
     },
 
+    // 数据容器迭代
     Selector: function(obj, item, cb) {
         var list = []
         obj.querySelectorAll(item).forEach(function(item, index, array) {
@@ -548,10 +588,6 @@ kit = toolkit = {
             }
         }
         return list
-    },
-    Format: function(objs) {
-        return JSON.stringify(objs)
-         wa
     },
     List: function(obj, cb, interval, cbs) {
         if (interval) {
@@ -576,21 +612,21 @@ kit = toolkit = {
         }
         return list
     },
-    alert: function(text) {
-        alert(JSON.stringify(text))
+    // 数据类型转换
+    isSpace: function(c) {
+        return c == " " || c == "Enter"
     },
-    prompt: function(text) {
-        return prompt(text)
-    },
-    confirm: function(text) {
-        return confirm(text)
-    },
-    reload: function() {
-        location.reload()
-    },
-
-    distance: function(x0, y0, x1, y1) {
-        return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))
+    right: function(arg) {
+        if (arg == "true") {
+            return true
+        }
+        if (arg == "false") {
+            return false
+        }
+        if (arg) {
+            return true
+        }
+        return false
     },
     number: function(d, n) {
         var result = []
@@ -606,28 +642,8 @@ kit = toolkit = {
         result.reverse()
         return result.join("")
     },
-    right: function(arg) {
-        if (arg == "true") {
-            return true
-        }
-        if (arg == "false") {
-            return false
-        }
-        if (arg) {
-            return true
-        }
-        return false
-    },
-    time: function(t, fmt) {
-        var now = t? new Date(t): new Date()
-        fmt = fmt || "%y-%m-%d %H:%M:%S"
-        fmt = fmt.replace("%y", now.getFullYear())
-        fmt = fmt.replace("%m", kit.number(now.getMonth()+1, 2))
-        fmt = fmt.replace("%d", kit.number(now.getDate(), 2))
-        fmt = fmt.replace("%H", kit.number(now.getHours(), 2))
-        fmt = fmt.replace("%M", kit.number(now.getMinutes(), 2))
-        fmt = fmt.replace("%S", kit.number(now.getSeconds(), 2))
-        return fmt
+    distance: function(x0, y0, x1, y1) {
+        return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))
     },
     format_date: function(arg) {
         var date = arg.getDate()
@@ -652,6 +668,20 @@ kit = toolkit = {
         }
         return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
     },
+    Format: function(objs) {
+        return JSON.stringify(objs)
+    },
+    time: function(t, fmt) {
+        var now = t? new Date(t): new Date()
+        fmt = fmt || "%y-%m-%d %H:%M:%S"
+        fmt = fmt.replace("%y", now.getFullYear())
+        fmt = fmt.replace("%m", kit.number(now.getMonth()+1, 2))
+        fmt = fmt.replace("%d", kit.number(now.getDate(), 2))
+        fmt = fmt.replace("%H", kit.number(now.getHours(), 2))
+        fmt = fmt.replace("%M", kit.number(now.getMinutes(), 2))
+        fmt = fmt.replace("%S", kit.number(now.getSeconds(), 2))
+        return fmt
+    },
     size: function(obj, width, height) {
         obj.style.width = width+"px"
         obj.style.height = height+"px"
@@ -669,73 +699,6 @@ kit = toolkit = {
             case 7: res = cb(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]); break
         }
         return res || true
-    },
-
-    OrderForm: function(page, field, option, append, result) {
-        if (!option) {return}
-        option.ondaemon = option.ondaemon || function(msg) {
-            append.innerHTML = ""
-            msg && msg.append && kit.AppendTable(append, ctx.Table(msg), msg.append, function(value, key, row, index, event) {
-                typeof option.daemon_action[key] == "function" && option.daemon_action[key](value, key, row, index, event)
-            })
-            result && (result.innerText = (msg && msg.result)? msg.result.join(""): "")
-        }
-
-        option.querySelectorAll("select").forEach(function(select, index, array) {
-            select.onchange = select.onchange || function(event) {
-                if (index == array.length-1) {
-                    ctx.Runs(page, option)
-                    return
-                }
-                if (array[index+1].type == "button") {
-                    array[index+1].click()
-                    return
-                }
-                array[index+1].focus()
-            }
-        })
-        option.querySelectorAll("input").forEach(function(input, index, array) {
-            switch (input.type) {
-                case "button":
-                    input.onclick = input.onclick || function(event) {
-                        if (index == array.length-1) {
-                            if (input.value == "login") {
-                                ctx.Runs(page, option, function(msg) {
-                                    if (document.referrer) {
-                                        location.href = document.referrer
-                                    } else {
-                                        ctx.Search("group", "")
-                                    }
-                                })
-                                return
-                            }
-
-                            ctx.Runs(page, option)
-                            return
-                        }
-                        if (array[index+1].type == "button") {
-                            array[index+1].click()
-                            return
-                        }
-                        array[index+1].focus()
-                    }
-                default:
-                    input.onkeyup = input.onkeyup || function(event) {
-                        if (event.key != "Enter") {
-                            return
-                        }
-                        if (index == array.length-1) {
-                            ctx.Runs(page, option)
-                            return
-                        }
-                        if (array[index+1].type == "button") {
-                            array[index+1].click()
-                            return
-                        }
-                        array[index+1].focus()
-                    }
-            }
-        })
     },
 }
 
@@ -1490,5 +1453,4 @@ function Canvas(plugin, option, output, width, height, space, msg) {
 
     return what.reset().refresh()
 }
-
 

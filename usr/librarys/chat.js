@@ -6,7 +6,7 @@ var page = Page({
         kit.isWindows && (document.body.style.overflow = "hidden")
 
         var height = document.body.clientHeight-page.conf.border
-        var width = document.body.clientWidth-page.conf.border-2
+        var width = document.body.clientWidth-page.conf.border
         page.conf.height = height
         page.conf.width = width
 
@@ -586,6 +586,8 @@ var page = Page({
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show(), page.pane = page.action, page.plugin = kit.Selector(page.action, "fieldset")[0]
-        page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.isMobile? "办公": "工作")
+		page.onlayout(event)
+		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? "办公": "工作")
+		page.onlayout(event)
     },
 })

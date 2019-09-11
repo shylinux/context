@@ -227,6 +227,9 @@ fieldset.Footer>div.output div.state div {
 fieldset.item {
     float:left;
 }
+fieldset.item.select {
+    background-color:gold;
+}
 fieldset.item>div.output {
     overflow:auto;
 }
@@ -252,13 +255,6 @@ fieldset.item>div.output>div.status>input.cmd {
     color:lightgreen;;
     font-size:16px;
     width:250px;
-}
-fieldset.item div.output.full table td {
-    height:16px;
-}
-
-fieldset.item.select {
-    background-color:gold;
 }
 
 fieldset table {
@@ -287,7 +283,6 @@ fieldset table th.order {
     cursor:pointer;
 }
 fieldset table td {
-    min-height:16px;
     max-width:1200px;
     font-family:monospace;
     padding-left: 10px;

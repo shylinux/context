@@ -15,14 +15,6 @@ var Index = &ctx.Context{Name: "mind", Help: "思维导图",
 	Configs: map[string]*ctx.Config{},
 	Commands: map[string]*ctx.Command{
 		"doc": {Name: "doc", Help: "文档", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch len(arg) {
-			case 0:
-				m.Cmdy("ssh.data", "show", "doc")
-			case 1:
-				m.Cmdy("ssh.data", "show", "doc", arg[0])
-			case 2:
-				m.Cmdy("ssh.data", "insert", "doc", "title", arg[0], "content", arg[1])
-			}
             return
 		}},
 		"xls": {Name: "xls", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -74,7 +66,6 @@ var Index = &ctx.Context{Name: "mind", Help: "思维导图",
             return
 		}},
 		"ppt": {Name: "ppt", Help: "文稿", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-            m.Echo(kit.Select("hello world", arg, 0))
             return
 		}},
 	},

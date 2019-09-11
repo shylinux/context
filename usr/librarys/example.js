@@ -79,11 +79,12 @@ function Meta(target, obj) {
                         return {}
                     }
                     var id = "plugin"+this.ID()
-                    list.push({view: [text.view+" item", "fieldset", "", "field"], data: {id: id, Run: cb}, list: [
+                    list.push({view: ["item", "fieldset", "", "field"], data: {id: id, Run: cb}, list: [
                         {text: [text.name+"("+text.help+")", "legend"]},
                         {view: ["option", "form", "", "option"], list: [{type: "input", style: {"display": "none"}}]},
                         {view: ["output", "div", "", "output"]},
                         {script: ""+id+".Script="+(text.init||"{}")},
+                        {styles: text.view},
                     ]})
                     break
             }
@@ -143,7 +144,7 @@ function Page(page) {
             }
 
             if (page.check) {
-                false && kit.isWeiXin? page.login.Pane.Run(["weixin"], function(msg) {
+                false && kit.device.isWeiXin? page.login.Pane.Run(["weixin"], function(msg) {
                     page.Include([
                         "https://res.wx.qq.com/open/js/jweixin-1.4.0.js",
                         "/static/librarys/weixin.js",
@@ -578,8 +579,8 @@ function Pane(page, field) {
             })
         },
         Select: function(index, key) {
-            -1 < last && last < list.length && (list[last].className = "item")
-            last = index, list[index] && (list[index].className = "item select")
+            -1 < last && last < list.length && (kit.classList.del(list[last], "select"))
+            last = index, list[index] && (kit.classList.add(list[index], "select"))
 			key && pane.which.set(key)
         },
         clear: function() {
@@ -685,10 +686,6 @@ function Pane(page, field) {
     return page[name] = field, pane.Field = field, field.Pane = pane
 }
 function Plugin(page, pane, field, runs) {
-    var run = function(event, cmds, cbs) {
-        event.Plugin = plugin, runs(event, cmds, cbs)
-    }
-
     var option = field.querySelector("form.option")
     var action = field.querySelector("div.action")
     var output = field.querySelector("div.output")
@@ -697,14 +694,16 @@ function Plugin(page, pane, field, runs) {
     var name = meta.name
     var args = meta.args || []
     var inputs = JSON.parse(meta.inputs || "[]")
-    var display = JSON.parse(meta.display||'{}')
     var feature = JSON.parse(meta.feature||'{}')
     var display = JSON.parse(meta.display||'{}')
     var exports = JSON.parse(meta.exports||'["",""]')
     var deal = (feature && feature.display) || "table"
-    var history = []
-    output.className = (feature.style || "") + " output"
+    kit.classList.add(field, feature.style)
 
+    var history = []
+    var run = function(event, cmds, cbs) {
+        event.Plugin = plugin, runs(event, cmds, cbs)
+    }
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
         Append: function(item, name, value) {
@@ -733,6 +732,7 @@ function Plugin(page, pane, field, runs) {
                 case "textarea":
                     input.type = "textarea", item.style = "height:100px;"+"width:"+(pane.target.clientWidth-30)+"px"
                     item.className = "args"
+                    // no break
                 case "text":
                     item.className = "args"
                     item.autocomplete = "off"
@@ -763,8 +763,8 @@ function Plugin(page, pane, field, runs) {
             field.parentNode.removeChild(field)
         },
         Select: function(silent) {
-            page.plugin && (page.plugin.className = "item")
-            page.plugin = field, field.className = "item select"
+            page.plugin && (kit.classList.del(page.plugin, "select"))
+            page.plugin = field, kit.classList.add(field, "select")
             !silent && (option.querySelectorAll("input")[1].focus())
         },
         Reveal: function(msg) {
@@ -938,7 +938,7 @@ function Plugin(page, pane, field, runs) {
                 action.target.value = kit.History.get("txt", -1).data.trim()
             },
             onchange: function(event, action, type, name, item) {
-                plugin.Check(item.action == "auto"? undefined: action)
+                type == "select" && plugin.Check(item.action == "auto"? undefined: action)
             },
             onkeyup: function(event, action, type, name, item) {
                 switch (event.key) {
@@ -1012,8 +1012,6 @@ function Plugin(page, pane, field, runs) {
         exports: JSON.parse(meta.exports||'["",""]'),
     })
 
-    inputs.map(function(item) {
-        plugin.Append(item, item.name, item.value)
-    })
+    inputs.map(plugin.Append)
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
 }

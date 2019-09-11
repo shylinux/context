@@ -360,7 +360,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						args = append(args, msg.Parse(v))
 					}
 				}
-				m.Log("time", "check: %v", m.Format("cost"))
+				msg.Log("time", "check: %v", m.Format("cost"))
+				msg.Log("time", "check: %v %v %v", tool["componet_cmd"], args, arg)
 				msg.Cmd(tool["componet_cmd"], args, arg).CopyTo(m)
 
 			default:
@@ -371,7 +372,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 					m.Push("name", value["componet_name"])
 					m.Push("help", value["componet_help"])
-					m.Push("view", value["componet_view"])
 					if kit.Right(value["componet_init"]) {
 						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["componet_init"])), -1)
 						if script == "" {
@@ -380,6 +380,15 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Push("init", script)
 					} else {
 						m.Push("init", "")
+					}
+					if kit.Right(value["componet_view"]) {
+						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["componet_view"])), -1)
+						if script == "" {
+							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_view"])), -1)
+						}
+						m.Push("view", script)
+					} else {
+						m.Push("view", "")
 					}
 					m.Push("inputs", kit.Format(value["inputs"]))
 					m.Push("feature", kit.Format(value["feature"]))
