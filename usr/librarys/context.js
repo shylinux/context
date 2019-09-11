@@ -4,6 +4,7 @@ ctx = context = {
         for (var k in dataset) {
             option[k] = dataset[k].split(",")
         }
+        var event = window.event
         kit.History.add("cmd", option)
         this.GET("", option, function(msg) {
             msg[0] && (msg = msg[0])
@@ -16,6 +17,7 @@ ctx = context = {
                 s = kit.Color(s)
                 return s
             }
+            msg.event = event
             typeof cb == "function" && cb(msg || {})
         })
     },

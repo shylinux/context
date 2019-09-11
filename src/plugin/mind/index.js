@@ -1,10 +1,8 @@
-
 {init: function(run, field, option, output) {
-    var stop = false
     return {
         ondaemon: {
             table: function(msg, cb) {
-                if (stop) {return}
+                if (msg.event.type == "blur") {return}
                 var plugin = field.Plugin
                 output.innerHTML = "", msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), "", function(event, value, name, line, index) {
                     if (name == "id") {
@@ -14,10 +12,8 @@
                         function submit(event) {
                             td.innerText = event.target.value
                             if (event.target.value != value) {
-                                stop = true
                                 plugin.Run(event, [option.title.value, name, index-1, event.target.value], function() {
                                     plugin.Check()
-                                    stop = false
                                 })
                             }
                         }
