@@ -1,6 +1,6 @@
 {init: function(run, field, option, output) {return {
     ondaemon: {
-        table: function(msg, cb) {if (msg.event.type == "blur") {return}
+        table: function(msg, cb) {if (msg.event && msg.event.type == "blur") {return}
             var plugin = field.Plugin
             output.innerHTML = "", msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), "", function(event, value, name, line, index) {
                 if (name == "id") {

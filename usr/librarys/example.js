@@ -711,10 +711,7 @@ function Plugin(page, pane, field, runs) {
                 item[k] == undefined && (item[k] = typeof cb == "function"? function(event) {
                     cb(event, action, item.type, name, item)
                 }: cb)
-            })
-
-            var count = kit.Selector(option, ".args").length
-            args && count < args.length && (item.value = value||args[count++]||item.value||"");
+            });
 
             (item.title || item.name) && (item.title = item.title || item.name)
             item.title && (item.placeholder = item.title)
@@ -736,10 +733,13 @@ function Plugin(page, pane, field, runs) {
                 case "text":
                     item.className = "args"
                     item.autocomplete = "off"
+
+                    var count = kit.Selector(option, ".args").length
+                    args && count < args.length && (item.value = value||args[count++]||item.value||"");
                     break
             }
 
-            var ui = kit.AppendChild(option, [{view: [item.view||""], data: {title: item.title}, list: [{type: "label", inner: item.label||""}, input]}])
+            var ui = kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])
             var action = Meta(ui[name] || {}, item, plugin.onaction, plugin);
 
             (typeof item.imports == "object"? item.imports: typeof item.imports == "string"? [item.imports]: []).forEach(function(imports) {
@@ -993,7 +993,7 @@ function Plugin(page, pane, field, runs) {
                             page.action.scrollTo(0, field.offsetTop)
                             break
                         case "b":
-                            plugin.Append({className: "args temp"}).focus()
+                            plugin.Append({className: "args temp", type: "text"}).focus()
                             break
                         case "m":
                             plugin.Clone().Select()
@@ -1012,6 +1012,6 @@ function Plugin(page, pane, field, runs) {
         exports: JSON.parse(meta.exports||'["",""]'),
     })
 
-    inputs.map(plugin.Append)
+    inputs.map(function(item) {plugin.Append(item)})
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
 }

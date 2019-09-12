@@ -268,7 +268,7 @@ kit = toolkit = {
                 }
 
             } else if (child.view) {
-                child.data["className"] = child.view[0]
+                (child.view.length > 0 && child.view[0]) && (child.data["className"] = child.view[0])
                 child.type = child.view.length > 1? child.view[1]: "div"
                 child.view.length > 2 && (child.data["innerHTML"] = child.view[2])
                 child.view.length > 3 && (child.name = child.view[3])

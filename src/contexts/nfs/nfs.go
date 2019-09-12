@@ -47,9 +47,10 @@ func dir(m *ctx.Message, root string, name string, level int, deep bool, dir_typ
 			}
 
 			p := path.Join(name, f.Name())
-			f, e := os.Stat(p)
-			if e != nil {
+			if f, e = os.Lstat(p); e != nil {
 				m.Log("info", "%s", e)
+				continue
+			} else if (f.Mode() & os.ModeSymlink) != 0 {
 				continue
 			}
 

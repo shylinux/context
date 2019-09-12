@@ -28,7 +28,7 @@ legend {
 }
 
 fieldset>form.option div {
-    margin-right:6px;
+    margin-right:3px;
     float:left;
 }
 fieldset>form.option div.hide {
@@ -38,7 +38,7 @@ fieldset>form.option div.clear {
     clear:both;
 }
 fieldset>form.option label {
-    margin-right:6px;
+    margin-right:3px;
 }
 fieldset>form.option div input.args {
     width:80px;

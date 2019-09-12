@@ -1168,15 +1168,15 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			}
 
 			m.Confv("_index", []interface{}{-2}, map[string]interface{}{
-				"componet_name": kit.Select("", arg, 1),
-				"componet_help": kit.Select("", arg, 2),
-				"componet_view": view,
-				"componet_init": init,
-				"componet_type": right,
+				"name": kit.Select("", arg, 1),
+				"help": kit.Select("", arg, 2),
+				"view": view,
+				"init": init,
+				"type": right,
 
-				"componet_ctx":  m.Cap("module"),
-				"componet_cmd":  cmd,
-				"componet_args": args,
+				"ctx":  m.Cap("module"),
+				"cmd":  cmd,
+				"args": args,
 				"inputs":        inputs,
 				"exports":       exports,
 				"feature":       feature,

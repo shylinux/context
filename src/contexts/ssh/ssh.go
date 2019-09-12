@@ -83,47 +83,47 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Configs: map[string]*ctx.Config{
 		"componet": {Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
-				map[string]interface{}{"componet_name": "ifconfig", "componet_help": "ifconfig",
-					"componet_tmpl": "componet", "componet_view": "", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
-					"componet_args": []interface{}{"_", "tcp.ifconfig"}, "inputs": []interface{}{
+				map[string]interface{}{"name": "ifconfig", "help": "ifconfig",
+					"tmpl": "componet", "view": "", "init": "",
+					"type": "private", "ctx": "ssh", "cmd": "_route",
+					"args": []interface{}{"_", "tcp.ifconfig"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "value": "", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "button", "value": "查看"},
 					},
 				},
-				map[string]interface{}{"componet_name": "proc", "componet_help": "proc",
-					"componet_tmpl": "componet", "componet_view": "", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
-					"componet_args": []interface{}{"_", "cli.proc"}, "inputs": []interface{}{
+				map[string]interface{}{"name": "proc", "help": "proc",
+					"tmpl": "componet", "view": "", "init": "",
+					"type": "private", "ctx": "ssh", "cmd": "_route",
+					"args": []interface{}{"_", "cli.proc"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "value": "", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "text", "name": "arg", "value": ""},
 						map[string]interface{}{"type": "text", "name": "filter", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
 				},
-				map[string]interface{}{"componet_name": "spide", "componet_help": "爬虫",
-					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
-					"componet_args": []interface{}{"_", "context", "web", "spide"}, "inputs": []interface{}{
+				map[string]interface{}{"name": "spide", "help": "爬虫",
+					"tmpl": "componet", "view": "Context", "init": "",
+					"type": "private", "ctx": "ssh", "cmd": "_route",
+					"args": []interface{}{"_", "context", "web", "spide"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
 					"exports": []interface{}{"site", "key"},
 				},
-				map[string]interface{}{"componet_name": "post", "componet_help": "请求",
-					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
-					"componet_args": []interface{}{"_", "web.post", "__", "content_type", "application/json", "parse", "json"}, "inputs": []interface{}{
+				map[string]interface{}{"name": "post", "help": "请求",
+					"tmpl": "componet", "view": "Context", "init": "",
+					"type": "private", "ctx": "ssh", "cmd": "_route",
+					"args": []interface{}{"_", "web.post", "__", "content_type", "application/json", "parse", "json"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "text", "name": "spide", "value": "dev", "imports": "plugin_site"},
 						map[string]interface{}{"type": "text", "name": "url", "value": "/", "view": "long"},
 						map[string]interface{}{"type": "button", "value": "执行"},
 					},
 				},
-				map[string]interface{}{"componet_name": "get", "componet_help": "请求",
-					"componet_tmpl": "componet", "componet_view": "Context", "componet_init": "",
-					"componet_type": "private", "componet_ctx": "ssh", "componet_cmd": "_route",
-					"componet_args": []interface{}{"_", "web.get", "__", "method", "GET", "parse", "json"}, "inputs": []interface{}{
+				map[string]interface{}{"name": "get", "help": "请求",
+					"tmpl": "componet", "view": "Context", "init": "",
+					"type": "private", "ctx": "ssh", "cmd": "_route",
+					"args": []interface{}{"_", "web.get", "__", "method", "GET", "parse", "json"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "imports": "plugin_pod"},
 						map[string]interface{}{"type": "text", "name": "spide", "value": "dev", "imports": "plugin_site"},
 						map[string]interface{}{"type": "text", "name": "url", "value": "/", "view": "long"},
@@ -303,14 +303,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 		"tool": {Name: "tool [group index][run group index chatid arg...]", Help: "工具", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Confm("componet", func(key string, index int, value map[string]interface{}) {
-					if kit.Format(value["componet_type"]) != "public" && m.Option("userrole") != "root" {
+					if kit.Format(value["type"]) != "public" && m.Option("userrole") != "root" {
 						return
 					}
 
 					m.Push("key", key)
 					m.Push("index", index)
-					m.Push("name", value["componet_name"])
-					m.Push("help", value["componet_help"])
+					m.Push("name", value["name"])
+					m.Push("help", value["help"])
 				})
 				m.Table()
 				return
@@ -321,7 +321,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Option("plugin", arg[1])
 				tool := m.Confm("componet", []string{arg[1], arg[2]})
 				if m.Option("userrole") != "root" {
-					switch kit.Format(tool["componet_type"]) {
+					switch kit.Format(tool["type"]) {
 					case "private":
 						m.Echo("private componet of %s", m.Conf("runtime", "work.name"))
 						return
@@ -333,7 +333,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 				}
 
-				msg := m.Find(kit.Format(tool["componet_ctx"]))
+				msg := m.Find(kit.Format(tool["ctx"]))
 				if option, ok := tool["options"].(map[string]interface{}); ok {
 					for k, v := range option {
 						msg.Option(k, v)
@@ -345,7 +345,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				arg = arg[4:]
 				args := []string{}
-				for _, v := range kit.Trans(tool["componet_args"]) {
+				for _, v := range kit.Trans(tool["args"]) {
 					if strings.HasPrefix(v, "__") {
 						if len(arg) > 0 {
 							args, arg = append(args, arg...), nil
@@ -361,31 +361,31 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 				}
 				msg.Log("time", "check: %v", m.Format("cost"))
-				if msg.Cmd(tool["componet_cmd"], args, arg).CopyTo(m); !msg.Hand {
-					msg.Log("warn", "not found %v:%v", tool["componet_ctx"], tool["componet_cmd"])
+				if msg.Cmd(tool["cmd"], args, arg).CopyTo(m); !msg.Hand {
+					msg.Log("warn", "not found %v:%v", tool["ctx"], tool["cmd"])
 				}
 
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {
-					if kit.Format(value["componet_type"]) == "private" && m.Option("userrole") != "root" {
+					if kit.Format(value["type"]) == "private" && m.Option("userrole") != "root" {
 						return
 					}
 
-					m.Push("name", value["componet_name"])
-					m.Push("help", value["componet_help"])
-					if kit.Right(value["componet_init"]) {
-						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["componet_init"])), -1)
+					m.Push("name", value["name"])
+					m.Push("help", value["help"])
+					if kit.Right(value["init"]) {
+						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["init"])), -1)
 						if script == "" {
-							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_init"])), -1)
+							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["init"])), -1)
 						}
 						m.Push("init", script)
 					} else {
 						m.Push("init", "")
 					}
-					if kit.Right(value["componet_view"]) {
-						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["componet_view"])), -1)
+					if kit.Right(value["view"]) {
+						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["view"])), -1)
 						if script == "" {
-							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["componet_view"])), -1)
+							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["view"])), -1)
 						}
 						m.Push("view", script)
 					} else {
