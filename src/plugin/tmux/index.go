@@ -83,6 +83,13 @@ var Index = &ctx.Context{Name: "tmux", Help: "终端管理",
 						m.Add("append", view[j], col)
 					}
 				}
+				for i, k := range m.Meta["append"] {
+					if strings.HasPrefix(k, "session_") {
+						x := strings.TrimPrefix(k, "session_")
+						m.Meta["append"][i] = x
+						m.Meta[x] = m.Meta[k]
+					}
+				}
 				m.Table()
 				return
 			}
@@ -97,6 +104,13 @@ var Index = &ctx.Context{Name: "tmux", Help: "终端管理",
 				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-windows", "-t", arg[0], "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
 					for j, col := range strings.Split(row, ",") {
 						m.Add("append", view[j], col)
+					}
+				}
+				for i, k := range m.Meta["append"] {
+					if strings.HasPrefix(k, "window_") {
+						x := strings.TrimPrefix(k, "window_")
+						m.Meta["append"][i] = x
+						m.Meta[x] = m.Meta[k]
 					}
 				}
 				m.Table()
@@ -127,6 +141,13 @@ var Index = &ctx.Context{Name: "tmux", Help: "终端管理",
 				for _, row := range strings.Split(strings.TrimSpace(m.Cmdx("cli.system", "tmux", "list-panes", "-t", target, "-F", fmt.Sprintf("#{%s}", strings.Join(view, "},#{")))), "\n") {
 					for j, col := range strings.Split(row, ",") {
 						m.Add("append", view[j], col)
+					}
+				}
+				for i, k := range m.Meta["append"] {
+					if strings.HasPrefix(k, "pane_") {
+						x := strings.TrimPrefix(k, "pane_")
+						m.Meta["append"][i] = x
+						m.Meta[x] = m.Meta[k]
 					}
 				}
 				m.Table()

@@ -8,31 +8,33 @@ kit buffer "粘贴板" public buf \
 
 kit session "会话" private mux \
 	button "查看" action auto \
-    exports tmux_sess session_name
+    exports tmux_sess name
 
 kit windows "窗口" private mux \
-	text "" imports plugin_tmux_sess action auto \
+	text "context" imports plugin_tmux_sess action auto \
 	button "查看" \
-    exports tmux_wins window_name
+    exports tmux_wins name
 
 kit pane "面板" private mux \
-	text "" imports plugin_tmux_sess \
-	text "" imports plugin_tmux_wins action auto \
+	text "context" imports plugin_tmux_sess \
+	text "docker" imports plugin_tmux_wins action auto \
 	button "查看" \
-    exports tmux_pane pane_index
+    exports tmux_pane index
 
 kit view "内容" private mux \
-	text "" imports plugin_tmux_sess \
-	text "" imports plugin_tmux_wins \
-	text "" imports plugin_tmux_pane action auto \
-	button "查看" \
-    exports tmux_pane pane_index
+	text "context" imports plugin_tmux_sess \
+	text "docker" imports plugin_tmux_wins \
+	text "4" imports plugin_tmux_pane action auto view tiny \
+	button "查看"
 
 kit cmd "命令" private mux _ _ _ r \
-	text "" imports plugin_tmux_sess \
-	text "" imports plugin_tmux_wins \
-	text "" imports plugin_tmux_pane \
-	text "pwd" view long \
-	button "执行" \
-    exports tmux_pane pane_index
+	text "context" imports plugin_tmux_sess \
+	text "docker" imports plugin_tmux_wins \
+	text "4" imports plugin_tmux_pane view tiny \
+	text "pwd" view full \
+	button "执行"
+
+kit json "解析" private "nfs.json" \
+	text "" view full \
+	button "执行"
 

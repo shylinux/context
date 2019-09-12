@@ -54,6 +54,9 @@ fieldset>form.option div.tiny input.args {
 fieldset>form.option div.long input.args {
     width:240px;
 }
+fieldset>form.option div.full input.args {
+    width:480px;
+}
 fieldset>div.action {
     padding:6px;
 }

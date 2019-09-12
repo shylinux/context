@@ -361,8 +361,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 				}
 				msg.Log("time", "check: %v", m.Format("cost"))
-				msg.Log("time", "check: %v %v %v", tool["componet_cmd"], args, arg)
-				msg.Cmd(tool["componet_cmd"], args, arg).CopyTo(m)
+				if msg.Cmd(tool["componet_cmd"], args, arg).CopyTo(m); !msg.Hand {
+					msg.Log("warn", "not found %v:%v", tool["componet_ctx"], tool["componet_cmd"])
+				}
 
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {

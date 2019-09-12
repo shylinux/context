@@ -149,7 +149,6 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			msg.Option("sessid", "")
 
 			// 请求环境
-			msg.Option("dir_root", msg.Cap("directory"))
 			for _, v := range r.Cookies() {
 				if v.Value != "" {
 					msg.Option(v.Name, v.Value)
