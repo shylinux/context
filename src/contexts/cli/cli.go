@@ -139,6 +139,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "版本发布"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
+			"install": []interface{}{"system"},
 			"system": []interface{}{"boot.sh", "zone.sh", "user.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
 			"portal": []interface{}{"template.tar.gz", "librarys.tar.gz"},
 			"script": []interface{}{"test.php"},
@@ -945,6 +946,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			switch arg[0] {
+			case "install":
+				m.Cmd("cli.upgrade", "system")
+				m.Cmd("cli.upgrade", "portal")
+
 			case "project":
 				m.Cmd("cli.project", "init")
 				m.Cmd("cli.compile", "all")

@@ -558,7 +558,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"trash":  "var/tmp/trash",
 		}, Help: "目录管理"},
 		"pwd": &ctx.Config{Name: "pwd", Value: []interface{}{
-			"var", "usr", "usr/local", "bin", "etc", "",
+			"", "usr/local", "usr", "var", "bin", "etc", "src", "src/plugin",
 		}, Help: "当前目录"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -629,7 +629,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 				skip, find := false, false
 				m.Confm("pwd", func(index int, value string) bool {
-					p := path.Join(value, arg[0])
+					p := kit.Select("./", path.Join(value, arg[0]))
 					if s, e := os.Stat(p); e == nil {
 						if s.IsDir() {
 							rg, _ := regexp.Compile(m.Option("dir_reg"))

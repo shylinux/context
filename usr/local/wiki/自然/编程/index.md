@@ -20,7 +20,29 @@ context是以分布式的方式，进行程序的开发。
 $ curl https://shylinux.com/publish/boot.sh | bash -s install context
 ```
 
-install后面的参数context，就是指定的下载目录，
+install后面的参数context，就是指定的下载目录，如不指定，会把相关文件下载到当前目录。
+
+下载完成后，会自动启动context，
+windows下的GitBash中，如果自动启动失败，则需要手动启动一下。
+```
+$ cd context && bin/boot.sh
+```
+
+启动后context，就是一种交互式的shell，可以执行各种内部命令和系统本地命令。
+如下查看当前目录与当目录下的文件。
+```
+0[22:21:19]nfs> pwd
+/home/homework/context
+
+1[22:21:20]nfs> dir
+time                size line path
+2019-09-12 22:21:18 103  5    bin/
+2019-09-12 22:20:40 72   3    etc/
+2019-09-12 22:21:18 50   2    usr/
+2019-09-12 22:20:40 55   3    var/
+2[22:21:20]nfs>
+```
+
 进入下载目录，可以看到的有八个文件。
 
 在bin目录下，就是各种执行文件
