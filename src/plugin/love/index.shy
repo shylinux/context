@@ -1,0 +1,20 @@
+fun meet "第一眼" public \
+	text "love" name table imports plugin_table \
+	text "" name when \
+	text "" name where \
+	button "操作"
+
+    if $2 == ""
+        copy ssh.data show _
+        return
+    end
+    if $3 == ""
+        return "meet miss"
+    end
+    copy ssh.data insert _ when _ where __
+end
+
+kit imports "导入" "" "" private "ssh.data" "import" \
+	text "love" name table \
+	text "" name file \
+	button "导入"

@@ -3,6 +3,7 @@ package ssh
 import (
 	"bufio"
 	"contexts/ctx"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -530,9 +531,22 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			case "update":
 				index := kit.Int(arg[2]) - 1
-				for i := 3; i < len(arg) - 1; i += 2 {
+				for i := 3; i < len(arg)-1; i += 2 {
 					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index), arg[i]}, arg[i+1])
 				}
+			case "import":
+				m.Cmd("nfs.import", arg[2:]).Table(func(maps map[string]string, lists []string, line int) {
+					data := map[string]interface{}{}
+					extra := map[string]interface{}{}
+					for k, v := range maps {
+						data[k] = v
+					}
+					json.Unmarshal(([]byte)(maps["extra"]), &data)
+					data["extra"] = extra
+
+					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", "-2"}, map[string]interface{}{})
+
+				})
 			}
 			return
 		}},
@@ -686,7 +700,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if rest := kit.Select("", names, 1); names[0] != "" {
 				// 数字签名
 				if !m.Options("remote_code") && arg[0] != "_check" {
-					for _, k := range []string{"river"}{
+					for _, k := range []string{"river"} {
 						m.Option(k, m.Option(k))
 					}
 
