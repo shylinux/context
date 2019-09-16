@@ -84,7 +84,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 	Configs: map[string]*ctx.Config{
 		"componet": {Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
-				map[string]interface{}{"name": "ifconfig", "help": "ifconfig",
+				map[string]interface{}{"name": "ifconfig", "help": "网卡",
 					"tmpl": "componet", "view": "", "init": "",
 					"type": "private", "ctx": "ssh", "cmd": "_route",
 					"args": []interface{}{"_", "tcp.ifconfig"}, "inputs": []interface{}{
@@ -92,7 +92,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						map[string]interface{}{"type": "button", "value": "查看", "action": "auto"},
 					},
 				},
-				map[string]interface{}{"name": "proc", "help": "proc",
+				map[string]interface{}{"name": "proc", "help": "进程",
 					"tmpl": "componet", "view": "", "init": "",
 					"type": "private", "ctx": "ssh", "cmd": "_route",
 					"args": []interface{}{"_", "cli.proc"}, "inputs": []interface{}{
