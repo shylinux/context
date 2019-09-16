@@ -1,15 +1,12 @@
 fun meet "第一眼" public \
 	text "love" name table imports plugin_table \
-	text "" name when \
+	text "date" name when \
 	text "" name where \
 	button "操作"
 
-    if $2 == ""
+    if $2 == "" || $3 == ""
         copy ssh.data show _
         return
-    end
-    if $3 == ""
-        return "meet miss"
     end
     copy ssh.data insert _ when _ where __
 end

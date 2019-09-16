@@ -14,22 +14,26 @@ context是以分布式的方式，进行程序的开发。
 消灭所有中间环节，让几行代码的小函数，就可以成为独立的应用，从而实现软件的快速开发与快速传播，将任意一行代码的价值，放大成千上万倍。
 
 ## 下载安装
-在Linux或Mac上，可以直接用脚本下载，
-在Windows上，可以先安装 [GitBash](https://www.git-scm.com/download/)，然后在GitBash中执行命令下载。
+### 下载
+在Linux或Mac上，可以直接用命令下载，
+在Windows上，推荐先安装 [GitBash](https://www.git-scm.com/download/)，然后在GitBash中执行命令下载。
 ```
-$ curl https://shylinux.com/publish/boot.sh | bash -s install context
+$ export ctx_dev=https://shylinux.com; curl $ctx_dev/publish/boot.sh | bash -s install context
 ```
+*install后面的参数context，就是指定的下载目录，如不指定，会把相关文件下载到当前目录。*
 
-install后面的参数context，就是指定的下载目录，如不指定，会把相关文件下载到当前目录。
+*ctx_dev环境变量指定服务器地址，所以可以自行搭建服务器。*
 
+### 启动
 下载完成后，会自动启动context，
-windows下的GitBash中，如果自动启动失败，则需要手动启动一下。
+windows下的GitBash中，如果自动启动失败，则需要手动启动一下，如下命令。
 ```
 $ cd context && bin/boot.sh
 ```
 
-启动后context，就是一种交互式的shell，可以执行各种内部命令和系统本地命令。
-如下查看当前目录与当目录下的文件。
+### 使用
+启动后context，提供了一种交互式的shell，直接可以执行各种内部命令和本地命令。
+如下查看当前目录与相关目录下的文件。
 ```
 0[22:21:19]nfs> pwd
 /home/homework/context
@@ -38,10 +42,36 @@ $ cd context && bin/boot.sh
 time                size line path
 2019-09-12 22:21:18 103  5    bin/
 2019-09-12 22:20:40 72   3    etc/
-2019-09-12 22:21:18 50   2    usr/
 2019-09-12 22:20:40 55   3    var/
-2[22:21:20]nfs>
+2019-09-12 22:21:18 50   2    usr/
+
+2[20:51:21]nfs> dir bin
+time                size     line path
+2019-09-16 20:51:14 18782016 5209 bin/bench
+2019-09-16 20:51:14 2634     99   bin/boot.sh
+2019-09-16 20:51:14 125      5    bin/node.sh
+2019-09-16 20:51:14 96       6    bin/user.sh
+2019-09-16 20:51:14 147      9    bin/zone.sh
+
+3[20:51:22]nfs> dir etc
+time                size line path
+2019-09-16 20:51:14 339  11   etc/common.shy
+2019-09-16 20:51:14 244  11   etc/exit.shy
+2019-09-16 20:51:14 297  18   etc/init.shy
+
+4[22:21:20]nfs>
 ```
+- bin目录，就是各种启动脚本与命令
+- etc目录，就是各种配置脚本
+- var目录，就是各种输出文件，如日志与缓存文件
+- usr目录，就是各种前端文件与数据，如js、css文件
+
+*如需要自行启动context，必须在当前目录，然后运行bin/boot.sh脚本。否则会找不到相关文件。*
+
+## 基本功能
+
+除了命令行交互，还可以访问<http://localhost:9095>，用浏览器进行操作。
+context启动后，默认监听9095端口，启动网页服务。
 
 进入下载目录，可以看到的有八个文件。
 

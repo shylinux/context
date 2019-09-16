@@ -712,6 +712,11 @@ function Plugin(page, pane, field, runs) {
                     cb(event, action, item.type, name, item)
                 }: cb)
             });
+            switch (item.value) {
+                case "date":
+                    item.value = kit.format_date(new Date())
+                    break
+            }
 
             (item.title || item.name) && (item.title = item.title || item.name)
             item.title && (item.placeholder = item.title)

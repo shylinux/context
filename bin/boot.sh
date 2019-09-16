@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/bash -i
 
 # 日志配置
 export ctx_log=${ctx_log:="var/log"}
@@ -45,7 +45,9 @@ install() {
         *) GOARCH=386;;
     esac
 
-    curl -o ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" &>/dev/null && chmod a+x ${ctx_app} || return
+    echo
+    echo
+    curl -o ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} || return
 
     target=install && [ -n "$1" ] && target=$1
     ${md5} ${ctx_app} && ./${ctx_app} upgrade ${target} || return
@@ -67,10 +69,10 @@ action() {
 hup() { echo "term hup"; }
 log() { echo -e $*; }
 
-log "bin:$ctx_bin"
-log "box:$ctx_box"
-log "dev:$ctx_dev"
-log "ups:$ctx_ups"
+log "bin: $ctx_bin"
+log "box: $ctx_box"
+log "dev: $ctx_dev"
+log "ups: $ctx_ups"
 
 case $1 in
     help) echo
@@ -95,4 +97,3 @@ case $1 in
     quit) action QUIT;;
     term) action TERM
 esac
-

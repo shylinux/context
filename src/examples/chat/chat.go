@@ -9,7 +9,7 @@ import (
 var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "默认组件"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true}, Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"name": "chat",
@@ -24,7 +24,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				},
 				map[string]interface{}{"name": "header",
 					"tmpl": "fieldset", "view": "Header", "init": "initHeader",
-					"title": "shylinux 天行健，君子以自强不息",
+					"ctx": "web.chat", "cmd": "login",
 				},
 
 				map[string]interface{}{"name": "ocean",
@@ -154,7 +154,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					return
 				}
 
-				m.Cmdx(".steam", h, "spawn", "favor")
+				m.Cmdx(".steam", h, "spawn", "index")
 
 				// 分发群聊
 				m.Confm("flow", []string{h, "user"}, func(key string, value map[string]interface{}) {
@@ -198,6 +198,11 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 						m.Push("count", 0)
 					}
 				})
+				if !m.Appends("key") {
+					m.Cmd(".ocean", "spawn", "", "hello", m.Option("username"))
+					m.Cmdy(".river")
+					return
+				}
 				m.Sort("name").Sort("update_time", "time_r").Table()
 				return
 			}

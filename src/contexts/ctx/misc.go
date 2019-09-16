@@ -202,6 +202,9 @@ func (m *Message) Format(arg ...interface{}) string {
 	}
 	return strings.Join(meta, " ")
 }
+func (m *Message) Err(str string, arg ...interface{}) {
+	m.Echo("").Echo("error: ").Echo(str, arg...)
+}
 
 func (m *Message) Start(name string, help string, arg ...string) bool {
 	return m.Set("detail", arg).target.Spawn(m, name, help).Begin(m).Start(m)

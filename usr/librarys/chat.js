@@ -26,6 +26,7 @@ var page = Page({
         sizes.source == undefined && (sizes.source = page.source.clientHeight);
         (sizes.action == -1 || sizes.source == 0) && (sizes.action = height, sizes.source = 0)
         width -= page.river.offsetWidth+page.storm.offsetWidth
+
         page.action.Pane.Size(width, sizes.action)
         page.source.Pane.Size(width, sizes.source)
 
@@ -370,23 +371,35 @@ var page = Page({
             Action: {
                 "聊天": function(event, value) {
                     page.onlayout(event, page.conf.layout)
+                    page.onlayout(event)
+                    page.onlayout(event)
                 },
                 "办公": function(event, value) {
                     page.onlayout(event, page.conf.layout)
                     page.onlayout(event, {river: 0, action:300, source:60})
+                    page.onlayout(event)
+                    page.onlayout(event)
                 },
                 "工作": function(event, value) {
                     page.onlayout(event, page.conf.layout)
                     page.onlayout(event, {river:0, action:-1, source:60})
+                    page.onlayout(event)
+                    page.onlayout(event)
                 },
                 "最高": function(event, value) {
                     page.onlayout(event, {action: -1})
+                    page.onlayout(event)
+                    page.onlayout(event)
                 },
                 "最宽": function(event, value) {
                     page.onlayout(event, {river:0, storm:0})
+                    page.onlayout(event)
+                    page.onlayout(event)
                 },
                 "最大": function(event, value) {
                     page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})
+                    page.onlayout(event)
+                    page.onlayout(event)
                 },
 
                 "刷新": function(event, value) {
@@ -586,8 +599,6 @@ var page = Page({
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show(), page.pane = page.action, page.plugin = kit.Selector(page.action, "fieldset")[0]
-		page.onlayout(event)
 		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? "办公": "工作")
-		page.onlayout(event)
     },
 })

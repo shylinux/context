@@ -1143,7 +1143,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 			m.Optionv("bio.args", arg)
 			if help := fmt.Sprintf("scan %s", arg[0]); arg[0] == "stdio" {
-				m.Put("option", "bio.in", os.Stdin).Put("option", "bio.out", os.Stdout).Start(arg[0], help, "scan", arg[0])
+				m.Put("option", "bio.in", os.Stdin).Put("option", "bio.out", os.Stdout)
+				m.Start(arg[0], help, "scan", arg[0])
 				m.Wait()
 
 			} else if p, f, e := open(m, arg[0]); e == nil {

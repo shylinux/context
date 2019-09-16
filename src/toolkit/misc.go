@@ -155,3 +155,12 @@ func UnMarshalm(data string) map[string]interface{} {
 	res, _ := UnMarshal(data).(map[string]interface{})
 	return res
 }
+func IsLocalIP(ip string) bool {
+	if strings.HasPrefix(ip, "127") {
+		return true
+	}
+	if ip == "::1" {
+		return true
+	}
+	return false
+}

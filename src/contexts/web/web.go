@@ -93,12 +93,8 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	if !msg.Has("username") || !msg.Options("username") {
 		msg.Option("username", "")
 	}
-	// if msg.Confs("skip_login", msg.Option("path")) {
-	// 	return true
-	// }
-	// defer func() {
-	// msg.Log("info", "access: %s", msg.Option("access", msg.Cmdx("aaa.sess", "access")))
-	// }()
+
+	// 用户登录
 	if msg.Options("username") && msg.Options("password") {
 		if msg.Cmds("aaa.auth", "username", msg.Option("username"), "password", msg.Option("password")) {
 			msg.Log("info", "login: %s", msg.Option("username"))
@@ -126,10 +122,19 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// 用户访问
 	if msg.Log("info", "sessid: %s", msg.Option("sessid")); msg.Options("sessid") {
 		msg.Log("info", "username: %s", msg.Option("username", msg.Cmd("aaa.sess", "user").Append("meta")))
 		msg.Log("info", "userrole: %v", msg.Option("userrole", msg.Cmd("aaa.user", "role").Append("meta")))
 	}
+
+	// 本地用户
+	if !msg.Options("username") && kit.IsLocalIP(msg.Option("remote_ip")) && msg.Confs("web.login", "local") {
+		msg.Cmd("aaa.role", "root", "user", msg.Cmdx("ssh.work", "create"))
+		msg.Log("info", "%s: %s", msg.Option("remote_ip"), msg.Option("username", msg.Conf("runtime", "work.name")))
+		http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
+	}
+
 	return true
 }
 func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
@@ -372,7 +377,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			"cert":       "etc/cert.pem",
 			"key":        "etc/key.pem",
 			"site":       "",
-			"index":      "/code/",
+			"index":      "/chat/",
 		}, Help: "服务配置"},
 		"route": &ctx.Config{Name: "route", Value: map[string]interface{}{
 			"index":          "/render",
@@ -384,6 +389,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "功能配置"},
 		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
+			"local":     true,
 			"check":     true,
 			"sess_void": false,
 			"cas_uuid":  "email",

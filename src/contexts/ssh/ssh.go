@@ -89,7 +89,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					"type": "private", "ctx": "ssh", "cmd": "_route",
 					"args": []interface{}{"_", "tcp.ifconfig"}, "inputs": []interface{}{
 						map[string]interface{}{"type": "text", "name": "pod", "value": "", "imports": "plugin_pod"},
-						map[string]interface{}{"type": "button", "value": "查看"},
+						map[string]interface{}{"type": "button", "value": "查看", "action": "auto"},
 					},
 				},
 				map[string]interface{}{"name": "proc", "help": "proc",
@@ -279,12 +279,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				name := kit.Select(m.Conf("runtime", "user.name"), arg, 1)
 				work := kit.Select(m.Conf("runtime", "work.route"), arg, 2)
 
-				if n := m.Cmdx("ssh._route", work, "_check", "work", name, m.Conf("runtime", "user.route")); n != "" {
+				if n := m.Cmdx("ssh._route", work, "_check", "work", "create", name, m.Conf("runtime", "user.route")); n != "" {
 					m.Conf("runtime", "work.route", work)
 					m.Conf("runtime", "work.name", n)
 					m.Echo(n)
 				} else {
-					m.Echo("error: %s from %s", name, work)
+					m.Err("%s from %s", name, work)
 				}
 
 			// 共享用户
@@ -535,18 +535,23 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index), arg[i]}, arg[i+1])
 				}
 			case "import":
-				m.Cmd("nfs.import", arg[2:]).Table(func(maps map[string]string, lists []string, line int) {
+				msg := m.Cmd("nfs.import", arg[2:])
+				id := m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "count"})
+				msg.Table(func(maps map[string]string) {
 					data := map[string]interface{}{}
 					extra := map[string]interface{}{}
 					for k, v := range maps {
+						m.Push(k, v)
 						data[k] = v
 					}
 					json.Unmarshal(([]byte)(maps["extra"]), &data)
 					data["extra"] = extra
+					id++
+					data["id"] = id
 
-					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", "-2"}, map[string]interface{}{})
-
+					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", "-2"}, data)
 				})
+				m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "count"}, id)
 			}
 			return
 		}},
@@ -601,9 +606,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Append("node.name", m.Conf("runtime", "node.name"))
 				m.Append("user.name", m.Conf("runtime", "user.name"))
 				m.Append("work.name", m.Conf("runtime", "work.name"))
-				m.Append("node.route", m.Conf("runtime", "node.route"))
-				m.Append("user.route", m.Conf("runtime", "user.route"))
 				m.Append("work.route", m.Conf("runtime", "work.route"))
+				m.Append("user.route", m.Conf("runtime", "user.route"))
+				m.Append("node.route", m.Conf("runtime", "node.route"))
 				m.Append("work.script", m.Cmdx("nfs.load", path.Join(m.Conf("cli.publish", "path"), kit.Select("hello", arg[3]), "local.shy")))
 				m.Echo(name).Back(m)
 
@@ -675,6 +680,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if len(arg) == 0 {
 				return
 			}
+
 			// 同步异步
 			sync := true
 			switch arg[0] {
@@ -789,6 +795,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				// 设备验签
 				m.Echo("node error of %s", m.Option("node.route"))
 
+			} else if arg[0] == "tool" {
+				m.Cmd("tool", arg[1:])
 			} else {
 				// 执行命令
 				m.Log("time", "check: %v", m.Format("cost"))
@@ -1019,6 +1027,22 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Add("append", "create_time", value["create_time"])
 					})
 					m.Table()
+
+				case "create":
+					name := arg[2]
+					if user := m.Conf("work", []string{name, "user"}); user != "" && user != arg[3] {
+						for i := 1; i < 100; i++ {
+							name = fmt.Sprintf("%s%02d", arg[2], i)
+							if user := m.Conf("work", []string{name, "user"}); user == "" || user == arg[3] {
+								break
+							}
+							name = ""
+						}
+					}
+					if name != "" {
+						m.Conf("work", name, map[string]interface{}{"create_time": m.Time(), "user": arg[3]})
+						m.Echo(name)
+					}
 
 				default:
 					if cert := m.Confm("work", arg[1]); len(arg) == 2 {
