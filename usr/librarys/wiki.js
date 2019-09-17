@@ -53,7 +53,7 @@ var page = Page({
                     page.onlayout()
                 })
 
-                ctx.Runs(page, form, function(msg) {
+                ctx.Runs(form, function(msg) {
                     ui.back.innerHTML = "", kit.AppendChild(ui.back, [
                         {"button": ["知识", function(event) {
                             ctx.Search({"level": "", "class": "", "favor": ""})
@@ -129,7 +129,7 @@ var page = Page({
 
                 ctx.Search("layout") == "max" && (page.Conf("tree.display", "none"), page.Conf("menu.display", "none"))
 
-                ctx.Runs(page, form, function(msg) {
+                ctx.Runs(form, function(msg) {
                     ui.menu.innerHTML = "", ui.text.innerHTML = msg.result? msg.result.join(""): ""
                     kit.AppendChild(ui.menu, [{"tree": kit.OrderText(field, ui.text)}])
                     page.footer.Pane.State("count", msg.visit_count)

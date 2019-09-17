@@ -111,13 +111,28 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		return false
 
 	} else if msg.Options("relay") {
-		if relay := msg.Cmd("aaa.relay", "check", msg.Option("relay")); relay.Appends("username") {
-			if role := msg.Cmdx("aaa.relay", "check", msg.Option("relay"), "userrole"); role != "" {
-				msg.Log("info", "login: %s", msg.Option("username", relay.Append("username")))
-				http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
-				msg.Cmd("aaa.role", role, "user", msg.Option("username"))
-				msg.Log("info", "relay: %s", role)
-				return true
+		relay := msg.Cmd("aaa.relay", "check", msg.Option("relay"))
+		if relay.Appendi("count") < 1 {
+			msg.Err("共享失效")
+			return false
+		}
+		if relay.Appends("username") {
+			msg.Log("info", "login: %s", msg.Option("username", relay.Append("username")))
+			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
+		}
+		if role := relay.Append("userrole"); role != "" {
+			msg.Cmd("aaa.role", role, "user", msg.Option("username"))
+			msg.Log("info", "relay: %s", role)
+		}
+		if relay.Appends("url") {
+			msg.Append("redirect", relay.Append("url"))
+			return false
+		}
+
+		if relay.Appends("form") {
+			form := kit.UnMarshalm(relay.Append("form"))
+			for k, v := range form {
+				msg.Log("info", "form %s:%s", k, msg.Option(k, kit.Format(v)))
 			}
 		}
 	}

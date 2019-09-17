@@ -1,5 +1,4 @@
-var page = Page({
-    check: true,
+var page = Page({check: true,
     conf: {refresh: 1000, border: 4, layout: {header:30, river:120, action:180, source:60, storm:100, footer:30}},
     onlayout: function(event, sizes) {
         var page = this
@@ -22,12 +21,17 @@ var page = Page({
         page.river.Pane.Size(sizes.river, height)
         page.storm.Pane.Size(sizes.storm, height)
 
+        var full = false
+        if (kit.device.isMobile && sizes.action == -1) {
+            full = true
+        }
         sizes.action == undefined && (sizes.action = page.action.clientHeight)
         sizes.source == undefined && (sizes.source = page.source.clientHeight);
         (sizes.action == -1 || sizes.source == 0) && (sizes.action = height, sizes.source = 0)
         width -= page.river.offsetWidth+page.storm.offsetWidth
 
         page.action.Pane.Size(width, sizes.action)
+        full && (page.action.style.height = "")
         page.source.Pane.Size(width, sizes.source)
 
         height -= page.source.offsetHeight+page.action.offsetHeight
@@ -192,8 +196,18 @@ var page = Page({
                 "创建": function(event) {
                     page.ocean.Pane.Show()
                 },
+                "共享": function(event) {
+                    page.login.Pane.Run(["relay", "river", "username", kit.prompt("分享给用户"), "url", ctx.Share({
+                        "river": page.river.Pane.which.get(),
+                        "layout": page.action.Pane.Layout(),
+                    })], function(msg) {
+                        page.ontoast({text: location.origin+location.pathname+"?relay="+msg.result.join(""), title: "共享链接", button: ["确定"], cb: function(which) {
+                            page.ontoast()
+                        }})
+                    })
+                },
             },
-            Button: ["创建"],
+            Button: ["创建", "共享"],
         }
     },
     initTarget: function(page, field, option, output) {
@@ -275,7 +289,7 @@ var page = Page({
                 var plugin = event.Plugin || {}, engine = {
                     share: function(args) {
                         typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
-                            river, line.group, line.index,  args[1]||"",
+                            river, line.storm, line.action,  args[1]||"",
                         ]}))
                         return true
                     },
@@ -481,8 +495,20 @@ var page = Page({
                 "创建": function(event) {
                     page.steam.Pane.Show()
                 },
+                "共享": function(event) {
+                    page.login.Pane.Run(["relay", "storm", "username", kit.prompt("分享给用户"), "url", ctx.Share({
+                        "river": page.river.Pane.which.get(),
+                        "storm": page.storm.Pane.which.get(),
+                        "layout": page.action.Pane.Layout(),
+                    })], function(msg) {
+                        var url = location.origin+location.pathname+"?relay="+msg.result.join("")
+                        page.ontoast({text: "<img src=\""+ctx.Share({"group": "index", "name": "login", cmds: ["share", url]})+"\">", height: 320, title: url, button: ["确定"], cb: function(which) {
+                            page.ontoast()
+                        }})
+                    })
+                },
             },
-            Button: ["创建"],
+            Button: ["创建", "共享"],
         }
     },
     initSteam: function(page, field, option, output) {
@@ -490,7 +516,7 @@ var page = Page({
         var table = kit.AppendChild(output, "table")
         var device = kit.AppendChild(field, [{"view": ["device", "table"]}]).last
         var ui = kit.AppendChild(field, [{view: ["create"], list: [
-            {input: ["name", function(event) {
+            {data: {title: "应用名称"}, input: ["name", function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
                         case "i":
@@ -529,7 +555,7 @@ var page = Page({
                     }
                 }), event.key == "Enter" && this.nextSibling.click()
 
-            }]}, {button: ["create", function(event) {
+            }]}, {button: ["创建", function(event) {
                 if (!ui.name.value) {ui.name.focus(); return}
 
                 var list = []
@@ -543,7 +569,7 @@ var page = Page({
 
                 field.Pane.Create(ui.name.value, list)
 
-            }]}, {name: "list", view: ["list", "table"]},
+            }]}, {name: "list", view: ["list", "table"], style: {"min-width": "240px"}, list: [{type: "caption", inner: "3. 已选命令列表"}]},
         ]}])
 
         return {
@@ -555,12 +581,14 @@ var page = Page({
                 }]).last
             },
             Update: function(list, pod) {var pane = field.Pane
-                device.innerHTML = "", kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
+                kit.AppendChilds(device, [{type: "caption", inner: "2. 选择模块命令 ->"}])
+                kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                     pane.Append(com, pod)
                 })
             },
             Select: function(list) {var pane = field.Pane
-                table.innerHTML = "", kit.AppendTable(table, list, ["user", "node"], function(value, key, pod, i, tr, event) {
+                kit.AppendChilds(table, [{type: "caption", inner: "1. 选择用户节点 ->"}])
+                kit.AppendTable(table, list, ["user", "node"], function(value, key, pod, i, tr, event) {
                     var old = table.querySelector("tr.select")
                     tr.className = "select", old && (old.className = "normal"), pane.Run([river, pod.user, pod.node], function(msg) {
                         pane.Update(ctx.Table(msg), pod)

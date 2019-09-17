@@ -216,14 +216,15 @@ function Page(page) {
         },
         ontoast: function(text, title, duration) {
             // {text, title, duration, inputs, buttons}
+            if (!text) {page.toast.style.display = "none"; return}
 
             var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
             var toast = kit.ModifyView("fieldset.toast", {
-                display: "block", dialog: [args.width||text.length*10+100, args.height||60], padding: 10,
+                display: "block", dialog: [args.width||text.length*10+100, args.height||80], padding: 10,
             })
-            if (!text) {toast.style.display = "none"; return}
+            if (!args.duration && args.button) {args.duration = -1}
 
-            var list = [{text: [title||"", "div", "title"]}, {text: [args.text||"", "div", "content"]}]
+            var list = [{text: [args.title||"", "div", "title"]}, {text: [args.text||"", "div", "content"]}]
             args.inputs && args.inputs.forEach(function(input) {
                 if (typeof input == "string") {
                     list.push({inner: input, type: "label", style: {"margin-right": "5px"}})
@@ -645,7 +646,7 @@ function Pane(page, field) {
             })
         },
         Run: function(cmds, cb) {
-            ctx.Run(page, option.dataset, cmds, cb||pane.ondaemon)
+            ctx.Run(option.dataset, cmds, cb||pane.ondaemon)
         },
 
         Size: function(width, height) {

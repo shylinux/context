@@ -189,7 +189,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 							if p == "" {
 								// 所有节点
 								m.Confm("auth", func(k string, node map[string]interface{}) {
-									if i > len(arg)-1 || node["type"].(string) == arg[i] || strings.HasSuffix(k, arg[i]) || strings.HasPrefix(k, arg[i]) {
+									if t, _ := node["type"].(string); i > len(arg)-1 || t == arg[i] || strings.HasSuffix(k, arg[i]) || strings.HasPrefix(k, arg[i]) {
 										m.Push("create_time", node["create_time"])
 										m.Push("key", k)
 										m.Push("type", node["type"])
@@ -623,11 +623,13 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			case "check":
 				if relay := m.Confm("auth", []string{rid, "data"}); relay != nil {
 					if kit.Select("", arg, 1) == "userrole" && kit.Int(relay["count"]) > 0 {
-						relay["count"] = kit.Int(relay["count"]) - 1
 						m.Echo("%s", relay["userrole"])
 					}
 					for k, v := range relay {
 						m.Append(k, v)
+					}
+					if kit.Int(relay["count"]) > 0 {
+						relay["count"] = kit.Int(relay["count"]) - 1
 					}
 				}
 
@@ -637,15 +639,16 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Cmdy("aaa.auth", "username", m.Option("username"), "relay")
 					break
 				}
-				m.Cmdy("aaa.auth", "username", m.Option("username"), "relay", arg[1], "data",
-					"userrole", kit.Select("tech", arg, 2),
-					"username", kit.Select("", arg, 3),
-					"count", kit.Select("1", arg, 4),
-				)
+				relay := m.Cmdx("aaa.auth", "username", m.Option("username"), "relay", arg[1])
+				m.Cmd("aaa.auth", relay, "data", "from", m.Option("username"), "count", "1", arg[2:])
+				m.Echo(relay)
 
 			// 授权计数
 			case "count":
 				m.Cmdy("aaa.auth", rid, "data", "count", kit.Select("1", arg, 1))
+
+			case "clear":
+				m.Cmdy("aaa.auth", "relay")
 
 			default:
 				m.Cmdy("aaa.auth", rid, "data", arg)

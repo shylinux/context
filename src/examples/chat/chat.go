@@ -92,7 +92,14 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 			if len(arg) > 0 {
 				switch arg[0] {
-				// 用户昵称
+				case "share":
+					m.Append("qrcode", arg[1])
+					return
+				case "relay":
+					relay := m.Cmdx("aaa.relay", "share", arg[1:])
+					m.Log("info", "relay: %s", relay)
+					m.Echo(relay)
+					return
 				case "rename":
 					m.Cmd("aaa.auth", "username", m.Option("username"), "data", "nickname", arg[1])
 				}

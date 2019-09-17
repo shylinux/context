@@ -274,7 +274,7 @@ kit = toolkit = {
                 child.view.length > 3 && (child.name = child.view[3])
 
             } else if (child.text) {
-                child.data["innerText"] = child.text[0]
+                child.data["innerHTML"] = child.text[0]
                 child.type = child.text.length > 1? child.text[1]: "pre"
                 child.text.length > 2 && (child.data["className"] = child.text[2])
 

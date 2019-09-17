@@ -1,14 +1,13 @@
 ctx = context = {
-    Run: function(page, dataset, cmd, cb) {
+    Run: function(dataset, cmd, cb) {
         var option = {"cmds": cmd}
         for (var k in dataset) {
             option[k] = dataset[k].split(",")
         }
+
         var event = window.event
-        kit.History.add("cmd", option)
-        this.GET("", option, function(msg) {
+        this.POST("", option, function(msg) {
             msg[0] && (msg = msg[0])
-            // msg && (msg.__proto__ = (page || {}))
             msg.Result = msg.result? msg.result.join(""): ""
             msg.Results = function() {
                 var s = msg.Result
@@ -21,7 +20,7 @@ ctx = context = {
             typeof cb == "function" && cb(msg || {})
         })
     },
-    Runs: function(page, form, cb) {
+    Runs: function(form, cb) {
         var data = {}
         for (var key in form.dataset) {
             data[key] = form.dataset[key]
@@ -31,7 +30,7 @@ ctx = context = {
                 data[form[i].name] = form[i].value
             }
         }
-        this.Run(page, data, [], cb || form.ondaemon)
+        this.Run(data, [], cb || form.ondaemon)
     },
     Table: function(msg, cb) {
         var ret = []
@@ -106,12 +105,37 @@ ctx = context = {
         return location.origin+location.pathname+"?"+arg
     },
 
-    Current: function(key, value) {
-        context.GET("", {
-            "group": "index",
-            "name": "cmd",
-            "cmds": ["sess", "current", key, value],
-        })
+    Search: function(key, value) {
+        var args = {}
+        var search = location.search.split("?")
+        if (search.length > 1) {
+            var searchs = search[1].split("&")
+            for (var i = 0; i < searchs.length; i++) {
+                var keys = searchs[i].split("=")
+                if (keys[1] == "") {continue}
+                args[keys[0]] = decodeURIComponent(keys[1])
+            }
+        }
+
+        if (key == undefined) {
+            return args
+        } else if (typeof key == "object") {
+            for (var k in key) {
+                if (key[k] != undefined) {
+                    args[k] = key[k]
+                }
+            }
+        } else if (value == undefined) {
+            return args[key] || this.Cookie(key)
+        } else {
+            args[key] = value
+        }
+
+        var arg = []
+        for (var k in args) {
+            arg.push(k+"="+encodeURIComponent(args[k]))
+        }
+        location.search = arg.join("&");
         return value
     },
     Cookie: function(key, value) {
@@ -130,77 +154,27 @@ ctx = context = {
             }
             return this.Cookie()
         }
-
         if (value == undefined) {
-            var pattern = new RegExp(key+"=([^;]*);?");
-            var result = pattern.exec(document.cookie);
-            if (result && result.length > 0) {
-                return result[1];
-            }
-            return "";
+            var pattern = new RegExp(key+"=([^;]*);?")
+            var result = pattern.exec(document.cookie)
+            return result && result.length > 0? result[1]: ""
         }
-
-        document.cookie = key+"="+value+";path=/";
-        return this.Cookie(key);
+        document.cookie = key+"="+value+";path=/"
+        return this.Cookie(key)
     },
-    Search: function(key, value) {
-        var args = {};
-        var search = location.search.split("?");
-        if (search.length > 1) {
-            var searchs = search[1].split("&");
-            for (var i = 0; i < searchs.length; i++) {
-                var keys = searchs[i].split("=");
-                if (keys[1]=="") {
-                    continue
-                }
-                args[keys[0]] = decodeURIComponent(keys[1]);
-            }
-        }
-
-        if (key == undefined) {
-            return args
-        } else if (typeof key == "object") {
-            for (var k in key) {
-                if (key[k] != undefined) {
-                    args[k] = key[k];
-                }
-            }
-        } else if (value == undefined) {
-            return args[key] || this.Cookie(key);
-        } else {
-            args[key] = value;
-        }
-
-        var arg = [];
-        for (var k in args) {
-            arg.push(k+"="+encodeURIComponent(args[k]));
-        }
-        location.search = arg.join("&");
-        return value
-    },
-    GET: function(url, form, cb) {
-        form = form || {}
-
-        var args = [];
+    POST: function(url, form, cb) {
+        var args = []
         for (var k in form) {
             if (form[k] instanceof Array) {
                 for (i in form[k]) {
-                    args.push(k+"="+encodeURIComponent(form[k][i]));
+                    args.push(k+"="+encodeURIComponent(form[k][i]))
                 }
             } else if (form[k] != undefined) {
-                args.push(k+"="+encodeURIComponent(form[k]));
+                args.push(k+"="+encodeURIComponent(form[k]))
             }
         }
 
-        var arg = args.join("&");
-        // arg && (url += ((url.indexOf("?")>-1)? "&": "?") + arg)
-
-        var xhr = new XMLHttpRequest();
-        // xhr.open("POST", url);
-        xhr.open("POST", url);
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded")
-        xhr.setRequestHeader("Accept", "application/json")
-
+        var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
             if (xhr.readyState != 4) {
                 return
@@ -224,6 +198,10 @@ ctx = context = {
             }
             typeof cb == "function" && cb(msg)
         }
-        xhr.send(arg);
+
+        xhr.open("POST", url)
+        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded")
+        xhr.setRequestHeader("Accept", "application/json")
+        xhr.send(args.join("&"))
     },
 }

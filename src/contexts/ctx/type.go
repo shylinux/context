@@ -312,7 +312,7 @@ func (m *Message) Table(cbs ...interface{}) *Message {
 		for i := 0; i < nrow; i++ {
 			line := map[string]string{}
 			for _, k := range m.Meta["append"] {
-				line[k] = m.Meta[k][i]
+				line[k] = kit.Select("", m.Meta[k], i)
 			}
 
 			switch cb := cbs[0].(type) {
