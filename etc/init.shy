@@ -3,11 +3,8 @@
 ~aaa
     config load tmp/auth.json auth
 ~ssh
-    config load tmp/cert.json work flow
-~mdb
-    config load tmp/data.json ktv
-~wiki
-    config load tmp/wiki.json wiki_visit
+    config load var/data/work.json work
+    config load var/data/flow.json flow
 
 ~nfs
     source etc/common.shy

@@ -106,7 +106,7 @@ var page = Page({check: true,
     initOcean: function(page, field, option, output) {
         var table = kit.AppendChild(output, "table")
         var ui = kit.AppendChild(field, [{view: ["create"], list: [
-            {input: ["name", function(event) {
+            {title: "群聊名称", input: ["name", function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
                         case "1":
@@ -126,71 +126,65 @@ var page = Page({check: true,
                         case "0":
                             field.Pane.Action["清空"](event)
                             return true
+
                         case "-":
-                            var pre = ui.list.querySelector("pre")
-                            pre && pre.click()
+                            var tr = ui.list.querySelectorAll("tr")[1]
+                            tr && tr.childNodes[0].click()
                             return true
                         case "=":
                             var td = table.querySelector("tr.normal td")
                             td && td.click()
                             return true
                     }
-                })
-                event.key == "Enter" && this.nextSibling.click()
+                }), event.key == "Enter" && this.nextSibling.click()
 
-            }]}, {button: ["create", function(event) {
+            }]}, {button: ["创建群聊", function(event) {
                 if (!ui.name.value) {ui.name.focus(); return}
 
-                var list = kit.Selector(ui.list, "pre", function(item) {return item.innerText})
+                var list = kit.Selector(ui.list, "tr", function(item) {
+                    return item.dataset.user
+                })
                 if (list.length == 0) {kit.alert("请添加组员"); return}
+
 
                 field.Pane.Create(ui.name.value, list)
 
-            }]}, {name: "list", view: ["list"]},
+            }]}, {name: "list", view: ["list", "table"], list: [{text: ["2. 已选用户列表", "caption"]}]},
         ]}])
         return {
             Append: function(msg) {
+                kit.AppendChilds(table, [{text: ["1. 选择用户节点 ->", "caption"]}])
                 kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, row, i, tr, event) {
                     tr.className = "hidden"
-                    var uis = kit.AppendChild(ui.list, [{text: [row.key], click: function(event) {
+                    var uis = kit.AppendChild(ui.list, [{row: [row.key, row["user.route"]], dataset: {user: row.key}, click: function(event) {
                         tr.className = "normal", uis.last.parentNode.removeChild(uis.last)
                     }}])
                 })
             },
-            clear: function(name) {
-                table.innerHTML = "", ui.list.innerHTML = "", ui.name.value = name, ui.name.focus()
-            },
             Create: function(name, list) {
                 field.Pane.Run(["spawn", "", name].concat(list), function(msg) {
-                    page.river.Pane.Show()
-                    field.Pane.Show()
+                    field.Pane.Show(), page.river.Pane.Show(name)
                 })
             },
-            Show: function() {var pane = field.Pane
-                pane.Dialog() && (pane.clear("good"), pane.Run([], pane.Append))
+            Show: function(name) {var pane = field.Pane
+                pane.Dialog(), ui.name.focus(), ui.name.value = name||"good", pane.Run([], pane.Append)
             },
             Action: {
-                "取消": function(event) {
-                    field.Pane.Show()
+                "取消": function(event) {field.Pane.Show()},
+                "清空": function(event) {
+                    kit.Selector(ui.list, "tr", function(item) {item.click()})
                 },
                 "全选": function(event) {
-                    table.querySelectorAll("tr.normal").forEach(function(item) {
-                        item.firstChild.click()
-                    })
-                },
-                "清空": function(event) {
-                    ui.list.querySelectorAll("pre").forEach(function(item) {
-                        item.click()
-                    })
+                    kit.Selector(table, "tr.normal", function(item) {item.firstChild.click()})
                 },
             },
-            Button: ["取消", "全选", "清空"],
+            Button: ["取消", "清空", "全选"],
         }
     },
     initRiver: function(page, field, option, output) {
         return {
-            Show: function() {var pane = field.Pane
-                output.innerHTML = "", pane.Update([], "text", ["nick", "count"], "key", ctx.Search("river")||true)
+            Show: function(which) {var pane = field.Pane
+                output.innerHTML = "", pane.Update([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true)
             },
             Action: {
                 "创建": function(event) {
@@ -515,21 +509,12 @@ var page = Page({check: true,
         }
     },
     initSteam: function(page, field, option, output) {
-        var river = ""
         var table = kit.AppendChild(output, "table")
         var device = kit.AppendChild(field, [{"view": ["device", "table"]}]).last
         var ui = kit.AppendChild(field, [{view: ["create"], list: [
-            {data: {title: "应用名称"}, input: ["name", function(event) {
+            {title: "应用名称", input: ["name", function(event) {
                 page.oninput(event, function(event) {
                     switch (event.key) {
-                        case "i":
-                            var prev = table.querySelector("tr.select").previousSibling
-                            prev && prev.childNodes[0].click()
-                            return true
-                        case "o":
-                            var next = table.querySelector("tr.select").nextSibling
-                            next && next.childNodes[0].click()
-                            return true
                         case "1":
                         case "2":
                         case "3":
@@ -547,6 +532,7 @@ var page = Page({check: true,
                         case "0":
                             field.Pane.Action["清空"](event)
                             return true
+
                         case "-":
                             var tr = ui.list.querySelectorAll("tr")[1]
                             tr && tr.childNodes[0].click()
@@ -555,10 +541,19 @@ var page = Page({check: true,
                             var td = device.querySelector("tr.normal td")
                             td && td.click()
                             return true
+
+                        case "i":
+                            var prev = table.querySelector("tr.select").previousSibling
+                            prev && prev.childNodes[0].click()
+                            return true
+                        case "o":
+                            var next = table.querySelector("tr.select").nextSibling
+                            next && next.childNodes[0].click()
+                            return true
                     }
                 }), event.key == "Enter" && this.nextSibling.click()
 
-            }]}, {button: ["创建", function(event) {
+            }]}, {button: ["创建应用", function(event) {
                 if (!ui.name.value) {ui.name.focus(); return}
 
                 var list = []
@@ -568,15 +563,15 @@ var page = Page({check: true,
                     list.push(item.dataset.index)
                     list.push(item.dataset.name)
                 })
-                // if (list.length == 0) {kit.alert("请添加命令"); return}
 
                 field.Pane.Create(ui.name.value, list)
 
-            }]}, {name: "list", view: ["list", "table"], style: {"min-width": "240px"}, list: [{type: "caption", inner: "3. 已选命令列表"}]},
+            }]}, {name: "list", view: ["list", "table"], list: [{text: ["3. 已选命令列表", "caption"]}]},
         ]}])
 
+        var river = ""
         return {
-            Append: function(com, pod) {var pane = field.Pane
+            Select: function(com, pod) {var pane = field.Pane
                 var last = kit.AppendChild(ui.list, [{
                     dataset: {pod: pod.node, group: com.key, index: com.index, name: com.name},
                     row: [com.key, com.index, com.name, com.help],
@@ -584,41 +579,38 @@ var page = Page({check: true,
                 }]).last
             },
             Update: function(list, pod) {var pane = field.Pane
-                kit.AppendChilds(device, [{type: "caption", inner: "2. 选择模块命令 ->"}])
+                kit.AppendChilds(device, [{text: ["2. 选择模块命令 ->", "caption"]}])
                 kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
-                    pane.Append(com, pod)
+                    pane.Select(com, pod)
                 })
             },
-            Select: function(list) {var pane = field.Pane
-                kit.AppendChilds(table, [{type: "caption", inner: "1. 选择用户节点 ->"}])
-                kit.AppendTable(table, list, ["user", "node"], function(value, key, pod, i, tr, event) {
-                    var old = table.querySelector("tr.select")
-                    tr.className = "select", old && (old.className = "normal"), pane.Run([river, pod.user, pod.node], function(msg) {
+            Append: function(msg) {var pane = field.Pane
+                kit.AppendChilds(table, [{text: ["1. 选择用户节点 ->", "caption"]}])
+                kit.AppendTable(table, ctx.Table(msg), ["user", "node"], function(value, key, pod, i, tr, event) {
+                    kit.Selector(table, "tr.select", function(item) {item.className = "normal"})
+                    tr.className = "select", pane.Run([river, pod.user, pod.node], function(msg) {
                         pane.Update(ctx.Table(msg), pod)
                     })
                 }), table.querySelector("td").click()
-                ui.name.value = "nice", ui.name.focus()
             },
             Create: function(name, list) {
                 field.Pane.Run([river, "spawn", name].concat(list), function(msg) {
                     field.Pane.Show(), page.storm.Pane.Show(name)
                 })
             },
-            Show: function() {var pane = field.Pane
-                pane.Dialog() && pane.Run([river], function(msg) {
-                    pane.Select(ctx.Table(msg))
-                })
+            Show: function(name) {var pane = field.Pane
+                pane.Dialog(), ui.name.focus(), ui.name.value = name||"nice", pane.Run([river], pane.Append)
             },
             Listen: {
                 river: function(value, old) {river = value},
             },
             Action: {
                 "取消": function(event) {field.Pane.Show()},
-                "清空": function(event) {ui.list.innerHTML = ""},
+                "清空": function(event) {
+                    kit.Selector(ui.list, "tr", function(item) {item.click()})
+                },
                 "全选": function(event) {
-                    ui.list.innerHTML = "", device.querySelectorAll("tr").forEach(function(item) {
-                        item.firstChild.click()
-                    })
+                    kit.Selector(device, "tr.normal", function(item) {item.firstChild.click()})
                 },
             },
             Button: ["取消", "清空", "全选"],

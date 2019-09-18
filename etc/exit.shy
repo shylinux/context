@@ -1,9 +1,6 @@
-~wiki
-    config save var/tmp/wiki.json wiki_visit
-~mdb
-    config save var/tmp/data.json ktv
 ~ssh
-    config save var/tmp/cert.json work flow trust
+    config save var/data/flow.json flow
+    config save var/data/work.json work
 ~aaa
     config save var/tmp/auth.json auth
 ~cli

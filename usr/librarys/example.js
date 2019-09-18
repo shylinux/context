@@ -573,7 +573,7 @@ function Pane(page, field) {
             pane.Runs(cmds, function(line, index, msg) {
                 var ui = pane.Append(type, line, key, which, cb)
                 if (typeof first == "string") {
-                    (line.key == first || line.name == first || line[which] == first) && ui.first.click()
+                    (line.key == first || line.name == first || line[which] == first || line[key[0]] == first) && ui.first.click()
                 } else {
                     first && index == 0 && ui.first.click()
                 }

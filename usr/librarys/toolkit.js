@@ -149,7 +149,7 @@ kit = toolkit = {
             return elm
         }
 
-        // 基本属性: name value inner
+        // 基本属性: name value title inner
         // 基本样式: style className
         // 基本事件: dataset click
         //
@@ -178,6 +178,9 @@ kit = toolkit = {
             }
             if (child.value) {
                 child.data["value"] = child.value
+            }
+            if (child.title) {
+                child.data["title"] = child.title
             }
             if (child.inner) {
                 child.data["innerHTML"] = child.inner
