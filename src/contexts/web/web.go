@@ -112,7 +112,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 
 	} else if msg.Options("relay") {
 		relay := msg.Cmd("aaa.relay", "check", msg.Option("relay"))
-		if relay.Appendi("count") < 1 {
+		if relay.Appendi("count") == 0 {
 			msg.Err("共享失效")
 			return false
 		}

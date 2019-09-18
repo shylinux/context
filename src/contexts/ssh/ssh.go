@@ -369,6 +369,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {
 					if kit.Format(value["type"]) == "private" && m.Option("userrole") != "root" {
+						m.Log("warn", "%v private", arg)
 						return
 					}
 

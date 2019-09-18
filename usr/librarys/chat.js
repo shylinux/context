@@ -496,7 +496,10 @@ var page = Page({check: true,
                     page.steam.Pane.Show()
                 },
                 "共享": function(event) {
-                    page.login.Pane.Run(["relay", "storm", "username", kit.prompt("分享给用户"), "url", ctx.Share({
+                    var user = kit.prompt("分享给用户")
+                    if (user == null) {return}
+
+                    page.login.Pane.Run(["relay", "storm", "username", user, "url", ctx.Share({
                         "river": page.river.Pane.which.get(),
                         "storm": page.storm.Pane.which.get(),
                         "layout": page.action.Pane.Layout(),

@@ -1,4 +1,9 @@
-fun meet "第一眼" public \
+kit imports "导入" "" "" private "ssh.data" "import" \
+	text "love" name table \
+	text "" name file \
+	button "导入"
+
+fun meets "第一眼" private \
 	text "love" name table imports plugin_table \
 	text "date" name when \
 	text "" name where \
@@ -11,7 +16,7 @@ fun meet "第一眼" public \
     copy ssh.data insert _ when _ where __
 end
 
-kit imports "导入" "" "" private "ssh.data" "import" \
-	text "love" name table \
-	text "" name file \
-	button "导入"
+fun meet "第一眼" protected "ssh.data" show \
+	text "love" name table imports plugin_table \
+	button "查看" action auto
+

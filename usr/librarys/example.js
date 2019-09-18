@@ -564,7 +564,7 @@ function Pane(page, field) {
 
             list.push(ui.last), field.scrollBy(0, field.scrollHeight+100)
 			key && key.length > 0 && (member[line[which]] = member[line[key[0]]] = {index:index, key:line[which]});
-            (type == "plugin" || type == "field") && pane.Plugin(page, pane, ui.field, function(event, cmds, cbs) {
+            line.name && (type == "plugin" || type == "field") && pane.Plugin(page, pane, ui.field, function(event, cmds, cbs) {
                 typeof cb == "function" && cb(line, index, event, cmds, cbs)
             })
             return ui
