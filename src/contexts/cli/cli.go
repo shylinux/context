@@ -139,10 +139,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "版本发布"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
-			"install": []interface{}{"system"},
-			"system": []interface{}{"boot.sh", "zone.sh", "user.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
-			"portal": []interface{}{"template.tar.gz", "librarys.tar.gz"},
-			"script": []interface{}{"test.php"},
+			"install": []interface{}{"context", "tmux", "mind", "love"},
+			"system":  []interface{}{"boot.sh", "zone.sh", "user.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
+			"portal":  []interface{}{"template.tar.gz", "librarys.tar.gz"},
+			"script":  []interface{}{"test.php"},
 			"list": map[string]interface{}{
 				"bench": "bin/bench.new",
 
@@ -915,6 +915,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				for _, v := range arg[1:] {
 					m.Cmd("nfs.copy", path.Join(q, v), path.Join(p, v))
 				}
+				m.Cmd("cli.system", "tar", "-zcf", q+".tar.gz", "-C", m.Conf("publish", "path"), arg[0])
 				m.Cmdy("nfs.dir", q, "time", "size", "hashs", "path", "dir_sort", "path", "str")
 				return e
 			}
@@ -949,6 +950,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			case "install":
 				m.Cmd("cli.upgrade", "system")
 				m.Cmd("cli.upgrade", "portal")
+				m.Confm("upgrade", "install", func(index int, value string) {
+					m.Cmd("cli.upgrade", "package", value)
+				})
 
 			case "project":
 				m.Cmd("cli.project", "init")
@@ -976,6 +980,15 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			case "restart":
 				m.Cmdy("cli.quit", "1")
 
+			case "package":
+				name := arg[1] + ".tar.gz"
+				p := path.Join(m.Conf("publish", "path"), name)
+
+				m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", name), "save", p,
+					"GOARCH", m.Conf("runtime", "host.GOARCH"), "GOOS", m.Conf("runtime", "host.GOOS"))
+
+				m.Cmd("cli.system", "tar", "-xvf", p, "-C", path.Dir(p))
+
 			case "plugin":
 				// 模块列表
 				if arg = arg[1:]; len(arg) == 0 {
@@ -993,6 +1006,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 查找模块
 				msg := m.Find(arg[0], false)
 				if msg == nil {
+					m.Log("info", "not find %s", arg[0])
 					m.Start(arg[0], "shy")
 					msg = m
 				}
