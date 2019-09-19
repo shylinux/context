@@ -34,6 +34,9 @@ func Time(arg ...string) int {
 	}
 	return 0
 }
+func Times(arg ...string) time.Time {
+	return time.Unix(int64(Time(arg...)), 0)
+}
 func Duration(arg ...string) time.Duration {
 	d, _ := time.ParseDuration(arg[0])
 	return d

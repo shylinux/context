@@ -477,6 +477,7 @@ kit = toolkit = {
 
     // HTML显示文本
     Color: function(s) {
+        if (!s) {return s}
         s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
         s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
         s = s.replace(/\033\[33m/g, "<span style='color:#ff0'>")

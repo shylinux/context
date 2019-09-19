@@ -16,7 +16,9 @@ fun meets "第一眼" private \
     copy ssh.data insert _ when _ where __
 end
 
-fun meet "第一眼" protected "ssh.data" show \
-	text "love" name table imports plugin_table \
-	button "查看" action auto
+kit date "日历" "index.js" protected "cli.date" format '<span class="%s">%s</span>' "s20060102" space true _ nature _ \
+	text "2019-07-08" name "起始时间" \
+	text "date" name "截止时间" \
+	button "查看" action auto \
+	button "显示" click show
 

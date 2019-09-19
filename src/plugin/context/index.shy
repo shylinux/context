@@ -17,7 +17,7 @@ kit publish "发布" private \
 
 kit upgrade "升级" private "ssh._route" _ "cli.upgrade" \
 	text "" name pod imports plugin_pod \
-    select "" values script values restart values plugin values bench values portal values system action auto \
+    select "" values script values plugin values restart values package values bench values portal values system action auto \
 	text "" name see imports plugin_see \
 	button "升级"
 

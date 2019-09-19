@@ -57,13 +57,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"runtime": &ctx.Config{Name: "runtime", Value: map[string]interface{}{
-			"init": []interface{}{
-				"ctx_log", "ctx_app", "ctx_bin",
-				"ctx_ups", "ctx_box", "ctx_dev",
-				"ctx_cas",
-				"ctx_root", "ctx_home",
-				"ctx_type",
-				"web_port", "ssh_port",
+			"init": []interface{}{"ctx_log",
+				"ctx_cas", "ctx_ups", "ctx_box", "ctx_dev",
+				"ctx_app", "ctx_bin", "ctx_root", "ctx_home",
+				"ctx_type", "ssh_port", "web_port",
 			},
 			"boot": map[string]interface{}{
 				"web_port": ":9095",
@@ -139,7 +136,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "版本发布"},
 		"upgrade": &ctx.Config{Name: "upgrade", Value: map[string]interface{}{
-			"install": []interface{}{"context", "tmux", "mind", "love"},
+			"install": []interface{}{"context", "love"},
 			"system":  []interface{}{"boot.sh", "zone.sh", "user.sh", "node.sh", "init.shy", "common.shy", "exit.shy"},
 			"portal":  []interface{}{"template.tar.gz", "librarys.tar.gz"},
 			"script":  []interface{}{"test.php"},
@@ -709,6 +706,66 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				return
 			}},
+		"date": &ctx.Command{Name: "date", Help: "日历", Form: map[string]int{"space": 1, "format": 2, "count": 1, "nature": 1, "cmd": -1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if m.Has("cmd") {
+				m.Log("fino", "what %v", m.Meta["cmd"])
+				m.Cmdy(m.Meta["cmd"])
+				return
+			}
+			show := map[int]string{0: "周日", 1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六"}
+
+			format, format_time := "", ""
+			if m.Has("format") {
+				format, format_time = kit.Select("%s", m.Meta["format"], 0), kit.Select("20060102", m.Meta["format"], 1)
+			}
+			space := m.Options("space")
+			now := kit.Times(m.Cmd("cli.time", arg).Append("datetime"))
+			n := kit.Int(kit.Select("1", m.Option("count")))
+			if m.Has("nature") {
+				n = 0
+				nature := kit.Times(m.Option("nature"))
+				for cur := now; cur.Before(nature); cur = cur.AddDate(0, 1, 0) {
+					n++
+				}
+			}
+
+			cur := now
+			for i := 0; i < n; i, now = i+1, now.AddDate(0, 1, 0) {
+				begin := time.Unix(now.Unix()-int64(now.Day()-1)*24*3600, 0)
+				last := time.Unix(begin.Unix()-int64(begin.Weekday())*24*3600, 0)
+				cur = last
+
+				if last.Month() != now.Month() {
+					for month := cur.Month(); cur.Month() == month; cur = cur.AddDate(0, 0, 1) {
+						if space || i == 0 {
+							m.Push(show[int(cur.Weekday())], "")
+						}
+					}
+				}
+				for month := cur.Month(); cur.Month() == month; cur = cur.AddDate(0, 0, 1) {
+					data := fmt.Sprintf("%d", cur.Day())
+					if cur.Day() == 1 {
+						if cur.Month() == 1 {
+							data = fmt.Sprintf("%d年", cur.Year())
+						} else {
+							data = fmt.Sprintf("%d月", cur.Month())
+						}
+					}
+					if format != "" {
+						data = fmt.Sprintf(format, cur.Format(format_time), data)
+					}
+					m.Push(show[int(cur.Weekday())], data)
+				}
+				if space || i == n-1 {
+					for ; cur.Weekday() > 0; cur = cur.AddDate(0, 0, 1) {
+						m.Push(show[int(cur.Weekday())], "")
+					}
+				}
+			}
+
+			m.Table()
+			return
+		}},
 		"proc": &ctx.Command{Name: "proc", Help: "进程管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmdy("cli.system", "ps", kit.Select("ax", arg, 0), "cmd_parse", "cut")
 			if len(arg) > 1 {
@@ -940,7 +997,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Sort("file").Table()
 			return
 		}},
-		"upgrade": &ctx.Command{Name: "upgrade project|bench|system|portal|plugin|restart|script", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"upgrade": &ctx.Command{Name: "upgrade install|bench|system|portal|script|plugin|restart|package|project", Help: "服务升级", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmdy("ctx.config", "upgrade")
 				return
@@ -953,11 +1010,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Confm("upgrade", "install", func(index int, value string) {
 					m.Cmd("cli.upgrade", "package", value)
 				})
-
-			case "project":
-				m.Cmd("cli.project", "init")
-				m.Cmd("cli.compile", "all")
-				m.Cmd("cli.publish")
 
 			case "script":
 				// 脚本列表
@@ -976,18 +1028,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Cmdy("web.get", "dev", fmt.Sprintf("publish/%s", v), "upgrade", "script",
 						"missyou", miss, "save", path.Join(m.Conf("project", "script.path"), v))
 				}
-
-			case "restart":
-				m.Cmdy("cli.quit", "1")
-
-			case "package":
-				name := arg[1] + ".tar.gz"
-				p := path.Join(m.Conf("publish", "path"), name)
-
-				m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", name), "save", p,
-					"GOARCH", m.Conf("runtime", "host.GOARCH"), "GOOS", m.Conf("runtime", "host.GOOS"))
-
-				m.Cmd("cli.system", "tar", "-xvf", p, "-C", path.Dir(p))
 
 			case "plugin":
 				// 模块列表
@@ -1014,6 +1054,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 查找脚本
 				p := m.Cmdx("nfs.path", path.Join(msg.Conf("project", "plugin.path"), arg[0], "index.shy"))
 				if p == "" {
+					p = m.Cmdx("nfs.path", path.Join(msg.Conf("publish", "path"), arg[0], "index.shy"))
+				}
+				if p == "" {
 					p = m.Cmdx("nfs.hash", m.Cmdx("web.get", "dev", fmt.Sprintf("publish/%s", arg[0]),
 						"GOARCH", m.Conf("runtime", "host.GOARCH"),
 						"GOOS", m.Conf("runtime", "host.GOOS"),
@@ -1031,12 +1074,29 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 组件列表
 				m.Confm("ssh.componet", arg[0], func(index int, value map[string]interface{}) {
 					m.Push("index", index)
-					m.Push("name", value["componet_name"])
-					m.Push("help", value["componet_help"])
-					m.Push("ctx", value["componet_ctx"])
-					m.Push("cmd", value["componet_cmd"])
+					m.Push("name", value["name"])
+					m.Push("help", value["help"])
+					m.Push("ctx", value["ctx"])
+					m.Push("cmd", value["cmd"])
 				})
 				m.Table()
+
+			case "restart":
+				m.Cmdy("cli.quit", "1")
+
+			case "package":
+				name := arg[1] + ".tar.gz"
+				p := path.Join(m.Conf("publish", "path"), name)
+
+				m.Cmd("web.get", "dev", fmt.Sprintf("publish/%s", name), "save", p,
+					"GOARCH", m.Conf("runtime", "host.GOARCH"), "GOOS", m.Conf("runtime", "host.GOOS"))
+
+				m.Cmd("cli.system", "tar", "-xvf", p, "-C", path.Dir(p))
+
+			case "project":
+				m.Cmd("cli.project", "init")
+				m.Cmd("cli.compile", "all")
+				m.Cmd("cli.publish")
 
 			default:
 				restart := false

@@ -13,3 +13,6 @@
 ~nfs
     source local.shy
 
+~cli
+    upgrade plugin context
+    upgrade plugin love
