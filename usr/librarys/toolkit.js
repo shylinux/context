@@ -48,9 +48,9 @@ kit = toolkit = {
     // HTML节点操作
     classList: {
         add: function(obj) {
-            var list = obj.className.split(" ")
+            var list = obj.className? obj.className.split(" "): []
             for (var i = 1; i < arguments.length; i++) {
-                list.push(arguments[i])
+                arguments[i] && list.push(arguments[i])
             }
             return obj.className = list.join(" ")
         },
@@ -650,6 +650,7 @@ kit = toolkit = {
         return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))
     },
     format_date: function(arg) {
+        arg = arg || new Date()
         var date = arg.getDate()
         if (date < 10) {
             date = "0"+date

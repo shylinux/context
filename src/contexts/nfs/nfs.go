@@ -1076,7 +1076,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		}},
 		"json": &ctx.Command{Name: "json str", Help: "导入数据", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			var data interface{}
-			m.Assert(json.Unmarshal([]byte(arg[0]), &data))
+			m.Assert(json.Unmarshal([]byte(kit.Select("{}", arg, 0)), &data))
 			if b, e := json.MarshalIndent(data, "", "  "); m.Assert(e) {
 				m.Echo(string(b))
 			}

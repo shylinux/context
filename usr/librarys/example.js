@@ -75,16 +75,14 @@ function Meta(target, obj) {
                     var text = JSON.parse(line.text)
 
                 case "plugin":
-                    if (!text.name) {
-                        return {}
-                    }
+                    if (!text.name) {return {}}
+
                     var id = "plugin"+this.ID()
                     list.push({view: ["item", "fieldset", "", "field"], data: {id: id, Run: cb}, list: [
                         {text: [text.name+"("+text.help+")", "legend"]},
                         {view: ["option", "form", "", "option"], list: [{type: "input", style: {"display": "none"}}]},
                         {view: ["output", "div", "", "output"]},
-                        {script: ""+id+".Script="+(text.init||"{}")},
-                        {styles: text.view},
+                        text.view?{styles: text.view}:null, text.init?{script: ""+id+".Script = "+text.init}:null,
                     ]})
                     break
             }
@@ -699,7 +697,7 @@ function Plugin(page, pane, field, runs) {
     var display = JSON.parse(meta.display||'{}')
     var exports = JSON.parse(meta.exports||'["",""]')
     var deal = (feature && feature.display) || "table"
-    kit.classList.add(field, feature.style)
+    kit.classList.add(field, meta.group, name, feature.style)
 
     var history = []
     var run = function(event, cmds, cbs) {
