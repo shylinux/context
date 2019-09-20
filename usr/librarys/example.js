@@ -867,7 +867,9 @@ function Plugin(page, pane, field, runs) {
         },
         display: function(arg, cb) {
             deal = arg, plugin.ondaemon[deal||"table"](plugin.msg, cb)
+            plugin.show_after(plugin.msg)
         },
+        show_after: function(msg) {},
         ondaemon: {
             inner: function(msg, cb) {
                 output.style.maxWidth = pane.target.clientWidth-20+"px"

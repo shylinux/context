@@ -3,7 +3,7 @@ kit imports "导入" "" "" private "ssh.data" "import" \
 	text "" name file \
 	button "导入"
 
-fun meets "第一眼" private \
+fun meet "第一眼" private \
 	text "love" name table imports plugin_table \
 	text "date" name when \
 	text "" name where \
@@ -16,9 +16,13 @@ fun meets "第一眼" private \
     copy ssh.data insert _ when _ where __
 end
 
-kit date "日历" "index.js" protected "cli.date" format '<span class="%s">%s</span>' "s20060102" space true _ nature _ \
+kit date "日历" "index.js" protected "cli.date" _ nature _ \
+    \ space true format '<span class="%s">%s</span>' "s20060102" \
 	text "2019-07-08" name "起始时间" \
 	text "date" name "截止时间" \
+	text "love" name "table" imports plugin_table \
+	text "when" name "when" \
+	text "where" name "where" \
 	button "查看" action auto \
 	button "显示" click show
 
