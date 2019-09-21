@@ -853,7 +853,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			case "trend":
 				// 提交记录
-				m.Cmdy("nfs.git", "sum", "-n", kit.Select("20", arg, 1))
+				if len(arg) == 1 {
+					m.Cmdy("nfs.git", "sum", "-n", 20)
+				} else {
+					m.Cmdy("nfs.git", "sum", "-n", arg[1:])
+				}
 
 			case "submit":
 				// 提交代码

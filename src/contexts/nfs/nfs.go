@@ -715,7 +715,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					if m.Options("git_dir") {
 						args = append(args, "-C", m.Option("git_dir"))
 					}
-					if args = append(args, "log", "--shortstat", "--pretty=commit: %ad", "--date=iso"); len(arg) > 1 {
+					if args = append(args, "log", "--shortstat", "--pretty=commit: %ad %n%s", "--date=iso"); len(arg) > 1 {
 						args = append(args, arg[1:]...)
 					} else {
 						args = append(args, "--reverse")
@@ -723,8 +723,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 
 					if out, e := exec.Command("git", args...).CombinedOutput(); e == nil {
 						for _, v := range strings.Split(string(out), "commit: ") {
-							if l := strings.Split(v, "\n"); len(l) > 2 {
-								fs := strings.Split(strings.TrimSpace(l[2]), ", ")
+							if l := strings.Split(v, "\n"); len(l) > 3 {
+								fs := strings.Split(strings.TrimSpace(l[3]), ", ")
 								hs := strings.Split(l[0], " ")
 								m.Add("append", "date", hs[0])
 
@@ -739,6 +739,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 									m.Add("append", "adds", "0")
 									m.Add("append", "dels", adds[0])
 								}
+								m.Add("append", "note", l[1])
 								m.Add("append", "hour", strings.Split(hs[1], ":")[0])
 								m.Add("append", "time", hs[1])
 							} else if len(l[0]) > 0 {
@@ -746,6 +747,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								m.Add("append", "date", hs[0])
 								m.Add("append", "adds", 0)
 								m.Add("append", "dels", 0)
+								m.Add("append", "note", l[1])
 								m.Add("append", "hour", strings.Split(hs[1], ":")[0])
 								m.Add("append", "time", hs[1])
 							}
