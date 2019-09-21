@@ -750,12 +750,13 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					if ms[i] == nil {
 						continue
 					}
-					if m.Push("code", ms[i].code); ms[i].message != nil {
-						m.Push("message", ms[i].message.code)
+					if ms[i].message != nil {
+						m.Push("msg", ms[i].message.code)
 					} else {
-						m.Push("message", 0)
+						m.Push("msg", 0)
 					}
 
+					m.Push("code", ms[i].code)
 					m.Push("time", ms[i].Time())
 					m.Push("source", ms[i].source.Name)
 					m.Push("target", ms[i].target.Name)
@@ -780,8 +781,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			case "free":
 				msg.Free()
 			default:
-				msg = msg.Spawn().Cmd(arg)
-				m.Copy(msg, "append").Copy(msg, "result")
+				m.Cmd(arg)
 			}
 			return
 		}},

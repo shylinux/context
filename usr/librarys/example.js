@@ -724,18 +724,18 @@ function Plugin(page, pane, field, runs) {
             var input = {type: "input", name: name, data: item}
             switch (item.type) {
                 case "select":
-                    item.className = "args"
+                    kit.classList.add(item, "args")
                     input.type = "select", input.list = item.values.map(function(value) {
                         return {type: "option", value: value, inner: value}
                     })
                     input.value = item.value
                     break
                 case "textarea":
+                    kit.classList.add(item, "args")
                     input.type = "textarea", item.style = "height:100px;"+"width:"+(pane.target.clientWidth-30)+"px"
-                    item.className = "args"
                     // no break
                 case "text":
-                    item.className = "args"
+                    kit.classList.add(item, "args")
                     item.autocomplete = "off"
 
                     var count = kit.Selector(option, ".args").length

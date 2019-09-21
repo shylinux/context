@@ -235,6 +235,7 @@ fieldset.item {
 }
 fieldset.item.select {
     background-color:gold;
+    border:solid 2px red;
 }
 fieldset.item>div.output {
     overflow:auto;

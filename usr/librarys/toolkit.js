@@ -50,7 +50,7 @@ kit = toolkit = {
         add: function(obj) {
             var list = obj.className? obj.className.split(" "): []
             for (var i = 1; i < arguments.length; i++) {
-                arguments[i] && list.push(arguments[i])
+                arguments[i] && list.indexOf(arguments[i]) == - 1 && list.push(arguments[i])
             }
             return obj.className = list.join(" ")
         },

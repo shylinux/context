@@ -1,14 +1,14 @@
 package main
 
 import (
-    "contexts/cli"
-    "contexts/ctx"
-    "toolkit"
+	"contexts/cli"
+	"contexts/ctx"
+	"toolkit"
 
+	"fmt"
+	"os"
 	"strings"
 	"time"
-    "fmt"
-    "os"
 )
 
 var Index = &ctx.Context{Name: "tmux", Help: "终端管理",
@@ -185,7 +185,7 @@ var Index = &ctx.Context{Name: "tmux", Help: "终端管理",
 					time.Sleep(kit.Duration(m.Conf("mux", "cmd_timeout")))
 					list := strings.Split(m.Cmdx("cli.system", "tmux", "capture-pane", "-t", target, "-p"), "\n")
 					m.Log("info", "current %v", list)
-					for j := len(list)-1; j >= 0; j-- {
+					for j := len(list) - 1; j >= 0; j-- {
 						if list[j] != "" {
 							if list[j] == prompt {
 								i = 1000
@@ -219,11 +219,14 @@ var Index = &ctx.Context{Name: "tmux", Help: "终端管理",
 			return
 		}},
 		"buf": &ctx.Command{Name: "buf", Help: "缓存管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 {
+				msg := m.Cmd(".buf")
+				arg[0] = msg.Meta[msg.Meta["append"][0]][0]
+			}
+
 			switch len(arg) {
 			case 0:
-				m.Cmdy("cli.system", "tmux", "list-buffer", "cmd_parse", "cut", 3, ":")
-				m.Meta["append"][0] = "cur"
-				m.Meta["cur"] = m.Meta["0"]
+				m.Cmdy("cli.system", "tmux", "list-buffer", "cmd_parse", "cut", 3, ":", "cur bytes text")
 
 			case 2:
 				m.Cmdy("cli.system", "tmux", "set-buffer", "-b", arg[0], arg[1])

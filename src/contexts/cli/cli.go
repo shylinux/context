@@ -27,6 +27,78 @@ type CLI struct {
 	Context *ctx.Context
 }
 
+func format(m *ctx.Message, out *bytes.Buffer) {
+	switch m.Option("cmd_parse") {
+	case "format":
+		var data interface{}
+		if json.Unmarshal(out.Bytes(), &data) == nil {
+			if b, e := json.MarshalIndent(data, "", "  "); e == nil {
+				m.Echo(string(b))
+				break
+			}
+		}
+		m.Echo(out.String())
+	case "json":
+		var data interface{}
+		if json.Unmarshal(out.Bytes(), &data) == nil {
+			msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
+			m.Copy(msg, "append").Copy(msg, "result")
+		} else {
+			m.Echo(out.String())
+		}
+
+	case "csv":
+		data, e := csv.NewReader(out).ReadAll()
+		m.Assert(e)
+		for i := 1; i < len(data); i++ {
+			for j := 0; j < len(data[i]); j++ {
+				m.Add("append", data[0][j], data[i][j])
+			}
+		}
+		m.Table()
+	case "cli":
+		read := csv.NewReader(out)
+		read.Comma = ' '
+		read.TrimLeadingSpace = true
+		read.FieldsPerRecord = 4
+		data, e := read.ReadAll()
+		m.Assert(e)
+		for i := 1; i < len(data); i++ {
+			for j := 0; j < len(data[i]); j++ {
+				m.Add("append", data[0][j], data[i][j])
+			}
+		}
+		m.Table()
+	case "cut":
+		c := byte(kit.Select(" ", m.Optionv("cmd_parse"), 2)[0])
+
+		bio := bufio.NewScanner(out)
+
+		heads := []string{}
+		if h := kit.Select("", m.Optionv("cmd_parse"), 3); h != "" {
+			heads = strings.Split(h, " ")
+		} else if bio.Scan() {
+			heads = kit.Split(bio.Text(), c, kit.Int(kit.Select("-1", m.Optionv("cmd_parse"), 1)))
+		}
+
+		for bio.Scan() {
+			for i, v := range kit.Split(bio.Text(), c, len(heads)) {
+				m.Add("append", heads[i], v)
+			}
+		}
+		m.Table()
+
+	default:
+		var data interface{}
+		if json.Unmarshal(out.Bytes(), &data) == nil {
+			if b, e := json.MarshalIndent(data, "", "  "); e == nil {
+				m.Echo(string(b))
+				break
+			}
+		}
+		m.Echo(out.String())
+	}
+}
 func (cli *CLI) schedule(m *ctx.Message) string {
 	first, timer := "", int64(1<<50)
 	for k, v := range m.Confv("timer", "list").(map[string]interface{}) {
@@ -231,10 +303,10 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_active(true/false): 是否交互",
 			"cmd_daemon(true/false): 是否守护",
 			"cmd_dir: 工作目录",
-			"cmd_env: 环境变量",
+			"cmd_env key value: 环境变量",
 			"cmd_log: 输出日志",
-			"cmd_temp: 缓存结果",
-			"cmd_parse: 解析结果",
+			"cmd_temp arg...: 缓存结果",
+			"cmd_parse format|json|csv|cli|cut [count sep]: 解析结果",
 			"cmd_error: 输出错误",
 		}, Form: map[string]int{
 			"cmd_timeout": 1,
@@ -244,7 +316,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_env":     2,
 			"cmd_log":     1,
 			"cmd_temp":    -1,
-			"cmd_parse":   3,
+			"cmd_parse":   4,
 			"cmd_error":   0,
 			"cmd_select":  -1,
 			"app_log":     1,
@@ -370,81 +442,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				// 输出错误
 				if m.Has("cmd_error") {
 					m.Echo(err.String())
+					return
+				}
+
+				// 解析结果
+				if format(m, out); m.Has("cmd_select") {
+					m.Cmd("select", m.Meta["cmd_select"])
 				}
 
 				// 缓存结果
 				if m.Options("cmd_temp") {
 					m.Put("option", "data", out.String()).Cmdy("mdb.temp", "script", strings.Join(arg, " "), "data", "data", m.Meta["cmd_temp"])
-					return
-				}
-
-				// 解析结果
-				switch m.Option("cmd_parse") {
-				case "format":
-					var data interface{}
-					if json.Unmarshal(out.Bytes(), &data) == nil {
-						if b, e := json.MarshalIndent(data, "", "  "); e == nil {
-							m.Echo(string(b))
-							break
-						}
-					}
-					m.Echo(out.String())
-				case "json":
-					var data interface{}
-					if json.Unmarshal(out.Bytes(), &data) == nil {
-						msg := m.Spawn().Put("option", "data", data).Cmd("trans", "data", "")
-						m.Copy(msg, "append").Copy(msg, "result")
-					} else {
-						m.Echo(out.String())
-					}
-
-				case "csv":
-					data, e := csv.NewReader(out).ReadAll()
-					m.Assert(e)
-					for i := 1; i < len(data); i++ {
-						for j := 0; j < len(data[i]); j++ {
-							m.Add("append", data[0][j], data[i][j])
-						}
-					}
-					m.Table()
-
-				case "cli":
-					read := csv.NewReader(out)
-					read.Comma = ' '
-					read.TrimLeadingSpace = true
-					read.FieldsPerRecord = 4
-					data, e := read.ReadAll()
-					m.Assert(e)
-					for i := 1; i < len(data); i++ {
-						for j := 0; j < len(data[i]); j++ {
-							m.Add("append", data[0][j], data[i][j])
-						}
-					}
-					m.Table()
-
-				case "cut":
-					bio := bufio.NewScanner(out)
-					bio.Scan()
-					c := byte(kit.Select(" ", m.Optionv("cmd_parse"), 2)[0])
-					for heads := kit.Split(bio.Text(), c, kit.Int(kit.Select("-1", m.Optionv("cmd_parse"), 1))); bio.Scan(); {
-						for i, v := range kit.Split(bio.Text(), c, len(heads)) {
-							m.Add("append", heads[i], v)
-						}
-					}
-					m.Table()
-
-				default:
-					var data interface{}
-					if json.Unmarshal(out.Bytes(), &data) == nil {
-						if b, e := json.MarshalIndent(data, "", "  "); e == nil {
-							m.Echo(string(b))
-							break
-						}
-					}
-					m.Echo(out.String())
-				}
-				if m.Has("cmd_select") {
-					m.Cmd("select", m.Meta["cmd_select"])
 				}
 			})
 
