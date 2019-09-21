@@ -111,6 +111,8 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		return false
 
 	} else if msg.Options("relay") {
+		msg.Short("relay")
+
 		relay := msg.Cmd("aaa.relay", "check", msg.Option("relay"))
 		if relay.Appendi("count") == 0 {
 			msg.Err("共享失效")
@@ -417,6 +419,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				map[string]interface{}{"name": "tail", "template": "tail"},
 			},
 		}, Help: "组件列表"},
+		"upload": &ctx.Config{Name: "upload", Value: map[string]interface{}{
+			"path": "var/file",
+		}, Help: "上件文件"},
 		"toolkit": &ctx.Config{Name: "toolkit", Value: map[string]interface{}{
 			"time": map[string]interface{}{"cmd": "time"},
 		}, Help: "工具列表"},
@@ -925,12 +930,34 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if f, h, e := r.FormFile("upload"); m.Assert(e) {
 				defer f.Close()
 
-				if o, p, e := kit.Create(path.Join(m.Cmdx("nfs.path", m.Magic("session", "current.dir")), h.Filename)); m.Assert(e) {
+				m.Log("info", "waht %v", h.Header)
+
+				name := kit.Hashx(f)
+				if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "list", name)); m.Assert(e) {
 					defer o.Close()
 
+					f.Seek(0, os.SEEK_SET)
 					if n, e := io.Copy(o, f); m.Assert(e) {
 						m.Log("upload", "file: %s %d", p, n)
-						m.Echo("%s", p)
+
+						code := kit.Hashs("uniq")
+						if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "meta", code)); m.Assert(e) {
+							defer o.Close()
+
+							m.Log("upload", "file: %s %d", p, n)
+							fmt.Fprintf(o, "create_time: %s\n", m.Time())
+							fmt.Fprintf(o, "create_user: %s\n", m.Option("username"))
+							fmt.Fprintf(o, "type: %s\n", h.Header.Get("Content-Type"))
+							fmt.Fprintf(o, "name: %s\n", h.Filename)
+							fmt.Fprintf(o, "hash: %s\n", name)
+							fmt.Fprintf(o, "size: %d\n", n)
+
+							m.Append("size", kit.FmtSize(n))
+							m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
+							m.Append("type", h.Header.Get("Content-Type"))
+							m.Append("hash", name)
+						}
+						m.Table()
 					}
 				}
 			}
@@ -940,7 +967,39 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 
-			if p := m.Cmdx("nfs.path", strings.TrimPrefix(key, "/download/")); p != "" {
+			file := strings.TrimPrefix(key, "/download/")
+			if file == "" {
+				if fs, e := ioutil.ReadDir(path.Join(m.Conf("web.upload", "path"), "meta")); e == nil {
+					for _, f := range fs {
+						meta := kit.Linex(path.Join(m.Conf("web.upload", "path"), "meta", f.Name()))
+						m.Push("time", meta["create_time"])
+						m.Push("user", meta["create_user"])
+						m.Push("size", kit.FmtSize(int64(kit.Int(meta["size"]))))
+						m.Push("name", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, f.Name(), meta["name"]))
+						m.Push("hash", meta["hash"][:8])
+					}
+					m.Sort("time", "time_r").Table()
+				}
+				return
+			}
+
+			if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), "meta", file)); p != "" {
+				meta := kit.Linex(p)
+				if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), "list", meta["hash"])); p != "" {
+					m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", meta["hash"]))
+					w.Header().Set("Content-Disposition", fmt.Sprintf("filename=%s", meta["name"]))
+					http.ServeFile(w, r, p)
+				} else {
+					http.NotFound(w, r)
+				}
+				return
+			}
+
+			if m.Option("userrole") != "root" {
+				return
+			}
+
+			if p := m.Cmdx("nfs.path", file); p != "" {
 				m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", p))
 				http.ServeFile(w, r, p)
 			}
@@ -949,6 +1008,36 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/proxy/": &ctx.Command{Name: "/proxy/which/method/url", Help: "服务代理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			fields := strings.Split(key, "/")
 			m.Cmdy("web.get", "which", fields[2], "method", fields[3], strings.Join(fields, "/"))
+			return
+		}},
+		"/login": &ctx.Command{Name: "/login", Help: "认证", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			switch {
+			case m.Options("cert"): // 注册证书
+				msg := m.Cmd("aaa.rsa", "info", m.Option("cert"))
+				m.Cmd("aaa.auth", "nodes", msg.Append("route"), "cert", m.Option("cert"))
+				m.Append("sess", m.Cmdx("aaa.sess", "nodes", "nodes", msg.Append("route")))
+
+			case m.Options("pull"): // 下载证书
+				sess := m.Cmd("aaa.auth", "nodes", m.Option("pull"), "session").Append("key")
+				m.Add("append", "username", m.Cmd("aaa.auth", sess, "username").Append("meta"))
+				m.Add("append", "cert", (m.Cmd("aaa.auth", "nodes", m.Option("pull"), "cert").Append("meta")))
+
+			case m.Options("bind"): // 绑定设备
+				sess := m.Cmd("aaa.auth", "nodes", m.Option("bind"), "session").Append("key")
+				if m.Cmd("aaa.auth", sess, "username").Appends("meta") {
+					return // 已经绑定
+				}
+
+				if m.Cmds("aaa.rsa", "verify", m.Cmd("aaa.auth", "username", m.Option("username"), "cert").Append("meta"), m.Option("code"), m.Option("bind")) {
+					m.Cmd("aaa.login", sess, "username", m.Option("username"))
+					m.Append("userrole", "root")
+				}
+			case m.Options("user.cert"): // 用户注册
+				if !m.Cmds("aaa.auth", "username", m.Option("username"), "cert") {
+					m.Cmd("aaa.auth", "username", m.Option("username"), "cert", m.Option("user.cert"))
+				}
+				m.Append("username", m.Option("username"))
+			}
 			return
 		}},
 
@@ -990,36 +1079,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Confm("runtime", "node.port", func(index int, value string) {
 				m.Add("append", "ports", value)
 			})
-			return
-		}},
-		"/login": &ctx.Command{Name: "/login", Help: "认证", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch {
-			case m.Options("cert"): // 注册证书
-				msg := m.Cmd("aaa.rsa", "info", m.Option("cert"))
-				m.Cmd("aaa.auth", "nodes", msg.Append("route"), "cert", m.Option("cert"))
-				m.Append("sess", m.Cmdx("aaa.sess", "nodes", "nodes", msg.Append("route")))
-
-			case m.Options("pull"): // 下载证书
-				sess := m.Cmd("aaa.auth", "nodes", m.Option("pull"), "session").Append("key")
-				m.Add("append", "username", m.Cmd("aaa.auth", sess, "username").Append("meta"))
-				m.Add("append", "cert", (m.Cmd("aaa.auth", "nodes", m.Option("pull"), "cert").Append("meta")))
-
-			case m.Options("bind"): // 绑定设备
-				sess := m.Cmd("aaa.auth", "nodes", m.Option("bind"), "session").Append("key")
-				if m.Cmd("aaa.auth", sess, "username").Appends("meta") {
-					return // 已经绑定
-				}
-
-				if m.Cmds("aaa.rsa", "verify", m.Cmd("aaa.auth", "username", m.Option("username"), "cert").Append("meta"), m.Option("code"), m.Option("bind")) {
-					m.Cmd("aaa.login", sess, "username", m.Option("username"))
-					m.Append("userrole", "root")
-				}
-			case m.Options("user.cert"): // 用户注册
-				if !m.Cmds("aaa.auth", "username", m.Option("username"), "cert") {
-					m.Cmd("aaa.auth", "username", m.Option("username"), "cert", m.Option("user.cert"))
-				}
-				m.Append("username", m.Option("username"))
-			}
 			return
 		}},
 	},

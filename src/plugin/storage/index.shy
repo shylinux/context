@@ -1,26 +1,4 @@
 
-kit xiao "数据库" public "ssh.data" show \
-	text "" name table imports plugin_table action auto view long \
-	text "" name index action auto \
-	button "查看" action auto \
-	button "返回" click Last \
-    exports table table
-
-fun meet "第一眼" public \
-	text "" name table imports plugin_table \
-	text "" name when \
-	text "" name where \
-	button "添加"
-
-    if $2 == ""
-        return "time miss"
-    end
-    if $3 == ""
-        return "meet miss"
-    end
-    copy ssh.data insert _ when _ where __
-end
-
 fun clip "粘贴板" public \
 	text "" name you imports plugin_you action auto \
 	text "" name txt view long \
@@ -47,4 +25,25 @@ fun note "记事本" public \
         copy ssh._route _ context wiki text __ level local/wiki
     end
 end
+
+kit data "数据库" public "ssh.data" show \
+	text "" name table imports plugin_table action auto view long \
+	text "" name index action auto \
+	button "查看" action auto \
+	button "返回" click Last \
+    exports table table
+
+kit save "导出" private "ssh.data" export \
+	text "love" name table imports plugin_table \
+	button "导出"
+
+kit load "导入" private "ssh.data" import \
+	text "love" name table imports plugin_table \
+	text "" name file \
+	button "导入"
+
+kit push "上传" private "web./download/" \
+	upfile "" name upload \
+	button "上传" click upload \
+	button "查看"
 
