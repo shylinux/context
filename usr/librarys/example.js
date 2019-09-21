@@ -723,6 +723,9 @@ function Plugin(page, pane, field, runs) {
             name = item.name || "input"
             var input = {type: "input", name: name, data: item}
             switch (item.type) {
+                case "upfile":
+                    item.type = "file"
+                    break
                 case "select":
                     kit.classList.add(item, "args")
                     input.type = "select", input.list = item.values.map(function(value) {
@@ -868,6 +871,14 @@ function Plugin(page, pane, field, runs) {
             plugin.show_after(plugin.msg)
         },
         show_after: function(msg) {},
+        upload: function(event) {
+            ctx.Upload(option.upload.files[0], function(event, msg) {
+                kit.OrderTable(kit.AppendTable(kit.AppendChilds(output, "table"), ctx.Table(msg), msg.append))
+                page.ontoast("上传成功")
+            }, function(event) {
+                page.ontoast(), page.ontoast("上传进度 "+parseInt(event.loaded*100/event.total)+"%")
+            })
+        },
         ondaemon: {
             inner: function(msg, cb) {
                 output.style.maxWidth = pane.target.clientWidth-20+"px"

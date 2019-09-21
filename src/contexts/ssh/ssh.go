@@ -3,7 +3,6 @@ package ssh
 import (
 	"bufio"
 	"contexts/ctx"
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -134,6 +133,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			},
 		}, Help: "组件列表"},
 
+		"data":  {Name: "data", Value: map[string]interface{}{"path": "var/data"}, Help: "聊天数据"},
 		"flow":  {Name: "flow", Value: map[string]interface{}{}, Help: "聊天群组"},
 		"work":  {Name: "work", Value: map[string]interface{}{}, Help: "工作信息"},
 		"node":  {Name: "node", Value: map[string]interface{}{}, Help: "节点信息"},
@@ -467,8 +467,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				for _, v := range arg[1:] {
 					data := m.Confm("flow", []string{m.Option("river"), "data", v})
-					kit.Marshal(data["meta"], path.Join("var/data", m.Option("river"), v, "/meta.json"))
-					kit.Marshal(data["list"], path.Join("var/data", m.Option("river"), v, "/list.csv"))
+					kit.Marshal(data["meta"], path.Join(m.Conf("ssh.data", "path"), m.Option("river"), v, "/meta.json"))
+					kit.Marshal(data["list"], path.Join(m.Conf("ssh.data", "path"), m.Option("river"), v, "/list.csv"))
 
 					l := len(data["list"].([]interface{}))
 					m.Push("table", v).Push("count", l)
@@ -536,23 +536,32 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index), arg[i]}, arg[i+1])
 				}
 			case "import":
-				msg := m.Cmd("nfs.import", arg[2:])
+				if len(arg) < 3 {
+					m.Cmdy("ssh.data", "show", arg)
+					return
+				}
+
 				id := m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "count"})
-				msg.Table(func(maps map[string]string) {
+				m.Cmd("nfs.import", arg[2:]).Table(func(maps map[string]string) {
 					data := map[string]interface{}{}
-					extra := map[string]interface{}{}
 					for k, v := range maps {
 						m.Push(k, v)
 						data[k] = v
 					}
-					json.Unmarshal(([]byte)(maps["extra"]), &data)
-					data["extra"] = extra
-					id++
-					data["id"] = id
 
+					if id++; id == 1 {
+						m.Cmd("ssh.data", "create", arg[1], data)
+					}
+
+					data["id"] = id
+					data["extra"] = kit.UnMarshalm(maps["extra"])
 					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", "-2"}, data)
 				})
 				m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "count"}, id)
+				m.Cmd("ssh.data", "save", arg[1])
+			case "export":
+				m.Append("directory", path.Join(m.Conf("ssh.data", "path"), m.Option("river"), arg[1], "/list.csv"))
+				m.Table()
 			}
 			return
 		}},

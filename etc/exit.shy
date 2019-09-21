@@ -3,6 +3,7 @@
     config save var/data/work.json work
 ~aaa
     config save var/tmp/auth.json auth
+    config save var/tmp/short.json short
 ~cli
     config save var/tmp/runtime.json runtime
 

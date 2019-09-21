@@ -1,2 +1,8 @@
+~cli
+    upgrade plugin context
+    upgrade plugin storage
+    upgrade plugin love
+
 ~aaa
     role root user shy shaoying
+

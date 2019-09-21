@@ -202,6 +202,13 @@ func (m *Message) Format(arg ...interface{}) string {
 	}
 	return strings.Join(meta, " ")
 }
+func (m *Message) Short(arg ...string) {
+	for _, k := range arg {
+		if v := m.Option(k); v != "" && len(v) != 32 {
+			m.Option(k, m.Cmdx("aaa.short", v))
+		}
+	}
+}
 func (m *Message) Err(str string, arg ...interface{}) {
 	m.Echo("").Echo("error: ").Echo(str, arg...)
 }

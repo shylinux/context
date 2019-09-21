@@ -1,7 +1,3 @@
-kit imports "导入" "" "" private "ssh.data" "import" \
-	text "love" name table \
-	text "" name file \
-	button "导入"
 
 fun meet "第一眼" private \
 	text "love" name table imports plugin_table \
@@ -11,9 +7,9 @@ fun meet "第一眼" private \
 
     if $2 == "" || $3 == ""
         copy ssh.data show _
-        return
+    else
+        copy ssh.data insert _ when _ where __
     end
-    copy ssh.data insert _ when _ where __
 end
 
 kit date "日历" "index.js" "index.css" protected "cli.date" _ nature _ \
@@ -34,8 +30,8 @@ fun delay "以后告诉你" private \
 
     if $2 == "" || $3 == ""
         copy ssh.data show _
-        return
+    else
+        copy ssh.data insert _ when _ what __
     end
-    copy ssh.data insert _ when _ what __
 end
 

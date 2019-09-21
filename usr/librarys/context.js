@@ -204,4 +204,30 @@ ctx = context = {
         xhr.setRequestHeader("Accept", "application/json")
         xhr.send(args.join("&"))
     },
+    Upload: function(file, cb, detail) {
+        var data = new FormData()
+        data.append("upload", file)
+
+        var xhr = new XMLHttpRequest()
+        xhr.onload = function(event) {
+            var msg = JSON.parse(xhr.responseText||'{"result":[]}')
+            typeof cb == "function" && cb(event, msg)
+        }
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState != 4) {
+                return
+            }
+            if (xhr.status != 200) {
+                return
+            }
+        }
+
+        xhr.upload.onprogress = function(event) {
+            typeof detail == "function" && detail(event)
+        }
+
+        xhr.open("POST", "/upload", true)
+        xhr.send(data)
+    },
 }

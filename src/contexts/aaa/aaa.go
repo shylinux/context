@@ -2,6 +2,7 @@ package aaa
 
 import (
 	"gopkg.in/gomail.v2"
+	"strconv"
 
 	"contexts/ctx"
 	"toolkit"
@@ -101,6 +102,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			"secrete": map[string]interface{}{"password": true, "token": true, "uuid": true, "ppid": true},
 		}, Help: "散列"},
 
+		"short": &ctx.Config{Name: "short", Value: map[string]interface{}{}, Help: "散列"},
 		"email": &ctx.Config{Name: "email", Value: map[string]interface{}{
 			"self": "shylinux@163.com", "smtp": "smtp.163.com", "port": "25",
 		}, Help: "邮件服务"},
@@ -602,7 +604,38 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 			}
 			return
 		}},
+		"short": &ctx.Command{Name: "short", Help: "短码", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			// cc2309e0cb95ab3cabced1b3e7141105
+			if len(arg) == 0 {
+				return
+			}
+			length := 6
+			short := arg[0][:length]
 
+			if len(arg[0]) == 32 {
+				m.Confm("aaa.short", short, func(index int, value string) {
+					if value == arg[0] {
+						m.Echo("%s%02x", short, index)
+					}
+				})
+				if m.Result() != "" {
+					return
+				}
+
+				m.Confv("aaa.short", []string{short, "-2"}, arg[0])
+				if v, ok := m.Confv("aaa.short", short).([]interface{}); ok {
+					m.Echo("%s%02x", short, len(v)-1)
+				}
+
+			} else {
+				if i, e := strconv.ParseInt(arg[0][length:], 16, 64); e == nil {
+					m.Echo(m.Conf("aaa.short", []interface{}{short, int(i)}))
+				} else {
+					m.Echo(arg[0])
+				}
+			}
+			return
+		}},
 		"relay": &ctx.Command{Name: "relay [rid] [check userrole]|[count num]|[share [type [role [name [count]]]]]", Help: "授权", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 授权列表
 			if len(arg) == 0 {
@@ -746,8 +779,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					// 生成证书
 					template := x509.Certificate{
-						SerialNumber:          big.NewInt(1),
-						IsCA:                  true,
+						SerialNumber: big.NewInt(1),
+						IsCA:         true,
 						BasicConstraintsValid: true,
 						KeyUsage:              x509.KeyUsageCertSign,
 						Subject:               pkix.Name{CommonName: kit.Format(common)},

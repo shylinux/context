@@ -328,7 +328,8 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			// 命令语句
 			map[string]interface{}{"page": "word", "hash": "word", "word": []interface{}{"mul{", "~", "!", "\\?", "\\?\\?", "exe", "str", "[\\-a-zA-Z0-9_:/.%*]+", "=", "<", ">$", ">@", ">", "\\|", "}"}},
 			map[string]interface{}{"page": "cmd", "hash": "cmd", "word": []interface{}{"rep{", "word", "}"}},
-			map[string]interface{}{"page": "com", "hash": "com", "word": []interface{}{"mul{", ";", "#[^\n]*\n?", "\n", "}"}},
+			map[string]interface{}{"page": "com", "hash": "cmd", "word": []interface{}{"rep{", ";", "cmd", "}"}},
+			map[string]interface{}{"page": "com", "hash": "com", "word": []interface{}{"mul{", "#[^\n]*\n?", "\n", "}"}},
 			map[string]interface{}{"page": "line", "hash": "line", "word": []interface{}{"opt{", "mul{", "stm", "cmd", "}", "}", "com"}},
 
 			// 复合语句
@@ -348,6 +349,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			map[string]interface{}{"page": "stm", "hash": "else", "word": []interface{}{"else", "opt{", "if", "exp", "}"}},
 			map[string]interface{}{"page": "stm", "hash": "end", "word": []interface{}{"end"}},
 
+			// 标签语句
 			map[string]interface{}{"page": "stm", "hash": "label", "word": []interface{}{"label", "key"}},
 			map[string]interface{}{"page": "stm", "hash": "goto", "word": []interface{}{"goto", "key"}},
 			/*
@@ -373,6 +375,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 			"text":     true,
 			"select":   true,
 			"button":   true,
+			"upfile":   true,
 			"textarea": true,
 			"exports":  true,
 			"feature":  true,
@@ -1174,12 +1177,12 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				"init": init,
 				"type": right,
 
-				"ctx":  m.Cap("module"),
-				"cmd":  cmd,
-				"args": args,
-				"inputs":        inputs,
-				"exports":       exports,
-				"feature":       feature,
+				"ctx":     m.Cap("module"),
+				"cmd":     cmd,
+				"args":    args,
+				"inputs":  inputs,
+				"exports": exports,
+				"feature": feature,
 			})
 			return
 		}},

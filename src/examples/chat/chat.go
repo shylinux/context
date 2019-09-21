@@ -6,6 +6,24 @@ import (
 	"toolkit"
 )
 
+func check(m *ctx.Message, arg []string) ([]string, string, bool) {
+	if !m.Options("sessid") || !m.Options("username") {
+		return nil, "", false
+	}
+
+	rid := m.Option("river")
+	if len(arg[0]) != 32 {
+		arg[0] = m.Cmdx("aaa.short", arg[0])
+	}
+	if m.Confs("flow", arg[0]) {
+		rid, arg = arg[0], arg[1:]
+	}
+	if rid != "" && len(rid) != 32 {
+		rid = m.Cmdx("aaa.short", rid)
+	}
+	return arg, rid, true
+}
+
 var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
@@ -98,7 +116,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				case "relay":
 					relay := m.Cmdx("aaa.relay", "share", arg[1:])
 					m.Log("info", "relay: %s", relay)
-					m.Echo(relay)
+					m.Echo(m.Cmdx("aaa.short", relay))
 					return
 				case "rename":
 					m.Cmd("aaa.auth", "username", m.Option("username"), "data", "nickname", arg[1])
@@ -193,7 +211,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 						return
 					}
 
-					m.Push("key", key)
+					m.Push("key", m.Cmdx("aaa.short", key))
 					m.Push("nick", kit.Chains(value, "conf.nick"))
 					m.Push("create_user", kit.Chains(value, "conf.create_user"))
 					m.Push("create_time", kit.Chains(value, "conf.create_time"))
@@ -214,9 +232,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				return
 			}
 
-			rid := m.Option("river")
-			if m.Confs("flow", arg[0]) {
-				rid, arg = arg[0], arg[1:]
+			// 登录失败
+			arg, rid, ok := check(m, arg)
+			if !ok {
+				return
 			}
 
 			switch arg[0] {
@@ -279,13 +298,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		}},
 		"storm": &ctx.Command{Name: "storm [rid] [[delete] group [index [arg...]]]", Help: "风雨", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 登录失败
-			if !m.Options("sessid") || !m.Options("username") {
+			arg, rid, ok := check(m, arg)
+			if !ok {
 				return
-			}
-
-			rid := m.Option("river")
-			if m.Confs("flow", arg[0]) {
-				rid, arg = arg[0], arg[1:]
 			}
 
 			// 命令列表
@@ -312,8 +327,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				m.Set("option", "init")
 				m.Set("option", "view")
 				if len(arg) == 1 {
+					short := m.Cmdx("aaa.short", rid)
 					m.Confm("flow", []string{rid, "tool", arg[0], "list"}, func(index int, tool map[string]interface{}) {
-						m.Push("river", rid)
+						m.Push("river", short)
 						m.Push("storm", arg[0])
 						m.Push("action", index)
 
@@ -346,13 +362,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		}},
 		"steam": &ctx.Command{Name: "steam rid [user node]|[spawn name [route group index name]...]", Help: "天空", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 登录失败
-			if !m.Options("sessid") || !m.Options("username") {
+			arg, rid, ok := check(m, arg)
+			if !ok {
 				return
-			}
-
-			rid := m.Option("river")
-			if m.Confs("flow", arg[0]) {
-				rid, arg = arg[0], arg[1:]
 			}
 
 			// 上传请求

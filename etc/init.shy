@@ -1,7 +1,8 @@
 ~cli
-    config load tmp/runtime.json runtime
+    config load var/tmp/runtime.json runtime
 ~aaa
-    config load tmp/auth.json auth
+    config load var/tmp/short.json short
+    config load var/tmp/auth.json auth
 ~ssh
     config load var/data/work.json work
     config load var/data/flow.json flow
@@ -14,5 +15,4 @@
     source local.shy
 
 ~cli
-    upgrade plugin context
-    upgrade plugin love
+

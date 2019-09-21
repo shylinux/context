@@ -46,7 +46,7 @@ call Keys("Statment", ["var", "let"])
 call Keys("Statment", ["if", "else", "else if", "for", "end"])
 call Keys("Statment", ["label", "goto"])
 " context nfs
-call Keys("SubCommand", ["import", "export", "load", "save"])
+" call Keys("SubCommand", ["import", "export", "load", "save"])
 
 " context ctx
 call Keys("Argument", ["list", "map"])

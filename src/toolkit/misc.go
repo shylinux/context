@@ -1,9 +1,13 @@
 package kit
 
 import (
+	"bytes"
+	"crypto/md5"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -64,15 +68,15 @@ func Split(str string, c byte, n int) []string {
 }
 func FmtSize(size int64) string {
 	if size > 1<<30 {
-		return fmt.Sprintf("%d.%dG", size>>30, (size>>20)%1024*100/1024)
+		return fmt.Sprintf("%d.%dG", size>>30, (size>>20)%1024*100>>10)
 	}
 
 	if size > 1<<20 {
-		return fmt.Sprintf("%d.%dM", size>>20, (size>>10)%1024*100/1024)
+		return fmt.Sprintf("%d.%dM", size>>20, (size>>10)%1024*100>>10)
 	}
 
 	if size > 1<<10 {
-		return fmt.Sprintf("%d.%dK", size>>10, size%1024*100/1024)
+		return fmt.Sprintf("%d.%dK", size>>10, size%1024*100>>10)
 	}
 
 	return fmt.Sprintf("%dB", size)
@@ -163,4 +167,42 @@ func IsLocalIP(ip string) bool {
 		return true
 	}
 	return false
+}
+func Hashx(f io.Reader) string {
+	md := md5.New()
+	io.Copy(md, f)
+	h := md.Sum(nil)
+	return hex.EncodeToString(h[:])
+}
+func Lines(p string, args ...interface{}) []string {
+	b, e := ioutil.ReadFile(p)
+	if e != nil {
+		return nil
+	}
+	bs := bytes.Split(b, []byte("\n"))
+
+	res := make([]string, 0, len(bs))
+	for _, v := range bs {
+		if len(args) > 0 {
+			switch arg := args[0].(type) {
+			case func(string) string:
+				res = append(res, arg(string(v)))
+				continue
+			case func(string):
+				arg(string(v))
+			}
+		}
+		res = append(res, string(v))
+	}
+	return res
+}
+func Linex(p string) map[string]string {
+	meta := map[string]string{}
+	Lines(p, func(value string) {
+		if strings.Contains(value, ":") {
+			bs := strings.SplitN(value, ":", 2)
+			meta[strings.TrimSpace(bs[0])] = strings.TrimSpace(bs[1])
+		}
+	})
+	return meta
 }
