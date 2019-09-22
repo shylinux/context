@@ -57,6 +57,7 @@ var Index = &ctx.Context{Name: "weixin", Help: "微信后台",
 	Commands: map[string]*ctx.Command{
 		"access": &ctx.Command{Name: "access", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Option("format", "object")
+			m.Option("temp_expire", "1")
 			now := kit.Int(time.Now().Unix())
 
 			access := m.Confm("chat", "access")
@@ -70,6 +71,7 @@ var Index = &ctx.Context{Name: "weixin", Help: "微信后台",
 		}},
 		"ticket": &ctx.Command{Name: "ticket", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Option("format", "object")
+			m.Option("temp_expire", "1")
 			now := kit.Int(time.Now().Unix())
 
 			ticket := m.Confm("chat", "ticket")

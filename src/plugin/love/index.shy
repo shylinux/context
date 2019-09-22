@@ -55,3 +55,9 @@ kit wss "推送" private "web.wss" \
 	button "返回" click Last \
 	exports wss key
 
+kit pos "位置" private \
+    button "查看" click getLocation \
+    button "显示" click openLocation \
+	text "0.0062" name x \
+	text "0.0014" name y \
+	text "当前位置" name pos \

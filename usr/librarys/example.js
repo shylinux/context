@@ -150,13 +150,13 @@ function Page(page) {
                         wx.error(function(res){})
                         wx.ready(function(){
                             page.getLocation = function(cb) {
-                                wx.getLocation({success: function (res) {cb(res)}})
+                                wx.getLocation({success: function (res) {
+                                    cb(res)
+                                }})
                             }
                             page.openLocation = function(latitude, longitude, name) {
                                 wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
                             }
-
-                            wx.getNetworkType({success: function (res) {}})
                             wx.getLocation({success: function (res) {
                                 page.footer.Pane.State("site", parseInt(res.latitude*10000)+","+parseInt(res.longitude*10000))
                             }})
@@ -808,6 +808,19 @@ function Plugin(page, pane, field, runs) {
             list? (list.target.value = list.value): inputs.map(function(item) {
                 option[item.name].value = item.value
             }), plugin.Check()
+        },
+
+        getLocation: function(event, target, option, field, cb) {
+            page.getLocation && page.getLocation(cb || (function(res) {
+                page.ontoast(JSON.stringify(res))
+            }))
+        },
+        openLocation: function(event) {
+            var x = parseFloat(option.x.value)
+            var y = parseFloat(option.y.value)
+            page.getLocation && page.getLocation(function(res) {
+                page.openLocation && page.openLocation(res.latitude+y, res.longitude+x, option.pos.value)
+            })
         },
 
         Help: function(type, action) {

@@ -89,6 +89,18 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 	},
 	Commands: map[string]*ctx.Command{
 		"login": &ctx.Command{Name: "login [username password]", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 {
+				switch arg[0] {
+				case "weixin":
+					if msg := m.Find("cli.weixin", true); msg != nil {
+						msg.Cmd("js_token")
+						m.Copy(msg, "append")
+						m.Table()
+					}
+					return
+				}
+			}
+
 			// 非登录态
 			if !m.Options("sessid") || !m.Options("username") {
 				if len(arg) > 0 {
@@ -121,7 +133,6 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				case "rename":
 					m.Cmd("aaa.auth", "username", m.Option("username"), "data", "nickname", arg[1])
 
-				case "weixin":
 				}
 			}
 

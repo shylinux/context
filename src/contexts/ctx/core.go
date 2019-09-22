@@ -17,6 +17,7 @@ func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 		case bool:
 			force = arg
 		case string:
+			force = true
 			name, s.Name = arg, arg
 		}
 	}
