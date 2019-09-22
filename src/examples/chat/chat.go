@@ -120,6 +120,8 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					return
 				case "rename":
 					m.Cmd("aaa.auth", "username", m.Option("username"), "data", "nickname", arg[1])
+
+				case "weixin":
 				}
 			}
 
