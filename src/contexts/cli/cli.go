@@ -181,6 +181,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				map[string]interface{}{"os": "darwin", "cpu": "amd64"},
 			}, "tmp": "var/tmp/go", "dep": []interface{}{
 				"github.com/nfs/termbox-go",
+				"github.com/gorilla/websocket"
 				"github.com/go-sql-driver/mysql",
 				"github.com/redigo/redis",
 				"github.com/gomarkdown/markdown",

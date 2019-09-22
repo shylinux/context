@@ -4,6 +4,7 @@ publish=usr/publish/
 
 install:
 	@go get github.com/nsf/termbox-go
+	@go get github.com/gorilla/websocket
 	@go get github.com/go-sql-driver/mysql
 	@go get github.com/gomodule/redigo/redis
 	@go get github.com/gomarkdown/markdown
