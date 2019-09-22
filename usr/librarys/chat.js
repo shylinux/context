@@ -295,6 +295,7 @@ var page = Page({check: true,
                         engine.help("action")
                         engine.help("storm")
                     },
+                    reload: function() {kit.reload()},
                     help: function() {
                         var args = kit.List(arguments), cb, target
                         if (args.length > 0 && page.pane && page.pane.Pane[args[0]] && page.pane.Pane[args[0]].Plugin) {

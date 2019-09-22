@@ -1,5 +1,5 @@
 
-fun meet "第一眼" private \
+fun meet "第一眼" protected \
 	text "love" name table imports plugin_table \
 	text "date" name when \
 	text "" name where \
@@ -15,14 +15,14 @@ end
 kit date "日历" "index.js" "index.css" protected "cli.date" _ nature _ \
     \ space true format '<span class="%s">%s</span>' "s20060102" \
 	text "2019-07-08" name "起始时间" \
-	text "date" name "截止时间" \
+	text "date" name "date" \
 	text "love" name "table" imports plugin_table \
 	text "when" name "when" \
 	text "where" name "where" \
 	button "查看" action auto \
 	button "显示" click show
 
-fun delay "以后告诉你" private \
+fun delay "以后告诉你" protected \
 	text "delay" name table imports plugin_table \
 	text "date" name when \
 	text "" name what view long \
