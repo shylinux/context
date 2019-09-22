@@ -195,6 +195,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			if !m.Options("sessid") || !m.Options("username") {
 				return
 			}
+			m.Short("river")
 
 			// 自动入群
 			if m.Options("river") {

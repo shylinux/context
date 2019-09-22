@@ -204,6 +204,33 @@ ctx = context = {
         xhr.setRequestHeader("Accept", "application/json")
         xhr.send(args.join("&"))
     },
+    WSS: function(cb) {
+        var s = new WebSocket("ws://"+location.host+"/wss")
+        s.onopen = function(event) {
+            kit.Log(event)
+        }
+        s.onmessage = function(event) {
+            var msg = JSON.parse(event.data)
+
+            try {
+                var msg = JSON.parse(event.data||'{}')
+            } catch (e) {
+                var msg = {"result": [event.data]}
+            }
+
+            msg.event = event, msg.reply = function(sub) {
+                s.send(JSON.stringify(sub||msg))
+            }
+            typeof cb == "function" && cb(msg)
+        }
+        s.onerror = function(event) {
+            kit.Log(event)
+        }
+        s.onclose = function(event) {
+            kit.Log(event)
+        }
+        return s
+    },
     Upload: function(file, cb, detail) {
         var data = new FormData()
         data.append("upload", file)

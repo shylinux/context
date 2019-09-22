@@ -1,10 +1,10 @@
 package ctx
 
 import (
-	"runtime"
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
 	"time"
 	"toolkit"
@@ -382,7 +382,10 @@ func (m *Message) Call(cb func(msg *Message) (sub *Message), arg ...interface{})
 	if m == nil {
 		return m
 	}
-	if m.callback = cb; len(arg) > 0 || len(m.Meta["detail"]) > 0 {
+	if m.callback = cb; len(arg) > 0 && kit.Format(arg[0]) == "skip" {
+		return m
+	}
+	if len(arg) > 0 || len(m.Meta["detail"]) > 0 {
 		m.Log("call", m.Format("detail", "option"))
 		m.Cmd(arg...)
 	}

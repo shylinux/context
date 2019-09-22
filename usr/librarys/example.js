@@ -437,6 +437,17 @@ function Page(page) {
             }
             return typeof page[args[0]] == "function" && kit._call(page[args[0]], args.slice(1))
         },
+        WSS: function(cb) {
+            return ctx.WSS(cb || (function(m) {
+                if (m.detail) {
+                    page.action.Pane.Core(event, m, ["_cmd", m.detail], function(msg) {
+                        m.reply(msg)
+                    })
+                } else {
+                    page.ontoast(m.result.join(""))
+                }
+            }))
+        },
 
         initToast: function() {},
         initLogin: function(page, field, option, output) {

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"github.com/gorilla/websocket"
 	"github.com/skip2/go-qrcode"
 
 	"contexts/ctx"
@@ -119,7 +120,8 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 			return false
 		}
 		if relay.Appends("username") {
-			msg.Log("info", "login: %s", msg.Option("username", relay.Append("username")))
+			name := msg.Cmdx("ssh._route", msg.Conf("runtime", "work.route"), "_check", "work", "create", relay.Append("username"), msg.Conf("runtime", "node.route"))
+			msg.Log("info", "login: %s", msg.Option("username", name))
 			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
 		}
 		if role := relay.Append("userrole"); role != "" {
@@ -425,6 +427,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"toolkit": &ctx.Config{Name: "toolkit", Value: map[string]interface{}{
 			"time": map[string]interface{}{"cmd": "time"},
 		}, Help: "工具列表"},
+		"wss": &ctx.Config{Name: "wss", Value: map[string]interface{}{}, Help: ""},
 	},
 	Commands: map[string]*ctx.Command{
 		"_init": &ctx.Command{Name: "_init", Help: "post请求", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -1079,6 +1082,122 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			m.Confm("runtime", "node.port", func(index int, value string) {
 				m.Add("append", "ports", value)
 			})
+			return
+		}},
+
+		"/wss": &ctx.Command{Name: "/wss", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
+
+			if s, e := websocket.Upgrade(w, r, nil, 4096, 4096); m.Assert(e) {
+				h := kit.Hashs("uniq")
+				p := make(chan *ctx.Message, 10)
+				meta := map[string]interface{}{
+					"create_time": m.Time(),
+					"create_user": m.Option("username"),
+					"agent":       r.Header.Get("User-Agent"),
+					"sessid":      m.Option("sessid"),
+					"socket":      s,
+					"channel":     p,
+				}
+				m.Conf("wss", []string{m.Option("username"), h}, meta)
+				m.Conf("wss", h, meta)
+
+				what := m
+				m.Log("info", "wss conn %v", h)
+				m.Gos(m.Spawn(), func(msg *ctx.Message) {
+					for {
+						if t, b, e := s.ReadMessage(); e == nil {
+							var data interface{}
+							if e := json.Unmarshal(b, &data); e == nil {
+								m.Log("info", "wss recv %s %d msg %v", h, t, data)
+							} else {
+								m.Log("warn", "wss recv %s %d msg %v", h, t, e)
+							}
+
+							what.Optionv("data", data)
+							what.Back(what)
+						} else {
+							m.Log("warn", "wss recv %s %d msg %v", h, t, e)
+							close(p)
+							break
+						}
+					}
+				})
+
+				for what = range p {
+					s.WriteJSON(what.Meta)
+				}
+
+				s.Close()
+				m.Conf("wss", h, "")
+				m.Conf("wss", []string{m.Option("username"), h}, "")
+				m.Log("warn", "wss close %s", h)
+			}
+			return
+		}},
+		"wss": &ctx.Command{Name: "wss", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				m.Confm("wss", func(key string, value map[string]interface{}) {
+					if value["agent"] == nil {
+						return
+					}
+					m.Push("key", m.Cmdx("aaa.short", key))
+					m.Push("create_time", value["create_time"])
+					m.Push("create_user", value["create_user"])
+					m.Push("sessid", kit.Format(value["sessid"])[:6])
+					m.Push("agent", value["agent"])
+				})
+				m.Table()
+				return
+			}
+
+			list := []string{}
+			if strings.Contains(arg[0], ".") {
+				vs := strings.SplitN(arg[0], ".", 2)
+				m.Confm("wss", vs[0], func(key string, value map[string]interface{}) {
+					if vs[1] == "*" || strings.Contains(kit.Format(value["agent"]), vs[1]) {
+						list = append(list, key)
+					}
+				})
+			} else {
+				if len(arg[0]) != 32 {
+					arg[0] = m.Cmdx("aaa.short", arg[0])
+				}
+				list = append(list, arg[0])
+			}
+
+			if len(arg) == 1 {
+				m.Cmdy(".config", "wss", arg[0])
+				return
+			}
+
+			for _, v := range list {
+				if p, ok := m.Confv("wss", []string{v, "channel"}).(chan *ctx.Message); ok {
+					if arg[1] == "sync" {
+						m.Meta["detail"] = arg[2:]
+						p <- m
+						m.CallBack(true, func(msg *ctx.Message) *ctx.Message {
+							if data, ok := m.Optionv("data").(map[string]interface{}); ok {
+								res := kit.Trans(data["result"])
+								m.Log("info", "result: %v", res)
+								if len(res) > 0 {
+									m.Result(res)
+								}
+							}
+
+							m.Push("time", m.Time())
+							m.Push("key", m.Cmdx("aaa.short", v))
+							m.Push("action", kit.Format(arg[2:]))
+							m.Push("result", kit.Format(m.Meta["result"]))
+							return nil
+						}, "skip")
+					} else {
+						m.Meta["detail"] = arg[1:]
+						p <- m
+					}
+				}
+			}
 			return
 		}},
 	},

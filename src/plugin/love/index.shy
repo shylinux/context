@@ -48,3 +48,10 @@ fun media "娱乐" private \
     end
 end
 
+kit wss "推送" private "web.wss" \
+	text "" name wss imports plugin_wss \
+	text "" name cmd \
+	button "推送" \
+	button "返回" click Last \
+	exports wss key
+

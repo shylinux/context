@@ -317,6 +317,12 @@ func Map(v interface{}, random string, args ...interface{}) map[string]interface
 				fun(i, val)
 			}
 		}
+	case func(string, []interface{}):
+		for k, v := range value {
+			if val, ok := v.([]interface{}); ok {
+				fun(k, val)
+			}
+		}
 	case func(string, map[string]interface{}):
 		switch random {
 		case "%":

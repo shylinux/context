@@ -70,6 +70,7 @@ type Message struct {
 	Hand bool
 	Meta map[string][]string
 	Data map[string]interface{}
+	Sync chan bool
 
 	callback func(msg *Message) (sub *Message)
 	freeback []func(msg *Message) (done bool)

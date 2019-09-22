@@ -280,7 +280,7 @@ var page = Page({check: true,
                 ], 0)
             },
             Core: function(event, line, args, cbs) {
-                var plugin = event.Plugin || {}, engine = {
+                var plugin = event.Plugin || page.plugin && page.plugin.Plugin || {}, engine = {
                     share: function(args) {
                         typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
                             river, line.storm, line.action,  args[1]||"",
@@ -347,12 +347,12 @@ var page = Page({check: true,
                     },
                     _run: function() {
                         var meta = plugin && plugin.target && plugin.target.Meta || {}
-                        field.Pane.Run([meta.river||river, meta.storm||storm, meta.action||index].concat(args), function(msg) {
+                        field.Pane.Run([meta.river||river, meta.storm||storm, meta.action].concat(args), function(msg) {
                             engine._msg(msg), typeof cbs == "function" && cbs(msg)
                         })
                     },
                 }
-                if (args.length > 0 && engine[args[0]] && engine[args[0]](args)) {return}
+                if (args.length > 0 && engine[args[0]] && engine[args[0]](args)) {typeof cbs == "function" && cbs(line); return}
                 event.shiftKey? engine._msg(): engine._run()
             },
             Show: function() {var pane = field.Pane
@@ -469,12 +469,17 @@ var page = Page({check: true,
                 "返回": function(event, value) {
                     page.plugin && page.plugin.Plugin.Last()
                 },
+                "推送": function(event, value) {
+                    if (page.socket) {return}
+                    page.socket = page.WSS()
+                },
             },
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"],
                 "", "刷新", "清屏", "并行", "串行",
 				"", ["display", "表格", "编辑", "绘图"],
                 "", "添加", "删除", "加参", "减参",
                 "", "执行", "下载", "清空", "返回",
+                "", "推送",
             ],
         }
     },
@@ -636,5 +641,6 @@ var page = Page({check: true,
         })
         page.river.Pane.Show(), page.pane = page.action, page.plugin = kit.Selector(page.action, "fieldset")[0]
 		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? "办公": "工作")
+        page.socket = page.WSS()
     },
 })
