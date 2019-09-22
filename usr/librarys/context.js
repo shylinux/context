@@ -138,7 +138,7 @@ ctx = context = {
         location.search = arg.join("&");
         return value
     },
-    Cookie: function(key, value) {
+    Cookie: function(key, value, expire) {
         if (key == undefined) {
             cs = {}
             cookies = document.cookie.split("; ")

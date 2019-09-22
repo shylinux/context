@@ -460,7 +460,8 @@ function Page(page) {
 
                     field.Pane.Login(ui.username.value, ui.password.value, function(sessid) {
                         if (!sessid) {kit.alert("用户或密码错误"); return}
-                        ctx.Cookie("sessid", sessid), page.login.Pane.Dialog(1, 1), page.onload()
+                        // ctx.Cookie("sessid", sessid),
+                            page.login.Pane.Dialog(1, 1), page.onload()
                     })
                 }]}, {type: "br"},
             ])
@@ -810,10 +811,19 @@ function Plugin(page, pane, field, runs) {
             }), plugin.Check()
         },
 
-        getLocation: function(event, target, option, field, cb) {
-            page.getLocation && page.getLocation(cb || (function(res) {
-                page.ontoast(JSON.stringify(res))
-            }))
+        getLocation: function(event) {
+            var x = parseFloat(option.x.value)
+            var y = parseFloat(option.y.value)
+            page.getLocation && page.getLocation(function(res) {
+                plugin.msg = {
+                    append: ["longitude", "latitude", "accuracy", "speed"],
+                    longitude: [res.longitude+x+""],
+                    latitude: [res.latitude+y+""],
+                    accuracy: [res.accuracy+""],
+                    speed: [res.speed+""],
+                }
+                plugin.display("table")
+            })
         },
         openLocation: function(event) {
             var x = parseFloat(option.x.value)

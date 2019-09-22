@@ -3,6 +3,7 @@ package web
 import (
 	"github.com/gorilla/websocket"
 	"github.com/skip2/go-qrcode"
+	"time"
 
 	"contexts/ctx"
 	"toolkit"
@@ -39,6 +40,13 @@ type WEB struct {
 	*ctx.Context
 }
 
+func Cookie(msg *ctx.Message, w http.ResponseWriter, r *http.Request) {
+	expire := time.Now().Add(kit.Duration(msg.Conf("login", "expire")))
+	msg.Log("info", "expire %v", expire)
+	http.SetCookie(w, &http.Cookie{Name: "sessid",
+		Value: msg.Cmdx("aaa.user", "session", "select"), Path: "/", Expires: expire})
+	return
+}
 func proxy(m *ctx.Message, url string) string {
 	if strings.HasPrefix(url, "//") {
 		return "proxy/https:" + url
@@ -99,8 +107,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	if msg.Options("username") && msg.Options("password") {
 		if msg.Cmds("aaa.auth", "username", msg.Option("username"), "password", msg.Option("password")) {
 			msg.Log("info", "login: %s", msg.Option("username"))
-			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Cmdx("aaa.user", "session", "select"), Path: "/"})
-			if msg.Options("relay") {
+			if Cookie(msg, w, r); msg.Options("relay") {
 				if role := msg.Cmdx("aaa.relay", "check", msg.Option("relay"), "userrole"); role != "" {
 					msg.Cmd("aaa.role", role, "user", msg.Option("username"))
 					msg.Log("info", "relay: %s", role)
@@ -122,7 +129,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 		if relay.Appends("username") {
 			name := msg.Cmdx("ssh._route", msg.Conf("runtime", "work.route"), "_check", "work", "create", relay.Append("username"), msg.Conf("runtime", "node.route"))
 			msg.Log("info", "login: %s", msg.Option("username", name))
-			http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
+			Cookie(msg, w, r)
 		}
 		if role := relay.Append("userrole"); role != "" {
 			msg.Cmd("aaa.role", role, "user", msg.Option("username"))
@@ -151,7 +158,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	if !msg.Options("username") && kit.IsLocalIP(msg.Option("remote_ip")) && msg.Confs("web.login", "local") {
 		msg.Cmd("aaa.role", "root", "user", msg.Cmdx("ssh.work", "create"))
 		msg.Log("info", "%s: %s", msg.Option("remote_ip"), msg.Option("username", msg.Conf("runtime", "work.name")))
-		http.SetCookie(w, &http.Cookie{Name: "sessid", Value: msg.Option("sessid", msg.Cmdx("aaa.user", "session", "select")), Path: "/"})
+		Cookie(msg, w, r)
 	}
 
 	return true
@@ -408,6 +415,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			},
 		}, Help: "功能配置"},
 		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{
+			"expire":    "240h",
 			"local":     true,
 			"check":     true,
 			"sess_void": false,

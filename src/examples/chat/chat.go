@@ -3,6 +3,7 @@ package chat
 import (
 	"contexts/ctx"
 	"contexts/web"
+	"net/http"
 	"toolkit"
 )
 
@@ -27,7 +28,7 @@ func check(m *ctx.Message, arg []string) ([]string, string, bool) {
 var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true}, Help: "默认组件"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h"}, Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"name": "chat",
@@ -95,6 +96,8 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					if msg := m.Find("cli.weixin", true); msg != nil {
 						msg.Cmd("js_token")
 						m.Copy(msg, "append")
+						m.Append("remote_ip", m.Option("remote_ip"))
+						m.Append("nickname", kit.Select(m.Option("username"), m.Option("nickname")))
 						m.Table()
 					}
 					return
@@ -113,6 +116,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 								m.Cmd("aaa.auth", "username", arg[0], "data", "chat.default",
 									m.Cmdx(".ocean", "spawn", "", m.Option("username")+"@"+m.Conf("runtime", "work.name"), m.Option("username")))
 							}
+							r := m.Optionv("request").(*http.Request)
+							w := m.Optionv("response").(http.ResponseWriter)
+
+							web.Cookie(m, w, r)
 							m.Echo(m.Option("sessid"))
 						}
 					}
