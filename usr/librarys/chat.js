@@ -413,7 +413,7 @@ var page = Page({check: true,
                 "刷新": function(event, value) {
                     output.innerHTML = "", field.Pane.Show()
                 },
-                "清空": function(event, value) {
+                "清屏": function(event, value) {
                     kit.Selector(output, "fieldset>div.output", function(item) {
                         item.innerHTML = ""
                     })
@@ -435,6 +435,16 @@ var page = Page({check: true,
                     run(list)
                 },
 
+                "表格": function(event, value) {
+                    page.plugin && page.plugin.Plugin.display("table")
+                },
+                "编辑": function(event, value) {
+                    page.plugin && page.plugin.Plugin.display("editor")
+                },
+                "绘图": function(event, value) {
+                    page.plugin && page.plugin.Plugin.display("canvas")
+                },
+
                 "添加": function(event, value) {
                     page.plugin && page.plugin.Plugin.Clone().Select()
                 },
@@ -447,21 +457,24 @@ var page = Page({check: true,
                 "减参": function(event, value) {
                     page.plugin && page.plugin.Plugin.Remove()
                 },
-
-                "表格": function(event, value) {
-                    page.plugin && page.plugin.Plugin.display("table")
+                "执行": function(event, value) {
+                    page.plugin && page.plugin.Plugin.Check()
                 },
-                "编辑": function(event, value) {
-                    page.plugin && page.plugin.Plugin.display("editor")
+                "下载": function(event, value) {
+                    page.plugin && page.plugin.Plugin.Download()
                 },
-                "绘图": function(event, value) {
-                    page.plugin && page.plugin.Plugin.display("canvas")
+                "清空": function(event, value) {
+                    page.plugin && page.plugin.Plugin.clear()
+                },
+                "返回": function(event, value) {
+                    page.plugin && page.plugin.Plugin.Last()
                 },
             },
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"],
-                "", "刷新", "清空", "并行", "串行",
+                "", "刷新", "清屏", "并行", "串行",
 				"", ["display", "表格", "编辑", "绘图"],
                 "", "添加", "删除", "加参", "减参",
+                "", "执行", "下载", "清空", "返回",
             ],
         }
     },
@@ -499,7 +512,7 @@ var page = Page({check: true,
                         "layout": page.action.Pane.Layout(),
                     })], function(msg) {
                         var url = location.origin+location.pathname+"?relay="+msg.result.join("")
-                        page.ontoast({text: "<img src=\""+ctx.Share({"group": "index", "name": "login", cmds: ["share", url]})+"\">", height: 320, title: url, button: ["确定"], cb: function(which) {
+                        page.ontoast({text: "<img src=\""+ctx.Share({"group": "index", "name": "login", cmds: ["share", url]})+"\">", height: 320, width: 320, title: url, button: ["确定"], cb: function(which) {
                             page.ontoast()
                         }})
                     })

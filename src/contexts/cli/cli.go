@@ -727,6 +727,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				format, format_time = kit.Select("%s", m.Meta["format"], 0), kit.Select("20060102", m.Meta["format"], 1)
 			}
 
+			today := time.Now()
 			now := kit.Times(m.Cmd("cli.time", arg).Append("datetime"))
 			n := kit.Int(kit.Select("1", m.Option("count")))
 			if m.Has("nature") {
@@ -752,6 +753,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				for month := cur.Month(); cur.Month() == month; cur = cur.AddDate(0, 0, 1) {
 					data := fmt.Sprintf("%d", cur.Day())
+					if cur.Year() == today.Year() && cur.YearDay() == today.YearDay() {
+						data = fmt.Sprintf(">%d<", cur.Day())
+					}
 					if cur.Day() == 1 {
 						if cur.Month() == 1 {
 							data = fmt.Sprintf("%d年", cur.Year())

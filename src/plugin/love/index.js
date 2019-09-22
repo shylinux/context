@@ -12,4 +12,7 @@
             kit.classList.add(item.parentNode, "today")
         })
     },
+    play: function(event) {
+        kit.AppendChilds(output, [{type: "video", data: {src: option.url.value, autoplay: ""}}])
+    },
 }}}

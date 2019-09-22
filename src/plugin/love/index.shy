@@ -35,3 +35,16 @@ fun delay "以后告诉你" private \
     end
 end
 
+fun media "娱乐" private \
+	text "media" name table imports plugin_table \
+	text "电影" name title \
+	text "" name link \
+	button "记下了"
+
+    if $2 == "" || $3 == ""
+        copy ssh.data show _
+    else
+        copy ssh.data insert _ title _ link __
+    end
+end
+

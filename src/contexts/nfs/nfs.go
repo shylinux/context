@@ -96,7 +96,14 @@ func dir(m *ctx.Message, root string, name string, level int, deep bool, dir_typ
 					case "line":
 						if f.IsDir() {
 							if d, e := ioutil.ReadDir(p); m.Assert(e) {
-								m.Add("append", "line", len(d))
+								count := 0
+								for _, f := range d {
+									if strings.HasPrefix(f.Name(), ".") {
+										continue
+									}
+									count++
+								}
+								m.Add("append", "line", count)
 							}
 						} else {
 							nline := 0

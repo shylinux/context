@@ -713,7 +713,7 @@ function Plugin(page, pane, field, runs) {
             });
             switch (item.value) {
                 case "date":
-                    item.value = kit.format_date(new Date())
+                    item.name == "date" && (item.value = kit.format_date(new Date()))
                     break
             }
 
@@ -870,6 +870,16 @@ function Plugin(page, pane, field, runs) {
             deal = arg, plugin.ondaemon[deal||"table"](plugin.msg, cb)
             plugin.show_after(plugin.msg)
         },
+        Download: function() {
+            var text = kit.Selector(output, "tr", function(tr) {
+                return kit.Selector(tr, "td,th", function(td) {
+                    return td.innerText
+                }).join(",")
+            }).join("\n"), type = ".csv"
+
+            !text && (text = plugin.msg.result.join(""), type = ".txt")
+            page.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([text]))+'" target="_blank" download="'+name+type+'">'+name+type+'</a>', width: 200})
+        },
         show_after: function(msg) {},
         upload: function(event) {
             ctx.Upload(option.upload.files[0], function(event, msg) {
@@ -934,6 +944,7 @@ function Plugin(page, pane, field, runs) {
         onaction: {
             onfocus: function(event, action, type, name, item) {
                 page.input = event.target
+                plugin.Select(true)
             },
             onblur: function(event, action, type, name, item) {
                 page.input = undefined
@@ -952,7 +963,7 @@ function Plugin(page, pane, field, runs) {
                 }
             },
             ondblclick: function(event, action, type, name, item) {
-                action.target.value = kit.History.get("txt", -1).data.trim()
+                type == "text" && (action.target.value = kit.History.get("txt", -1).data.trim())
             },
             onchange: function(event, action, type, name, item) {
                 type == "select" && plugin.Check(item.action == "auto"? undefined: action)

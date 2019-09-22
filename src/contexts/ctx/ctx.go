@@ -449,17 +449,17 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 							continue
 						}
 						if len(arg) == 1 || arg[1] == "all" {
-							m.Add("append", "key", k)
+							m.Add("append", "cmd", k)
 							m.Add("append", "name", v.Name)
 						} else if arg[1] == k {
-							m.Add("append", "key", k)
+							m.Add("append", "cmd", k)
 							m.Add("append", "name", v.Name)
 							m.Add("append", "help", v.Name)
 						}
 					}
 					return len(arg) == 1 || arg[1] != "all"
 				})
-				m.Sort("key").Table()
+				m.Sort("cmd").Table()
 
 			case "help":
 				m.Cmdy("ctx.help", "command", arg[1:])
