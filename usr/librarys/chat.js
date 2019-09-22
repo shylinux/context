@@ -642,6 +642,14 @@ var page = Page({check: true,
         })
         page.river.Pane.Show(), page.pane = page.action, page.plugin = kit.Selector(page.action, "fieldset")[0]
 		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? "办公": "工作")
-        page.socket = page.WSS()
+
+        function conn() {
+            page.socket = page.WSS(null, function() {
+                page.socket.close()
+            }, function() {
+                setTimeout(conn, 1000)
+            })
+        }
+        conn()
     },
 })

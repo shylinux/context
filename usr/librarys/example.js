@@ -142,10 +142,10 @@ function Page(page) {
             }
 
             if (page.check) {
-                false && kit.device.isWeiXin? page.login.Pane.Run(["weixin"], function(msg) {
+                kit.device.isWeiXin? page.login.Pane.Run(["weixin"], function(msg) {
                     page.Include([
                         "https://res.wx.qq.com/open/js/jweixin-1.4.0.js",
-                        "/static/librarys/weixin.js",
+                        // "/static/librarys/weixin.js",
                     ], function(event) {
                         wx.error(function(res){})
                         wx.ready(function(){
@@ -437,7 +437,7 @@ function Page(page) {
             }
             return typeof page[args[0]] == "function" && kit._call(page[args[0]], args.slice(1))
         },
-        WSS: function(cb) {
+        WSS: function(cb, onerror, onclose) {
             return ctx.WSS(cb || (function(m) {
                 if (m.detail) {
                     page.action.Pane.Core(event, m, ["_cmd", m.detail], function(msg) {
@@ -446,7 +446,7 @@ function Page(page) {
                 } else {
                     page.ontoast(m.result.join(""))
                 }
-            }))
+            }), onerror, onclose)
         },
 
         initToast: function() {},
@@ -464,6 +464,10 @@ function Page(page) {
                     })
                 }]}, {type: "br"},
             ])
+
+            if (kit.device.isWeiXin) {
+                kit.AppendChild(output, [])
+            }
             return {
                 Login: function(username, password, cb) {
                     field.Pane.Run([username, password], function(msg) {cb(msg.result && msg.result[0] || "")})

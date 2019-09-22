@@ -204,7 +204,7 @@ ctx = context = {
         xhr.setRequestHeader("Accept", "application/json")
         xhr.send(args.join("&"))
     },
-    WSS: function(cb) {
+    WSS: function(cb, onerror, onclose) {
         var s = new WebSocket(location.protocol.replace("http", "ws")+"//"+location.host+"/wss")
         s.onopen = function(event) {
             kit.Log(event)
@@ -225,9 +225,11 @@ ctx = context = {
         }
         s.onerror = function(event) {
             kit.Log(event)
+            typeof onerror == "function" && onerror(event)
         }
         s.onclose = function(event) {
             kit.Log(event)
+            typeof onclose == "function" && onclose(event)
         }
         return s
     },
