@@ -205,7 +205,7 @@ ctx = context = {
         xhr.send(args.join("&"))
     },
     WSS: function(cb) {
-        var s = new WebSocket("ws://"+location.host+"/wss")
+        var s = new WebSocket(location.protocol.replace("http", "ws")+"://"+location.host+"/wss")
         s.onopen = function(event) {
             kit.Log(event)
         }
