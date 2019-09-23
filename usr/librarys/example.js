@@ -438,7 +438,7 @@ function Page(page) {
             return typeof page[args[0]] == "function" && kit._call(page[args[0]], args.slice(1))
         },
         WSS: function(cb, onerror, onclose) {
-            return ctx.WSS(cb || (function(m) {
+            return page.socket || (page.socket = ctx.WSS(cb || (function(m) {
                 if (m.detail) {
                     page.action.Pane.Core(event, m, ["_cmd", m.detail], function(msg) {
                         m.reply(msg)
@@ -446,7 +446,15 @@ function Page(page) {
                 } else {
                     page.ontoast(m.result.join(""))
                 }
-            }), onerror, onclose)
+
+            }), onerror || (function() {
+                page.socket.close()
+
+            }), onclose || (function() {
+                setTimeout(function() {
+                    page.WSS(cb, onerror, onclose)
+                }, 1000)
+            })))
         },
 
         initToast: function() {},
@@ -583,13 +591,16 @@ function Pane(page, field) {
             })
             return ui
         },
-        Update: function(cmds, type, key, which, first, cb) {
+        Update: function(cmds, type, key, which, first, cb, cbs) {
             pane.Runs(cmds, function(line, index, msg) {
                 var ui = pane.Append(type, line, key, which, cb)
                 if (typeof first == "string") {
                     (line.key == first || line.name == first || line[which] == first || line[key[0]] == first) && ui.first.click()
                 } else {
                     first && index == 0 && ui.first.click()
+                }
+                if (index == msg[msg.append[0]].length-1) {
+                    typeof cbs == "function" && cbs(msg)
                 }
             })
         },
@@ -664,9 +675,27 @@ function Pane(page, field) {
         },
 
         Size: function(width, height) {
-            field.style.display = (width<=0 || height<=0)? "none": "block"
-            field.style.width = width+"px"
-            field.style.height = height+"px"
+            if (width > 0) {
+                field.style.width = width+"px"
+                field.style.display = "block"
+            } else if (width === "") {
+                field.style.width = ""
+                field.style.display = "block"
+            } else {
+                field.style.display = "none"
+                return
+            }
+
+            if (height > 0) {
+                field.style.height = height+"px"
+                field.style.display = "block"
+            } else if (height === "") {
+                field.style.height = ""
+                field.style.display = "block"
+            } else {
+                field.style.display = "none"
+                return
+            }
         },
         Dialog: function(width, height) {
             if (field.style.display != "block") {

@@ -1,42 +1,32 @@
 var page = Page({check: true,
-    conf: {refresh: 1000, border: 4, layout: {header:30, river:120, action:180, source:60, storm:100, footer:30}},
+    conf: {refresh: 1000, border: 4, first: "工作", mobile: "工作", layout: {header:30, footer:30, river:100, storm:100, action:180, source:45}},
     onlayout: function(event, sizes) {
         var page = this
-        kit.isWindows && (document.body.style.overflow = "hidden")
-
         var height = document.body.clientHeight-page.conf.border
         var width = document.body.clientWidth-page.conf.border
-        page.conf.height = height
-        page.conf.width = width
+        kit.device.isWindows && (document.body.style.overflow = "hidden")
 
         sizes = sizes || {}
         sizes.header == undefined && (sizes.header = page.header.clientHeight)
         sizes.footer == undefined && (sizes.footer = page.footer.clientHeight)
         page.header.Pane.Size(width, sizes.header)
         page.footer.Pane.Size(width, sizes.footer)
+        height -= page.header.offsetHeight+page.footer.offsetHeight
 
         sizes.river == undefined && (sizes.river = page.river.clientWidth)
         sizes.storm == undefined && (sizes.storm = page.storm.clientWidth)
-        height -= page.header.offsetHeight+page.footer.offsetHeight
         page.river.Pane.Size(sizes.river, height)
         page.storm.Pane.Size(sizes.storm, height)
-
-        var full = false
-        if (kit.device.isMobile && sizes.action == -1) {
-            full = true
-        }
-        sizes.action == undefined && (sizes.action = page.action.clientHeight)
-        sizes.source == undefined && (sizes.source = page.source.clientHeight);
-        (sizes.action == -1 || sizes.source == 0) && (sizes.action = height, sizes.source = 0)
         width -= page.river.offsetWidth+page.storm.offsetWidth
 
+        sizes.action == -1 && (sizes.action = kit.device.isMobile? "": height, sizes.target = 0, sizes.source = 0)
+        sizes.action == undefined && (sizes.action = page.action.clientHeight)
+        sizes.source == undefined && (sizes.source = page.source.clientHeight)
         page.action.Pane.Size(width, sizes.action)
-        full && (page.action.style.height = "")
         page.source.Pane.Size(width, sizes.source)
+        height -= sizes.target==0? height: page.source.offsetHeight+page.action.offsetHeight
 
-        height -= page.source.offsetHeight+page.action.offsetHeight
         page.target.Pane.Size(width, height)
-        kit.History.add("lay", sizes)
     },
     oncontrol: function(event, target, action) {
         var page = this
@@ -253,11 +243,29 @@ var page = Page({check: true,
                 ui.first.value = ""
             },
             Size: function(width, height) {
-                field.style.display = (width<=0 || height<=0)? "none": "block"
-                field.style.width = width+"px"
-                field.style.height = height+"px"
-                ui.first.style.width = (width-7)+"px"
-                ui.first.style.height = (height-7)+"px"
+                if (width > 0) {
+                    field.style.width = width+"px"
+                    ui.first.style.width = (width-7)+"px"
+                    field.style.display = "block"
+                } else if (width === "") {
+                    field.style.width = ""
+                    field.style.display = "block"
+                } else {
+                    field.style.display = "none"
+                    return
+                }
+
+                if (height > 0) {
+                    field.style.height = height+"px"
+                    ui.first.style.height = (height-7)+"px"
+                    field.style.display = "block"
+                } else if (height === "") {
+                    field.style.height = ""
+                    field.style.display = "block"
+                } else {
+                    field.style.display = "none"
+                    return
+                }
             },
         }
     },
@@ -361,6 +369,8 @@ var page = Page({check: true,
 
                 pane.clear(), pane.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                     pane.Core(event, line, args, cbs)
+                }, function(msg) {
+                    !page.plugin && output.querySelector("fieldset.item").Plugin.Select()
                 })
             },
             Layout: function(name) {var pane = field.Pane
@@ -380,35 +390,23 @@ var page = Page({check: true,
             Action: {
                 "聊天": function(event, value) {
                     page.onlayout(event, page.conf.layout)
-                    page.onlayout(event)
-                    page.onlayout(event)
                 },
                 "办公": function(event, value) {
                     page.onlayout(event, page.conf.layout)
-                    page.onlayout(event, {river: 0, action:300, source:60})
-                    page.onlayout(event)
-                    page.onlayout(event)
+                    page.onlayout(event, {river: 0, action:300})
                 },
                 "工作": function(event, value) {
                     page.onlayout(event, page.conf.layout)
-                    page.onlayout(event, {river:0, action:-1, source:60})
-                    page.onlayout(event)
-                    page.onlayout(event)
+                    page.onlayout(event, {river:0, action:-1})
                 },
                 "最高": function(event, value) {
                     page.onlayout(event, {action: -1})
-                    page.onlayout(event)
-                    page.onlayout(event)
                 },
                 "最宽": function(event, value) {
                     page.onlayout(event, {river:0, storm:0})
-                    page.onlayout(event)
-                    page.onlayout(event)
                 },
                 "最大": function(event, value) {
-                    page.onlayout(event, {header:0, footer:0, river:0, action: -1, storm:0})
-                    page.onlayout(event)
-                    page.onlayout(event)
+                    page.onlayout(event, {header:0, footer:0, river:0, storm:0, action: -1})
                 },
 
                 "刷新": function(event, value) {
@@ -470,17 +468,12 @@ var page = Page({check: true,
                 "返回": function(event, value) {
                     page.plugin && page.plugin.Plugin.Last()
                 },
-                "推送": function(event, value) {
-                    if (page.socket) {return}
-                    page.socket = page.WSS()
-                },
             },
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"],
                 "", "刷新", "清屏", "并行", "串行",
 				"", ["display", "表格", "编辑", "绘图"],
                 "", "添加", "删除", "加参", "减参",
                 "", "执行", "下载", "清空", "返回",
-                "", "推送",
             ],
         }
     },
@@ -641,15 +634,7 @@ var page = Page({check: true,
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show(), page.pane = page.action, page.plugin = kit.Selector(page.action, "fieldset")[0]
-		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? "办公": "工作")
-
-        function conn() {
-            page.socket = page.WSS(null, function() {
-                page.socket.close()
-            }, function() {
-                setTimeout(conn, 1000)
-            })
-        }
-        conn()
+		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? page.conf.first: page.conf.mobile)
+        page.WSS()
     },
 })
