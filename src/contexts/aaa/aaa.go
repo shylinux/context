@@ -627,7 +627,7 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 					m.Echo("%s%02x", short, len(v)-1)
 				}
 
-			} else {
+			} else if len(arg[0]) > 0 {
 				if i, e := strconv.ParseInt(arg[0][length:], 16, 64); e == nil {
 					m.Echo(m.Conf("aaa.short", []interface{}{short, int(i)}))
 				} else {
@@ -779,8 +779,8 @@ var Index = &ctx.Context{Name: "aaa", Help: "认证中心",
 
 					// 生成证书
 					template := x509.Certificate{
-						SerialNumber: big.NewInt(1),
-						IsCA:         true,
+						SerialNumber:          big.NewInt(1),
+						IsCA:                  true,
 						BasicConstraintsValid: true,
 						KeyUsage:              x509.KeyUsageCertSign,
 						Subject:               pkix.Name{CommonName: kit.Format(common)},

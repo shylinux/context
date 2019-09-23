@@ -128,7 +128,7 @@ function Meta(target, obj) {
 }
 function Page(page) {
     var script = {}, record = ""
-    page = Meta(document.body, page, {
+    page = Meta(document.body, page, {__proto__: ctx,
         onload: function() {
             var sessid = ctx.Cookie("sessid")
             if (page.check && !sessid) {
@@ -425,20 +425,22 @@ function Page(page) {
             return []
         },
         Jshy: function(event, args) {
+            var msg = event.msg || {}
             if (page[args[0]] && page[args[0]].type == "fieldset") {
                 if (args.length > 1) {
                     return page[args[0]].Pane.Jshy(event, args.slice(1))
                 } else {
+                    msg.result = ["pane", args[0]]
                     return page[args[0]].Pane.Show()
                 }
             }
-            if (script[args[0]]) {
-                return page.script("replay", args[0])
-            }
+            if (script[args[0]]) {return page.script("replay", args[0])}
+
             return typeof page[args[0]] == "function" && kit._call(page[args[0]], args.slice(1))
         },
         WSS: function(cb, onerror, onclose) {
             return page.socket || (page.socket = ctx.WSS(cb || (function(m) {
+
                 if (m.detail) {
                     page.action.Pane.Core(event, m, ["_cmd", m.detail], function(msg) {
                         m.reply(msg)
@@ -451,7 +453,7 @@ function Page(page) {
                 page.socket.close()
 
             }), onclose || (function() {
-                setTimeout(function() {
+                page.socket = undefined, setTimeout(function() {
                     page.WSS(cb, onerror, onclose)
                 }, 1000)
             })))
@@ -633,14 +635,18 @@ function Pane(page, field) {
             return text
         },
         Jshy: function(event, args) {
+            var msg = event.msg || {}
             if (pane[args[0]] && pane[args[0]].type == "fieldset") {
+                msg.result = ["plugin", args[0]]
                 pane[args[0]].scrollIntoView(), pane[args[0]].Plugin.Select(true)
                 return pane[args[0]].Plugin.Jshy(event, args.slice(1))
             }
             if (typeof pane.Action[args[0]] == "function") {
+                msg.result = ["action", args[0]]
                 return kit._call(pane.Action[args[0]], [event, args[0]])
             }
 			if (member[args[0]] != undefined) {
+                msg.result = ["item", args[0]]
 				pane.Select(member[args[0]].index, member[args[0]].key)
 				return true
 			}
@@ -1010,11 +1016,10 @@ function Plugin(page, pane, field, runs) {
         },
         onaction: {
             onfocus: function(event, action, type, name, item) {
-                page.input = event.target
-                plugin.Select(true)
+                page.input = event.target, plugin.Select(true)
             },
             onblur: function(event, action, type, name, item) {
-                page.input = undefined
+                // page.input = undefined
             },
             onclick: function(event, action, type, name, item) {
                 switch (type) {

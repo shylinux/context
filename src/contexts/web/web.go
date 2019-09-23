@@ -1096,31 +1096,37 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/wss": &ctx.Command{Name: "/wss", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
+			agent := r.Header.Get("User-Agent")
 
 			if s, e := websocket.Upgrade(w, r, nil, 4096, 4096); m.Assert(e) {
-				h := kit.Hashs("uniq")
+				h := m.Option("wssid")
+				if h == "" || m.Confs("wss", h) {
+					h = kit.Hashs("uniq")
+				}
 				p := make(chan *ctx.Message, 10)
 				meta := map[string]interface{}{
 					"create_time": m.Time(),
 					"create_user": m.Option("username"),
-					"agent":       r.Header.Get("User-Agent"),
+					"agent":       agent,
 					"sessid":      m.Option("sessid"),
 					"socket":      s,
 					"channel":     p,
 				}
 				m.Conf("wss", []string{m.Option("username"), h}, meta)
 				m.Conf("wss", h, meta)
+				p <- m.Spawn().Add("detail", "wss", h)
 
 				what := m
-				m.Log("info", "wss conn %v", h)
+				m.Log("wss", "conn %v %s", h, agent)
 				m.Gos(m.Spawn(), func(msg *ctx.Message) {
 					for {
 						if t, b, e := s.ReadMessage(); e == nil {
 							var data interface{}
 							if e := json.Unmarshal(b, &data); e == nil {
-								m.Log("info", "wss recv %s %d msg %v", h, t, data)
+								m.Log("wss", "recv %s %d msg %v", h, t, data)
 							} else {
-								m.Log("warn", "wss recv %s %d msg %v", h, t, e)
+								m.Log("wss", "recv %s %d msg %v", h, t, b)
+								data = b
 							}
 
 							what.Optionv("data", data)
@@ -1137,15 +1143,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					s.WriteJSON(what.Meta)
 				}
 
-				s.Close()
-				m.Conf("wss", h, "")
+				m.Log("wss", "close %s %s", h, agent)
 				m.Conf("wss", []string{m.Option("username"), h}, "")
-				m.Log("warn", "wss close %s", h)
+				m.Conf("wss", h, "")
+				s.Close()
 			}
 			return
 		}},
 		"wss": &ctx.Command{Name: "wss", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
+			if len(arg) == 0 || arg[0] == "" {
 				m.Confm("wss", func(key string, value map[string]interface{}) {
 					if value["agent"] == nil {
 						return
@@ -1164,7 +1170,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if strings.Contains(arg[0], ".") {
 				vs := strings.SplitN(arg[0], ".", 2)
 				m.Confm("wss", vs[0], func(key string, value map[string]interface{}) {
-					if vs[1] == "*" || strings.Contains(kit.Format(value["agent"]), vs[1]) {
+					if len(vs) == 1 || vs[1] == "*" || strings.Contains(kit.Format(value["agent"]), vs[1]) {
 						list = append(list, key)
 					}
 				})
@@ -1187,19 +1193,28 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						p <- m
 						m.CallBack(true, func(msg *ctx.Message) *ctx.Message {
 							if data, ok := m.Optionv("data").(map[string]interface{}); ok {
-								res := kit.Trans(data["result"])
-								m.Log("info", "result: %v", res)
-								if len(res) > 0 {
-									m.Result(res)
-								}
-							}
+								if len(list) == 1 && data["append"] != nil {
+									for _, k := range kit.Trans(data["append"]) {
+										m.Push(k, kit.Trans(data[k]))
+									}
+								} else {
+									m.Push("time", m.Time())
+									m.Push("key", m.Cmdx("aaa.short", v))
+									m.Push("action", kit.Format(arg[2:]))
 
-							m.Push("time", m.Time())
-							m.Push("key", m.Cmdx("aaa.short", v))
-							m.Push("action", kit.Format(arg[2:]))
-							m.Push("result", kit.Format(m.Meta["result"]))
-							return nil
+									res := kit.Trans(data["result"])
+									m.Push("return", kit.Format(res))
+									m.Log("wss", "result: %v", res)
+								}
+
+							} else {
+								m.Push("time", m.Time())
+								m.Push("key", m.Cmdx("aaa.short", v))
+								m.Push("action", kit.Format(arg[2:]))
+							}
+							return m
 						}, "skip")
+						m.Table()
 					} else {
 						m.Meta["detail"] = arg[1:]
 						p <- m

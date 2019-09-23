@@ -25,7 +25,7 @@ func (ctx *CTX) Spawn(m *Message, c *Context, arg ...string) Server {
 func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 	m.Option("ctx.routine", 0)
 	m.Option("log.disable", true)
-	m.Option("ctx.chain", "aaa", "ssh", "cli", "nfs")
+	m.Option("ctx.chain", "aaa", "ssh", "nfs", "cli", "web")
 
 	m.Option("table.limit", 30)
 	m.Option("table.offset", 0)
@@ -58,7 +58,7 @@ func (ctx *CTX) Start(m *Message, arg ...string) bool {
 		m.Optionv("bio.ctx", m.Target())
 		m.Optionv("bio.msg", m)
 		m.Cap("stream", "stdio")
-		m.Cmd("aaa.role", "root", "user", m.Option("username", m.Conf("runtime", "boot.username")))
+		m.Cmd("aaa.role", m.Option("userrole", "root"), "user", m.Option("username", m.Conf("runtime", "boot.username")))
 		m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
 
 		m.Cmd("nfs.source", m.Conf("cli.system", "script.init")).Cmd("nfs.source", "stdio").Cmd("nfs.source", m.Conf("cli.system", "script.exit"))
@@ -814,8 +814,8 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				}
 			}
 			// 默认参数
-			args := make([]string, 0, len(arg))
-			for i, j := 0, 1; i < len(arg); i++ {
+			args, j := make([]string, 0, len(arg)), 1
+			for i := 0; i < len(arg); i++ {
 				if strings.HasPrefix(arg[i], "__") {
 					if j < len(msg.Meta["detail"]) {
 						args = append(args, msg.Meta["detail"][j:]...)
@@ -827,6 +827,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 				} else {
 					args = append(args, arg[i])
 				}
+			}
+			if j < len(msg.Meta["detail"]) {
+				args = append(args, msg.Meta["detail"][j:]...)
 			}
 			msg.Cmdy(args)
 			return

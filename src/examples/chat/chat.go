@@ -215,11 +215,10 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			if !m.Options("sessid") || !m.Options("username") {
 				return
 			}
-			m.Short("river")
 
 			// 自动入群
 			if m.Options("river") {
-				if m.Confs("flow", m.Option("river")) && !m.Confs("flow", []string{m.Option("river"), "user", m.Option("username")}) {
+				if m.Short("river"); m.Confs("flow", m.Option("river")) && !m.Confs("flow", []string{m.Option("river"), "user", m.Option("username")}) {
 					u := m.Cmdx("ssh._route", m.Conf("runtime", "work.route"), "_check", "work", m.Option("username"))
 					m.Conf("flow", []string{m.Option("river"), "user", m.Option("username"), "user"}, u)
 				}

@@ -288,12 +288,46 @@ var page = Page({check: true,
                 ], 0)
             },
             Core: function(event, line, args, cbs) {
+                var msg = (event.msg = line || {})
                 var plugin = event.Plugin || page.plugin && page.plugin.Plugin || {}, engine = {
                     share: function(args) {
                         typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
                             river, line.storm, line.action,  args[1]||"",
                         ]}))
                         return true
+                    },
+                    wss: function(id) {
+                        return page.wssid = id
+                    },
+                    pwd: function(args) {
+                        return [river, storm, page.plugin && page.plugin.Meta.name, page.input && page.input.name, page.input && page.input.value]
+                    },
+                    dir: function(rid, sid, pid, uid) {
+                        if (!rid) {
+                            return kit.Selector(page.river, "div.output>div.item>div.text>span", function(item) {
+                                return item.innerText
+                            })
+                        }
+                        if (!sid) {
+                            return kit.Selector(page.storm, "div.output>div.item>div.text>span", function(item) {
+                                return item.innerText
+                            })
+                        }
+                        if (!pid) {
+                            return kit.Selector(page.action, "fieldset.item>legend", function(item) {
+                                return item.innerText
+                            })
+                        }
+                        if (!uid) {
+                            msg.append = ["name", "value"]
+                            msg.name = [], msg.value = []
+                            return kit.Selector(page.plugin, "input", function(item) {
+                                msg.name.push(item.name)
+                                msg.value.push(item.value)
+                                return item.name+":"+item.value
+                            })
+                        }
+                        return [river, storm, page.plugin && page.plugin.Meta.name, page.input && page.input.name]
                     },
                     echo: function(one, two) {
                         kit.Log(one, two)
@@ -328,21 +362,28 @@ var page = Page({check: true,
                     _split: function(str) {return str.trim().split(" ")},
                     _cmd: function(arg) {
                         var args = typeof arg[1] == "string"? engine._split(arg[1]): arg[1];
+                        var res = null
                         page.script("record", args)
+                        function result(res) {
+                            res != null && res != undefined && !msg.result && (msg.result = [res])
+                            return true
+                        }
+
                         if (typeof engine[args[0]] == "function") {
-                            return kit._call(engine[args[0]], args.slice(1))
+                            return result(kit._call(engine[args[0]], args.slice(1)))
                         }
                         if (page.plugin && typeof page.plugin.Plugin[args[0]] == "function") {
-                            return kit._call(page.plugin.Plugin[args[0]], args.slice(1))
+                            return result(kit._call(page.plugin.Plugin[args[0]], args.slice(1)))
                         }
 
-                        if (page.dialog && page.dialog.Pane.Jshy(event, args)) {return true}
-                        if (page.pane && page.pane.Pane.Jshy(event, args)) {return true}
-                        if (page.storm && page.storm.Pane.Jshy(event, args)) {return true}
-                        if (page.river && page.river.Pane.Jshy(event, args)) {return true}
+                        if (page.dialog && (res = page.dialog.Pane.Jshy(event, args))) {return result(res)}
+                        if (page.pane && (res = page.pane.Pane.Jshy(event, args))) {return result(res)}
+                        if (page.storm && (res = page.storm.Pane.Jshy(event, args))) {return result(res)}
+                        if (page.river && (res = page.river.Pane.Jshy(event, args))) {return result(res)}
 
-                        if (page && page.Jshy(event, args)) {return true}
-                        if (page.plugin && page.plugin.Plugin.Jshy(event, args)) {return true}
+
+                        if (page && (res = page.Jshy(event, args))) {return result(res)}
+                        if (page.plugin && (res = page.plugin.Plugin.Jshy(event, args))) {return result(res)}
                         kit.Log("not find", arg[1])
                         return true
                     },

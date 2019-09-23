@@ -361,10 +361,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						args = append(args, msg.Parse(v))
 					}
 				}
-				msg.Log("time", "check: %v", m.Format("cost"))
-				if msg.Cmd(tool["cmd"], args, arg).CopyTo(m); !msg.Hand {
-					msg.Log("warn", "not found %v:%v", tool["ctx"], tool["cmd"])
-				}
+				msg.Cmd(tool["cmd"], args, arg).CopyTo(m)
 
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {
@@ -756,6 +753,19 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					rest, ps = old, append(ps, m.Cap("stream"))
 				}
 				if len(ps) == 0 {
+					// 发送前端
+					if m.Option("userrole") == "root" {
+						if !strings.Contains(old, ".") {
+							old = m.Option("username") + "." + old
+						}
+						m.CallBack(true, func(msg *ctx.Message) *ctx.Message {
+							m.Copy(msg, "append")
+							return nil
+						}, "web.wss", old, "sync", arg)
+						m.Table()
+						return
+					}
+
 					// 查找失败
 					m.Echo("error: not found %s", names[0]).Back(m)
 					return

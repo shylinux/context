@@ -1,4 +1,4 @@
-ctx = context = {
+ctx = context = {__proto__: kit,
     Run: function(dataset, cmd, cb) {
         var option = {"cmds": cmd}
         for (var k in dataset) {
@@ -85,6 +85,32 @@ ctx = context = {
         }
         return ret
     },
+    Upload: function(file, cb, detail) {
+        var data = new FormData()
+        data.append("upload", file)
+
+        var xhr = new XMLHttpRequest()
+        xhr.onload = function(event) {
+            var msg = JSON.parse(xhr.responseText||'{"result":[]}')
+            typeof cb == "function" && cb(event, msg)
+        }
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState != 4) {
+                return
+            }
+            if (xhr.status != 200) {
+                return
+            }
+        }
+
+        xhr.upload.onprogress = function(event) {
+            typeof detail == "function" && detail(event)
+        }
+
+        xhr.open("POST", "/upload", true)
+        xhr.send(data)
+    },
     Share: function(objs) {
         var args = this.Search()
         for (var k in objs) {
@@ -152,7 +178,7 @@ ctx = context = {
             for (var k in key) {
                 document.cookie = k+"="+key[k];
             }
-            return this.Cookie()
+            return arguments.callee()
         }
         if (value == undefined) {
             var pattern = new RegExp(key+"=([^;]*);?")
@@ -160,7 +186,7 @@ ctx = context = {
             return result && result.length > 0? result[1]: ""
         }
         document.cookie = key+"="+value+";path=/"
-        return this.Cookie(key)
+        return arguments.callee(key)
     },
     POST: function(url, form, cb) {
         var args = []
@@ -205,9 +231,10 @@ ctx = context = {
         xhr.send(args.join("&"))
     },
     WSS: function(cb, onerror, onclose) {
-        var s = new WebSocket(location.protocol.replace("http", "ws")+"//"+location.host+"/wss")
+        var s = new WebSocket(location.protocol.replace("http", "ws")+"//"+location.host+"/wss?wssid="+(page.wssid||""))
         s.onopen = function(event) {
-            kit.Log(event)
+            kit.Log("wss", "open")
+            page.ontoast("wss open")
         }
         s.onmessage = function(event) {
             var msg = JSON.parse(event.data)
@@ -218,9 +245,14 @@ ctx = context = {
                 var msg = {"result": [event.data]}
             }
 
-            msg.event = event, msg.reply = function(sub) {
-                s.send(JSON.stringify(sub||msg))
+            msg.event = event, msg.reply = function(res) {
+                res = res || msg, res.event = undefined
+                kit.Log(["wss", "detail"].concat(msg.detail))
+                kit.Log(["wss", "result"].concat(res.result))
+                s.send(JSON.stringify(res))
             }
+
+            kit.Log(msg)
             typeof cb == "function" && cb(msg)
         }
         s.onerror = function(event) {
@@ -228,35 +260,10 @@ ctx = context = {
             typeof onerror == "function" && onerror(event)
         }
         s.onclose = function(event) {
-            kit.Log(event)
+            kit.Log("wss", "close")
+            page.ontoast("wss close")
             typeof onclose == "function" && onclose(event)
         }
         return s
-    },
-    Upload: function(file, cb, detail) {
-        var data = new FormData()
-        data.append("upload", file)
-
-        var xhr = new XMLHttpRequest()
-        xhr.onload = function(event) {
-            var msg = JSON.parse(xhr.responseText||'{"result":[]}')
-            typeof cb == "function" && cb(event, msg)
-        }
-
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState != 4) {
-                return
-            }
-            if (xhr.status != 200) {
-                return
-            }
-        }
-
-        xhr.upload.onprogress = function(event) {
-            typeof detail == "function" && detail(event)
-        }
-
-        xhr.open("POST", "/upload", true)
-        xhr.send(data)
     },
 }

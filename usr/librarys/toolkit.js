@@ -1,4 +1,4 @@
-kit = toolkit = {
+kit = toolkit = {__proto__: document,
     // 用户终端
     device: {
         isWeiXin: navigator.userAgent.indexOf("MicroMessenger") > -1,
