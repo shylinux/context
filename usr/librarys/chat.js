@@ -288,7 +288,12 @@ var page = Page({check: true,
                 ], 0)
             },
             Core: function(event, line, args, cbs) {
-                var msg = (event.msg = line || {})
+                var msg = event.msg || {}, res
+                function result(res) {
+                    res != null && res != undefined && !msg.result && (msg.result = kit.Trans(res))
+                    return true
+                }
+
                 var plugin = event.Plugin || page.plugin && page.plugin.Plugin || {}, engine = {
                     share: function(args) {
                         typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
@@ -297,10 +302,37 @@ var page = Page({check: true,
                         return true
                     },
                     wss: function(id) {
-                        return page.wssid = id
+                        return id && (page.wssid = id)
                     },
-                    pwd: function(args) {
+                    pwd: function(name, value) {
+                        name && kit.Selector(page.action, "fieldset.item."+name, function(item) {
+                            item.Plugin.Select()
+                        })
+                        if (value) {return engine.set(value)}
                         return [river, storm, page.plugin && page.plugin.Meta.name, page.input && page.input.name, page.input && page.input.value]
+                    },
+                    set: function(value, name) {
+                        try {
+                            if (value == undefined) {
+                                msg.append = ["name", "value"]
+                                msg.name = [], msg.value = []
+                                return kit.Selector(page.plugin, ".args", function(item) {
+                                    msg.name.push(item.name)
+                                    msg.value.push(item.value)
+                                    return item.name+":"+item.value
+                                })
+
+                            } else if (name == undefined) {
+                                kit.Selector(page.plugin, "input[type=button]", function(item) {
+                                    if (item.value == value) {item.click(); return value}
+                                }).length > 0 || (page.action.Pane.Action[value]?
+                                    page.action.Pane.Action[value](event, value): (page.input.value = value))
+                            } else {
+                                page.plugin.Plugin.Inputs[name].value = value
+                            }
+                        } catch (e) {
+                            engine._cmd("_cmd", [value, name])
+                        }
                     },
                     dir: function(rid, sid, pid, uid) {
                         if (!rid) {
@@ -315,6 +347,8 @@ var page = Page({check: true,
                         }
                         if (!pid) {
                             return kit.Selector(page.action, "fieldset.item>legend", function(item) {
+                                msg.push("name", item.parentNode.Meta.name)
+                                msg.push("help", item.parentNode.Meta.help)
                                 return item.innerText
                             })
                         }
@@ -362,12 +396,8 @@ var page = Page({check: true,
                     _split: function(str) {return str.trim().split(" ")},
                     _cmd: function(arg) {
                         var args = typeof arg[1] == "string"? engine._split(arg[1]): arg[1];
-                        var res = null
                         page.script("record", args)
-                        function result(res) {
-                            res != null && res != undefined && !msg.result && (msg.result = [res])
-                            return true
-                        }
+                        kit.Log(["cmd"].concat(args))
 
                         if (typeof engine[args[0]] == "function") {
                             return result(kit._call(engine[args[0]], args.slice(1)))
@@ -402,7 +432,7 @@ var page = Page({check: true,
                         })
                     },
                 }
-                if (args.length > 0 && engine[args[0]] && engine[args[0]](args)) {typeof cbs == "function" && cbs(line); return}
+                if (args.length > 0 && engine[args[0]] && engine[args[0]](args)) {typeof cbs == "function" && cbs(); return}
                 event.shiftKey? engine._msg(): engine._run()
             },
             Show: function() {var pane = field.Pane
@@ -430,23 +460,29 @@ var page = Page({check: true,
             },
             Action: {
                 "聊天": function(event, value) {
+                    page.which.set(value)
                     page.onlayout(event, page.conf.layout)
                 },
                 "办公": function(event, value) {
+                    page.which.set(value)
                     page.onlayout(event, page.conf.layout)
                     page.onlayout(event, {river: 0, action:300})
                 },
                 "工作": function(event, value) {
+                    page.which.set(value)
                     page.onlayout(event, page.conf.layout)
                     page.onlayout(event, {river:0, action:-1})
                 },
                 "最高": function(event, value) {
+                    page.which.set(value)
                     page.onlayout(event, {action: -1})
                 },
                 "最宽": function(event, value) {
+                    page.which.set(value)
                     page.onlayout(event, {river:0, storm:0})
                 },
                 "最大": function(event, value) {
+                    page.which.set(value)
                     page.onlayout(event, {header:0, footer:0, river:0, storm:0, action: -1})
                 },
 
@@ -492,7 +528,7 @@ var page = Page({check: true,
                     page.plugin && page.plugin.Plugin.Delete()
                 },
                 "加参": function(event, value) {
-                    page.plugin && page.plugin.Plugin.Append({className: "args temp"})
+                    page.plugin && page.plugin.Plugin.Appends()
                 },
                 "减参": function(event, value) {
                     page.plugin && page.plugin.Plugin.Remove()

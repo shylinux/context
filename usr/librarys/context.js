@@ -5,6 +5,8 @@ ctx = context = {__proto__: kit,
             option[k] = dataset[k].split(",")
         }
 
+        kit.Log(["run"].concat(option.group).concat(option.name).concat(option.cmds))
+
         var event = window.event
         this.POST("", option, function(msg) {
             msg[0] && (msg = msg[0])
@@ -237,23 +239,30 @@ ctx = context = {__proto__: kit,
             page.ontoast("wss open")
         }
         s.onmessage = function(event) {
-            var msg = JSON.parse(event.data)
-
             try {
                 var msg = JSON.parse(event.data||'{}')
             } catch (e) {
                 var msg = {"result": [event.data]}
             }
 
-            msg.event = event, msg.reply = function(res) {
-                res = res || msg, res.event = undefined
+            event.msg = msg, msg.event = event, msg.reply = function(res) {
+                msg.result = (msg.result||[]).concat(kit.Trans(res))
                 kit.Log(["wss", "detail"].concat(msg.detail))
-                kit.Log(["wss", "result"].concat(res.result))
-                s.send(JSON.stringify(res))
+                kit.Log(["wss", "result"].concat(msg.result))
+                delete(msg.event), s.send(JSON.stringify(msg))
+            }
+            msg.push = function(key, value) {
+                msg.append || (msg.append = [])
+                msg[key]? msg[key].push(value): (msg[key] = [value], msg.append.push(key))
+                return msg
             }
 
-            kit.Log(msg)
-            typeof cb == "function" && cb(msg)
+            try {
+                kit.Log("wss", "msg", msg)
+                typeof cb == "function" && cb(msg)
+            } catch (e) {
+                msg.reply(kit.Log("err", e))
+            }
         }
         s.onerror = function(event) {
             kit.Log(event)

@@ -1188,11 +1188,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			for _, v := range list {
 				if p, ok := m.Confv("wss", []string{v, "channel"}).(chan *ctx.Message); ok {
-					if arg[1] == "sync" {
-						m.Meta["detail"] = arg[2:]
-						p <- m
-						m.CallBack(true, func(msg *ctx.Message) *ctx.Message {
-							if data, ok := m.Optionv("data").(map[string]interface{}); ok {
+					if msg := m.Spawn(); arg[1] == "sync" {
+						p <- msg.Add("detail", arg[2], arg[3:])
+						msg.CallBack(true, func(msg *ctx.Message) *ctx.Message {
+							if data, ok := msg.Optionv("data").(map[string]interface{}); ok {
 								if len(list) == 1 && data["append"] != nil {
 									for _, k := range kit.Trans(data["append"]) {
 										m.Push(k, kit.Trans(data[k]))
@@ -1216,8 +1215,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}, "skip")
 						m.Table()
 					} else {
-						m.Meta["detail"] = arg[1:]
-						p <- m
+						p <- msg.Add("detail", arg[1], arg[2:])
 					}
 				}
 			}

@@ -20,7 +20,7 @@ kit date "日历" "index.js" "index.css" protected "cli.date" _ nature _ \
 	text "when" name "when" \
 	text "where" name "where" \
 	button "查看" action auto \
-	button "显示" click show
+	button "显示" cb show
 
 fun delay "以后告诉你" protected \
 	text "delay" name table imports plugin_table \
@@ -52,7 +52,7 @@ fun wss "推送" private \
 	text "" name wss imports plugin_wss \
 	text "" name cmd view long \
 	button "推送" \
-	button "返回" click Last \
+	button "返回" cb Last \
 	exports wss key
 
     if $2 == ""
@@ -63,8 +63,8 @@ fun wss "推送" private \
 end
 
 kit pos "位置" private \
-    button "查看" click getLocation \
-    button "显示" click openLocation \
+    button "查看" cb getLocation \
+    button "显示" cb openLocation \
 	text "0.0062" name x \
 	text "0.0014" name y \
 	text "当前位置" name pos \

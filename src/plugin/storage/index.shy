@@ -15,7 +15,7 @@ fun note "记事本" public \
 	text "" name you imports plugin_you action auto \
 	text "" name tip imports plugin_tip view long action auto \
 	button "查看" action auto \
-	button "返回" click Last \
+	button "返回" cb Last \
     exports tip file tip \
     feature display inner
 
@@ -30,7 +30,7 @@ kit data "数据库" public "ssh.data" show \
 	text "" name table imports plugin_table action auto view long \
 	text "" name index action auto \
 	button "查看" action auto \
-	button "返回" click Last \
+	button "返回" cb Last \
     exports table table
 
 kit save "导出" private "ssh.data" export \
@@ -44,6 +44,6 @@ kit load "导入" private "ssh.data" import \
 
 kit push "上传" private "web./download/" \
 	upfile "" name upload \
-	button "上传" click upload \
+	button "上传" cb upload \
 	button "查看"
 

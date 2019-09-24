@@ -19,18 +19,7 @@ kit = toolkit = {__proto__: document,
     reload: function() {
         location.reload()
     },
-    // 操作日志
-    Log: function() {
-        var args = []
-        for (var i = 0; i < arguments.length; i++) {
-            args.push(arguments[i])
-        }
-        console.log(arguments.length == 1? args[0]: args)
-        return args
-    },
-    Delay: function(time, cb) {
-        return setTimeout(cb, time)
-    },
+    // 日志调试
     History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [], lay: [],
         add: function(type, data) {
             var list = this[type] || []
@@ -43,6 +32,26 @@ kit = toolkit = {__proto__: document,
             var len = list.length
             return index == undefined? this[type]: this[type][(index+len)%len]
         },
+    },
+    Debug: function(key) {
+        if (kit.debug[key]) {debugger}
+    }, debug: {"why": true},
+    Log: function(type, arg) {
+        var args = [kit.time()]
+        if (arg == undefined) {
+            args = args.concat(kit.Trans(type))
+        } else {
+            for (var i = 0; i < arguments.length; i++) {
+                args.push(arguments[i])
+            }
+        }
+
+        !kit.hide[args[1]] && console.log(args)
+        kit.Debug(args[1])
+        return args.slice(1)
+    }, hide: {"wss": false},
+    Delay: function(time, cb) {
+        return setTimeout(cb, time)
     },
 
     // HTML节点操作
@@ -675,6 +684,38 @@ kit = toolkit = {__proto__: document,
     },
     Format: function(objs) {
         return JSON.stringify(objs)
+    },
+    Trans: function(arg) {
+        var res = []
+        if (arg != undefined && arg != null) {
+            switch (typeof arg) {
+                case "string":
+                    res.push(arg)
+                    break
+                case "object":
+                    if (arg.length > 0) {
+                        for (var i = 0; i < arg.length; i++) {
+                            res.push(arg[i])
+                        }
+                    } else {
+                        for (var k in arg) {
+                            res.push(k)
+                            res.push(arg[k])
+                        }
+                    }
+                    break
+                default:
+                    res.push(arg)
+            }
+        }
+        for (var i = res.length - 1; i > -1; i--) {
+            if (res[i] == undefined) {
+                res.pop()
+            } else {
+                break
+            }
+        }
+        return res
     },
     time: function(t, fmt) {
         var now = t? new Date(t): new Date()

@@ -3,7 +3,7 @@ kit project "项目" private \
     select "" values plugin values review values submit values trend values stats values stat values init action auto \
 	text "" name see imports plugin_see action auto \
 	button "执行" \
-	button "返回" click Last \
+	button "返回" cb Last \
     exports see name see
 
 kit compile "编译" private \
@@ -43,14 +43,14 @@ kit cmd "命令" private "ssh._route" _ context _ command __ \
 	text "cli" name ctx imports plugin_ctx \
 	text "date" name cmd imports plugin_cmd \
 	button "执行" \
-	button "返回" click Last \
+	button "返回" cb Last \
     exports cmd cmd
 
 kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
 	text "" name pod imports plugin_pod action auto \
 	text "usr/script" name dir imports plugin_dir action auto view long \
 	button "浏览" action auto \
-	button "返回" click Last \
+	button "返回" cb Last \
     feature display "editor" \
     exports dir "" dir
 

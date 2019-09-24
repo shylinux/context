@@ -9,9 +9,9 @@ end
 kit macro "脚本宏" "macro.js" public \
 	text "" name mac imports plugin_mac action auto \
 	button "查看" \
-	button "全部" click "all" \
-	button "录制" click "Record" \
-	button "运行" click "Replay" \
+	button "全部" cb "all" \
+	button "录制" cb "Record" \
+	button "运行" cb "Replay" \
     exports mac name
 
 kit sys "命令行" public "ssh._route" _ "nfs.source" \

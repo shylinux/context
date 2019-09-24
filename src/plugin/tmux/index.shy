@@ -3,7 +3,7 @@ kit buffer "粘贴板" public buf \
 	text "0" name index imports plugin_tmux_bindex action auto \
 	text "" name txt action auto \
 	button "查看" action auto \
-	button "返回" click Last \
+	button "返回" cb Last \
     exports tmux_bindex cur
 
 kit session "会话" private mux \

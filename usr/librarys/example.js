@@ -36,7 +36,7 @@ function Meta(target, obj) {
                     if (value == data && !force) {return value}
 
                     old_value = data, data = value
-                    meta && kit.Log(meta, value, old_value)
+                    meta && kit.Log("key", meta, value, old_value)
                     for (var i = 0; i < list.length; i++) {
                         list[i](value, old_value)
                     }
@@ -130,86 +130,52 @@ function Page(page) {
     var script = {}, record = ""
     page = Meta(document.body, page, {__proto__: ctx,
         onload: function() {
-            var sessid = ctx.Cookie("sessid")
-            if (page.check && !sessid) {
+            if (page.check && !ctx.Cookie("sessid")) {
+                // 用户登录
                 document.querySelectorAll("body>fieldset.Login").forEach(function(field) {
                     page.Pane(page, field)
-                })
+                }), page.login.Pane.Dialog(1, 1)
             } else {
+                // 登录成功
                 document.querySelectorAll("body>fieldset").forEach(function(field) {
                     page.Pane(page, field)
-                }), page.init(page)
-            }
-
-            if (page.check) {
-                kit.device.isWeiXin? page.login.Pane.Run(["weixin"], function(msg) {
-                    page.Include([
-                        "https://res.wx.qq.com/open/js/jweixin-1.4.0.js",
-                        // "/static/librarys/weixin.js",
-                    ], function(event) {
-                        wx.error(function(res){})
-                        wx.ready(function(){
-                            page.getLocation = function(cb) {
-                                wx.getLocation({success: function (res) {
-                                    cb(res)
-                                }})
-                            }
-                            page.openLocation = function(latitude, longitude, name) {
-                                wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
-                            }
-                            wx.getLocation({success: function (res) {
-                                page.footer.Pane.State("site", parseInt(res.latitude*10000)+","+parseInt(res.longitude*10000))
-                            }})
-                        })
-                        wx.config({
-                            appId: msg.appid[0],
-                            nonceStr: msg.nonce[0],
-                            timestamp: msg.timestamp[0],
-                            signature: msg.signature[0],
-                            jsApiList: [
-                                "scanQRCode",
-                                "chooseImage",
-                                "closeWindow",
-                                "openAddress",
-                                "getNetworkType",
-                                "getLocation",
-                                "openLocation",
-                            ]
-                        })
-                    })
-                }): sessid? page.login.Pane.Run([], function(msg) {
+                }), page.init(page), page.check && page.login.Pane.Run([], function(msg) {
                     msg.result && msg.result[0]? page.header.Pane.State("user", msg.nickname[0])
                         :page.login.Pane.Dialog(1, 1)
-                }): page.login.Pane.Dialog(1, 1)
+                })
             }
+
+            // 微信接口
+            kit.device.isWeiXin && page.login.Pane.Run(["weixin"], function(msg) {
+                msg.appid[0] && page.Include(["https://res.wx.qq.com/open/js/jweixin-1.4.0.js"], function(event) {
+                    wx.error(function(res){})
+                    wx.ready(function(){
+                        page.scanQRCode = function(cb) {
+
+                        }
+                        page.getLocation = function(cb) {
+                            wx.getLocation({success: cb})
+                        }
+                        page.openLocation = function(latitude, longitude, name) {
+                            wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
+                        }
+                    }), wx.config({jsApiList: ["closeWindow", "scanQRCode", "getLocation", "openLocation"],
+                    appId: msg.appid[0], nonceStr: msg.nonce[0], timestamp: msg.timestamp[0], signature: msg.signature[0]})
+                })
+            })
+
+            // 事件回调
             window.onresize = function(event) {
                 page.onlayout && page.onlayout(event)
-
             }, document.body.onkeydown = function(event) {
                 if (page.localMap && page.localMap(event)) {return}
                 page.oncontrol && page.oncontrol(event, document.body, "control")
 
-                if (kit.isWindows && event.ctrlKey) {
-                    // event.stopPropagation()
-                    // event.preventDefault()
-                }
-
             }, document.body.onkeyup = function(event) {
-                if (kit.isWindows && event.ctrlKey) {
-                    // event.stopPropagation()
-                    // event.preventDefault()
-                }
-
             }, document.body.oncontextmenu = function(event) {
-                event.stopPropagation()
-                event.preventDefault()
-
             }, document.body.onmousewheel = function(event) {
-
             }, document.body.onmousedown = function(event) {
-
             }, document.body.onmouseup = function(event) {
-
             }
         },
         ontoast: function(text, title, duration) {
@@ -261,8 +227,7 @@ function Page(page) {
                 }
                 ticker()
             }, 10): setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
-            page.toast = toast
-            return true
+            return page.toast = toast
         },
         oninput: function(event, local) {
             var target = event.target
@@ -440,11 +405,8 @@ function Page(page) {
         },
         WSS: function(cb, onerror, onclose) {
             return page.socket || (page.socket = ctx.WSS(cb || (function(m) {
-
                 if (m.detail) {
-                    page.action.Pane.Core(event, m, ["_cmd", m.detail], function(msg) {
-                        m.reply(msg)
-                    })
+                    page.action.Pane.Core(event, m, ["_cmd", m.detail], m.reply)
                 } else {
                     page.ontoast(m.result.join(""))
                 }
@@ -566,6 +528,7 @@ function Page(page) {
         },
         Pane: Pane,
     })
+    page.which = page.Sync("layout")
     return window.onload = page.onload, page
 }
 function Pane(page, field) {
@@ -756,6 +719,11 @@ function Plugin(page, pane, field, runs) {
     }
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
+        Inputs: {},
+        Appends: function() {
+            var name = "args"+kit.Selector(option, "input.args.temp").length
+            plugin.Append({type: "text", name: name, className: "args temp"}).focus()
+        },
         Append: function(item, name, value) {
             kit.Item(plugin.onaction, function(k, cb) {
                 item[k] == undefined && (item[k] = typeof cb == "function"? function(event) {
@@ -768,8 +736,8 @@ function Plugin(page, pane, field, runs) {
                     break
             }
 
-            (item.title || item.name) && (item.title = item.title || item.name)
-            item.title && (item.placeholder = item.title)
+            !item.title && item.name && (item.title = item.name)
+            !item.placeholder && item.title && (item.placeholder = item.title)
 
             name = item.name || "input"
             var input = {type: "input", name: name, data: item}
@@ -810,6 +778,8 @@ function Plugin(page, pane, field, runs) {
                 var td = output.querySelector("td")
                 td && td.click()
             })
+            item.which = plugin.Sync(item.name)
+            plugin.Inputs[item.name] = ui[name]
             return action.target
         },
         Remove: function() {
@@ -824,6 +794,7 @@ function Plugin(page, pane, field, runs) {
             page.plugin && (kit.classList.del(page.plugin, "select"))
             page.plugin = field, kit.classList.add(field, "select")
             !silent && (option.querySelectorAll("input")[1].focus())
+			name && pane.which.set(name)
         },
         Reveal: function(msg) {
             return msg.append && msg.append[0]? ["table", JSON.stringify(ctx.Tables(msg))]: ["code", msg.result? msg.result.join(""): ""]
@@ -839,7 +810,6 @@ function Plugin(page, pane, field, runs) {
             }).field.Plugin
         },
         Last: function() {
-            console.log(meta)
             var list = history.pop()
             list? (list.target.value = list.value): inputs.map(function(item) {
                 option[item.name].value = item.value
@@ -951,7 +921,10 @@ function Plugin(page, pane, field, runs) {
             }).join("\n"), type = ".csv"
 
             !text && (text = plugin.msg.result.join(""), type = ".txt")
-            page.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([text]))+'" target="_blank" download="'+name+type+'">'+name+type+'</a>', width: 200})
+            page.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([text]))+'" target="_blank" download="'+name+type+'">'+name+type+'</a>', title: "下载中...", width: 200})
+            kit.Selector(page.toast, "a", function(item) {
+                item.click()
+            })
         },
         show_after: function(msg) {},
         upload: function(event) {
@@ -1017,15 +990,17 @@ function Plugin(page, pane, field, runs) {
         onaction: {
             onfocus: function(event, action, type, name, item) {
                 page.input = event.target, plugin.Select(true)
+                plugin.which.set(name)
             },
             onblur: function(event, action, type, name, item) {
+                item.which.set(action.target.value)
                 // page.input = undefined
             },
             onclick: function(event, action, type, name, item) {
                 switch (type) {
                     case "button":
-                        action[item.click]? action[item.click](event, item, option, field):
-                            plugin[item.click]? plugin[item.click](event, item, option, field): plugin.Check()
+                        action[item.cb]? action[item.cb](event, item, option, field):
+                            plugin[item.cb]? plugin[item.cb](event, item, option, field): plugin.Check()
                         break
                     case "text":
                         if (event.ctrlKey) {
@@ -1093,7 +1068,7 @@ function Plugin(page, pane, field, runs) {
                             page.action.scrollTo(0, field.offsetTop)
                             break
                         case "b":
-                            plugin.Append({className: "args temp", type: "text"}).focus()
+                            plugin.Appends()
                             break
                         case "m":
                             plugin.Clone().Select()
@@ -1104,6 +1079,7 @@ function Plugin(page, pane, field, runs) {
                     return true
                 })
                 if (item.type != "textarea" && event.key == "Enter") {
+                    item.which.set(action.target.value)
                     history.push({target: action.target, value: action.target.value});
                     plugin.Check(action.target)
                 }
@@ -1111,6 +1087,7 @@ function Plugin(page, pane, field, runs) {
         },
         exports: JSON.parse(meta.exports||'["",""]'),
     })
+    plugin.which = plugin.Sync("input")
 
     inputs.map(function(item) {plugin.Append(item)})
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
