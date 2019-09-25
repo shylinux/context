@@ -1,26 +1,53 @@
 ctx = context = {__proto__: kit,
-    Run: function(dataset, cmd, cb) {
-        var option = {"cmds": cmd}
-        for (var k in dataset) {
-            option[k] = dataset[k].split(",")
-        }
-
-        kit.Log(["run"].concat(option.group).concat(option.name).concat(option.cmds))
-
-        var event = window.event
-        this.POST("", option, function(msg) {
-            msg[0] && (msg = msg[0])
-            msg.Result = msg.result? msg.result.join(""): ""
-            msg.Results = function() {
-                var s = msg.Result
+    Event: function(event, msg, proto) {
+        if (event.msg) {return event.msg}
+        event.msg = msg = msg || {}, proto = proto || {}, msg.__proto__ = proto, proto.__proto__ = {
+            Push: function(key, value) {
+                msg.append || (msg.append = [])
+                msg[key]? msg[key].push(value): (msg[key] = [value], msg.append.push(key))
+                return msg
+            },
+            Echo: function(res) {
+                res != null && res != undefined && (msg.result = (msg.result || []).concat(kit.Trans(res)))
+                return msg
+            },
+            Result: function() {
+                return msg.result? msg.result.join(""): ""
+            },
+            Results: function() {
+                var s = msg.Result()
                 s = s.replace(/</g, "&lt;")
                 s = s.replace(/>/g, "&gt;")
                 s = kit.Color(s)
                 return s
-            }
-            msg.event = event
-            typeof cb == "function" && cb(msg || {})
+            },
+        }, msg.event = event
+        kit.Log("event", event.type, proto.name, msg)
+        return msg
+    },
+    Run: function(dataset, cmd, cb) {
+        var msg = ctx.Event(event)
+
+        var option = {"cmds": cmd}
+        msg.option && msg.option.forEach(function(item) {
+            msg.option[item] && (option[item] = msg.option[item])
         })
+        for (var k in dataset) {
+            option[k] = dataset[k].split(",")
+        }
+
+        msg.option = []
+        for (var k in option) {
+            msg.option.push(k)
+            msg[k] = option[k]
+        }
+        msg.detail = ["run"].concat(option.group).concat(option.name).concat(option.cmds)
+
+        kit.Log(msg.detail.concat([msg]))
+        this.POST("", option, function(msg) {
+            kit.Log("run", "result", msg.result? msg.result[0]: "", msg)
+            typeof cb == "function" && cb(msg || {})
+        }, msg)
     },
     Runs: function(form, cb) {
         var data = {}
@@ -190,7 +217,7 @@ ctx = context = {__proto__: kit,
         document.cookie = key+"="+value+";path=/"
         return arguments.callee(key)
     },
-    POST: function(url, form, cb) {
+    POST: function(url, form, cb, msg) {
         var args = []
         for (var k in form) {
             if (form[k] instanceof Array) {
@@ -212,19 +239,25 @@ ctx = context = {__proto__: kit,
             }
 
             try {
-                var msg = JSON.parse(xhr.responseText||'{"result":[]}')
+                var res = JSON.parse(xhr.responseText||'[{"result":[]}]')
+                res = res[0] && res[0]
             } catch (e) {
-                var msg = {"result": [xhr.responseText]}
+                var res = {"result": [xhr.responseText]}
             }
 
-            if (msg.download_file) {
-                window.open(msg.download_file.join(""))
-            } else if (msg.page_redirect) {
-                location.href = msg.page_redirect.join("")
-            } else if (msg.page_refresh) {
-                location.reload()
-            }
-            typeof cb == "function" && cb(msg)
+            res.result && (msg.result = res.result)
+            res.append && (msg.append = res.append) && res.append.forEach(function(item) {
+                res[item] && (msg[item] = res[item])
+            })
+
+            // if (msg.download_file) {
+            //     window.open(msg.download_file.join(""))
+            // } else if (msg.page_redirect) {
+            //     location.href = msg.page_redirect.join("")
+            // } else if (msg.page_refresh) {
+            //     location.reload()
+            // }
+            typeof cb == "function" && cb(msg || {})
         }
 
         xhr.open("POST", url)
@@ -245,20 +278,15 @@ ctx = context = {__proto__: kit,
                 var msg = {"result": [event.data]}
             }
 
-            event.msg = msg, msg.event = event, msg.reply = function(res) {
-                msg.result = (msg.result||[]).concat(kit.Trans(res))
-                kit.Log(["wss", "detail"].concat(msg.detail))
-                kit.Log(["wss", "result"].concat(msg.result))
-                delete(msg.event), s.send(JSON.stringify(msg))
-            }
-            msg.push = function(key, value) {
-                msg.append || (msg.append = [])
-                msg[key]? msg[key].push(value): (msg[key] = [value], msg.append.push(key))
-                return msg
-            }
+            msg = ctx.Event(event, msg, {
+                reply: function(msg) {
+                    kit.Log(["wss", "result"].concat(msg.result))
+                    delete(msg.event), s.send(JSON.stringify(msg))
+                },
+            })
 
             try {
-                kit.Log("wss", "msg", msg)
+                kit.Log(["wss"].concat(msg.detail).concat([msg]))
                 typeof cb == "function" && cb(msg)
             } catch (e) {
                 msg.reply(kit.Log("err", e))

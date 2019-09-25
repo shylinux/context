@@ -1,4 +1,16 @@
+Wrap = function(cb, obj) {
+    for (var k in obj) {
+        cb[k] = obj[k]
+    }
+    return cb
+}
 kit = toolkit = {__proto__: document,
+    meta: function(cb, obj) {
+        for (var k in obj) {
+            cb[k] = obj[k]
+        }
+        return cb
+    },
     // 用户终端
     device: {
         isWeiXin: navigator.userAgent.indexOf("MicroMessenger") > -1,
@@ -33,11 +45,12 @@ kit = toolkit = {__proto__: document,
             return index == undefined? this[type]: this[type][(index+len)%len]
         },
     },
-    Debug: function(key) {
-        if (kit.debug[key]) {debugger}
-    }, debug: {"why": true},
-    Log: function(type, arg) {
-        var args = [kit.time()]
+    Debug: Wrap(function(key) {
+        var list = arguments.callee.list
+        if (list[key]) {debugger}
+    }, {list: {why: true, msg: true}}),
+    Log: Wrap(function(type, arg) {
+        var args = [kit.time().split(" ")[1]]
         if (arg == undefined) {
             args = args.concat(kit.Trans(type))
         } else {
@@ -46,10 +59,12 @@ kit = toolkit = {__proto__: document,
             }
         }
 
-        !kit.hide[args[1]] && console.log(args)
+        var mine = arguments.callee
+        !mine.hide[args[1]] && console[mine.func[args[1]]||"log"](args)
+
         kit.Debug(args[1])
         return args.slice(1)
-    }, hide: {"wss": false},
+    }, {hide: {"init": true, "wss": false}, func: {debug: "debug", info: "info", warn: "warn", err: "error"}}),
     Delay: function(time, cb) {
         return setTimeout(cb, time)
     },

@@ -288,20 +288,14 @@ var page = Page({check: true,
                 ], 0)
             },
             Core: function(event, line, args, cbs) {
-                var msg = event.msg || {}, res
-                function result(res) {
-                    res != null && res != undefined && !msg.result && (msg.result = kit.Trans(res))
-                    return true
-                }
-
+                var msg = ctx.Event(event)
                 var plugin = event.Plugin || page.plugin && page.plugin.Plugin || {}, engine = {
                     share: function(args) {
-                        typeof cbs == "function" && cbs(ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
+                        return ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
                             river, line.storm, line.action,  args[1]||"",
-                        ]}))
-                        return true
+                        ]})
                     },
-                    wss: function(id) {
+                    wssid: function(id) {
                         return id && (page.wssid = id)
                     },
                     pwd: function(name, value) {
@@ -317,8 +311,8 @@ var page = Page({check: true,
                                 msg.append = ["name", "value"]
                                 msg.name = [], msg.value = []
                                 return kit.Selector(page.plugin, ".args", function(item) {
-                                    msg.name.push(item.name)
-                                    msg.value.push(item.value)
+                                    msg.Push("name", item.name)
+                                    msg.Push("value", item.value)
                                     return item.name+":"+item.value
                                 })
 
@@ -347,17 +341,15 @@ var page = Page({check: true,
                         }
                         if (!pid) {
                             return kit.Selector(page.action, "fieldset.item>legend", function(item) {
-                                msg.push("name", item.parentNode.Meta.name)
-                                msg.push("help", item.parentNode.Meta.help)
+                                msg.Push("name", item.parentNode.Meta.name)
+                                msg.Push("help", item.parentNode.Meta.help)
                                 return item.innerText
                             })
                         }
                         if (!uid) {
-                            msg.append = ["name", "value"]
-                            msg.name = [], msg.value = []
                             return kit.Selector(page.plugin, "input", function(item) {
-                                msg.name.push(item.name)
-                                msg.value.push(item.value)
+                                msg.Push("name", item.name)
+                                msg.Push("value", item.value)
                                 return item.name+":"+item.value
                             })
                         }
@@ -371,7 +363,6 @@ var page = Page({check: true,
                         engine.help("action")
                         engine.help("storm")
                     },
-                    reload: function() {kit.reload()},
                     help: function() {
                         var args = kit.List(arguments), cb, target
                         if (args.length > 0 && page.pane && page.pane.Pane[args[0]] && page.pane.Pane[args[0]].Plugin) {
@@ -400,22 +391,21 @@ var page = Page({check: true,
                         kit.Log(["cmd"].concat(args))
 
                         if (typeof engine[args[0]] == "function") {
-                            return result(kit._call(engine[args[0]], args.slice(1)))
+                            return kit._call(engine[args[0]], args.slice(1))
                         }
                         if (page.plugin && typeof page.plugin.Plugin[args[0]] == "function") {
-                            return result(kit._call(page.plugin.Plugin[args[0]], args.slice(1)))
+                            return kit._call(page.plugin.Plugin[args[0]], args.slice(1))
                         }
 
-                        if (page.dialog && (res = page.dialog.Pane.Jshy(event, args))) {return result(res)}
-                        if (page.pane && (res = page.pane.Pane.Jshy(event, args))) {return result(res)}
-                        if (page.storm && (res = page.storm.Pane.Jshy(event, args))) {return result(res)}
-                        if (page.river && (res = page.river.Pane.Jshy(event, args))) {return result(res)}
+                        if (page.dialog && (res = page.dialog.Pane.Jshy(event, args))) {return res}
+                        if (page.pane && (res = page.pane.Pane.Jshy(event, args))) {return res}
+                        if (page.storm && (res = page.storm.Pane.Jshy(event, args))) {return res}
+                        if (page.river && (res = page.river.Pane.Jshy(event, args))) {return res}
 
 
-                        if (page && (res = page.Jshy(event, args))) {return result(res)}
-                        if (page.plugin && (res = page.plugin.Plugin.Jshy(event, args))) {return result(res)}
-                        kit.Log("not find", arg[1])
-                        return true
+                        if (page && (res = page.Jshy(event, args))) {return res}
+                        if (page.plugin && (res = page.plugin.Plugin.Jshy(event, args))) {return res}
+                        return kit.Log(["warn", "not", "find"].concat(args))
                     },
                     _msg: function(msg) {
                         if (msg) {
@@ -432,7 +422,7 @@ var page = Page({check: true,
                         })
                     },
                 }
-                if (args.length > 0 && engine[args[0]] && engine[args[0]](args)) {typeof cbs == "function" && cbs(); return}
+                if (args.length > 0 && engine[args[0]] && msg.Echo(engine[args[0]](args))) {typeof cbs == "function" && cbs(msg); return}
                 event.shiftKey? engine._msg(): engine._run()
             },
             Show: function() {var pane = field.Pane
@@ -706,12 +696,12 @@ var page = Page({check: true,
         }
     },
     init: function(page) {
-        page.footer.Pane.Order({"ncmd": "", "ntxt": ""}, ["ncmd", "ntxt"], function(event, item, value) {})
+		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? page.conf.first: page.conf.mobile)
+        page.footer.Pane.Order({"ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(event, item, value) {})
         page.header.Pane.Order({"logout": "logout", "user": ""}, ["logout", "user"], function(event, item, value) {
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
-        page.river.Pane.Show(), page.pane = page.action, page.plugin = kit.Selector(page.action, "fieldset")[0]
-		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? page.conf.first: page.conf.mobile)
+        page.river.Pane.Show()
         page.WSS()
     },
 })

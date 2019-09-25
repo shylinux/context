@@ -139,10 +139,10 @@ function Page(page) {
                 // 登录成功
                 document.querySelectorAll("body>fieldset").forEach(function(field) {
                     page.Pane(page, field)
-                }), page.init(page), page.check && page.login.Pane.Run([], function(msg) {
-                    msg.result && msg.result[0]? page.header.Pane.State("user", msg.nickname[0])
+                }), page.check? page.login.Pane.Run([], function(msg) {
+                    msg.result && msg.result[0]? (page.init(page), page.header.Pane.State("user", msg.nickname[0]))
                         :page.login.Pane.Dialog(1, 1)
-                })
+                }): page.init(page)
             }
 
             // 微信接口
@@ -529,6 +529,7 @@ function Page(page) {
         Pane: Pane,
     })
     page.which = page.Sync("layout")
+    kit.Log("init", "page", page)
     return window.onload = page.onload, page
 }
 function Pane(page, field) {
@@ -546,6 +547,7 @@ function Pane(page, field) {
             var index = list.length, ui = pane.View(output, type, line, key, function(event, cmds, cbs) {
                 (type != "plugin" && type != "field") && pane.Select(index, line[which])
                 page.script("record", [name, line[key[0]]])
+                ctx.Event(event, {}, {name: name})
                 typeof cb == "function" && cb(line, index, event, cmds, cbs)
             })
 
@@ -696,6 +698,7 @@ function Pane(page, field) {
     option.onsubmit = function(event) {
         event.preventDefault()
     };
+    kit.Log("init", "pane", name, pane)
     return page[name] = field, pane.Field = field, field.Pane = pane
 }
 function Plugin(page, pane, field, runs) {
@@ -727,7 +730,12 @@ function Plugin(page, pane, field, runs) {
         Append: function(item, name, value) {
             kit.Item(plugin.onaction, function(k, cb) {
                 item[k] == undefined && (item[k] = typeof cb == "function"? function(event) {
-                    cb(event, action, item.type, name, item)
+                    try {
+                        cb(event, action, item.type, input.name, item)
+                    } catch (e) {
+                        console.trace()
+                        kit.Log("err", e)
+                    }
                 }: cb)
             });
             switch (item.value) {
@@ -739,9 +747,11 @@ function Plugin(page, pane, field, runs) {
             !item.title && item.name && (item.title = item.name)
             !item.placeholder && item.title && (item.placeholder = item.title)
 
-            name = item.name || "input"
-            var input = {type: "input", name: name, data: item}
+            var input = {type: "input", name: name || item.name || "input", data: item}
             switch (item.type) {
+                case "button":
+                    input.name = item.name || item.value || name
+                    break
                 case "upfile":
                     item.type = "file"
                     break
@@ -766,7 +776,7 @@ function Plugin(page, pane, field, runs) {
             }
 
             var ui = kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])
-            var action = Meta(ui[name] || {}, item, plugin.onaction, plugin);
+            var action = Meta(ui[input.name] || {}, item, plugin.onaction, plugin);
 
             (typeof item.imports == "object"? item.imports: typeof item.imports == "string"? [item.imports]: []).forEach(function(imports) {
                 page.Sync(imports).change(function(value) {
@@ -778,8 +788,8 @@ function Plugin(page, pane, field, runs) {
                 var td = output.querySelector("td")
                 td && td.click()
             })
-            item.which = plugin.Sync(item.name)
-            plugin.Inputs[item.name] = ui[name]
+            item.which = plugin.Sync(input.name)
+            plugin.Inputs[input.name] = ui[input.name]
             return action.target
         },
         Remove: function() {
@@ -999,6 +1009,8 @@ function Plugin(page, pane, field, runs) {
             onclick: function(event, action, type, name, item) {
                 switch (type) {
                     case "button":
+                        ctx.Event(event, {}, {name: meta.name+"."+name, pane: pane, plugin: plugin, input: item})
+
                         action[item.cb]? action[item.cb](event, item, option, field):
                             plugin[item.cb]? plugin[item.cb](event, item, option, field): plugin.Check()
                         break
@@ -1079,6 +1091,7 @@ function Plugin(page, pane, field, runs) {
                     return true
                 })
                 if (item.type != "textarea" && event.key == "Enter") {
+                    ctx.Event(event, {}, {name: meta.name+"."+name, pane: pane, plugin: plugin, input: item})
                     item.which.set(action.target.value)
                     history.push({target: action.target, value: action.target.value});
                     plugin.Check(action.target)
@@ -1090,5 +1103,6 @@ function Plugin(page, pane, field, runs) {
     plugin.which = plugin.Sync("input")
 
     inputs.map(function(item) {plugin.Append(item)})
+    kit.Log("init", "plugin", name, plugin)
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
 }

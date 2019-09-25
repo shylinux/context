@@ -1114,7 +1114,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				}
 				m.Conf("wss", []string{m.Option("username"), h}, meta)
 				m.Conf("wss", h, meta)
-				p <- m.Spawn().Add("detail", "wss", h)
+				p <- m.Spawn().Add("detail", "wssid", h)
 
 				what := m
 				m.Log("wss", "conn %v %s", h, agent)
