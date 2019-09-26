@@ -1,6 +1,7 @@
 ctx = context = {__proto__: kit,
     Event: function(event, msg, proto) {
-        if (event.msg) {return event.msg}
+        if (event.msg && !msg) {return event.msg}
+
         event.msg = msg = msg || {}, proto = proto || {}, msg.__proto__ = proto, proto.__proto__ = {
             Push: function(key, value) {
                 msg.append || (msg.append = [])
@@ -26,7 +27,7 @@ ctx = context = {__proto__: kit,
         return msg
     },
     Run: function(dataset, cmd, cb) {
-        var msg = ctx.Event(event)
+        var msg = ctx.Event(event||document.createEvent("Event"), null, {name: "ctx.run"})
 
         var option = {"cmds": cmd}
         msg.option && msg.option.forEach(function(item) {
@@ -265,7 +266,8 @@ ctx = context = {__proto__: kit,
         xhr.setRequestHeader("Accept", "application/json")
         xhr.send(args.join("&"))
     },
-    WSS: function(cb, onerror, onclose) {
+    WSS: Wrap(function(cb, onerror, onclose) {
+        var meta = arguments.callee
         var s = new WebSocket(location.protocol.replace("http", "ws")+"//"+location.host+"/wss?wssid="+(page.wssid||""))
         s.onopen = function(event) {
             kit.Log("wss", "open")
@@ -278,8 +280,12 @@ ctx = context = {__proto__: kit,
                 var msg = {"result": [event.data]}
             }
 
+            meta.order++
+            // Event入口 -1.0
             msg = ctx.Event(event, msg, {
-                reply: function(msg) {
+                name: meta.order,
+                Order: meta.order,
+                Reply: function(msg) {
                     kit.Log(["wss", "result"].concat(msg.result))
                     delete(msg.event), s.send(JSON.stringify(msg))
                 },
@@ -302,5 +308,5 @@ ctx = context = {__proto__: kit,
             typeof onclose == "function" && onclose(event)
         }
         return s
-    },
+    }, {order: 0}),
 }

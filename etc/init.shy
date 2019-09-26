@@ -1,11 +1,11 @@
 ~cli
-    config load var/tmp/runtime.json runtime
+    config load tmp/runtime.json runtime
 ~aaa
-    config load var/tmp/short.json short
-    config load var/tmp/auth.json auth
+    config load tmp/short.json short
+    config load tmp/auth.json auth
 ~ssh
-    config load var/data/work.json work
-    config load var/data/flow.json flow
+    config load data/work.json work
+    config load data/flow.json flow
 
 ~nfs
     source etc/common.shy

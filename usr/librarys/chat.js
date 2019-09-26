@@ -174,6 +174,7 @@ var page = Page({check: true,
     initRiver: function(page, field, option, output) {
         return {
             Show: function(which) {var pane = field.Pane
+                ctx.Event(event, {}, {name: "river.show"})
                 output.innerHTML = "", pane.Update([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true)
             },
             Action: {
@@ -556,6 +557,7 @@ var page = Page({check: true,
                 prev? prev.click(): output.lastChild.click()
             },
             Show: function(which) {var pane = field.Pane
+                ctx.Event(event, {}, {name: "storm.show"})
                 pane.which.get("") == which && page.action.Pane.Show()
                 output.innerHTML = "", pane.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
             },

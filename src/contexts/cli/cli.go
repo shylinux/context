@@ -356,6 +356,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			// 工作目录
 			cmd.Dir = kit.Select(kit.Chains(conf, "dir"), m.Option("cmd_dir"))
 			if cmd.Dir != "" {
+				os.MkdirAll(cmd.Dir, 0777)
 				m.Log("info", "dir %v", cmd.Dir)
 			}
 

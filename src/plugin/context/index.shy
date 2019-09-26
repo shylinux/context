@@ -21,15 +21,17 @@ kit upgrade "升级" private "ssh._route" _ "cli.upgrade" \
 	text "" name see imports plugin_see \
 	button "升级"
 
-kit missyou "任务" private \
+kit missyou "任务" private "ssh._route" _ "cli.missyou" \
+	text "" name pod imports plugin_pod action auto \
 	text "" name see imports plugin_see \
 	text "" name you view long \
 	button "行动" action auto \
     exports you "" you
 
 kit pod "设备" private "ssh._route" _ "ssh.remote" __ \
-	text "" name pod \
+	text "" name pod imports plugin_pod action auto \
 	button "查看" action auto \
+	button "返回" cb Last \
     exports pod pod pod
 
 kit ctx "模块" private "ssh._route" _ context _ list __ \

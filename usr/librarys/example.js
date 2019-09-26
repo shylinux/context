@@ -130,6 +130,8 @@ function Page(page) {
     var script = {}, record = ""
     page = Meta(document.body, page, {__proto__: ctx,
         onload: function() {
+            // Event入口 0
+            ctx.Event(event, {}, {name: document.title})
             if (page.check && !ctx.Cookie("sessid")) {
                 // 用户登录
                 document.querySelectorAll("body>fieldset.Login").forEach(function(field) {
@@ -406,7 +408,7 @@ function Page(page) {
         WSS: function(cb, onerror, onclose) {
             return page.socket || (page.socket = ctx.WSS(cb || (function(m) {
                 if (m.detail) {
-                    page.action.Pane.Core(event, m, ["_cmd", m.detail], m.reply)
+                    page.action.Pane.Core(event, m, ["_cmd", m.detail], m.Reply)
                 } else {
                     page.ontoast(m.result.join(""))
                 }
@@ -547,7 +549,6 @@ function Pane(page, field) {
             var index = list.length, ui = pane.View(output, type, line, key, function(event, cmds, cbs) {
                 (type != "plugin" && type != "field") && pane.Select(index, line[which])
                 page.script("record", [name, line[key[0]]])
-                ctx.Event(event, {}, {name: name})
                 typeof cb == "function" && cb(line, index, event, cmds, cbs)
             })
 
@@ -574,6 +575,8 @@ function Pane(page, field) {
         Select: function(index, key) {
             -1 < last && last < list.length && (kit.classList.del(list[last], "select"))
             last = index, list[index] && (kit.classList.add(list[index], "select"))
+            // Event入口 1.0
+            ctx.Event(event, {}, {name: name+"."+key})
 			key && pane.which.set(key)
         },
         clear: function() {
@@ -686,14 +689,14 @@ function Pane(page, field) {
         page.Sync(k).change(pane.Listen[k])
     }
     pane.Button && pane.Button.length > 0 && (kit.InsertChild(field, output, "div", pane.Button.map(function(value) {
-        return typeof value == "object"? {className: value[0], select: [value.slice(1), function(value, event) {
-            value = event.target.value
+        function call(value, event) {
+            // Event入口 1.1
+            ctx.Event(event, {}, {name: name+"."+value})
             page.script("record", [name, value])
             typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
-        }]}: value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, function(value, event) {
-            page.script("record", [name, value])
-            typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
-        }]}
+        }
+        return typeof value == "object"? {className: value[0], select: [value.slice(1), call]}:
+            value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, call]}
     })).className="action")
     option.onsubmit = function(event) {
         event.preventDefault()
@@ -718,7 +721,8 @@ function Plugin(page, pane, field, runs) {
 
     var history = []
     var run = function(event, cmds, cbs) {
-        event.Plugin = plugin, runs(event, cmds, cbs)
+        ctx.Event(event, null, {name: name, Plugin: plugin})
+        runs(event, cmds, cbs)
     }
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
@@ -781,13 +785,11 @@ function Plugin(page, pane, field, runs) {
             (typeof item.imports == "object"? item.imports: typeof item.imports == "string"? [item.imports]: []).forEach(function(imports) {
                 page.Sync(imports).change(function(value) {
                     history.push({target: action.target, value: action.target.value});
-                    (action.target.value = value) && item.action == "auto" && plugin.Runs(window.event)
+                    (action.target.value = value) && item.action == "auto" && plugin.Runs(document.createEvent("Event"))
                 })
             })
-            item.type == "button" && item.action == "auto" && plugin.Runs(window.event, function() {
-                var td = output.querySelector("td")
-                td && td.click()
-            })
+            item.type == "button" && item.action == "auto" && action.target.click()
+
             item.which = plugin.Sync(input.name)
             plugin.Inputs[input.name] = ui[input.name]
             return action.target
@@ -979,9 +981,10 @@ function Plugin(page, pane, field, runs) {
             you: function(value, name, line) {
                 var event = window.event
                 event.Plugin = plugin
+
                 line.you && name == "status" && (line.status == "start"? function() {
-                    plugin.Delay(3000, event, line.you+" stop...") && field.Run(event, [line.you, "stop"])
-                }(): field.Run(event, [line.you], function(msg) {
+                    plugin.Delay(3000, event, line.you+" stop...") && field.Run(event, [option.pod.value, line.you, "stop"])
+                }(): field.Run(event, [option.pod.value, line.you], function(msg) {
                     plugin.Delay(3000, event, line.you+" start...")
                 }))
                 return name == "status" || line.status == "stop" ? undefined: line.you
@@ -999,8 +1002,8 @@ function Plugin(page, pane, field, runs) {
         },
         onaction: {
             onfocus: function(event, action, type, name, item) {
-                page.input = event.target, plugin.Select(true)
-                plugin.which.set(name)
+                plugin.Select(true)
+                page.input = event.target, plugin.which.set(name)
             },
             onblur: function(event, action, type, name, item) {
                 item.which.set(action.target.value)
@@ -1009,7 +1012,8 @@ function Plugin(page, pane, field, runs) {
             onclick: function(event, action, type, name, item) {
                 switch (type) {
                     case "button":
-                        ctx.Event(event, {}, {name: meta.name+"."+name, pane: pane, plugin: plugin, input: item})
+                        // Event入口 2.0
+                        ctx.Event(event, {}, {name: meta.name+"."+name})
 
                         action[item.cb]? action[item.cb](event, item, option, field):
                             plugin[item.cb]? plugin[item.cb](event, item, option, field): plugin.Check()
@@ -1025,25 +1029,7 @@ function Plugin(page, pane, field, runs) {
                 type == "text" && (action.target.value = kit.History.get("txt", -1).data.trim())
             },
             onchange: function(event, action, type, name, item) {
-                type == "select" && plugin.Check(item.action == "auto"? undefined: action)
-            },
-            onkeyup: function(event, action, type, name, item) {
-                switch (event.key) {
-                    case " ":
-                        event.stopPropagation()
-                        return true
-                }
-
-                page.oninput(event, function(event) {
-                    switch (event.key) {
-                        case " ":
-                        case "w":
-                            break
-                        default:
-                            return false
-                    }
-                    return true
-                })
+                type == "select" && ctx.Event(event, {}, {name: meta.name+"."+name}) && plugin.Check(item.action == "auto"? undefined: action)
             },
             onkeydown: function(event, action, type, name, item) {
                 switch (event.key) {
@@ -1091,11 +1077,30 @@ function Plugin(page, pane, field, runs) {
                     return true
                 })
                 if (item.type != "textarea" && event.key == "Enter") {
+                    // Event入口 2.1
                     ctx.Event(event, {}, {name: meta.name+"."+name, pane: pane, plugin: plugin, input: item})
                     item.which.set(action.target.value)
                     history.push({target: action.target, value: action.target.value});
                     plugin.Check(action.target)
                 }
+            },
+            onkeyup: function(event, action, type, name, item) {
+                switch (event.key) {
+                    case " ":
+                        event.stopPropagation()
+                        return true
+                }
+
+                page.oninput(event, function(event) {
+                    switch (event.key) {
+                        case " ":
+                        case "w":
+                            break
+                        default:
+                            return false
+                    }
+                    return true
+                })
             },
         },
         exports: JSON.parse(meta.exports||'["",""]'),
