@@ -621,7 +621,7 @@ kit = toolkit = {__proto__: document,
         if (interval) {
             function loop(i) {
                 if (i >= obj.length) {typeof cbs == "function" && cbs(); return}
-                typeof cb == "function" && cb(obj[i], i)
+                typeof cb == "function" && cb(obj[i], i, obj)
                 setTimeout(function() {loop(i+1)}, interval)
             }
             obj.length > 0 && setTimeout(function() {loop(0)}, interval)
@@ -629,7 +629,7 @@ kit = toolkit = {__proto__: document,
         }
         var list = []
         for (var i = 0; i < obj.length; i++) {
-            list.push(typeof cb == "function"? cb(obj[i], i): obj[i])
+            list.push(typeof cb == "function"? cb(obj[i], i, obj): obj[i])
         }
         return list
     },

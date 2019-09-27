@@ -22,6 +22,20 @@ kit date "日历" "index.js" "index.css" protected "cli.date" _ nature _ \
 	button "查看" action auto \
 	button "显示" cb show
 
+fun days "每一天" "index.js" "index.css" protected \
+	text "days" name table imports plugin_table \
+	text "" name when init date\
+	text "" name what view long \
+	button "记下了" \
+	button "记下了" cb Quick
+
+    if $2 == "" || $3 == ""
+        copy skip ssh.data show _
+    else
+        copy ssh.data insert _ when _ what __
+    end
+end
+
 fun delay "以后告诉你" protected \
 	text "delay" name table imports plugin_table \
 	text "" name when init date\

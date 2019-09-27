@@ -2,3 +2,22 @@
 fieldset.item.love.date table td.today {
     border:solid 2px red;
 }
+
+fieldset.item.love.days div.day {
+    margin:8px;
+    border:solid 2px cyan;
+    padding:8px;
+    opacity:0;
+    float:left;
+}
+fieldset.item.love.days span.what {
+    font-size:24px;
+}
+fieldset.item.love.days span.day0 {
+    font-size:32px;
+    color:red;
+}
+fieldset.item.love.days span.day1 {
+    font-size:32px;
+    color:green;
+}
