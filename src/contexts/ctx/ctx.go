@@ -804,6 +804,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 			return
 		}},
 		"copy": &Command{Name: "copy", Help: "查看或添加选项", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
+			skip := false
+			if arg[0] == "skip" {
+				skip, arg = true, arg[1:]
+			}
 			msg := m.Optionv("bio.msg").(*Message)
 			// 去年尾参
 			for i := len(arg) - 1; i >= 0; i-- {
@@ -828,7 +832,7 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					args = append(args, arg[i])
 				}
 			}
-			if j < len(msg.Meta["detail"]) {
+			if !skip && j < len(msg.Meta["detail"]) {
 				args = append(args, msg.Meta["detail"][j:]...)
 			}
 			msg.Cmdy(args)

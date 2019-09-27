@@ -865,7 +865,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 
 			// 响应数据
-			group, order := m.Option("group", kit.Select(m.Conf("route", "componet_index"), m.Option("group"))), m.Option("name")
+			group, order := m.Option("group", kit.Select(m.Conf("route", "componet_index"), m.Option("group"))), m.Option("names")
 			list := []interface{}{}
 
 			for _, v := range m.Confv("componet", group).([]interface{}) {

@@ -1,21 +1,21 @@
 
 fun meet "第一眼" protected \
 	text "love" name table imports plugin_table \
-	text "date" name when \
+	text "" name when init date \
 	text "" name where \
 	button "操作"
 
     if $2 == "" || $3 == ""
-        copy ssh.data show _
+        copy skip ssh.data show _
     else
-        copy ssh.data insert _ when _ where __
+        copy ssh.data insert _ when _ where
     end
 end
 
 kit date "日历" "index.js" "index.css" protected "cli.date" _ nature _ \
     \ space true format '<span class="%s">%s</span>' "s20060102" \
 	text "2019-07-08" name "起始时间" \
-	text "date" name "date" \
+	text "" name "截止时间" init date \
 	text "love" name "table" imports plugin_table \
 	text "when" name "when" \
 	text "where" name "where" \
@@ -24,12 +24,12 @@ kit date "日历" "index.js" "index.css" protected "cli.date" _ nature _ \
 
 fun delay "以后告诉你" protected \
 	text "delay" name table imports plugin_table \
-	text "date" name when \
+	text "" name when init date\
 	text "" name what view long \
 	button "记下了"
 
     if $2 == "" || $3 == ""
-        copy ssh.data show _
+        copy skip ssh.data show _
     else
         copy ssh.data insert _ when _ what __
     end

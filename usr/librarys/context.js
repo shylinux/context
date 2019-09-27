@@ -1,6 +1,10 @@
 ctx = context = {__proto__: kit,
-    Event: function(event, msg, proto) {
+    Event: Wrap(function(event, msg, proto) {
+        event = event || document.createEvent("Event")
         if (event.msg && !msg) {return event.msg}
+
+        var meta = arguments.callee
+        var order = ++meta.order
 
         event.msg = msg = msg || {}, proto = proto || {}, msg.__proto__ = proto, proto.__proto__ = {
             Push: function(key, value) {
@@ -23,10 +27,12 @@ ctx = context = {__proto__: kit,
                 return s
             },
         }, msg.event = event
-        kit.Log("event", event.type, proto.name, msg)
+        kit.Log("event", order, event.type, proto.name, msg)
         return msg
-    },
-    Run: function(dataset, cmd, cb) {
+    }, {order: 0}),
+    Run: Wrap(function(dataset, cmd, cb) {
+        var meta = arguments.callee
+        var order = ++meta.order
         var msg = ctx.Event(event||document.createEvent("Event"), null, {name: "ctx.run"})
 
         var option = {"cmds": cmd}
@@ -42,14 +48,15 @@ ctx = context = {__proto__: kit,
             msg.option.push(k)
             msg[k] = option[k]
         }
-        msg.detail = ["run"].concat(option.group).concat(option.name).concat(option.cmds)
+        msg.detail = ["run", order].concat(option.group).concat(option.names).concat(option.cmds)
+        msg.Order = order
 
         kit.Log(msg.detail.concat([msg]))
         this.POST("", option, function(msg) {
-            kit.Log("run", "result", msg.result? msg.result[0]: "", msg)
+            kit.Log("run", order, "result", msg.result? msg.result[0]: "", msg)
             typeof cb == "function" && cb(msg || {})
         }, msg)
-    },
+    }, {order: 0}),
     Runs: function(form, cb) {
         var data = {}
         for (var key in form.dataset) {
@@ -274,32 +281,32 @@ ctx = context = {__proto__: kit,
             page.ontoast("wss open")
         }
         s.onmessage = function(event) {
+            var order = ++meta.order
             try {
                 var msg = JSON.parse(event.data||'{}')
             } catch (e) {
                 var msg = {"result": [event.data]}
             }
 
-            meta.order++
             // Event入口 -1.0
             msg = ctx.Event(event, msg, {
-                name: meta.order,
-                Order: meta.order,
+                name: document.title,
+                Order: order,
                 Reply: function(msg) {
-                    kit.Log(["wss", "result"].concat(msg.result))
+                    kit.Log(["wss", order, "result"].concat(msg.result).concat([msg]))
                     delete(msg.event), s.send(JSON.stringify(msg))
                 },
             })
 
             try {
-                kit.Log(["wss"].concat(msg.detail).concat([msg]))
+                kit.Log(["wss", order].concat(msg.detail).concat([msg]))
                 typeof cb == "function" && cb(msg)
             } catch (e) {
                 msg.reply(kit.Log("err", e))
             }
         }
         s.onerror = function(event) {
-            kit.Log(event)
+            kit.Log("wss", "error", event)
             typeof onerror == "function" && onerror(event)
         }
         s.onclose = function(event) {

@@ -14,13 +14,13 @@
     </head>
     <body>
     <fieldset class="toast"><legend></legend>
-        <form class="option" data-name="toast"></form>
+        <form class="option" data-names="toast"></form>
         <div class="output"></div>
     </fieldset>
 {{end}}
 {{define "fieldset"}}
     <fieldset class="{{options . "view"}}" data-init="{{options . "init"}}">
-        <form class="option" data-name="{{options . "name"}}" data-group="{{options . "group"}}">
+        <form class="option" data-names="{{options . "name"}}" data-group="{{options . "group"}}">
               <input style="display:none"></input>
         </form>
         <div class="output"></div>

@@ -541,7 +541,7 @@ function Pane(page, field) {
 
     var timer = ""
     var list = [], last = -1, member = {}
-    var name = option.dataset.name
+    var name = option.dataset.names
     var pane = Meta(field, (page[field.dataset.init] || function() {
     })(page, field, option, output) || {}, {
         Append: function(type, line, key, which, cb) {
@@ -742,11 +742,7 @@ function Plugin(page, pane, field, runs) {
                     }
                 }: cb)
             });
-            switch (item.value) {
-                case "date":
-                    item.name == "date" && (item.value = kit.format_date(new Date()))
-                    break
-            }
+            item.value = plugin.onformat(item.init)(item.value)
 
             !item.title && item.name && (item.title = item.name)
             !item.placeholder && item.title && (item.placeholder = item.title)
@@ -947,6 +943,13 @@ function Plugin(page, pane, field, runs) {
                 page.ontoast(), page.ontoast("上传进度 "+parseInt(event.loaded*100/event.total)+"%")
             })
         },
+        onformat: Wrap(function(which) {
+            var meta = arguments.callee
+            return meta[which]||meta["none"]
+        }, {
+            none: function(value) {return value},
+            date: function(value) {return kit.format_date(new Date())},
+        }),
         ondaemon: {
             inner: function(msg, cb) {
                 output.style.maxWidth = pane.target.clientWidth-20+"px"
