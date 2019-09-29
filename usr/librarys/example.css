@@ -40,16 +40,19 @@ fieldset>form.option div.clear {
 fieldset>form.option label {
     margin-right:3px;
 }
-fieldset>form.option div input.args {
-    width:80px;
-}
 fieldset>form.option div.cmd input.args {
     color:white;
     background-color: black;
     width:160px;
 }
-fieldset>form.option div.tiny input.args {
+fieldset>form.option div.char input.args {
     width:20px;
+}
+fieldset>form.option div.tiny input.args {
+    width:40px;
+}
+fieldset>form.option div input.args {
+    width:80px;
 }
 fieldset>form.option div.long input.args {
     width:240px;
@@ -94,11 +97,10 @@ fieldset>div.output div.code span.green {
 }
 fieldset>div.output table td {
     word-break:break-all;
-    min-width:40px;
 }
-fieldset>div.output table td {
-    word-break:keep-all;
-    min-width:40px;
+fieldset>div.output table td.when {
+	text-align:center;
+	min-width:140px;
 }
 fieldset>div.output table.edit {
 }

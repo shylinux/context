@@ -1103,9 +1103,10 @@ function Plugin(page, pane, field, runs) {
         },
         exports: JSON.parse(meta.exports||'["",""]'),
     })
-    plugin.which = plugin.Sync("input")
 
+    plugin.which = plugin.Sync("input")
+	page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
     inputs.map(function(item) {plugin.Append(item)})
     kit.Log("init", "plugin", name, plugin)
-    return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
+    return plugin
 }

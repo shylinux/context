@@ -292,7 +292,7 @@ var page = Page({check: true,
                 var msg = ctx.Event(event)
                 var plugin = event.Plugin || page.plugin && page.plugin.Plugin || {}, engine = {
                     share: function(args) {
-                        return ctx.Share({"group": option.dataset.group, "name": option.dataset.name, "cmds": [
+                        return ctx.Share({"group": option.dataset.group, "names": option.dataset.names, "cmds": [
                             river, line.storm, line.action,  args[1]||"",
                         ]})
                     },
@@ -580,7 +580,7 @@ var page = Page({check: true,
                         "layout": page.action.Pane.Layout(),
                     })], function(msg) {
                         var url = location.origin+location.pathname+"?relay="+msg.result.join("")
-                        page.ontoast({text: "<img src=\""+ctx.Share({"group": "index", "name": "login", cmds: ["share", url]})+"\">", height: 320, width: 320, title: url, button: ["确定"], cb: function(which) {
+                        page.ontoast({text: "<img src=\""+ctx.Share({"group": "index", "names": "login", cmds: ["share", url]})+"\">", height: 320, width: 320, title: url, button: ["确定"], cb: function(which) {
                             page.ontoast()
                         }})
                     })

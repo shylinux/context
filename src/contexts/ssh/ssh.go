@@ -433,6 +433,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 					sort.Strings(keys)
 
+					m.Meta["append"] = []string{"id", "when"}
 					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list"}, func(index int, value map[string]interface{}) {
 						for _, k := range keys {
 							m.Push(k, kit.Format(value[k]))

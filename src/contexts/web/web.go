@@ -855,7 +855,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			} else {
 				w.Header().Set("Content-Type", "application/json")
 			}
-			w.Header().Set("Access-Control-Allow-Origin", "api.map.baidu.com")
+			// w.Header().Set("Access-Control-Allow-Origin", "api.map.baidu.com")
 
 			web, ok := m.Target().Server.(*WEB)
 			m.Assert(ok)

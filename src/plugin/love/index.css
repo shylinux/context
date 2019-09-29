@@ -2,6 +2,10 @@
 fieldset.item.love.date table td.today {
     border:solid 2px red;
 }
+fieldset.item.love.date table td {
+	text-align:center;
+	min-width:40px;
+}
 
 fieldset.item.love.days div.day {
     margin:8px;

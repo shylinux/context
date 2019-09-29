@@ -414,6 +414,7 @@ kit = toolkit = {__proto__: document,
                 if (row[key].startsWith("http")) {
                     td.innerHTML = "<a href='"+row[key]+"' target='_blank'>"+row[key]+"</a>"
                 }
+				if (key == "when") {td.className = "when"}
 
                 if (typeof cb == "function") {
                     td.onclick = function(event) {
@@ -598,16 +599,17 @@ kit = toolkit = {__proto__: document,
     },
 
     // 数据容器迭代
-    Selector: function(obj, item, cb) {
+    Selector: function(obj, item, cb, interval, cbs) {
         var list = []
-        obj.querySelectorAll(item).forEach(function(item, index, array) {
+		kit.List(obj.querySelectorAll(item), function(item, index, array) {
             if (typeof cb == "function") {
                 var value = cb(item, index, array)
                 value != undefined && list.push(value)
             } else {
                 list.push(item)
             }
-        })
+        }, interval, cbs)
+
         for (var i = list.length-1; i >= 0; i--) {
             if (list[i] == "") {
                 list.pop()
@@ -624,7 +626,7 @@ kit = toolkit = {__proto__: document,
                 typeof cb == "function" && cb(obj[i], i, obj)
                 setTimeout(function() {loop(i+1)}, interval)
             }
-            obj.length > 0 && setTimeout(function() {loop(0)}, interval)
+            obj.length > 0 && setTimeout(function() {loop(0)}, interval/4)
             return obj
         }
         var list = []
@@ -640,7 +642,30 @@ kit = toolkit = {__proto__: document,
         }
         return list
     },
+    Span: function(list) {
+		list = list || []
+		list.span = function(value, style) {
+			for (var i = 0; i < arguments.length; i++) {
+				if (typeof arguments[i] == "string") {
+					list.push(arguments[i])
+				} else {
+					list.push('<span class="'+arguments[i][1]+'">', arguments[i][0], "</span>")
+				}
+			}
+			list.push("<br/>")
+			return list
+		}
+        return list
+    },
+	Opacity: function(obj, list, interval) {
+		kit.List(kit.Value(list, [0, 0.2, 0.4, 0.6, 1.0]), function(value) {
+			obj.style.opacity = value
+		}, kit.Value(interval, 150))
+	},
     // 数据类型转换
+	Value: function(obj, value) {
+		return obj === undefined || obj === null || obj === "" ? value: obj
+	},
     isSpace: function(c) {
         return c == " " || c == "Enter"
     },
