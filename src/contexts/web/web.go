@@ -404,6 +404,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			"key":        "etc/key.pem",
 			"site":       "",
 			"index":      "/chat/",
+			"open":       []interface{}{},
 		}, Help: "服务配置"},
 		"route": &ctx.Config{Name: "route", Value: map[string]interface{}{
 			"index":          "/render",

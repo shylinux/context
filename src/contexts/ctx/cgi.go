@@ -2,6 +2,7 @@ package ctx
 
 import (
 	"html/template"
+
 	"io"
 	"path"
 	"strings"
@@ -74,6 +75,21 @@ func index(name string, arg ...interface{}) interface{} {
 }
 
 var CGI = template.FuncMap{
+	"conf": func(arg ...interface{}) interface{} {
+		switch m := arg[0].(type) {
+		case *Message:
+			switch c := arg[1].(type) {
+			case string:
+				if len(arg) == 2 {
+					return m.Confv(c)
+				}
+				if len(arg) == 3 {
+					return m.Confv(c, arg[2])
+				}
+			}
+		}
+		return nil
+	},
 	"option": func(arg ...interface{}) interface{} {
 		return index("option", arg...)
 	},
