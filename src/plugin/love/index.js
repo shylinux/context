@@ -1,4 +1,16 @@
-{init: function(run, field, option, output) {return {
+{init: function(run, field, option, output) {
+var id
+return {
+    initMap: function() {var plugin = field.Plugin
+        var width = field.parentNode.clientWidth-40
+        !id && (id = plugin.id+"map"+plugin.ID())
+        kit.AppendChilds(output, [{type: "div", data: {id: id}, style: {width: width+"px", height: width*3/5}}])
+        map = new BMap.Map(id)
+        map.addControl(new BMap.NavigationControl())
+        map.addControl(new BMap.ScaleControl())
+        map.addControl(new BMap.OverviewMapControl())
+        map.addControl(new BMap.MapTypeControl())
+    },
     show: function(event) {
         run(event, ["", "", "cmd", "ssh.data", "show", option.table.value], function(msg) {ctx.Table(msg, function(value) {
             kit.Selector(output, ".s"+value[option.when.value].split(" ")[0].split("-").join(""), function(item) {
@@ -56,4 +68,40 @@
             })
         })
     },
+    Search: function() {var plugin = field.Plugin
+        plugin.initMap()
+        var g = new BMap.Geocoder()
+        g.getPoint(option.place.value, function(p) {
+            kit.Log("place", p)
+            if (!p) {alert("not found"); return}
+            map.centerAndZoom(p, option.scale.value)
+        }, option.city.value)
+    },
+    Record: function() {var plugin = field.Plugin
+        var l = map.getCenter()
+        run(event, [option.table.value, option.when.value, option.what.value, option.city.value, option.place.value, l.lng, l.lat, map.getZoom()], function(msg) {
+            console.log("ok")
+        })
+    },
+    Plays: function() {var plugin = field.Plugin
+        plugin.initMap(), run(event, [option.table.value], function(msg) {
+            kit.List(ctx.Table(msg), function(line) {
+                output.style.opacity = 0
+                var p = new BMap.Point(line.longitude, line.latitude)
+                map.centerAndZoom(p, line.scale)
+
+                var info = new BMap.InfoWindow(line.when+"<br/>"+line.place, {width: 200, height: 100, title: line.what})
+                map.openInfoWindow(info, map.getCenter())
+
+                var scales = []
+                for (var i = 0; i < 10; i++) {
+                    scales.push(i*0.1)
+                }
+                kit.List(scales, function(scale) {
+                    output.style.opacity = scale
+                }, 100)
+            }, 3000)
+        })
+    },
+
 }}}

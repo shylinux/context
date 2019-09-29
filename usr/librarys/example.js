@@ -734,12 +734,7 @@ function Plugin(page, pane, field, runs) {
         Append: function(item, name, value) {
             kit.Item(plugin.onaction, function(k, cb) {
                 item[k] == undefined && (item[k] = typeof cb == "function"? function(event) {
-                    try {
-                        cb(event, action, item.type, input.name, item)
-                    } catch (e) {
-                        console.trace()
-                        kit.Log("err", e)
-                    }
+                    cb(event, action, item.type, input.name, item)
                 }: cb)
             });
             item.value = plugin.onformat(item.init)(item.value)

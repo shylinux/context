@@ -704,6 +704,6 @@ var page = Page({check: true,
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show()
-        page.WSS()
+        // page.WSS()
     },
 })

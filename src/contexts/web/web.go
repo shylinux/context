@@ -849,9 +849,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			// 响应类型
 			accept_json := strings.HasPrefix(m.Option("accept"), "application/json")
 			w := m.Optionv("response").(http.ResponseWriter)
-			if accept_json {
+			if !accept_json {
 				w.Header().Set("Content-Type", "text/html")
+			} else {
+				w.Header().Set("Content-Type", "application/json")
 			}
+			w.Header().Set("Access-Control-Allow-Origin", "api.map.baidu.com")
 
 			web, ok := m.Target().Server.(*WEB)
 			m.Assert(ok)
