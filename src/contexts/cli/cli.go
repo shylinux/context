@@ -9,7 +9,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -163,8 +162,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		"project": &ctx.Config{Name: "project", Value: map[string]interface{}{
 			"github":  "https://github.com/shylinux/context",
 			"goproxy": "https://goproxy.cn",
+			"template": map[string]interface{}{
+				"path": "usr/template",
+			},
 			"plugin": map[string]interface{}{
-				"path": "src/plugin", "list": Template,
+				"path": "src/plugin", "template": "usr/template/plugin",
 			}, "script": map[string]interface{}{
 				"path": "usr/script",
 			}, "trash": map[string]interface{}{
@@ -887,15 +889,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 				fallthrough
 			default:
-				// 创建插件
-				p := path.Join(m.Conf("project", "plugin.path"), arg[0])
-				if _, e := os.Stat(p); os.IsNotExist(e) && m.Assert(os.MkdirAll(p, 0777)) {
-					m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
-						ioutil.WriteFile(path.Join(p, kit.Format(value["name"])), []byte(kit.Format(value["text"])), 0666)
-					})
-				}
-				// 插件列表
-				m.Cmdy("nfs.dir", p, "time", "line", "hashs", "path")
+				m.Option("name", arg[0])
+				m.Option("help", kit.Select("plugin", arg, 1))
+				m.Cmdy("nfs.template", path.Join(m.Conf("project", "plugin.path"), arg[0])+"/", path.Join(m.Conf("project", "plugin.template"))+"/")
 			}
 			return
 		}},
@@ -1228,17 +1224,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				m.Table()
 				return
 			}
-			m.Cmd("nfs.save", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/contexts/cli/version.go"), fmt.Sprintf(`package cli
-var version = struct {
-	time string
-	host string
-	self int
-}{
-	"%s", "%s", %d,
-}
-`, m.Time(), m.Conf("runtime", "node.route"), version.self+1))
 
-			m.Append("directory", "")
+			m.Option("time", m.Time())
+			m.Option("host", m.Conf("runtime", "node.route"))
+			m.Option("self", version.self+1)
+			m.Cmdy("nfs.template", "force", path.Join(m.Conf("runtime", "boot.ctx_home"), "src/contexts/cli/version.go"), path.Join(m.Conf("project", "template.path"), "version/"))
 			return
 		}},
 	},

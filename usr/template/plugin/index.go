@@ -1,19 +1,15 @@
-package cli
-
-var Template = []interface{}{
-	map[string]interface{}{"name": "index.go", "text":
-`package main
+package main
 
 import (
-    "contexts/cli"
-    "contexts/ctx"
-    "toolkit"
+	"contexts/cli"
+	"contexts/ctx"
+	"toolkit"
 
-    "fmt"
-    "os"
+	"fmt"
+	"os"
 )
 
-var Index = &ctx.Context{Name: "test", Help: "测试工具",
+var Index = &ctx.Context{Name: `{{options . "name"}}`, Help: `{{options . "help"}}`,
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
 		"_index": &ctx.Config{Name: "index", Value: []interface{}{
@@ -29,29 +25,12 @@ var Index = &ctx.Context{Name: "test", Help: "测试工具",
 	},
 	Commands: map[string]*ctx.Command{
 		"demo": {Name: "demo", Help: "demo", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-            m.Echo(kit.Select("hello world", arg, 0))
-            return
+			m.Echo(kit.Select("hello world", arg, 0))
+			return
 		}},
 	},
 }
 
 func main() {
 	fmt.Print(cli.Index.Plugin(Index, os.Args[1:]))
-}
-`}, map[string]interface{}{"name": "index.shy", "text":
-`fun hello world "" "" public \
-	text "" \
-	button "执行"
-	copy pwd
-end
-`}, map[string]interface{}{"name": "index.css", "text":
-`fieldset.item.demo div.output {
-}
-`}, map[string]interface{}{"name": "index.js", "text":
-`{init: function(run, field, option, output) {
-    kit.Log("hello world")
-    return {}
-}}
-`}, map[string]interface{}{"name": "local.shy", "text":
-``},
 }

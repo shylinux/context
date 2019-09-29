@@ -1,3 +1,5 @@
+error.log
+usr/publish
 var/
 pkg/
 *.swp

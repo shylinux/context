@@ -7,5 +7,5 @@ var version = struct {
 	self int
 }{
 	[]string{"2017-11-01 01:02:03", "2019-07-13 18:02:21"},
-	`2019-09-29 17:30:47`, `centos`, 612,
+	`{{options . "time"}}`, `{{options . "host"}}`, {{options . "self"}},
 }

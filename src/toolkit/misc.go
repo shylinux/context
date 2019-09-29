@@ -206,3 +206,15 @@ func Linex(p string) map[string]string {
 	})
 	return meta
 }
+
+func List(arg interface{}, cb interface{}) {
+	list := Trans(arg)
+	for i, v := range list {
+		switch cb := cb.(type) {
+		case func(string):
+			cb(v)
+		case func(string, int):
+			cb(v, i)
+		}
+	}
+}

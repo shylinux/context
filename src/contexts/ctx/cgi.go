@@ -2,6 +2,8 @@ package ctx
 
 import (
 	"html/template"
+	"io"
+	"path"
 	"strings"
 )
 
@@ -84,4 +86,10 @@ var CGI = template.FuncMap{
 		}
 		return ""
 	},
+}
+
+func ExecuteFile(m *Message, w io.Writer, p string) error {
+	tmpl := template.New("render").Funcs(CGI)
+	tmpl.ParseGlob(p)
+	return tmpl.ExecuteTemplate(w, path.Base(p), m)
 }

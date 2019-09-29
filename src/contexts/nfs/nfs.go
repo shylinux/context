@@ -799,6 +799,38 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			return
 		}},
 
+		"template": &ctx.Command{Name: "template [force] target source...", Help: "生成模板", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			force := false
+			if arg[0] == "force" {
+				force, arg = true, arg[1:]
+			}
+
+			if _, e := os.Stat(arg[0]); os.IsNotExist(e) || force {
+				if strings.HasSuffix(arg[0], "/") && m.Assert(os.MkdirAll(arg[0], 0777)) {
+
+					kit.List(arg[1:], func(p string) {
+						m.Cmd("nfs.dir", p, "name", "path").Table(func(line map[string]string) {
+							if w, _, e := kit.Create(path.Join(arg[0], line["name"])); m.Assert(e) {
+								defer w.Close()
+
+								m.Assert(ctx.ExecuteFile(m, w, line["path"]))
+							}
+						})
+					})
+				} else if w, _, e := kit.Create(arg[0]); m.Assert(e) {
+					defer w.Close()
+
+					kit.List(arg[1:], func(p string) {
+						m.Cmd("nfs.dir", p).Table(func(line map[string]string) {
+							m.Assert(ctx.ExecuteFile(m, w, line["path"]))
+						})
+					})
+				}
+			}
+
+			m.Cmdy("nfs.dir", arg[0], "time", "line", "hashs", "path")
+			return
+		}},
 		"temp": &ctx.Command{Name: "temp data", Help: "查找文件路径", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if f, p, e := kit.Create(path.Join(m.Conf("dir", "temp"), kit.Hashs(arg[0]))); m.Assert(e) {
 				defer f.Close()
