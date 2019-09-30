@@ -3,16 +3,23 @@ fieldset.item.love.date table td.today {
     border:solid 2px red;
 }
 fieldset.item.love.date table td {
+    word-break:break-all;
 	text-align:center;
 	min-width:40px;
 }
 
 fieldset.item.love.days div.day {
-    margin:8px;
-    border:solid 2px cyan;
-    padding:8px;
     opacity:0;
+    padding:8px;
+    border:solid 2px cyan;
+    margin:8px;
     float:left;
+}
+fieldset.item.love.days div.day span.day {
+    font-size:18px;
+    font-weight:bold;
+    font-style:italic;
+    margin-right:5px;
 }
 fieldset.item.love.days span.what {
     font-size:24px;

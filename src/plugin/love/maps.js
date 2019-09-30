@@ -40,7 +40,7 @@ return {
     },
     Flashs: function() {var plugin = field.Plugin
         plugin.initMap(), run(event, [option.table.value], function(msg) {
-            kit.List(ctx.Table(msg), function(line) {
+            kit.List(ctx.Table(msg), function(line, index) {
                 var p = new BMap.Point(line.longitude, line.latitude)
                 map.centerAndZoom(p, line.scale)
 
@@ -49,8 +49,12 @@ return {
 
                 output.style.opacity = 0
 				kit.Opacity(output)
-            }, 3000)
+            }, 1000)
         })
+    },
+    Demo: function() {
+        var info = new BMap.InfoWindow("hello"+"<br/>"+"world", {width: 200, height: 100, title: "haha"})
+        map.openInfoWindow(info, map.getCenter())
     },
 }}}
 

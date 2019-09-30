@@ -96,11 +96,11 @@ fieldset>div.output div.code span.green {
     color:green;
 }
 fieldset>div.output table td {
-    word-break:break-all;
+    word-break:break-word;
 }
 fieldset>div.output table td.when {
+    word-break:break-word;
 	text-align:center;
-	min-width:140px;
 }
 fieldset>div.output table.edit {
 }
@@ -294,8 +294,8 @@ fieldset table th.order {
 fieldset table td {
     max-width:1200px;
     font-family:monospace;
-    padding-left: 10px;
-    padding-right: 20px;
+    padding-left: 6px;
+    padding-right: 6px;
 }
 fieldset table td.clip {
     background-color:red;
