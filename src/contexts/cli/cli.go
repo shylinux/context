@@ -719,10 +719,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				return
 			}},
 		"date": &ctx.Command{Name: "date", Help: "日历", Form: map[string]int{"space": 1, "format": 2, "count": 1, "nature": 1, "cmd": -1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if m.Has("cmd") { // TODO 这是个漏洞
-				m.Cmdy(m.Meta["cmd"])
-				return
-			}
 			show := map[int]string{0: "周日", 1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六"}
 
 			space := m.Options("space")

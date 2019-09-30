@@ -399,7 +399,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"data": {Name: "data show|save|create|insert", Help: "数据", Form: map[string]int{"format": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"data": {Name: "data show|save|create|insert", Help: "数据", Form: map[string]int{"format": 1, "fields": -1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				arg = append(arg, "show")
 			}
@@ -433,7 +433,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 					sort.Strings(keys)
 
-					m.Meta["append"] = []string{"id", "when"}
+					if m.Meta["append"] = []string{"id", "when"}; m.Has("fields") {
+						keys = kit.Trans(m.Optionv("fields"))
+					}
 					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list"}, func(index int, value map[string]interface{}) {
 						for _, k := range keys {
 							m.Push(k, kit.Format(value[k]))
@@ -445,13 +447,25 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					switch m.Option("format") {
 					case "object":
 						m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index)}, func(key string, value string) {
-							m.Push(key, value)
+							if key != "extra" {
+								m.Push(key, value)
+							}
+						})
+						m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index), "extra"}, func(key string, value string) {
+							m.Push("extra."+key, value)
 						})
 					default:
 						m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index)}, func(key string, value string) {
-							m.Push("key", key)
+							if key != "extra" {
+								m.Push("key", key)
+								m.Push("value", value)
+							}
+						})
+						m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index), "extra"}, func(key string, value string) {
+							m.Push("key", "extra."+key)
 							m.Push("value", value)
 						})
+						m.Sort("key")
 					}
 				}
 				m.Table()
@@ -529,10 +543,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Cmdy("ssh.data", "save", arg[1])
 
 			case "update":
-				index := kit.Int(arg[2]) - 1
-				for i := 3; i < len(arg)-1; i += 2 {
-					m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index), arg[i]}, arg[i+1])
+				table, index, prefix, arg := arg[1], kit.Int(arg[2])-1, "", arg[3:]
+				if arg[0] == "extra" {
+					prefix, arg = "extra.", arg[1:]
 				}
+				for i := 0; i < len(arg)-1; i += 2 {
+					m.Confv("flow", []string{m.Option("river"), "data", table, "list", kit.Format(index), prefix + arg[i]}, arg[i+1])
+				}
+				m.Cmdy("ssh.data", "show", table, index+1)
 			case "import":
 				if len(arg) < 3 {
 					m.Cmdy("ssh.data", "show", arg)

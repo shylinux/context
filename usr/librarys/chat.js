@@ -20,8 +20,10 @@ var page = Page({check: true,
         width -= page.river.offsetWidth+page.storm.offsetWidth
 
         sizes.action == -1 && (sizes.action = kit.device.isMobile? "": height, sizes.target = 0, sizes.source = 0)
-        sizes.action == undefined && (sizes.action = page.action.clientHeight)
+        sizes.action == undefined && (sizes.action = page.action.offsetHeight-page.conf.border)
         sizes.source == undefined && (sizes.source = page.source.clientHeight)
+        sizes.target == undefined && (sizes.target = page.target.clientHeight)
+		sizes.source == 0 && sizes.target == 0 && (sizes.action = height)
         page.action.Pane.Size(width, sizes.action)
         page.source.Pane.Size(width, sizes.source)
         height -= sizes.target==0? height: page.source.offsetHeight+page.action.offsetHeight
@@ -704,6 +706,6 @@ var page = Page({check: true,
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show()
-        // page.WSS()
+        page.WSS()
     },
 })

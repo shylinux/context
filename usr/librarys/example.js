@@ -731,6 +731,19 @@ function Plugin(page, pane, field, runs) {
             var name = "args"+kit.Selector(option, "input.args.temp").length
             plugin.Append({type: "text", name: name, className: "args temp"}).focus()
         },
+		Change: function(target, cb) {
+			var value = target.value
+			function reset(event) {
+				value != event.target.value && kit._call(cb, [event.target.value, value])
+				target.innerHTML = event.target.value
+			}
+			kit.AppendChilds(target, [{type: "input", value: target.innerText, data: {
+				onblur: reset,
+				onkeydown: function(event) {
+					page.oninput(event), event.key == "Enter" && reset(event)
+				},
+			}}]).last.focus()
+		},
         Append: function(item, name, value) {
             kit.Item(plugin.onaction, function(k, cb) {
                 item[k] == undefined && (item[k] = typeof cb == "function"? function(event) {
@@ -949,14 +962,14 @@ function Plugin(page, pane, field, runs) {
             inner: function(msg, cb) {
                 output.style.maxWidth = pane.target.clientWidth-20+"px"
                 output.style.maxHeight = pane.target.clientHeight-60+"px"
-                output.innerHTML = "", msg.append? kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
+                output.innerHTML = "", msg.append? kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1]||"", function(event, value, name, line) {
                     page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
                 }): (output.innerHTML = msg.result.join(""))
                 typeof cb == "function" && cb(msg)
             },
             table: function(msg, cb) {
                 output.innerHTML = ""
-                !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
+                !display.hide_append && msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1]||"", function(event, value, name, line) {
                     page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
                 });
                 (display.show_result || !msg.append) && msg.result && kit.OrderCode(kit.AppendChild(output, [{view: ["code", "div", msg.Results()]}]).first)
@@ -970,7 +983,7 @@ function Plugin(page, pane, field, runs) {
             },
         },
         onexport: {
-            "": function(value, name) {
+            "": function(value, name, line) {
                 return value
             },
             see: function(value, name, line) {

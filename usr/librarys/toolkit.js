@@ -597,6 +597,7 @@ kit = toolkit = {__proto__: document,
         }
         return true
     },
+    // HTML修改文本
 
     // 数据容器迭代
     Selector: function(obj, item, cb, interval, cbs) {
@@ -774,6 +775,8 @@ kit = toolkit = {__proto__: document,
     },
     _call: function(cb, arg) {
         var res
+		if (typeof cb != "function") {return}
+
         switch (arg.length) {
             case 0: res = cb(); break
             case 1: res = cb(arg[0]); break

@@ -1,29 +1,36 @@
 
-kit date "每一天" "index.js" "index.css" protected "cli.date" _ nature _ \
-    \ space true format '<span class="%s">%s</span>' "s20060102" \
+fun date "每一天" "index.js" "index.css" protected \
+	text "love" name "table" imports plugin_table view tiny \
 	text "2019-07-08" name "起始时间" \
 	text "" name "截止时间" init date \
-	text "love" name "table" imports plugin_table view tiny \
-	text "when" name "when" view tiny \
-	text "where" name "where" view tiny \
-	button "查看" action auto \
-	button "显示" cb show
+	button "日历" action auto \
+	button "记录" cb data \
+	button "展示" cb show \
+	exports index ""
+
+    if $2 == "" || $3 == ""
+        copy skip ssh.data show _ fields id when where what
+    else
+        copy skip cli.date $2 nature $3 space true format '<span class="%s">%s</span>' "s20060102"
+    end
+end
 
 fun maps "每一面" "maps.js" "index.css" protected \
 	text "love" name table imports plugin_table \
 	text "" name when init date \
 	text "" name what view long \
+	button "本地" cb Current \
     text "北京市" name city view tiny \
     text "弘源首著" name where \
-	button "本地" cb Current \
 	button "搜索" cb Search action auto \
 	button "记录" cb Record \
-	button "展示" cb Flashs
+	button "展示" cb Flashs \
+	exports index ""
 
     if $2 == "" || $3 == ""
         copy skip ssh.data show _
     else
-        copy ssh.data insert _ when _ what _ city _ where _ longitude _ latitude _ scale _
+        copy ssh.data insert _ when _ what _ city _ where _
     end
 end
 
@@ -32,14 +39,33 @@ fun days "每一次" "index.js" "index.css" protected \
 	text "" name when init date \
 	text "" name what view long \
 	button "记录" \
-	button "展示" cb Flash
+	button "展示" cb Flash \
+	exports index ""
 
     if $2 == "" || $3 == ""
-        copy skip ssh.data show _
+        copy skip ssh.data show _ fields id when where what
     else
         copy ssh.data insert _ when _ what __
     end
 end
+
+fun detail "详情" "index.js" protected \
+	text "love" name table imports plugin_table \
+	text "1" name index imports plugin_index action auto view tiny \
+	button "查看"
+    if $1 == "update"
+		copy ssh.data
+	else
+		copy ssh.data show
+	end
+end
+
+kit note "回忆" "index.js" protected "ssh.data" update _ _ extra \
+	text "love" name table imports plugin_table \
+	text "1" name index imports plugin_index action auto view tiny \
+	text "" name field \
+	text "" name value \
+	button "添加"
 
 fun delay "以后告诉你" protected \
 	text "delay" name table imports plugin_table \
@@ -56,14 +82,15 @@ end
 
 fun media "娱乐" private \
 	text "media" name table imports plugin_table \
-	text "电影" name title \
-	text "" name link \
+	select "电影" values "电影" values "音乐" values "电视剧" \
+	text "" name title \
+	text "" name link view long \
 	button "记下了"
 
-    if $2 == "" || $3 == ""
-        copy ssh.data show _
+    if $2 == "" || $3 == "" || $4 == ""
+        copy skip ssh.data show $1 fields id type name link
     else
-        copy ssh.data insert _ title _ link __
+        copy ssh.data insert _ type _ name _ link __
     end
 end
 

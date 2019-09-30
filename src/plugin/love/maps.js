@@ -2,14 +2,17 @@
 var id
 return {
     initMap: function() {var plugin = field.Plugin
-        var width = field.parentNode.clientWidth-40
         !id && (id = plugin.id+"map"+plugin.ID())
+
+        var width = field.parentNode.clientWidth-40
         kit.AppendChilds(output, [{type: "div", data: {id: id}, style: {width: width+"px", height: width*(kit.device.isMobile? 7: 3)/5}}])
+
         map = new BMap.Map(id)
         map.addControl(new BMap.NavigationControl())
         map.addControl(new BMap.ScaleControl())
         map.addControl(new BMap.OverviewMapControl())
         map.addControl(new BMap.MapTypeControl())
+		return map
     },
 	Current: function() {
 		var geo = new BMap.Geolocation()
@@ -34,27 +37,29 @@ return {
 			return parseInt(value*len)/parseFloat(len)
 		}
         var l = map.getCenter()
-        run(event, [option.table.value, option.when.value, option.what.value, option.city.value, option.where.value, trunc(l.lng), trunc(l.lat), map.getZoom()], function(msg) {
+        run(event, [option.table.value, option.when.value, option.what.value, option.city.value, option.where.value,
+			"longitude", trunc(l.lng), "latitude", trunc(l.lat), "scale", map.getZoom()], function(msg) {
 			plugin.msg = msg, plugin.display("table")
         })
     },
     Flashs: function() {var plugin = field.Plugin
         plugin.initMap(), run(event, [option.table.value], function(msg) {
-            kit.List(ctx.Table(msg), function(line, index) {
-                var p = new BMap.Point(line.longitude, line.latitude)
-                map.centerAndZoom(p, line.scale)
-
-                var info = new BMap.InfoWindow(line.when+"<br/>"+line.where, {width: 200, height: 100, title: line.what})
-                map.openInfoWindow(info, map.getCenter())
-
-                output.style.opacity = 0
-				kit.Opacity(output)
-            }, 1000)
+            kit.List(ctx.Table(msg), plugin.place, 1000)
         })
     },
-    Demo: function() {
-        var info = new BMap.InfoWindow("hello"+"<br/>"+"world", {width: 200, height: 100, title: "haha"})
-        map.openInfoWindow(info, map.getCenter())
-    },
+	place: function(line) {
+		var p = new BMap.Point(line.longitude, line.latitude)
+		map.centerAndZoom(p, line.scale)
+
+		var info = new BMap.InfoWindow(line.when+"<br/>"+line.where, {width: 200, height: 100, title: line.what})
+		map.openInfoWindow(info, map.getCenter())
+
+		output.style.opacity = 0
+		kit.Opacity(output)
+	},
+	onexport: {"": function(value, name, line) {var plugin = field.Plugin
+		plugin.initMap(), plugin.place(line)
+		return line.id
+	}},
 }}}
 
