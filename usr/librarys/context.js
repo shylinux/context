@@ -122,9 +122,12 @@ ctx = context = {__proto__: kit,
         }
         return ret
     },
-    Upload: function(file, cb, detail) {
+    Upload: function(form, file, cb, detail) {
         var data = new FormData()
         data.append("upload", file)
+        for (var k in form) {
+            data.append(k, form[k])
+        }
 
         var xhr = new XMLHttpRequest()
         xhr.onload = function(event) {

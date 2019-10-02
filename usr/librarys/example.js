@@ -190,7 +190,9 @@ function Page(page) {
             })
             if (!args.duration && args.button) {args.duration = -1}
 
-            var list = [{text: [args.title||"", "div", "title"]}, {text: [args.text||"", "div", "content"]}]
+            var main = typeof args.text == "string"? {text: [args.text||"", "div", "content"]}: args.text
+
+            var list = [{text: [args.title||"", "div", "title"]}, main]
             args.inputs && args.inputs.forEach(function(input) {
                 if (typeof input == "string") {
                     list.push({inner: input, type: "label", style: {"margin-right": "5px"}})
@@ -726,6 +728,7 @@ function Plugin(page, pane, field, runs) {
     }
     var plugin = Meta(field, (field.Script && field.Script.init || function() {
     })(run, field, option, output)||{}, {
+        ontoast: page.ontoast,
         Inputs: {},
         Appends: function() {
             var name = "args"+kit.Selector(option, "input.args.temp").length
@@ -943,8 +946,14 @@ function Plugin(page, pane, field, runs) {
             })
         },
         show_after: function(msg) {},
+        Option: function(key, value) {
+            if (value != undefined) {
+                option[key] && (option[key].value = value)
+            }
+            return option[key]? option[key].value: ""
+        },
         upload: function(event) {
-            ctx.Upload(option.upload.files[0], function(event, msg) {
+            ctx.Upload({river: meta.river, table: plugin.Option("table")}, option.upload.files[0], function(event, msg) {
                 kit.OrderTable(kit.AppendTable(kit.AppendChilds(output, "table"), ctx.Table(msg), msg.append))
                 page.ontoast("上传成功")
             }, function(event) {

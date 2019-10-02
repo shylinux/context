@@ -658,7 +658,7 @@ kit = toolkit = {__proto__: document,
 		}
         return list
     },
-	Opacity: function(obj, list, interval) {
+	Opacity: function(obj, interval, list) {
 		kit.List(kit.Value(list, [0, 0.2, 0.4, 0.6, 1.0]), function(value) {
 			obj.style.opacity = value
 		}, kit.Value(interval, 150))

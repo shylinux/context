@@ -30,3 +30,8 @@ fieldset.item.love.media table td {
 	text-align:center;
 	min-width:60px;
 }
+
+fieldset.item.love.pics img {
+    border:solid 2px red;
+    margin:10px;
+}

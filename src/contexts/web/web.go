@@ -187,7 +187,12 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			}
 
 			// 请求参数
-			r.ParseMultipartForm(int64(msg.Confi("serve", "form_size")))
+			if r.ParseMultipartForm(int64(msg.Confi("serve", "form_size"))); r.MultipartForm != nil && len(r.MultipartForm.Value) > 0 {
+				for k, v := range r.MultipartForm.Value {
+					msg.Log("info", "%s: %v", k, v)
+					msg.Add("option", k, v)
+				}
+			}
 			if r.ParseForm(); len(r.PostForm) > 0 {
 				for k, v := range r.PostForm {
 					msg.Log("info", "%s: %v", k, v)
@@ -214,6 +219,8 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 					}
 				}
 			}
+
+			msg.Short("river")
 
 			// 用户登录
 			if msg.Put("option", "request", r).Put("option", "response", w).Sess("web", msg); web.Login(msg, w, r) {
@@ -945,8 +952,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if f, h, e := r.FormFile("upload"); m.Assert(e) {
 				defer f.Close()
 
-				m.Log("info", "waht %v", h.Header)
-
 				name := kit.Hashx(f)
 				if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "list", name)); m.Assert(e) {
 					defer o.Close()
@@ -959,18 +964,25 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "meta", code)); m.Assert(e) {
 							defer o.Close()
 
+							kind := h.Header.Get("Content-Type")
 							m.Log("upload", "file: %s %d", p, n)
 							fmt.Fprintf(o, "create_time: %s\n", m.Time())
 							fmt.Fprintf(o, "create_user: %s\n", m.Option("username"))
-							fmt.Fprintf(o, "type: %s\n", h.Header.Get("Content-Type"))
 							fmt.Fprintf(o, "name: %s\n", h.Filename)
+							fmt.Fprintf(o, "type: %s\n", kind)
 							fmt.Fprintf(o, "hash: %s\n", name)
 							fmt.Fprintf(o, "size: %d\n", n)
 
 							m.Append("size", kit.FmtSize(n))
+							m.Append("code", code)
 							m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
-							m.Append("type", h.Header.Get("Content-Type"))
+							m.Append("type", kind)
 							m.Append("hash", name)
+
+							kind = strings.Split(kind, "/")[0]
+							m.Cmd("nfs.copy", path.Join(m.Conf("web.upload", "path"), kind, code), p)
+							m.Cmd("ssh.data", "insert", kit.Select(kind, m.Option("table")),
+								"name", h.Filename, "kind", kind, "hash", name, "size", n)
 						}
 						m.Table()
 					}
@@ -982,15 +994,21 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 
+			kind := kit.Select("meta", kit.Select(m.Option("meta"), arg, 0))
 			file := strings.TrimPrefix(key, "/download/")
 			if file == "" {
-				if fs, e := ioutil.ReadDir(path.Join(m.Conf("web.upload", "path"), "meta")); e == nil {
+				// 文件列表
+				if fs, e := ioutil.ReadDir(path.Join(m.Conf("web.upload", "path"), kind)); e == nil {
 					for _, f := range fs {
-						meta := kit.Linex(path.Join(m.Conf("web.upload", "path"), "meta", f.Name()))
+						meta := kit.Linex(path.Join(m.Conf("web.upload", "path"), kind, f.Name()))
 						m.Push("time", meta["create_time"])
 						m.Push("user", meta["create_user"])
 						m.Push("size", kit.FmtSize(int64(kit.Int(meta["size"]))))
-						m.Push("name", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, f.Name(), meta["name"]))
+						if kind == "image" {
+							m.Push("name", f.Name())
+						} else {
+							m.Push("name", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, f.Name(), meta["name"]))
+						}
 						m.Push("hash", meta["hash"][:8])
 					}
 					m.Sort("time", "time_r").Table()
@@ -998,7 +1016,14 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), "meta", file)); p != "" {
+			// 直接下载
+			if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), "list", file)); p != "" {
+				m.Log("info", "download %s direct", p)
+				http.ServeFile(w, r, p)
+				return
+			}
+			// 下载文件
+			if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), kind, file)); p != "" {
 				meta := kit.Linex(p)
 				if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), "list", meta["hash"])); p != "" {
 					m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", meta["hash"]))
@@ -1014,6 +1039,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
+			// 任意文件
 			if p := m.Cmdx("nfs.path", file); p != "" {
 				m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", p))
 				http.ServeFile(w, r, p)

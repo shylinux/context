@@ -60,12 +60,19 @@ fun detail "详情" "index.js" protected \
 	end
 end
 
-kit note "回忆" "index.js" protected "ssh.data" update _ _ extra \
+kit append "扩展" "index.js" protected "ssh.data" update _ _ extra \
 	text "love" name table imports plugin_table \
 	text "1" name index imports plugin_index action auto view tiny \
 	text "" name field \
 	text "" name value \
 	button "添加"
+
+kit pics "图片" "pics.js" "index.css" private "ssh.data" show \
+	text "image" name table imports plugin_table \
+	upfile "" name upload \
+	button "上传" cb upload \
+	button "记录" \
+	button "展示" cb show
 
 fun delay "以后告诉你" protected \
 	text "delay" name table imports plugin_table \
