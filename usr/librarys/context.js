@@ -301,12 +301,12 @@ ctx = context = {__proto__: kit,
                 },
             })
 
-            try {
+            // try {
                 kit.Log(["wss", order].concat(msg.detail).concat([msg]))
                 typeof cb == "function" && cb(msg)
-            } catch (e) {
-                msg.reply(kit.Log("err", e))
-            }
+            // } catch (e) {
+            //     msg.Reply(kit.Log("err", e))
+            // }
         }
         s.onerror = function(event) {
             kit.Log("wss", "error", event)

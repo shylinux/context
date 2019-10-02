@@ -96,7 +96,7 @@ fieldset>div.output div.code span.green {
     color:green;
 }
 fieldset>div.output table td {
-    word-break:break-word;
+    /* word-break:break-word; */
 }
 fieldset>div.output table td.when {
     word-break:break-word;
@@ -129,6 +129,17 @@ fieldset>div.Help>div {
     overflow:auto;
 }
 
+fieldset.carte {
+    border:solid 2px red;
+    background-color:#ffffff;
+    position:absolute;
+    display:none;
+    z-index:200;
+}
+fieldset.carte>div.output>div.line {
+    border:solid 1px gray;
+    margin-top:8px;
+}
 fieldset.toast {
     border:solid 2px red;
     background-color:#ffffff;

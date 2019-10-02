@@ -4,6 +4,23 @@ Wrap = function(cb, obj) {
     }
     return cb
 }
+shy = function(help, meta, list, cb) {
+    var index = -1, value = "", type = "string", args = arguments
+    function next(check) {
+        if (++index >= args.length) {return false}
+        if (check && check != typeof args[index]) {index--; return false}
+        return value = args[index], type = typeof value, value
+    }
+
+    var cb = arguments[arguments.length-1] || function() {}
+    cb.help = next("string") || "还没有写"
+    cb.meta = next("object") || {}
+    cb.list = next("object") || {}
+    cb.runs = function() {
+    }
+    return cb
+}
+
 kit = toolkit = {__proto__: document,
     meta: function(cb, obj) {
         for (var k in obj) {
@@ -397,7 +414,7 @@ kit = toolkit = {__proto__: document,
         })
         return kit.AppendChild(parent, result)
     },
-    AppendTable: function(table, data, fields, cb) {
+    AppendTable: function(table, data, fields, cb, cbs) {
         if (!data || !fields) {
             return
         }
@@ -411,16 +428,18 @@ kit = toolkit = {__proto__: document,
             tr.Meta = row
             fields.forEach(function(key, j) {
                 var td = kit.AppendChild(tr, "td", kit.Color(row[key]))
+				if (key == "when") {td.className = "when"}
                 if (row[key].startsWith("http")) {
                     td.innerHTML = "<a href='"+row[key]+"' target='_blank'>"+row[key]+"</a>"
                 }
-				if (key == "when") {td.className = "when"}
-
-                if (typeof cb == "function") {
-                    td.onclick = function(event) {
-                        cb(row[key], key, row, i, tr, event)
-                    }
-                }
+                cb && (td.onclick = function(event) {
+                    kit._call(cb, [row[key], key, row, i, tr, event])
+                })
+                cbs && (td.oncontextmenu = function(event) {
+                    kit._call(cbs, [row[key], key, row, i, tr, event])
+                    event.stopPropagation()
+                    event.preventDefault()
+                })
             })
         })
         return table
@@ -639,7 +658,8 @@ kit = toolkit = {__proto__: document,
     Item: function(obj, cb) {
         var list = []
         for (var k in obj) {
-            list.push(typeof cb == "function"? cb(k, obj[k]): k)
+            var v = typeof cb == "function"? cb(k, obj[k]): k
+            v != undefined && list.push(v)
         }
         return list
     },
@@ -664,8 +684,17 @@ kit = toolkit = {__proto__: document,
 		}, kit.Value(interval, 150))
 	},
     // 数据类型转换
-	Value: function(obj, value) {
-		return obj === undefined || obj === null || obj === "" ? value: obj
+	Value: function() {
+        for (var i = 0; i < arguments.length; i++) {
+            switch (arguments[i]) {
+                case undefined:
+                case null:
+                case "":
+                    break
+                default:
+                    return arguments[i]
+            }
+        }
 	},
     isSpace: function(c) {
         return c == " " || c == "Enter"
@@ -773,21 +802,22 @@ kit = toolkit = {__proto__: document,
         obj.style.width = width+"px"
         obj.style.height = height+"px"
     },
-    _call: function(cb, arg) {
-        var res
-		if (typeof cb != "function") {return}
+    type: function(obj, type) {
+        if (type == undefined) {return typeof obj}
+        return typeof obj == type? obj: null
+    },
+    _call: function() {// obj, cb, arg
+        var index = 0, obj, cb, arg;
+        (obj = kit.type(arguments[index], "object")) && index++
+        (cb = kit.type(arguments[index], "function")) && index++
+        (arg = kit.type(arguments[index], "object")) && index++
 
-        switch (arg.length) {
-            case 0: res = cb(); break
-            case 1: res = cb(arg[0]); break
-            case 2: res = cb(arg[0], arg[1]); break
-            case 3: res = cb(arg[0], arg[1], arg[2]); break
-            case 4: res = cb(arg[0], arg[1], arg[2], arg[3]); break
-            case 5: res = cb(arg[0], arg[1], arg[2], arg[3], arg[4]); break
-            case 6: res = cb(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]); break
-            case 7: res = cb(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]); break
+        arg = arg || []
+        while (index < arguments.length) {
+            arg.push(arguments[index++])
         }
-        return res || true
+        cb = cb || function(){}
+        return cb.apply(obj||window, arg||[])
     },
 }
 

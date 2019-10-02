@@ -545,6 +545,10 @@ var page = Page({check: true,
                 "", "添加", "删除", "加参", "减参",
                 "", "执行", "下载", "清空", "返回",
             ],
+            Choice: [
+                "刷新", "清屏", "并行", "串行",
+                "", "聊天", "办公", "工作",
+            ],
         }
     },
     initStorm: function(page, field, option, output) {
@@ -589,6 +593,7 @@ var page = Page({check: true,
                 },
             },
             Button: ["创建", "共享"],
+            Choice: ["创建", "共享"],
         }
     },
     initSteam: function(page, field, option, output) {
@@ -665,6 +670,10 @@ var page = Page({check: true,
                 kit.AppendChilds(device, [{text: ["2. 选择模块命令 ->", "caption"]}])
                 kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                     pane.Select(com, pod)
+                }, function(value, key, com, i, tr, event) {
+                    page.oncarte(event, ["创建"], function(event, item) {
+                        pane.Create(com.key)
+                    })
                 })
             },
             Append: function(msg) {var pane = field.Pane
@@ -677,7 +686,7 @@ var page = Page({check: true,
                 }), table.querySelector("td").click()
             },
             Create: function(name, list) {
-                field.Pane.Run([river, "spawn", name].concat(list), function(msg) {
+                field.Pane.Run([river, "spawn", name].concat(list||[]), function(msg) {
                     field.Pane.Show(), page.storm.Pane.Show(name)
                 })
             },
