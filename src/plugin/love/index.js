@@ -1,20 +1,19 @@
-{init: function(run, field, option, output) {
-return {
+Script["love/index.js"] = function(field, option, output) {return {
 	data: function(event) {var plugin = field.Plugin
-        run(event, [option.table.value], function(msg) {
-			plugin.msg = msg, plugin.display("table")
+        plugin.Run(event, [option.table.value], function(msg) {
+            plugin.ondaemon(msg)
 		})
 	},
     show: function(event) {var plugin = field.Plugin
 		plugin.Check(undefined, function(msg) {
-			run(event, [option.table.value], function(msg) {
+			plugin.Run(event, [option.table.value], function(msg) {
 				kit.List(ctx.Table(msg), function(line) {
 					kit.Selector(output, ".s"+line.when.split(" ")[0].split("-").join(""), function(item) {
 						kit.classList.add(item.parentNode, "select")
 						item.parentNode.title = line.what
 					})
 				}, 200)
-			})
+			}, true)
 		})
     },
     show_after: function(msg) {
@@ -37,7 +36,7 @@ return {
 				break
 			case "detail":
 				plugin.Change(event.target, function(value) {
-					run(event, ["update", option.table.value, option.index.value, line.key, value], function(msg) {
+					plugin.Run(event, ["update", option.table.value, option.index.value, line.key, value], function(msg) {
 						kit.Log("ok")
 					})
 				})
@@ -75,4 +74,4 @@ return {
             })
         })
     },
-}}}
+}}

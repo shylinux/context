@@ -339,10 +339,15 @@ kit = toolkit = {__proto__: document,
 
             } else if (child.require) {
                 child.data["href"] = child.require[0]
-                child.data["rel"] = child.require.length > 1? child.require[1]: "stylesheet"
-                child.data["type"] = child.require.length > 2? child.require[2]: "text/css"
+                child.data["rel"] = "stylesheet"
+                child.data["type"] = "text/css"
+                child.require.length > 1 && (child.data["onload"] = child.require[1])
                 child.type = "link"
 
+                // child.data["rel"] = child.require.length > 1? child.require[1]: "stylesheet"
+                // child.data["type"] = child.require.length > 2? child.require[2]: "text/css"
+                // child.require.length > 1 && (child.data["onload"] = child.require[1])
+                //
             } else if (child.styles) {
                 var str = []
                 if (typeof child.styles == "string") {
@@ -517,6 +522,7 @@ kit = toolkit = {__proto__: document,
                 kit.CopyText()
             })
         }
+        return true
     },
 
     // HTML显示文本
@@ -649,6 +655,9 @@ kit = toolkit = {__proto__: document,
             obj.length > 0 && setTimeout(function() {loop(0)}, interval/4)
             return obj
         }
+
+        obj = typeof obj == "string"? [obj]: (obj || [])
+
         var list = []
         for (var i = 0; i < obj.length; i++) {
             list.push(typeof cb == "function"? cb(obj[i], i, obj): obj[i])

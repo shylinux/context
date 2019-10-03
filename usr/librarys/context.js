@@ -251,7 +251,7 @@ ctx = context = {__proto__: kit,
 
             try {
                 var res = JSON.parse(xhr.responseText||'[{"result":[]}]')
-                res = res[0] && res[0]
+                res.length > 0 && res[0] && (res = res[0])
             } catch (e) {
                 var res = {"result": [xhr.responseText]}
             }
@@ -261,13 +261,13 @@ ctx = context = {__proto__: kit,
                 res[item] && (msg[item] = res[item])
             })
 
-            // if (msg.download_file) {
-            //     window.open(msg.download_file.join(""))
-            // } else if (msg.page_redirect) {
-            //     location.href = msg.page_redirect.join("")
-            // } else if (msg.page_refresh) {
-            //     location.reload()
-            // }
+            if (msg.download_file) {
+                window.open(msg.download_file.join(""))
+            } else if (msg.page_redirect) {
+                location.href = msg.page_redirect.join("")
+            } else if (msg.page_refresh) {
+                location.reload()
+            }
             typeof cb == "function" && cb(msg || {})
         }
 

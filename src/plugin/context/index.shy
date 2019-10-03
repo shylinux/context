@@ -53,7 +53,6 @@ kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
 	text "usr/script" name dir imports plugin_dir action auto view long \
 	button "浏览" action auto \
 	button "返回" cb Last \
-    feature display "editor" \
     exports dir "" dir
 
 kit git "版本" private "ssh._route" _ "nfs.git" __ \

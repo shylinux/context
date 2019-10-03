@@ -372,24 +372,27 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 					m.Push("name", value["name"])
 					m.Push("help", value["help"])
-					if kit.Right(value["init"]) {
-						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["init"])), -1)
-						if script == "" {
-							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["init"])), -1)
-						}
-						m.Push("init", script)
-					} else {
-						m.Push("init", "")
-					}
-					if kit.Right(value["view"]) {
-						script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["view"])), -1)
-						if script == "" {
-							script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["view"])), -1)
-						}
-						m.Push("view", script)
-					} else {
-						m.Push("view", "")
-					}
+					m.Push("init", value["init"])
+					m.Push("view", value["view"])
+
+					// if kit.Right(value["init"]) {
+					// 	script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["init"])), -1)
+					// 	if script == "" {
+					// 		script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["init"])), -1)
+					// 	}
+					// 	m.Push("init", script)
+					// } else {
+					// 	m.Push("init", "")
+					// }
+					// if kit.Right(value["view"]) {
+					// 	script := m.Cmdx("nfs.load", path.Join(m.Conf("cli.project", "plugin.path"), arg[0], kit.Format(value["view"])), -1)
+					// 	if script == "" {
+					// 		script = m.Cmdx("nfs.load", path.Join("usr/librarys/plugin", kit.Format(value["view"])), -1)
+					// 	}
+					// 	m.Push("view", script)
+					// } else {
+					// 	m.Push("view", "")
+					// }
 					m.Push("inputs", kit.Format(value["inputs"]))
 					m.Push("feature", kit.Format(value["feature"]))
 					m.Push("exports", kit.Format(value["exports"]))

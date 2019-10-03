@@ -875,6 +875,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl"))
 			}
 
+			m.Option("title", m.Conf("runtime", "boot.hostname"))
 			// 响应数据
 			group, order := m.Option("group", kit.Select(m.Conf("route", "componet_index"), m.Option("group"))), m.Option("names")
 			list := []interface{}{}
@@ -1043,6 +1044,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			if p := m.Cmdx("nfs.path", file); p != "" {
 				m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", p))
 				http.ServeFile(w, r, p)
+			}
+			return
+		}},
+		"/require/": &ctx.Command{Name: "/require/", Help: "加载脚本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			r := m.Optionv("request").(*http.Request)
+			w := m.Optionv("response").(http.ResponseWriter)
+			file := strings.TrimPrefix(key, "/require/")
+
+			if p := m.Cmdx("nfs.path", m.Conf("cli.project", "plugin.path"), file); p != "" {
+				m.Log("info", "download %s direct", p)
+				http.ServeFile(w, r, p)
+				return
 			}
 			return
 		}},

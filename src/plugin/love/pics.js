@@ -1,5 +1,4 @@
-{init: function(run, field, option, output) {
-return {
+Script["love/pics.js"] = function(field, option, output) {return {
     onexport: {"": function(value, name, line) {var plugin = field.Plugin
         kit.AppendChilds(output, [{img: ["/download/"+line.hash], data: {width: output.clientWidth, onclick: function() {
             plugin.display("table")
@@ -26,5 +25,5 @@ return {
         })
 
     },
-}}}
+}}
 

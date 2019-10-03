@@ -1,4 +1,4 @@
-{init: function(run, field, option, output) {
+{init: function(field, option, output) {
     return {
         Record: function() {
             if (confirm("run script "+option.mac.value)) {

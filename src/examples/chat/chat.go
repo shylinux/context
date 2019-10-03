@@ -31,7 +31,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h"}, Help: "默认组件"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
-				map[string]interface{}{"name": "chat",
+				map[string]interface{}{"name": "head",
 					"tmpl": "head", "metas": []interface{}{map[string]interface{}{
 						"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no",
 					}}, "favicon": "favicon.ico", "styles": []interface{}{

@@ -736,6 +736,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				for cur := now; cur.Before(nature); cur = cur.AddDate(0, 1, 0) {
 					n++
 				}
+				if now.Day() > nature.Day() {
+					n++
+				}
 			}
 
 			cur := now

@@ -583,14 +583,15 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				return
 			}
 
-			p := path.Join("src/plugin", m.Option("plugin"), arg[0])
+			file := path.Join(arg...)
+			p := path.Join("src/plugin", m.Option("plugin"), file)
 			if _, e := os.Stat(p); e == nil {
 				m.Echo(p)
 				return e
 			}
 
 			m.Confm("pwd", func(index int, value string) bool {
-				p := path.Join(value, arg[0])
+				p := path.Join(value, file)
 				if _, e := os.Stat(p); e == nil {
 					m.Echo(p)
 					return true

@@ -1,4 +1,4 @@
-{init: function(run, field, option, output) {
+Script["love/maps.js"] = function(field, option, output) {
 var id
 return {
     initMap: function() {var plugin = field.Plugin
@@ -37,13 +37,13 @@ return {
 			return parseInt(value*len)/parseFloat(len)
 		}
         var l = map.getCenter()
-        run(event, [option.table.value, option.when.value, option.what.value, option.city.value, option.where.value,
+        plugin.Run(event, [option.table.value, option.when.value, option.what.value, option.city.value, option.where.value,
 			"longitude", trunc(l.lng), "latitude", trunc(l.lat), "scale", map.getZoom()], function(msg) {
 			plugin.msg = msg, plugin.display("table")
         })
     },
     Flashs: function() {var plugin = field.Plugin
-        plugin.initMap(), run(event, [option.table.value], function(msg) {
+        plugin.initMap(), plugin.Run(event, [option.table.value], function(msg) {
             kit.List(ctx.Table(msg), plugin.place, 1000)
         })
     },
@@ -61,5 +61,5 @@ return {
 		plugin.initMap(), plugin.place(line)
 		return line.id
 	}},
-}}}
+}}
 
