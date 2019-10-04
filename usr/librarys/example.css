@@ -251,8 +251,6 @@ fieldset.item.select {
     border:solid 2px red;
 }
 fieldset.item>div.output {
-    margin-top:2px;
-    border-top:solid 2px gray;
     overflow:auto;
 }
 fieldset.item>div.output>canvas {

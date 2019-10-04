@@ -1,4 +1,4 @@
-Script["love/index.js"] = function(field, option, output) {return {
+Plugin["love/index.js"] = function(field, option, output) {return {
 	data: function(event) {var plugin = field.Plugin
         plugin.Run(event, [option.table.value], function(msg) {
             plugin.ondaemon(msg)
@@ -7,7 +7,7 @@ Script["love/index.js"] = function(field, option, output) {return {
     show: function(event) {var plugin = field.Plugin
 		plugin.Check(undefined, function(msg) {
 			plugin.Run(event, [option.table.value], function(msg) {
-				kit.List(ctx.Table(msg), function(line) {
+				kit.List(msg.Table(), function(line) {
 					kit.Selector(output, ".s"+line.when.split(" ")[0].split("-").join(""), function(item) {
 						kit.classList.add(item.parentNode, "select")
 						item.parentNode.title = line.what
@@ -17,7 +17,7 @@ Script["love/index.js"] = function(field, option, output) {return {
 		})
     },
     show_after: function(msg) {
-        kit.Selector(output, ".s"+ kit.format_date().split(" ")[0].split("-").join(""), function(item) {
+        kit.Selector(output, ".s"+ kit.time().split(" ")[0].split("-").join(""), function(item) {
             kit.classList.add(item.parentNode, "today")
         })
     },
@@ -61,7 +61,7 @@ Script["love/index.js"] = function(field, option, output) {return {
 		kit.Opacity(cb([{text: [list.join(""), "div", "day"]}]).last)
 	},
 	Order: function(t, cb, cbs) {var plugin = field.Plugin
-		kit.List(ctx.Table(plugin.msg).concat([{when: "9999-01-08", what: "最后一次爱你", where: "北京市"}]), function(line, index, array) {
+		kit.List(plugin.msg.Table().concat([{when: "9999-01-08", what: "最后一次爱你", where: "北京市"}]), function(line, index, array) {
 			plugin.flash(line, cb, index, array)
 		}, t, cbs)
 	},

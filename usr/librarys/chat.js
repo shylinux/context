@@ -23,7 +23,7 @@ var page = Page({check: true,
         sizes.action == undefined && (sizes.action = page.action.offsetHeight-page.conf.border)
         sizes.source == undefined && (sizes.source = page.source.clientHeight)
         sizes.target == undefined && (sizes.target = page.target.clientHeight)
-		sizes.source == 0 && sizes.target == 0 && (sizes.action = height)
+		sizes.source == 0 && sizes.target == 0 && !kit.device.isMobile && (sizes.action = height)
         page.action.Pane.Size(width, sizes.action)
         page.source.Pane.Size(width, sizes.source)
         height -= sizes.target==0? height: page.source.offsetHeight+page.action.offsetHeight
@@ -146,7 +146,7 @@ var page = Page({check: true,
         return {
             Append: function(msg) {
                 kit.AppendChilds(table, [{text: ["1. 选择用户节点 ->", "caption"]}])
-                kit.AppendTable(table, ctx.Table(msg), ["key", "user.route"], function(value, key, row, i, tr, event) {
+                kit.AppendTable(table, msg.Table(), ["key", "user.route"], function(value, key, row, i, tr, event) {
                     tr.className = "hidden"
                     var uis = kit.AppendChild(ui.list, [{row: [row.key, row["user.route"]], dataset: {user: row.key}, click: function(event) {
                         tr.className = "normal", uis.last.parentNode.removeChild(uis.last)
@@ -188,8 +188,8 @@ var page = Page({check: true,
                         "river": page.river.Pane.which.get(),
                         "layout": page.action.Pane.Layout(),
                     })], function(msg) {
-                        page.ontoast({text: location.origin+location.pathname+"?relay="+msg.result.join(""), title: "共享链接", button: ["确定"], cb: function(which) {
-                            page.ontoast()
+                        page.toast.Pane.Show({text: location.origin+location.pathname+"?relay="+msg.result.join(""), title: "共享链接", button: ["确定"], cb: function(which) {
+                            page.toast.Pane.Show()
                         }})
                     })
                 },
@@ -431,10 +431,9 @@ var page = Page({check: true,
             Show: function() {var pane = field.Pane
                 if (field.Pane.Back(river+storm, output)) {return}
 
+                ctx.Event(event, {}, {name: "action.show"})
                 pane.clear(), pane.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                     pane.Core(event, line, args, cbs)
-                }, function(msg) {
-                    !page.plugin && output.querySelector("fieldset.item").Plugin.Select()
                 })
             },
             Layout: function(name) {var pane = field.Pane
@@ -586,8 +585,8 @@ var page = Page({check: true,
                         "layout": page.action.Pane.Layout(),
                     })], function(msg) {
                         var url = location.origin+location.pathname+"?relay="+msg.result.join("")
-                        page.ontoast({text: "<img src=\""+ctx.Share({"group": "index", "names": "login", cmds: ["share", url]})+"\">", height: 320, width: 320, title: url, button: ["确定"], cb: function(which) {
-                            page.ontoast()
+                        page.toast.Pane.Show({text: "<img src=\""+ctx.Share({"group": "index", "names": "login", cmds: ["share", url]})+"\">", height: 320, width: 320, title: url, button: ["确定"], cb: function(which) {
+                            page.toast.Pane.Show()
                         }})
                     })
                 },
@@ -671,17 +670,17 @@ var page = Page({check: true,
                 kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                     pane.Select(com, pod)
                 }, function(value, key, com, i, tr, event) {
-                    page.oncarte(event, ["创建"], function(event, item) {
+                    page.carte.Pane.Show(event, ["创建"], function(event, item) {
                         pane.Create(com.key)
                     })
                 })
             },
             Append: function(msg) {var pane = field.Pane
                 kit.AppendChilds(table, [{text: ["1. 选择用户节点 ->", "caption"]}])
-                kit.AppendTable(table, ctx.Table(msg), ["user", "node"], function(value, key, pod, i, tr, event) {
+                kit.AppendTable(table, msg.Table(), ["user", "node"], function(value, key, pod, i, tr, event) {
                     kit.Selector(table, "tr.select", function(item) {item.className = "normal"})
                     tr.className = "select", pane.Run([river, pod.user, pod.node], function(msg) {
-                        pane.Update(ctx.Table(msg), pod)
+                        pane.Update(msg.Table(), pod)
                     })
                 }), table.querySelector("td").click()
             },
@@ -711,7 +710,7 @@ var page = Page({check: true,
     init: function(page) {
 		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? page.conf.first: page.conf.mobile)
         page.footer.Pane.Order({"ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(event, item, value) {})
-        page.header.Pane.Order({"logout": "logout", "user": ""}, ["logout", "user"], function(event, item, value) {
+        page.header.Pane.Order({"logout": "logout", "user": "", "title": "github.com/shylinux/context"}, ["logout", "user"], function(event, item, value) {
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show()

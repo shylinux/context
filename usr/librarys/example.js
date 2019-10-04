@@ -1,29 +1,29 @@
-Script = {}
 function Meta(target, obj) {
+    // 级连对象
     var a = obj
     for (var i = 2; i < arguments.length; i++) {
         a.__proto__ = arguments[i], a = arguments[i]
     }
 
+    // 构造对象
     var id = 1
-    var conf = {}, conf_cb = {}
+    var conf = {}, conf_cb = {}, old
     var sync = {}
     var cache = {}
-    return {__proto__: obj, target: target,
-        ID: function() {return id++},
-        Conf: function(key, value, cb) {
-            if (key == undefined) {return conf}
-
-            cb != undefined && (conf_cb[key] = cb)
-
-            if (value != undefined) {
-                var old = conf[key]
-                conf[key] = value
-                conf_cb[key] && conf_cb[key](value, old)
+    var history = []
+    var meta = {__proto__: obj, target: target,
+        ID: shy("单一序列", function() {return id++}),
+        Conf: shy("配置变量", function(key, value, cb) {
+            if (kit.isNone(key)) {return conf}
+            kit.notNone(cb) && (conf_cb[key] = cb)
+            if (kit.notNone(value)) {
+                old = conf[key], conf[key] = value
+                kit.Log("config", key, value, old)
+                kit._call(conf_cb[key], [value, old])
             }
-            return conf[key] == undefined && obj && obj.Conf? obj.Conf(key): conf[key]
-        },
-        Sync: function(m) {
+            return kit.isNone(conf[key]) && obj && obj.Conf? obj.Conf(key): conf[key]
+        }),
+        Sync: shy("同步变量", function(m) {
             var meta = m, data = "", list = []
             return sync[m] || (sync[m] = {
                 change: function(cb) {list.push(cb); return list.length-1},
@@ -31,19 +31,35 @@ function Meta(target, obj) {
                 neq: function(value) {return data != value},
                 get: function() {return data},
                 set: function(value, force) {
-                    if (value == undefined) {return}
+                    if (kit.isNone(value)) {return}
                     if (value == data && !force) {return}
-
-                    old_value = data, data = value
-                    meta && kit.Log("key", meta, value, old_value)
-                    for (var i = 0; i < list.length; i++) {
-                        list[i](value, old_value)
-                    }
+                    old = data, data = value
+                    meta && kit.Log("key", meta, value, old)
+                    kit.List(list, function(cb) {cb(value, old)})
                     return value
                 },
             })
-        },
-        View: function(output, type, line, key, cb) {
+        }),
+        Save: shy("保存视图", function(name, output) {if (name === "") {return cache = {}}
+            var temp = document.createDocumentFragment()
+            while (output.childNodes.length>0) {
+                var item = output.childNodes[0]
+                item.parentNode.removeChild(item)
+                temp.appendChild(item)
+            }
+            cache[name] = temp
+            return name
+        }),
+        Back: shy("恢复视图", function(name, output) {if (kit.isNone(cache[name])) {return}
+            while (cache[name].childNodes.length>0) {
+                var item = cache[name].childNodes[0]
+                item.parentNode.removeChild(item)
+                output.appendChild(item)
+            }
+            delete(cache[name])
+            return name
+        }),
+        View: shy("添加视图", function(output, type, line, key, cb) {
             var text = line, list = [], ui = {}
             switch (type) {
                 case "icon":
@@ -94,59 +110,27 @@ function Meta(target, obj) {
             ui = kit.AppendChild(output, list)
             ui.field && (ui.field.Meta = text)
             return ui
-        },
-        Save: function(name, output) {
-            if (name === "") {return cache = {}}
-
-            var temp = document.createDocumentFragment()
-            while (output.childNodes.length>0) {
-                var item = output.childNodes[0]
-                item.parentNode.removeChild(item)
-                temp.appendChild(item)
-            }
-            cache[name] = temp
-            return name
-        },
-        Back: function(name, output) {
-            if (!cache[name]) {return}
-
-            while (cache[name].childNodes.length>0) {
-                item = cache[name].childNodes[0]
-                item.parentNode.removeChild(item)
-                output.appendChild(item)
-            }
-            delete(cache[name])
-            return name
-        },
-        Include: function(src, cb) {
-            typeof src == "string" && (src = [src])
-            kit.AppendChild(target, [{include: [src[0], function(event) {
-                src.length == 1? cb(event): page.Include(src.slice(1), cb)
-            }]}])
-        },
-        Require: function(file, cb) {
-            if (!file || Script[file]) {return kit._call(cb, [Script[file]])}
-            file.endsWith(".css")? kit.AppendChild(document.body, [{require: ["/require/"+file, function(event) {
-                return Script[file] = file, kit._call(cb, [Script[file]])
-            }]}]): kit.AppendChild(document.body, [{data: {what: id++}, include: ["/require/"+file, function(event) {
-                return kit._call(cb, [Script[file]])
-            }]}])
-        },
-        History: shy("操作历史", {}, [], function(value, target) {
-            var list = arguments.callee.list, item
-            return value == undefined? (item = list.pop()) && (item.target.value = item.value):
-                list.push({value: value, target: target})
+        }),
+        Include: shy("加载脚本", function(src, cb) {src = kit.List(src)
+            function next(event) {src.length > 1? meta.Include(src.slice(1), cb): cb(event)}
+            kit.AppendChild(target, [file.endsWith(".css")? {require: [src[0], next]}: {include: [src[0], next]}])
+        }),
+        History: shy("操作历史", function(value, target) {var item
+            return kit.isNone(value)? (item = history.pop()) && (item.target.value = item.value):
+                history.push({value: value, target: target})
         }),
     }
+
+    // 注册事件
+    meta.onaction && kit.Item(meta.onaction.meta, function(key, cb) {target[key] = function(event) {
+        meta.onaction(event, key, cb)
+    }})
+    return meta
 }
 function Page(page) {
     var script = {}, record = ""
-    var carte = document.querySelector("fieldset.carte")
-    carte.onmouseleave = function(event) {
-        kit.ModifyView(carte, {display: "none"})
-    }
     page = Meta(document.body, page, {__proto__: ctx,
-        onload: function() {
+        onload: function(event) {
             // Event入口 0
             ctx.Event(event, {}, {name: document.title})
             if (page.check && !ctx.Cookie("sessid")) {
@@ -197,93 +181,25 @@ function Page(page) {
             }, document.body.onmouseup = function(event) {
             }
         },
-        oncarte: function(event, cb) {
-            kit.Selector(carte, "div.output", function(output) {if (!cb.list || cb.list.length == 0) {return}
-                kit.AppendChilds(output, kit.List(cb.list, function(item) {
-                    return item === ""? {view: ["line"]}: {text: [item, "div", "item"], click: function(event) {
-                        kit._call(cb, [item, cb.meta, event]) && kit.ModifyView(carte, {display: "none"})
-                    }}
-                }))
-                kit.ModifyView(carte, {display: "block", left: event.x, top: event.y})
-                event.stopPropagation()
-                event.preventDefault()
-            })
-        },
-        ontoast: function(text, title, duration) {
-            // {text, title, duration, inputs, buttons}
-            if (!text) {page.toast.style.display = "none"; return}
-
-            var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
-            var toast = kit.ModifyView("fieldset.toast", {
-                display: "block", dialog: [args.width||text.length*10+100, args.height||80], padding: 10,
-            })
-            if (!args.duration && args.button) {args.duration = -1}
-
-            var main = typeof args.text == "string"? {text: [args.text||"", "div", "content"]}: args.text
-
-            var list = [{text: [args.title||"", "div", "title"]}, main]
-            args.inputs && args.inputs.forEach(function(input) {
-                if (typeof input == "string") {
-                    list.push({inner: input, type: "label", style: {"margin-right": "5px"}})
-                    list.push({input: [input, page.oninput]})
-                } else {
-                    list.push({inner: input[0], type: "label", style: {"margin-right": "5px"}})
-                    var option = []
-                    for (var i = 1; i < input.length; i++) {
-                        option.push({type: "option", inner: input[i]})
-                    }
-                    list.push({name: input[0], type: "select", list: option})
-                }
-                list.push({type: "br"})
-            })
-            args.button && args.button.forEach(function(input) {
-                list.push({type: "button", inner: input, click: function(event) {
-                    var values = {}
-                    toast.querySelectorAll("input").forEach(function(input) {
-                        values[input.name] = input.value
-                    })
-                    toast.querySelectorAll("select").forEach(function(input) {
-                        values[input.name] = input.value
-                    })
-                    typeof args.cb == "function" && args.cb(input, values)
-                    toast.style.display = "none"
-                }})
-            })
-            list.push({view: ["tick"], name: "tick"})
-
-            var ui = kit.AppendChild(kit.ModifyNode(toast.querySelector("div.output"), ""), list)
-            var tick = 1
-            var begin = kit.time(0,"%H:%M:%S")
-            var timer = args.duration ==- 1? setTimeout(function() {
-                function ticker() {
-                    toast.style.display != "none" && (ui.tick.innerText = begin+" ... "+(tick++)+"s") && setTimeout(ticker, 1000)
-                }
-                ticker()
-            }, 10): setTimeout(function(){toast.style.display = "none"}, args.duration||3000)
-            return page.toast = toast
-        },
-        oninput: function(event, local) {
-            var target = event.target
+        oninput: function(event, local) {var target = event.target
             kit.History.add("key", (event.ctrlKey? "Control+": "")+(event.shiftKey? "Shift+": "")+event.key)
 
             if (event.ctrlKey) {
-                if (typeof local == "function" && local(event)) {
+                if (local && kit._call(local, [event])) {
                     event.stopPropagation()
                     event.preventDefault()
                     return true
                 }
 
-                var his = target.History
+                var his = target.History || []
                 var pos = target.Current || -1
                 switch (event.key) {
                     case "p":
-                        if (!his) { break }
                         pos = (pos-1+his.length+1) % (his.length+1)
                         target.value = pos < his.length? his[pos]: ""
                         target.Current = pos
                         break
                     case "n":
-                        if (!his) { break }
                         pos = (pos+1) % (his.length+1)
                         target.value = pos < his.length? his[pos]: ""
                         target.Current = pos
@@ -388,6 +304,14 @@ function Page(page) {
             }
         },
 
+        Require: function(file, cb) {
+            if (!file || Plugin[file]) {return kit._call(cb, [Plugin[file]])}
+            file.endsWith(".css")? kit.AppendChild(document.body, [{require: ["/require/"+file, function(event) {
+                return Plugin[file] = file, kit._call(cb, [Plugin[file]])
+            }]}]): kit.AppendChild(document.body, [{include: ["/require/"+file, function(event) {
+                return kit._call(cb, [Plugin[file]])
+            }]}])
+        },
         script: function(action, name, time) {
             switch (action) {
                 case "create":
@@ -411,7 +335,7 @@ function Page(page) {
                         kit.Log("script", action, name, item)
                         page.action.Pane.Core(event, {}, ["_cmd", item]);
                     }, time||1000, function() {
-                        page.ontoast("run "+name+" done")
+                        page.toast.Pane.Show("run "+name+" done")
                     })
                     break
                 default:
@@ -419,16 +343,13 @@ function Page(page) {
             }
             return true
         },
-        Help: function(pane, type, action) {
-            return []
-        },
-        Jshy: function(event, args) {
-            var msg = event.msg || {}
+        Help: function(pane, type, action) {return []},
+        Jshy: function(event, args) {var msg = ctx.Event(event)
             if (page[args[0]] && page[args[0]].type == "fieldset") {
                 if (args.length > 1) {
                     return page[args[0]].Pane.Jshy(event, args.slice(1))
                 } else {
-                    msg.result = ["pane", args[0]]
+                    msg.Echo("pane", args[0])
                     return page[args[0]].Pane.Show()
                 }
             }
@@ -441,20 +362,77 @@ function Page(page) {
                 if (m.detail) {
                     page.action.Pane.Core(event, m, ["_cmd", m.detail], m.Reply)
                 } else {
-                    page.ontoast(m.result.join(""))
+                    page.toast.Pane.Show(m.result.join(""))
                 }
 
             }), onerror || (function() {
                 page.socket.close()
 
             }), onclose || (function() {
-                page.socket = undefined, setTimeout(function() {
+                delete(page.socket), setTimeout(function() {
                     page.WSS(cb, onerror, onclose)
                 }, 1000)
             })))
         },
 
-        initToast: function() {},
+        initCarte: function(page, field, option, output) {
+            field.onmouseleave = function(event) {field.Pane.Hide()}
+            return {
+                Show: function(event, cb) {if (!cb.list || cb.list.length == 0) {return}
+                    kit.AppendChilds(output, kit.List(cb.list, function(item) {
+                        return item === ""? {view: "space"}: {text: [item, "div", "item"], click: function(event) {
+                            kit._call(cb, [item, cb.meta, event]) && field.Pane.Hide()
+                        }}
+                    }))
+                    kit.ModifyView(carte, {display: "block", left: event.x, top: event.y})
+                    event.stopPropagation()
+                    event.preventDefault()
+                },
+            }
+        },
+        initToast: function(page, field, option, output) {
+            return {
+                Dialog: function(width, height) {
+                    kit.ModifyView(field, {display: "block", dialog: [width, height], padding: 10})
+                },
+                Ticker: function(text, duration) {
+                    var tick = 1
+                    var begin = kit.time(0, "%H:%M:%S")
+                    function ticker() {
+                        field.style.display != "none" && (text.innerText = begin+" ... "+(tick++)+"s") && setTimeout(ticker, 1000)
+                    }
+                    return duration == -1? setTimeout(ticker, 10): setTimeout(field.Pane.Hide, duration||3000)
+                },
+                Show: function(text, title, duration) {if (!text) {return field.Pane.Hide()}
+                    var args = typeof text == "object"? text: {text: text, title: title, duration: duration}
+
+                    var list = [{text: [args.title||"", "div", "title"]},
+                        typeof args.text == "string"? {text: [args.text||"", "div", "content"]}: args.text]
+
+                    kit.List(args.inputs, function(input) {
+                        typeof input == "string"? list.push({label: input}, {input: [input, page.oninput]}):
+                            list.push({label: input[0]}, {select: input.slice(1)})
+                        list.push({type: "br"})
+                    })
+                    kit.List(args.button, function(input) {
+                        list.push({button: [input, function(event) {
+                            var values = {}
+                            toast.querySelectorAll("input").forEach(function(input) {
+                                values[input.name] = input.value
+                            })
+                            toast.querySelectorAll("select").forEach(function(input) {
+                                values[input.name] = input.value
+                            })
+                            kit._call(args.cb, [input, values]) && field.Pane.Hide()
+                        }]})
+                    })
+                    list.push({view: ["tick"], name: "tick"})
+
+                    field.Pane.Dialog(args.width||text.length*10+100, args.height||80)
+                    return field.Pane.Ticker(kit.AppendChilds(output, list).tick, args.button? -1: args.duration || 3000)
+                },
+            }
+        },
         initLogin: function(page, field, option, output) {
             var ui = kit.AppendChilds(option, [
                 {label: "username"}, {input: ["username"]}, {type: "br"},
@@ -465,8 +443,7 @@ function Page(page) {
 
                     field.Pane.Login(ui.username.value, ui.password.value, function(sessid) {
                         if (!sessid) {kit.alert("用户或密码错误"); return}
-                        // ctx.Cookie("sessid", sessid),
-                            page.login.Pane.Dialog(1, 1), page.onload()
+                        page.login.Pane.Dialog(1, 1), page.onload()
                     })
                 }]}, {type: "br"},
             ])
@@ -482,20 +459,20 @@ function Page(page) {
             }
         },
         initHeader: function(page, field, option, output) {
-            var state = {}, list = [], cb = function(event, item, value) {}
-            field.onclick = function(event) {page.pane && page.pane.scrollTo(0,0)}
+            var state = {title: "github.com/shylinux/context"}, list = [], cb = function(event, item, value) {}
+            field.onclick = function(event) {page.pane && page.pane.scrollTo(0, 0)}
             return {
                 Order: function(value, order, cbs) {
                     state = value, list = order, cb = cbs || cb, field.Pane.Show()
                 },
                 State: function(name, value) {
-                    value != undefined && (state[name] = value, field.Pane.Show())
-                    return name == undefined? state: state[name]
+                    kit.notNone(value) && (state[name] = value, field.Pane.Show())
+                    return kit.isNone(name)? state: state[name]
                 },
                 Show: function() {
-                    output.innerHTML = "", kit.AppendChild(output, [
-                        {"view": ["title", "div", "github.com/shylinux/context"], click: function(event) {
-                            cb(event, "title", "shycontext")
+                    kit.AppendChilds(output, [
+                        {"view": ["title", "div", state.title], click: function(event) {
+                            cb(event, "title", state.title)
                         }},
                         {"view": ["state"], list: list.map(function(item) {return {text: [state[item], "div"], click: function(event) {
                             cb(event, item, state[item])
@@ -506,10 +483,10 @@ function Page(page) {
             }
         },
         initFooter: function(page, field, option, output) {
-            var state = {}, list = [], cb = function(event, item, value) {}
-            var ui = kit.AppendChild(output, [
-                {"view": ["title", "div", "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"]},
-                {"view": ["magic"], style: {"margin-top": "-4px"}, list: [{text: ["0", "label"], name: "count"}, {input: ["magic", function(event) {
+            var state = {title: "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"}, list = [], cb = function(event, item, value) {}
+            var ui = kit.AppendChilds(output, [
+                {"view": ["title", "div", state.title]},
+                {"view": ["magic"], list: [{label: "0", name: "count"}, {input: ["magic", function(event) {
                     if (event.key == "Enter" || event.ctrlKey && event.key == "j") {
                         page.action.Pane.Core(event, {}, ["_cmd", event.target.value]);
                         (ui.magic.History.length == 0 || ui.magic.History[ui.magic.History.length-1] != event.target.value) && ui.magic.History.push(event.target.value)
@@ -530,8 +507,7 @@ function Page(page) {
                     }
                     ui.count.innerHTML = ui.magic.Current || 0
                     field.Pane.Show()
-
-                }], style: {"margin-top": "-2px", "font-size": "16px"}}]},
+                }]}]},
                 {"view": ["state"]},
             ])
 
@@ -551,7 +527,7 @@ function Page(page) {
                     ui && kit.size(ui.magic, (width - ui.count.offsetWidth - ui.first.offsetWidth - ui.last.offsetWidth - 20), height-6)
                 },
                 Show: function() {
-                    ui.last.innerHTML = "", kit.AppendChild(ui.last, list.map(function(item) {return {text: [item+":"+state[item], "div"], click: function(item) {
+                    kit.AppendChilds(ui.last, list.map(function(item) {return {text: [item+":"+state[item], "div"], click: function(item) {
                         cb(event, item, state[item])
                     }}}))
                     field.Pane.Size(field.clientWidth, field.clientHeight)
@@ -560,8 +536,8 @@ function Page(page) {
             }
         },
         Pane: Pane,
-    })
-    page.which = page.Sync("layout")
+    }), page.which = page.Sync("layout")
+
     kit.Log("init", "page", page)
     return window.onload = page.onload, page
 }
@@ -571,12 +547,11 @@ function Pane(page, field) {
     var output = field.querySelector("div.output")
 
     var timer = ""
-    var list = [], last = -1, member = {}
     var name = option.dataset.names
+    var list = [], last = -1, member = {}
     var pane = Meta(field, (page[field.dataset.init] || function() {
     })(page, field, option, output) || {}, {
-        Append: function(type, line, key, which, cb) {
-            type = type || line.type
+        Append: function(type, line, key, which, cb) {type = type || line.type
             var index = list.length, ui = pane.View(output, type, line, key, function(event, cmds, cbs) {
                 (type != "plugin" && type != "field") && pane.Select(index, line[which])
                 page.script("record", [name, line[key[0]]])
@@ -588,9 +563,10 @@ function Pane(page, field) {
 
             (type == "plugin" && line.name || type == "field") && page.Require(line.init? line.group+"/"+line.init: "", function(init) {
                 page.Require(line.view? line.group+"/"+line.view: "", function(view) {
-                    pane.Plugin(page, pane, ui.field, init, function(event, cmds, cbs) {
+                    var p = pane.Plugin(page, pane, ui.field, init, function(event, cmds, cbs) {
                         kit._call(cb, [line, index, event, cmds, cbs])
                     })
+                    index == 0 && p.Select()
                 })
             })
             return ui
@@ -615,9 +591,7 @@ function Pane(page, field) {
             ctx.Event(event, {}, {name: name+"."+key})
 			key && pane.which.set(key)
         },
-        clear: function() {
-            output.innerHTML = "", list = [], last = -1
-        },
+        clear: function() {output.innerHTML = "", list = [], last = -1},
 
         Help: function(type, action) {
             var text = []
@@ -638,8 +612,7 @@ function Pane(page, field) {
             }
             return text
         },
-        Jshy: function(event, args) {
-            var msg = event.msg || {}
+        Jshy: function(event, args) {var msg = ctx.Event(event)
             if (pane[args[0]] && pane[args[0]].type == "fieldset") {
                 msg.result = ["plugin", args[0]]
                 pane[args[0]].scrollIntoView(), pane[args[0]].Plugin.Select(true)
@@ -658,32 +631,26 @@ function Pane(page, field) {
         },
 
         Tickers: function(time, cmds, cb) {
-            pane.Ticker(time, cmds, function(msg) {
-                ctx.Table(msg, function(line, index) {
-                    cb(line, index, msg)
-                })
-            })
+            pane.Ticker(time, cmds, function(msg) {msg.Table(function(line, index) {
+                cb(line, index, msg)
+            })})
         },
-        Ticker: function(time, cmds, cb) {
-            timer && clearTimeout(timer)
-            function loop() {
-                !pane.Stop() && pane.Run(cmds, function(msg) {
-                    cb(msg), timer = setTimeout(loop, time)
-                })
-            }
+        Ticker: function(time, cmds, cb) {timer && clearTimeout(timer)
+            function loop() {!pane.Stop() && pane.Run(cmds, function(msg) {
+                cb(msg), timer = setTimeout(loop, time)
+            })}
             time && (timer = setTimeout(loop, 10))
         },
         Runs: function(cmds, cb) {
-            pane.Run(cmds, function(msg) {
-                ctx.Table(msg, function(line, index) {
-                    (cb||pane.ondaemon)(line, index, msg)
-                })
-            })
+            pane.Run(cmds, function(msg) {msg.Table(function(line, index) {
+                (cb||pane.ondaemon)(line, index, msg)
+            })})
         },
-        Run: function(cmds, cb) {
-            ctx.Run(option.dataset, cmds, cb||pane.ondaemon)
-        },
+        Run: function(cmds, cb) {ctx.Run(option.dataset, cmds, cb||pane.ondaemon)},
 
+        Hide: function() {
+            kit.ModifyView(field, {display: "none"})
+        },
         Size: function(width, height) {
             if (width > 0) {
                 field.style.width = width+"px"
@@ -721,9 +688,6 @@ function Pane(page, field) {
         Plugin: Plugin,
     })
 
-    for (var k in pane.Listen) {
-        page.Sync(k).change(pane.Listen[k])
-    }
     function call(value, event) {
         // Event入口 1.1
         ctx.Event(event, {}, {name: name+"."+value})
@@ -734,15 +698,9 @@ function Pane(page, field) {
         return typeof value == "object"? {className: value[0], select: [value.slice(1), call]}:
             value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, call]}
     })).className="action")
-    field.oncontextmenu = function(event) {
-        page.oncarte(event, pane.Choice, function(event, value) {
-            call(value, event)
-            return true
-        }) && (event.stopPropagation(), event.preventDefault())
-    }
-    option.onsubmit = function(event) {
-        event.preventDefault()
-    };
+
+    kit.Item(pane.Listen, function(key, cb) {page.Sync(key).change(cb)})
+    option.onsubmit = function(event) {event.preventDefault()};
     kit.Log("init", "pane", name, pane)
     return page[name] = field, pane.Field = field, field.Pane = pane
 }
@@ -752,16 +710,12 @@ function Plugin(page, pane, field, inits, runs) {
     var output = field.querySelector("div.output")
 
     var meta = field.Meta
-    var name = meta.name
-    var args = meta.args || []
+    var name = meta.name, args = meta.args || []
     var inputs = JSON.parse(meta.inputs || "[]")
     var feature = JSON.parse(meta.feature||'{}')
-    var display = JSON.parse(meta.display||'{}')
-    var deal = (feature && feature.display) || "table"
     kit.classList.add(field, meta.group, name, feature.style)
 
-    var plugin = Meta(field, (inits || function() {
-    })(field, option, output)||{}, {Inputs: {},
+    var plugin = Meta(field, inits && inits(field, option, output) || {}, {Inputs: {},
         Appends: function() {
             var name = "args"+kit.Selector(option, "input.args.temp").length
             plugin.Append({type: "text", name: name, className: "args temp"}).focus()
@@ -828,7 +782,7 @@ function Plugin(page, pane, field, inits, runs) {
             page.input.focus()
         },
         Reveal: function(msg) {
-            return msg.append && msg.append[0]? ["table", JSON.stringify(ctx.Tables(msg))]: ["code", msg.result? msg.result.join(""): ""]
+            return msg.append && msg.append[0]? ["table", JSON.stringify(msg.Table())]: ["code", msg.result? msg.result.join(""): ""]
         },
         Format: function() {
             field.Meta.args = arguments.length > 0? kit.List(arguments):
@@ -902,77 +856,63 @@ function Plugin(page, pane, field, inits, runs) {
         },
 
         Option: function(key, value) {
-            if (value != undefined) {
-                option[key] && (option[key].value = value)
-            }
+            kit.notNone(value) && option[key] && (option[key].value = value)
             return option[key]? option[key].value: ""
         },
         Check: function(target, cb) {
             kit.Selector(option, ".args", function(item, index, list) {
-                target == undefined && index == list.length-1 && plugin.Runs(window.event, cb)
-                item == target && (index == list.length-1? plugin.Runs(window.event, cb): page.plugin == field && list[index+1].focus())
+                kit.isNone(target)? index == list.length-1 && plugin.Runs(window.event, cb):
+                    item == target && (index == list.length-1? plugin.Runs(window.event, cb): page.plugin == field && list[index+1].focus())
                 return item
             }).length == 0 && plugin.Runs(window.event, cb)
         },
         Delay: function(time, event, text) {
-            page.ontoast(text, "", -1)
+            plugin.ontoast(text, "", -1)
             return setTimeout(function() {
-                plugin.Runs(event), page.ontoast("")
+                plugin.Runs(event), plugin.ontoast("")
             }, time)
         },
-        Last: function() {
-            plugin.History() != undefined && plugin.Check()
-        },
-        Runs: function(event, cb) {
-            plugin.Run(event, kit.Selector(option, ".args", function(item, index) {return item.value}), cb)
-        },
-        Run: function(event, args, cb, silent) {
+        Last: function() {kit.notNone(plugin.History()) && plugin.Check()},
+        Runs: function(event, cb) {plugin.Run(event, kit.Selector(option, ".args", function(item, index) {return item.value}), cb)},
+        Run: function(event, args, cb, silent) {var show = true
             page.script("record", ["action", name].concat(args))
-            var show = true
-            setTimeout(function() {
-                show && page.ontoast(kit.Format(args||["running..."]), meta.name, -1)
-            }, 1000)
+            setTimeout(function() {show && plugin.ontoast(kit.Format(args||["running..."]), meta.name, -1)}, 1000)
             event.Plugin = plugin, runs(event, args, function(msg) {
-                page.footer.Pane.State("ncmd", kit.History.get("cmd").length)
-                silent? kit._call(cb, [msg]): plugin.ondaemon(msg, cb)
-                show = false, page.ontoast("")
+                silent? kit._call(cb, [msg]): plugin.ondaemon(msg, cb), show = false, plugin.ontoast()
             })
         },
-        clear: function() {
-            output.innerHTML = ""
-        },
+        clear: function() {output.innerHTML = ""},
         Download: function() {
-            var text = kit.Selector(output, "tr", function(tr) {
+            var type = "csv", text = kit.Selector(output, "tr", function(tr) {
                 return kit.Selector(tr, "td,th", function(td) {
                     return td.innerText
                 }).join(",")
-            }).join("\n"), type = ".csv"
+            }).join("\n")
+            !text && (type = ".txt", text = plugin.msg.result.join(""))
 
-            !text && (text = plugin.msg.result.join(""), type = ".txt")
-            page.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([text]))+'" target="_blank" download="'+name+type+'">'+name+type+'</a>', title: "下载中...", width: 200})
-            kit.Selector(page.toast, "a", function(item) {
-                item.click()
-            })
+            plugin.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([text]))+'" target="_blank" download="'+name+type+'">'+name+type+'</a>', title: "下载中...", width: 200})
+            kit.Selector(page.toast, "a", function(item) {item.click()})
         },
         upload: function(event) {
             ctx.Upload({river: meta.river, table: plugin.Option("table")}, option.upload.files[0], function(event, msg) {
-                kit.OrderTable(kit.AppendTable(kit.AppendChilds(output, "table"), ctx.Table(msg), msg.append))
-                page.ontoast("上传成功")
+                Output(plugin, "table", msg, null, output, option)
+                plugin.ontoast("上传成功")
             }, function(event) {
-                page.ontoast(), page.ontoast("上传进度 "+parseInt(event.loaded*100/event.total)+"%")
+                plugin.ontoast("上传进度 "+parseInt(event.loaded*100/event.total)+"%")
             })
         },
 
-        ontoast: page.ontoast,
+        ontoast: function() {kit._call(page.toast.Pane.Show, arguments)},
+        oncarte: function() {kit._call(page.carte.Pane.Show, arguments)},
         onformat: shy("数据转换", {
             none: function(value) {return value||""},
-            date: function(value) {return kit.format_date(new Date())},
+            date: function(value) {return kit.time()},
         }, function(which, value) {var meta = arguments.callee.meta
             return (meta[which||"none"]||meta["none"])(value)
         }),
 
         ondaemon: shy("接收数据", function(msg, cb) {
-            plugin.msg = msg, plugin.Save(""), plugin.onfigure.meta.type = "", plugin.onfigure(deal, msg, cb)
+            plugin.msg = msg, plugin.Save(""), plugin.onfigure.meta.type = "", plugin.onfigure(feature.display||"table", msg, cb)
         }),
         onfigure: shy("显示数据", {type: "",
             max: function(output) {
@@ -985,25 +925,20 @@ function Plugin(page, pane, field, inits, runs) {
         }),
         onchoice: shy("菜单列表", {
             "添加": "Clone",
-            "删除": "Delete",
             "加参": "Appends",
             "减参": "Remove",
-        }, ["添加", "删除", "加参", "减参"], function(value, meta, event) {
+            "删除": "Delete",
+        }, ["添加", "加参", "减参", "删除"], function(value, meta, event) {
             kit._call(plugin, plugin[meta[value]])
             return true
         }),
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {
-                page.oncarte(event, plugin.onchoice)
+                plugin.oncarte(event, plugin.onchoice)
             },
-        }, function() {
-            kit.Item(arguments.callee.meta, function(k, cb) {field[k] = function(event) {
-                cb(event)
-            }})
-        }),
+        }, function(event, key, cb) {cb(event)}),
     })
 
-    plugin.onaction()
     plugin.which = plugin.Sync("input")
 	page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
     inputs.map(function(item) {plugin.Append(item)})
@@ -1111,17 +1046,13 @@ function Inputs(plugin, item, target) {
                     return true
                 })
             },
-        }, function() {
-            kit.Item(arguments.callee.meta, function(k, cb) {target[k] = function(event) {
-                cb(event)
-            }})
-        }),
+        }, function(event, key, cb) {cb(event)}),
         Event: shy("事件入口", {name: plug+"."+name}, function(event, msg) {
             return ctx.Event(event, msg||{}, arguments.callee.meta)
         }),
         which: plugin.Sync(name),
     }, plugin)
-    input.onaction()
+
     input.onimport()
     target.value = plugin.onformat(item.init, item.value)
     plugin.Inputs[item.name] = target, target.Input = input
@@ -1145,8 +1076,8 @@ function Output(plugin, type, msg, cb, target, option) {
                 event.Plugin = plugin
 
                 line.you && name == "status" && (line.status == "start"? function() {
-                    plugin.Delay(3000, event, line.you+" stop...") && field.Run(event, [option.pod.value, line.you, "stop"])
-                }(): field.Run(event, [option.pod.value, line.you], function(msg) {
+                    plugin.Delay(3000, event, line.you+" stop...") && plugin.Run(event, [option.pod.value, line.you, "stop"])
+                }(): plugin.Run(event, [option.pod.value, line.you], function(msg) {
                     plugin.Delay(3000, event, line.you+" start...")
                 }))
                 return name == "status" || line.status == "stop" ? undefined: line.you
@@ -1168,7 +1099,7 @@ function Output(plugin, type, msg, cb, target, option) {
         }),
         onimport: shy("导入数据", {
             _table: function(msg, list) {
-                return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), ctx.Table(msg), list), "", output.onexport)
+                return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport)
             },
             _code: function(msg) {
                 return msg.result && msg.result.length > 0 && kit.OrderCode(kit.AppendChild(target, [{view: ["code", "div", msg.Results()]}]).first)
@@ -1202,15 +1133,10 @@ function Output(plugin, type, msg, cb, target, option) {
         }),
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {
-                page.oncarte(event, output.onchoice)
+                plugin.oncarte(event, output.onchoice)
             },
-        }, function() {
-            kit.Item(arguments.callee.meta, function(k, cb) {target[k] = function(event) {
-                cb(event)
-            }})
-        }),
+        }, function(event, key, cb) {cb(event)}),
     }, plugin)
-    output.onaction()
     output.onimport(type, msg, cb)
     return output
 }

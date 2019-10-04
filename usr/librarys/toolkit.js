@@ -1,9 +1,3 @@
-Wrap = function(cb, obj) {
-    for (var k in obj) {
-        cb[k] = obj[k]
-    }
-    return cb
-}
 shy = function(help, meta, list, cb) {
     var index = -1, value = "", type = "string", args = arguments
     function next(check) {
@@ -16,18 +10,10 @@ shy = function(help, meta, list, cb) {
     cb.help = next("string") || "还没有写"
     cb.meta = next("object") || {}
     cb.list = next("object") || {}
-    cb.runs = function() {
-    }
+    cb.runs = function() {}
     return cb
 }
-
-kit = toolkit = {__proto__: document,
-    meta: function(cb, obj) {
-        for (var k in obj) {
-            cb[k] = obj[k]
-        }
-        return cb
-    },
+kit = toolkit = (function() {var kit = {__proto__: document,
     // 用户终端
     device: {
         isWeiXin: navigator.userAgent.indexOf("MicroMessenger") > -1,
@@ -36,161 +22,96 @@ kit = toolkit = {__proto__: document,
         isMacOSX: navigator.userAgent.indexOf("Mac OS X") > -1,
         isWindows: navigator.userAgent.indexOf("Windows") > -1,
     },
-    alert: function(text) {
-        alert(JSON.stringify(text))
-    },
-    prompt: function(text) {
-        return prompt(text)
-    },
-    confirm: function(text) {
-        return confirm(text)
-    },
-    reload: function() {
-        location.reload()
-    },
+    alert: function(text) {alert(JSON.stringify(text))},
+    confirm: function(text) {return confirm(text)},
+    prompt: function(text) {return prompt(text)},
+    reload: function() {location.reload()},
     // 日志调试
-    History: {dir: [], pod: [], ctx: [], cmd: [], txt: [], key: [], lay: [],
-        add: function(type, data) {
-            var list = this[type] || []
-            data && list.push({time: Date.now(), data: data})
-            this[type] = list
-            return list.length-1
-        },
-        get: function(type, index) {
-            var list = this[type] || []
-            var len = list.length
-            return index == undefined? this[type]: this[type][(index+len)%len]
-        },
-    },
-    Debug: Wrap(function(key) {
-        var list = arguments.callee.list
-        if (list[key]) {debugger}
-    }, {list: {why: true, msg: true}}),
-    Log: Wrap(function(type, arg) {
-        var args = [kit.time().split(" ")[1]]
-        if (arg == undefined) {
-            args = args.concat(kit.Trans(type))
-        } else {
-            for (var i = 0; i < arguments.length; i++) {
-                args.push(arguments[i])
-            }
+    History: shy("历史记录", {lay: [], cmd: [], txt: [], key: []}, function(type, index, value) {var meta = arguments.callee.meta
+        if (kit.isNone(index)) {return meta[type]}
+        var list = meta[type] || []
+        if (kit.isNone(value)) {var len = list.length
+            return list[(index+len)%len]
         }
-
-        var mine = arguments.callee
-        !mine.hide[args[1]] && console[mine.func[args[1]]||"log"](args)
-
+        return meta[type] = list, list.push({time: Date.now(), data: data})-1
+    }),
+    Debug: shy("调试断点", {why: true, msg: true}, function(key) {
+        if (arguments.callee.meta[key]) {debugger}
+    }),
+    Log: shy("输出日志", {hide: {"init": true, "wss": false},
+        func: {debug: "debug", info: "info", parn: "warn", err: "error"},
+    }, function(type, arg) {var meta = arguments.callee.meta
+        var args = [kit.time().split(" ")[1]].concat(kit.List(kit.isNone(arg)? type: arguments))
+        !meta.hide[args[1]] && console[meta.func[args[1]]||"log"](args)
         kit.Debug(args[1])
         return args.slice(1)
-    }, {hide: {"init": true, "wss": false}, func: {debug: "debug", info: "info", warn: "warn", err: "error"}}),
-    Delay: function(time, cb) {
-        return setTimeout(cb, time)
-    },
+    }),
+    Tip: shy("用户提示", function() {}),
 
     // HTML节点操作
     classList: {
-        add: function(obj) {
-            var list = obj.className? obj.className.split(" "): []
-            for (var i = 1; i < arguments.length; i++) {
-                arguments[i] && list.indexOf(arguments[i]) == - 1 && list.push(arguments[i])
-            }
-            return obj.className = list.join(" ")
+        add: function(obj, key) {var list = (obj.className||"").split(" ")
+            return obj.className = list.concat(kit.List(arguments, function(value, index) {
+                return index > 0 && list.indexOf(value) == -1? value: undefined
+            })).join(" ")
         },
-        del: function(obj) {
-            var res = []
-            var list = arguments
-            obj.className.split(" ").forEach(function(item) {
-                for (var i = 1; i < list.length; i++) {
-                    if (item == list[i]) {return}
-                }
-                res.push(item)
-            })
-            return obj.className = res.join(" ")
+        del: function(obj, key) {
+            var list = kit.List(arguments, function(value, index) {return index > 0? value: undefined})
+            return obj.className = kit.List(obj.className.split(" "), function(value) {
+                return list.indexOf(value) == -1? value: undefined
+            }).join(" ")
         },
     },
     ModifyView: function(which, args) {
-        var height = document.body.clientHeight-4
         var width = document.body.clientWidth-4
-        for (var k in args) {
-            switch (k) {
-                case "dialog":
-                    var w = h = args[k]
-                    if (typeof(args[k]) == "object") {
-                        w = args[k][0]
-                        h = args[k][1]
-                    }
-                    if (w > width) {
-                        w = width
-                    }
-                    if (h > height) {
-                        h = height
-                    }
-
+        var height = document.body.clientHeight-4
+        kit.Item(args, function(key, value) {var w = h = value
+            if (typeof(value) == "object") {w = value[0], h = value[1]}
+            switch (key) {
+                case "dialog": // 设置宽高
+                    if (w > width) {w = width}
+                    if (h > height) {h = height}
                     args["top"] = (height-h)/2
                     args["left"] = (width-w)/2
                     args["width"] = w
                     args["height"] = h
-                    args[k] = undefined
                     break
-                case "window":
-                    var w = h = args[k]
-                    if (typeof(args[k]) == "object") {
-                        w = args[k][0]
-                        h = args[k][1]
-                    }
-
+                case "window": // 设置边距
                     args["top"] = h/2
                     args["left"] = w/2
                     args["width"] = width-w-20
                     args["height"] = height-h-20
-                    args[k] = undefined
                     break
+                default:
+                    return
             }
-        }
+            delete(args[key])
+        })
 
-        for (var k in args) {
-            switch (k) {
-                case "top":
-                case "left":
-                case "width":
-                case "height":
-                case "padding":
-                    args[k] = args[k]+"px"
-                    break
-            }
-        }
+        var list = ["top", "left", "width", "height", "padding", "margin"]
+        kit.Item(args, function(key, value) {
+            typeof value == "number" && list.indexOf(key) != -1 && (args[key] = value+"px")
+        })
         return kit.ModifyNode(which, {style: args})
     },
     ModifyNode: function(which, html) {
         var node = typeof which == "string"? document.querySelector(which): which
-        switch (typeof html) {
-            case "string":
-                node.innerHTML = html
-                break
-            case "object":
-                for (var k in html) {
-                    if (typeof html[k] == "object") {
-                        for (var d in html[k]) {
-                            node[k] && (node[k][d] = html[k][d])
-                        }
-                        continue
-                    }
-                    node[k] = html[k]
-                }
-                break
-        }
+        typeof html == "string"? (node.innerHTML = html): kit.Item(html, function(key, value) {
+            typeof value != "object"? (node[key] = value): kit.Item(value, function(item, value) {
+                node[key] && (node[key][item] = value)
+            })
+        })
         return node
     },
-    CreateNode: function(element, html) {
-        return this.ModifyNode(document.createElement(element), html)
-    },
+    CreateNode: function(element, html) {return kit.ModifyNode(document.createElement(element), html)},
     AppendChild: function(parent, children, subs) {
         if (typeof children == "string") {
-            var elm = this.CreateNode(children, subs)
-            parent.append(elm)
-            return elm
+            var elm = kit.CreateNode(children, subs)
+            return parent.append(elm), elm
         }
 
-        // 基本属性: name value title inner
+        // 基本属性: name value title
+        // 基本内容: inner innerHTML
         // 基本样式: style className
         // 基本事件: dataset click
         //
@@ -204,239 +125,159 @@ kit = toolkit = {__proto__: document,
         //
         // 基本结构: type data list
 
-        var kit = this
-
         subs = subs || {}
-        children.forEach(function(child, i) {
-            if (!child) {
-                return
-            }
-            child.data = child.data || {}
-            child.type = child.type || "div"
+        children.forEach(function(child, i) {if (kit.isNone(child)) {return}
+            var type = child.type || "div", name = child.name, data = child.data || {}
 
-            if (child.name) {
-                child.data["name"] = child.name
-            }
-            if (child.value) {
-                child.data["value"] = child.value
-            }
-            if (child.title) {
-                child.data["title"] = child.title
-            }
-            if (child.inner) {
-                child.data["innerHTML"] = child.inner
-            }
-            if (typeof(child.style) == "object") {
-                var str = []
-                for (var k in child.style) {
-                    str.push(k)
-                    str.push(":")
-                    str.push(child.style[k] + (typeof child.style[k] == "number"? "px": ""))
-                    str.push(";")
+            kit.List([
+                "name", "value", "title",
+                "innerHTML",
+                "className",
+                "dataset",
+            ], function(key) {
+                kit.notNone(child[key]) && (data[key] = child[key])
+            })
+            kit.notNone(child.click) && (data.onclick = child.click)
+            kit.notNone(child.inner) && (data.innerHTML = child.inner)
+            kit.notNone(child.style) && (data.style = typeof child.style == "string"? child.style: kit.Item(child.style, function(key, value) {
+                return [key, ": ", kit.pixs(key, value)].join("")
+            }).join("; "))
+
+            if (kit.notNone(child.button)) {var list = kit.List(child.button)
+                type = "button", name = name || list[0]
+                data.innerText = list[0], data.onclick = function(event) {
+                    kit._call(list[1], [list[0], event])
                 }
-                child.data["style"] = str.join("")
-            }
-            if (child.className) {
-                child.data["className"] = child.className
-            }
-            if (child.dataset) {
-                child.data["dataset"] = child.dataset
-            }
-            if (child.click) {
-                child.data["onclick"] = child.click
-            }
 
-            if (child.button) {
-                child.type = "button"
-                child.data["onclick"] = function(event) {
-                    child.button[1](child.button[0], event)
+            } else if (child.select) {var list = child.select
+                type = "select", name = name || list[0][0]
+                data.onchange = function(event) {
+                    kit._call(list[1], [event.target.value, event])
                 }
-                child.data["innerText"] = child.button[0]
-                child.name = child.name || child.button[0]
-
-            } else if (child.select) {
-                child.type = "select"
-                child.name = child.select[0][0]
-                child.list = child.select[0].map(function(value) {
+                child.list = list[0].map(function(value) {
                     return {type: "option", value: value, inner: value}
                 })
-                child.data["onchange"] = function(event) {
-                    child.select[1](event.target.value, event)
+
+            } else if (child.input) {var list = kit.List(child.input)
+                type = "input", name = name || list[0]
+                data.onkeydown = function(event) {
+                    kit._call(list[1], [event])
+                }
+                data.onkeyup = function(event) {
+                    kit._call(list[2], [event])
                 }
 
-            } else if (child.input) {
-                child.type = "input"
-                child.data["name"] = child.input[0]
-                // child.data["onkeyup"] = child.input[1]
-                child.data["onkeydown"] = child.input[1]
-                child.name = child.name || child.input[0]
+            } else if (child.password) {var list = kit.List(child.password)
+                type = "input", name = name || list[0]
+                data.type = "password"
 
-            } else if (child.password) {
-                child.type = "input"
-                child.data["onkeyup"] = child.password[1]
-                child.data["name"] = child.password[0]
-                child.data["type"] = "password"
-                child.name = child.name || child.password[0]
+            } else if (child.label) {var list = kit.List(child.label)
+                type = "label", data.innerText = list[0]
 
-            } else if (child.label) {
-                child.type = "label"
-                child.data["innerText"] = child.label
-
-            } else if (child.img) {
-                child.type = "img"
-                child.data["src"] = child.img[0]
-                child.img.length > 1 && (child.data["onload"] = child.img[1])
+            } else if (child.img) {var list = kit.List(child.img)
+                type = "img", data.src = list[0], data.onload = function(event) {
+                    kit._call(list[1], [event])
+                }
 
             } else if (child.row) {
-                child.type = "tr"
-                child.list = child.row.map(function(item) {return {text: [item, "td"]}})
+                type = "tr"
+                child.list = child.row.map(function(item) {return {text: [item, child.sub||"td"]}})
 
             } else if (child.tree) {
-                child.type = "ul"
-                child.list = child.tree
+                type = "ul", child.list = child.tree
 
-            } else if (child.fork) {
-                child.type = "li"
-                child.list = [
-                    {"text": [child.fork[0], "div"], "click": (child.fork.length>2? child.fork[2]: "")},
-                    {"type": "ul", "list": child.fork[1]},
+            } else if (child.fork) {var list = kit.List(child.fork)
+                type = "li", child.list = [
+                    {"text": [list[0], "div"], "click": function(event) {
+                        kit._call(list[2], [event])
+                    }},
+                    {"type": "ul", "list": list[1]},
                 ]
 
-            } else if (child.leaf) {
-                child.type = "li"
-                child.list = [{"text": [child.leaf[0], "div"]}]
-                if (child.leaf.length > 1 && typeof child.leaf[1] == "function") {
-                    child.data["onclick"] = function(event) {
-                        child.leaf[1](event, node)
-                    }
+            } else if (child.leaf) {var list = kit.List(child.leaf)
+                type = "li"
+                child.list = [{"text": [list[0], "div"]}]
+                data.onclick = function(event) {
+                    kit._call(list[1], [event])
                 }
 
-            } else if (child.view) {
-                (child.view.length > 0 && child.view[0]) && (child.data["className"] = child.view[0])
-                child.type = child.view.length > 1? child.view[1]: "div"
-                child.view.length > 2 && (child.data["innerHTML"] = child.view[2])
-                child.view.length > 3 && (child.name = child.view[3])
+            } else if (child.view) {var list = kit.List(child.view);
+                (list.length > 0 && list[0]) && (data.className = list[0])
+                type = list[1] || "div"
+                data.innerHTML = list[2] || ""
+                name = name || list[3] || ""
 
-            } else if (child.text) {
-                child.data["innerHTML"] = child.text[0]
-                child.type = child.text.length > 1? child.text[1]: "pre"
-                child.text.length > 2 && (child.data["className"] = child.text[2])
+            } else if (child.text) {var list = kit.List(child.text)
+                data.innerHTML = list[0]
+                type = list[1] || "pre"
+                list.length > 2 && (data.className = list[2])
 
-            } else if (child.code) {
-                child.type = "code"
-                child.list = [{"type": "pre" ,"data": {"innerText": child.code[0]}, "name": child.code[1]}]
-                child.code.length > 2 && (child.data["className"] = child.code[2])
+            } else if (child.code) {var list = kit.List(child.code)
+                type = "code"
+                child.list = [{type: "pre" ,data: {innerText: list[0]}, name: list[1]||""}]
+                list.length > 2 && (data.className = list[2])
 
             } else if (child.script) {
-                child.type = "script"
-                child.data.innerHTML = child.script
+                type = "script", data.innerHTML = child.script
 
-            } else if (child.include) {
-                child.type = "script"
-                child.data["src"] = child.include[0]
-                child.data["type"] = "text/javascript"
-                child.include.length > 1 && (child.data["onload"] = child.include[1])
-
-            } else if (child.require) {
-                child.data["href"] = child.require[0]
-                child.data["rel"] = "stylesheet"
-                child.data["type"] = "text/css"
-                child.require.length > 1 && (child.data["onload"] = child.require[1])
-                child.type = "link"
-
-                // child.data["rel"] = child.require.length > 1? child.require[1]: "stylesheet"
-                // child.data["type"] = child.require.length > 2? child.require[2]: "text/css"
-                // child.require.length > 1 && (child.data["onload"] = child.require[1])
-                //
-            } else if (child.styles) {
-                var str = []
-                if (typeof child.styles == "string") {
-                    str.push(child.styles)
-                } else {
-                    for (var key in child.styles) {
-                        str.push(key)
-                        str.push(" {")
-                        for (var k in child.styles[key]) {
-                            str.push(k)
-                            str.push(":")
-                            str.push(child.styles[key][k] + (typeof child.styles[key][k] == "number"? "px": ""))
-                            str.push(";")
-                        }
-                        str.push("}\n")
-                    }
+            } else if (child.include) {var list = kit.List(child.include)
+                type = "script", data.type = "text/javascript"
+                data.src = list[0], data.onload = function(event) {
+                    kit._call(list[1], [event])
                 }
-                child.data["innerHTML"] = str.join("")
-                child.data["type"] = "text/css"
-                child.type = "style"
 
+            } else if (child.require) {var list = kit.List(child.require)
+                type = "link", data.type = "text/css", data.rel = "stylesheet"
+                data.href = list[0], data.onload = function(event) {
+                    kit._call(list[1], [event])
+                }
+
+            } else if (child.styles) {
+                type = "style", data.type = "text/css"
+                data.innerHTML = typeof child.styles == "string"? child.styles: kit.Item(child.styles, function(key, value) {
+                    return key + " {\n" + kit.Item(value, function(item, value) {
+                        return ["  ", item, ": ", kit.pixs(value)].join("")
+                    }).join(";\n") + "\n}\n"
+                }).join("")
             }
 
-            var node = kit.CreateNode(child.type, child.data)
+            data.name = data.name || name || ""
+            var node = kit.CreateNode(type, data)
             child.list && kit.AppendChild(node, child.list, subs)
-            child.name && (subs[child.name] = node)
-            subs.first || (subs.first = node)
-            subs.last, subs.last = node
+            subs.first || (subs.first = node), subs.last = node
+            name && (subs[name] = node)
             parent.append(node)
         })
         return subs
     },
     AppendChilds: function(parent, children, subs) {
-        return parent.innerHTML = "", this.AppendChild(parent, children, subs)
+        return parent.innerHTML = "", kit.AppendChild(parent, children, subs)
     },
     InsertChild: function (parent, position, element, children) {
-        var elm = this.CreateNode(element)
-        this.AppendChild(elm, children)
+        var elm = kit.CreateNode(element)
+        kit.AppendChild(elm, children)
         return parent.insertBefore(elm, position || parent.firstElementChild)
     },
     // HTML控件操作
     AppendAction: function(parent, list, cb) {
-        var result = []
-        list.forEach(function(item, index) {
-            if (item == "") {
-                result.push({view: ["space"]})
-            } else if (typeof item == "string") {
-                result.push({button: [item, cb]})
-            } else if (item.forEach) {
-                result.push({select: [item, cb]})
-            } else {
-                result.push(item)
-            }
-        })
-        return kit.AppendChild(parent, result)
+        return kit.AppendChild(parent, kit.List(list, function(item, index) {
+            return item === ""? {view: ["space"]}:
+                typeof item == "string"? {button: [item, cb]}:
+                    item.forEach? {select: [item, cb]}: item
+        }))
     },
-    AppendStatus: function(parent, list, cb) {
-        var result = []
-        list.forEach(function(item, index) {
-            if (item == "") {
-                result.push({view: ["space"]})
-            } else if (typeof item == "string") {
-                result.push({button: [item, cb]})
-            } else if (item.forEach) {
-                result.push({select: [item, cb]})
-            } else {
-                result.push(item)
-            }
-        })
-        return kit.AppendChild(parent, result)
-    },
-    AppendTable: function(table, data, fields, cb, cbs) {
-        if (!data || !fields) {
-            return
-        }
-        var kit = this
-        var tr = kit.AppendChild(table, "tr")
-        fields.forEach(function(key, j) {
-            var td = kit.AppendChild(tr, "th", kit.Color(key))
-        })
+    AppendTable: function(table, data, fields, cb, cbs) {if (!data || !fields) {return}
+        kit.AppendChild(table, [{row: fields, sub: "th"}])
         data.forEach(function(row, i) {
             var tr = kit.AppendChild(table, "tr", {className: "normal"})
-            tr.Meta = row
-            fields.forEach(function(key, j) {
+            tr.Meta = row, fields.forEach(function(key, j) {
                 var td = kit.AppendChild(tr, "td", kit.Color(row[key]))
+
 				if (key == "when") {td.className = "when"}
                 if (row[key].startsWith("http")) {
                     td.innerHTML = "<a href='"+row[key]+"' target='_blank'>"+row[key]+"</a>"
                 }
+
                 cb && (td.onclick = function(event) {
                     kit._call(cb, [row[key], key, row, i, tr, event])
                 })
@@ -450,74 +291,46 @@ kit = toolkit = {__proto__: document,
         return table
     },
     RangeTable: function(table, index, sort_asc) {
-        var list = table.querySelectorAll("tr")
+        var list = kit.Selector(table, "tr").slice(1)
 
         var is_time = true, is_number = true
-        for (var i = 1; i < list.length; i++) {
-            var text = list[i].childNodes[index].innerText
-            var value = Date.parse(text)
-            if (!(value > 0)) {
-                is_time = false
-            }
+        kit.List(list, function(tr) {
+            var text = tr.childNodes[index].innerText
+            is_time = is_time && Date.parse(text) > 0
+            is_number = is_number && !isNaN(parseInt(text))
+        })
 
-            var value = parseInt(text)
-            if (text != "" && !(value >= 0 || value <= 0)) {
-                is_number = false
-            }
-        }
+        var num_list = kit.List(list, function(tr) {
+            var text = tr.childNodes[index].innerText
+            return is_time? Date.parse(text):
+                is_number? parseInt(text): text
+        })
 
-        var num_list = [], new_list = []
-        for (var i = 1; i < list.length; i++) {
-            var text = list[i].childNodes[index].innerText
-            if (is_time) {
-                num_list.push(Date.parse(text))
-            } else if (is_number) {
-                num_list.push(parseInt(text) || 0)
-            } else {
-                num_list.push(text)
-            }
-            new_list.push(list[i])
-        }
-
-        for (var i = 0; i < new_list.length; i++) {
-            for (var j = i+1; j < new_list.length; j++) {
+        for (var i = 0; i < num_list.length; i++) {
+            for (var j = i+1; j < num_list.length; j++) {
                 if (sort_asc? num_list[i] < num_list[j]: num_list[i] > num_list[j]) {
                     var temp = num_list[i]
                     num_list[i] = num_list[j]
                     num_list[j] = temp
-                    var temp = new_list[i]
-                    new_list[i] = new_list[j]
-                    new_list[j] = temp
+                    var temp = list[i]
+                    list[i] = list[j]
+                    list[j] = temp
                 }
             }
-            new_list[i].parentElement && new_list[i].parentElement.removeChild(new_list[i])
-            table.appendChild(new_list[i])
+            list[i].parentElement && list[i].parentElement.removeChild(list[i])
+            table.appendChild(list[i])
         }
     },
-    OrderTable: function(table, field, cb) {
-        if (!table) {return}
-        table.onclick = function(event) {
-            var index = 0
-            var target = event.target
-            var dataset = target.dataset
-            var head = target.parentElement.parentElement.querySelector("tr")
-            // kit.Selector(table, "tr.select", function(item) {item.className = ""})
-            // kit.Selector(table, "td.select", function(item) {item.className = ""})
-            kit.Selector(table, "tr", function(item, i) {item == target.parentElement && (index = i)})
-
-            target.parentElement.childNodes.forEach(function(item, i) {
-                if (item != target) {return}
-
-                if (target.tagName == "TH") {
+    OrderTable: function(table, field, cb) {if (!table) {return}
+        table.onclick = function(event) {var target = event.target
+            target.parentElement.childNodes.forEach(function(item, i) {if (item != target) {return}
+                if (target.tagName == "TH") {var dataset = target.dataset
                     dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
                     kit.RangeTable(table, i, dataset["sort_asc"] == "1")
-                    return
-                }
-                var name = head.childNodes[i].innerText
-                if (name.startsWith(field)) {
-                    // item.className = "select"
-                    // item.parentElement.className = "select"
-                    typeof cb == "function" && cb(event, item.innerText, name, item.parentNode.Meta, index)
+                } else {var index = 0
+                    kit.Selector(table, "tr", function(item, i) {item == target.parentElement && (index = i)})
+                    var name = target.parentElement.parentElement.querySelector("tr").childNodes[i].innerText
+                    name.startsWith(field) && kit._call(cb, [event, item.innerText, name, item.parentNode.Meta, index])
                 }
                 kit.CopyText()
             })
@@ -526,32 +339,16 @@ kit = toolkit = {__proto__: document,
     },
 
     // HTML显示文本
-    Color: function(s) {
-        if (!s) {return s}
-        s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
-        s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
-        s = s.replace(/\033\[33m/g, "<span style='color:#ff0'>")
-        s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
-        s = s.replace(/\033\[32;1m/g, "<span style='color:#0f0'>")
-        s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
-        s = s.replace(/\033\[0m/g, "</span>")
-        s = s.replace(/\033\[m/g, "</span>")
-        return s
+    OrderCode: function(code) {if (!code) {return}
+        code.onclick = function(event) {kit.CopyText()}
     },
-    OrderCode: function(code) {
-        if (!code) {return}
-
-        var kit = this
-        code.onclick = function(event) {
-            kit.CopyText()
-        }
-    },
-    OrderLink: function(link) {
-        link.target = "_blank"
-    },
+    OrderLink: function(link) {link.target = "_blank"},
     OrderText: function(pane, text) {
         text.querySelectorAll("a").forEach(function(value, index, array) {
             kit.OrderLink(value, pane)
+        })
+        text.querySelectorAll("code").forEach(function(value, index, array) {
+            kit.OrderCode(value)
         })
         text.querySelectorAll("table").forEach(function(value, index, array) {
             kit.OrderTable(value)
@@ -590,13 +387,6 @@ kit = toolkit = {__proto__: document,
             value.id = id
         })
         return h0
-
-        text.querySelectorAll("table.wiki_list").forEach(function(value, index, array) {
-            kit.OrderTable(value, "path", function(event) {
-                var text = event.target.innerText
-                ctx.Search({"class": text})
-            })
-        })
     },
     Position: function(which) {
         return (parseInt((which.scrollTop + which.clientHeight) / which.scrollHeight * 100)||0)+"%"
@@ -622,68 +412,48 @@ kit = toolkit = {__proto__: document,
         }
         return true
     },
-    // HTML修改文本
+    Delay: function(time, cb) {
+        return setTimeout(cb, time)
+    },
 
     // 数据容器迭代
-    Selector: function(obj, item, cb, interval, cbs) {
-        var list = []
-		kit.List(obj.querySelectorAll(item), function(item, index, array) {
-            if (typeof cb == "function") {
-                var value = cb(item, index, array)
-                value != undefined && list.push(value)
-            } else {
-                list.push(item)
-            }
-        }, interval, cbs)
-
-        for (var i = list.length-1; i >= 0; i--) {
-            if (list[i] == "") {
-                list.pop()
-            } else {
-                break
-            }
-        }
-        return list
+    Push: function(list, value, check) {list = list || []
+        return (kit.notNone||check)(value) && list.push(value), list
     },
-    List: function(obj, cb, interval, cbs) {
-        if (interval) {
-            function loop(i) {
-                if (i >= obj.length) {typeof cbs == "function" && cbs(); return}
-                typeof cb == "function" && cb(obj[i], i, obj)
-                setTimeout(function() {loop(i+1)}, interval)
+    List: function(obj, cb, interval, cbs) {obj = typeof obj == "string"? [obj]: (obj || [])
+        if (interval > 0) {
+            function loop(i) {if (i >= obj.length) {return kit._call(cbs)}
+                kit._call(cb, [obj[i], i, obj]), setTimeout(function() {loop(i+1)}, interval)
             }
             obj.length > 0 && setTimeout(function() {loop(0)}, interval/4)
             return obj
         }
 
-        obj = typeof obj == "string"? [obj]: (obj || [])
-
         var list = []
         for (var i = 0; i < obj.length; i++) {
-            list.push(typeof cb == "function"? cb(obj[i], i, obj): obj[i])
+            kit.Push(list, kit._call(cb, [obj[i], i, obj]))
         }
         return list
     },
-    Item: function(obj, cb) {
-        var list = []
+    Item: function(obj, cb) {var list = []
         for (var k in obj) {
-            var v = typeof cb == "function"? cb(k, obj[k]): k
-            v != undefined && list.push(v)
+            kit.Push(list, kit._call(cb, [k, obj[k]]))
         }
         return list
     },
-    Span: function(list) {
-		list = list || []
+    Items: function(obj, cb) {var list = []
+        for (var key in obj) {
+            list = list.concat(kit.List(obj[key], function(value, index, array) {
+                return kit._call(cb, [value, index, key, obj])
+            }))
+        }
+        return list
+    },
+    Span: function(list) {list = list || []
 		list.span = function(value, style) {
-			for (var i = 0; i < arguments.length; i++) {
-				if (typeof arguments[i] == "string") {
-					list.push(arguments[i])
-				} else {
-					list.push('<span class="'+arguments[i][1]+'">', arguments[i][0], "</span>")
-				}
-			}
-			list.push("<br/>")
-			return list
+            return kit.List(arguments, function(item) {
+                kit._call(list, list.push, typeof item == "string"? [item]: ['<span class="'+item[1]+'">', item[0], "</span>"])
+            }), list.push("<br/>"), list
 		}
         return list
     },
@@ -692,7 +462,33 @@ kit = toolkit = {__proto__: document,
 			obj.style.opacity = value
 		}, kit.Value(interval, 150))
 	},
+    Selector: function(obj, item, cb, interval, cbs) {var list = []
+		kit.List(obj.querySelectorAll(item), function(item, index, array) {
+            kit.Push(list, kit._call(cb, [item, index, array]))
+        }, interval, cbs)
+
+        for (var i = list.length-1; i >= 0; i--) {
+            if (list[i] !== "") {break}
+            list.pop()
+        }
+        return list
+    },
     // 数据类型转换
+    isNone: function(c) {return c === undefined || c === null},
+    notNone: function(c) {return !kit.isNone(c)},
+    isSpace: function(c) {return c == " " || c == "Enter"},
+    Format: function(objs) {return JSON.stringify(objs)},
+    Color: function(s) {if (!s) {return s}
+        s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
+        s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
+        s = s.replace(/\033\[33m/g, "<span style='color:#ff0'>")
+        s = s.replace(/\033\[32m/g, "<span style='color:#0f0'>")
+        s = s.replace(/\033\[32;1m/g, "<span style='color:#0f0'>")
+        s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
+        s = s.replace(/\033\[0m/g, "</span>")
+        s = s.replace(/\033\[m/g, "</span>")
+        return s
+    },
 	Value: function() {
         for (var i = 0; i < arguments.length; i++) {
             switch (arguments[i]) {
@@ -705,21 +501,7 @@ kit = toolkit = {__proto__: document,
             }
         }
 	},
-    isSpace: function(c) {
-        return c == " " || c == "Enter"
-    },
-    right: function(arg) {
-        if (arg == "true") {
-            return true
-        }
-        if (arg == "false") {
-            return false
-        }
-        if (arg) {
-            return true
-        }
-        return false
-    },
+    distance: function(x0, y0, x1, y1) {return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))},
     number: function(d, n) {
         var result = []
         while (d>0) {
@@ -734,68 +516,6 @@ kit = toolkit = {__proto__: document,
         result.reverse()
         return result.join("")
     },
-    distance: function(x0, y0, x1, y1) {
-        return Math.sqrt(Math.pow(x1-x0, 2)+Math.pow(y1-y0, 2))
-    },
-    format_date: function(arg) {
-        arg = arg || new Date()
-        var date = arg.getDate()
-        if (date < 10) {
-            date = "0"+date
-        }
-        var month = arg.getMonth()+1
-        if (month < 10) {
-            month = "0"+month
-        }
-        var hour = arg.getHours()
-        if (hour < 10) {
-            hour = "0"+hour
-        }
-        var minute = arg.getMinutes()
-        if (minute < 10) {
-            minute = "0"+minute
-        }
-        var second = arg.getSeconds()
-        if (second < 10) {
-            second = "0"+second
-        }
-        return arg.getFullYear()+"-"+month+"-"+date+" "+hour+":"+minute+":"+second
-    },
-    Format: function(objs) {
-        return JSON.stringify(objs)
-    },
-    Trans: function(arg) {
-        var res = []
-        if (arg != undefined && arg != null) {
-            switch (typeof arg) {
-                case "string":
-                    res.push(arg)
-                    break
-                case "object":
-                    if (arg.length > 0) {
-                        for (var i = 0; i < arg.length; i++) {
-                            res.push(arg[i])
-                        }
-                    } else {
-                        for (var k in arg) {
-                            res.push(k)
-                            res.push(arg[k])
-                        }
-                    }
-                    break
-                default:
-                    res.push(arg)
-            }
-        }
-        for (var i = res.length - 1; i > -1; i--) {
-            if (res[i] == undefined) {
-                res.pop()
-            } else {
-                break
-            }
-        }
-        return res
-    },
     time: function(t, fmt) {
         var now = t? new Date(t): new Date()
         fmt = fmt || "%y-%m-%d %H:%M:%S"
@@ -807,28 +527,25 @@ kit = toolkit = {__proto__: document,
         fmt = fmt.replace("%S", kit.number(now.getSeconds(), 2))
         return fmt
     },
-    size: function(obj, width, height) {
-        obj.style.width = width+"px"
-        obj.style.height = height+"px"
+    size: function(obj, width, height) {obj.style.width = width+"px", obj.style.height = height+"px"},
+    pixs: function(key, value) {
+        var list = ["top", "left", "width", "height", "padding", "margin"]
+        return typeof value == "number" && list.indexOf(key) != -1? value+"px": value
     },
-    type: function(obj, type) {
-        if (type == undefined) {return typeof obj}
-        return typeof obj == type? obj: null
-    },
+    type: function(obj, type) {return type == undefined? typeof obj: typeof obj == type? obj: null},
     _call: function() {// obj, cb, arg
         var index = 0, obj, cb, arg;
         (obj = kit.type(arguments[index], "object")) && index++
-        (cb = kit.type(arguments[index], "function")) && index++
+        (cb = kit.type(arguments[index], "function")), index++
         (arg = kit.type(arguments[index], "object")) && index++
 
         arg = arg || []
         while (index < arguments.length) {
             arg.push(arguments[index++])
         }
-        cb = cb || function(){}
-        return cb.apply(obj||window, arg||[])
+        return typeof cb == "function"? cb.apply(obj||window, arg||[]): arg && arg.length > 0? arg[0]: null
     },
-}
+}; return kit})()
 
 function Editor(run, plugin, option, output, width, height, space, msg) {
     exports = ["dir", "path", "dir"]
@@ -1569,7 +1286,7 @@ function Canvas(plugin, option, output, width, height, space, msg) {
         },
     }}]).last.getContext("2d")
 
-    var status = kit.AppendStatus(kit.AppendChild(output, [{view: ["status"]}]).last, [{name: "nshape"}, {"className": "cmd", style: {width: (output.clientWidth - 100)+"px"}, data: {autocomplete: "off"}, input: ["cmd", function(event) {
+    var status = kit.AppendAction(kit.AppendChild(output, [{view: ["status"]}]).last, [{name: "nshape"}, {"className": "cmd", style: {width: (output.clientWidth - 100)+"px"}, data: {autocomplete: "off"}, input: ["cmd", function(event) {
         var target = event.target
         event.type == "keyup" && event.key == "Enter" && what.parse(target.value) && (!target.History && (target.History=[]),
             target.History.push(target.value), target.Current=target.History.length, target.value = "")

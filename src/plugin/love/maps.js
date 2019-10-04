@@ -1,4 +1,4 @@
-Script["love/maps.js"] = function(field, option, output) {
+Plugin["love/maps.js"] = function(field, option, output) {
 var id
 return {
     initMap: function() {var plugin = field.Plugin
