@@ -504,13 +504,13 @@ var page = Page({check: true,
                 },
 
                 "表格": function(event, value) {
-                    page.plugin && page.plugin.Plugin.display("table")
+                    page.plugin && page.plugin.Plugin.onfigure("table")
                 },
                 "编辑": function(event, value) {
-                    page.plugin && page.plugin.Plugin.display("editor")
+                    page.plugin && page.plugin.Plugin.onfigure("editor")
                 },
                 "绘图": function(event, value) {
-                    page.plugin && page.plugin.Plugin.display("canvas")
+                    page.plugin && page.plugin.Plugin.onfigure("canvas")
                 },
 
                 "添加": function(event, value) {

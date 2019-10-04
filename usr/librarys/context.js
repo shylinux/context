@@ -19,6 +19,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
         msg.detail = ["run", msg.Order].concat(option.group).concat(option.names).concat(option.cmds)
         kit.Log(msg.detail.concat([msg]))
 
+        kit.History("run", -1, option)
         this.POST("", option, function(msg) {
             kit.Log("run", msg.Order, "result", msg.result? msg.result[0]: "", msg)
             kit._call(cb, [msg])

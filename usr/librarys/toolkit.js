@@ -27,10 +27,10 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     prompt: function(text) {return prompt(text)},
     reload: function() {location.reload()},
     // 日志调试
-    History: shy("历史记录", {lay: [], cmd: [], txt: [], key: []}, function(type, index, value) {var meta = arguments.callee.meta
+    History: shy("历史记录", {lay: [], cmd: [], txt: [], key: []}, function(type, index, data) {var meta = arguments.callee.meta
         if (kit.isNone(index)) {return meta[type]}
         var list = meta[type] || []
-        if (kit.isNone(value)) {var len = list.length
+        if (kit.isNone(data)) {var len = list.length
             return list[(index+len)%len]
         }
         return meta[type] = list, list.push({time: Date.now(), data: data})-1
@@ -395,7 +395,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     CopyText: function(text) {
         text = window.getSelection().toString()
         if (text == "") {return}
-        kit.History.add("txt", text)
+        kit.History("txt", -1, text)
         document.execCommand("copy")
     },
     DelText: function(target, start, count) {
@@ -406,7 +406,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         var start = target.selectionStart
         for (var i = 1; i < text.length+1; i++) {
             var ch = text[text.length-i]
-            if (target.value[start-i] != ch && kit.History.get("key", -i).data != ch) {
+            if (target.value[start-i] != ch && kit.History("key", -i).data != ch) {
                 return false
             }
         }
@@ -549,7 +549,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
 
 function Editor(run, plugin, option, output, width, height, space, msg) {
     exports = ["dir", "path", "dir"]
-    msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), ctx.Table(msg), msg.append), exports[1], function(event, value, name, line) {
+    msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), msg.Table(), msg.append), exports[1], function(event, value, name, line) {
         page.Sync("plugin_"+exports[0]).set(plugin.onexport[exports[2]||""](value, name, line))
     });
 
