@@ -9,19 +9,20 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
         for (var k in dataset) {
             option[k] = dataset[k].split(",")
         }
-        msg.Order = ++arguments.callee.meta.order
+
+        var what = ++arguments.callee.meta.order
 
         msg.option = []
         for (var k in option) {
             msg.option.push(k)
             msg[k] = option[k]
         }
-        msg.detail = ["run", msg.Order].concat(option.group).concat(option.names).concat(option.cmds)
+        msg.detail = ["run", what].concat(option.group).concat(option.names).concat(option.cmds)
         kit.Log(msg.detail.concat([msg]))
 
         kit.History("run", -1, option)
         this.POST("", option, function(msg) {
-            kit.Log("run", msg.Order, "result", msg.result? msg.result[0]: "", msg)
+            kit.Log("run", what, "result", msg.result? msg.result[0]: "", msg)
             kit._call(cb, [msg])
         }, msg)
     }),
@@ -55,7 +56,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
             },
         }, msg.event = event
 
-        kit.Log("event", ++arguments.callee.meta.order, event.type, proto.name, msg)
+        kit.Log("event", ++arguments.callee.meta.order, event.type, proto.name.join("."), msg)
         return msg
     }),
     Share: shy("共享链接", function(objs, clear) {objs = objs || {}
@@ -167,7 +168,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
             }
 
             // Event入口 -1.0
-            msg = ctx.Event(event, msg, {name: document.title, Order: ++meta.order, Reply: function(msg) {
+            msg = ctx.Event(event, msg, {name: [document.title, "wss", msg.detail[0]], Order: ++meta.order, Reply: function(msg) {
                 kit.Log(["wss", msg.Order, "result"].concat(msg.result).concat([msg]))
                 delete(msg.event), s.send(JSON.stringify(msg))
             }})

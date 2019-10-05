@@ -286,9 +286,8 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         }
         return kit.AppendChild(parent, kit.List(list, function(item, index) {
             return item === ""? {view: ["space"]}:
-                typeof item == "string"? {button: [item, function(event) {
-                    kit._call(cb, [item, event])
-                }]}: item.forEach? {select: [item, cb]}: item
+                typeof item == "string"? {button: [item, cb]}:
+                    item.forEach? {select: [item, cb]}: item
         }))
     },
     AppendTable: function(table, data, fields, cb, cbs) {if (!data || !fields) {return}

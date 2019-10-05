@@ -176,7 +176,7 @@ var page = Page({check: true,
     initRiver: function(page, field, option, output) {
         return {
             Show: function(which) {var pane = field.Pane
-                ctx.Event(event, {}, {name: "river.show"})
+                pane.Event(event, {}, {name: pane.Zone("show", page.who.get())})
                 output.innerHTML = "", pane.Update([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true)
             },
             Action: {
@@ -211,7 +211,7 @@ var page = Page({check: true,
                 return field.style.display == "none"
             },
             Show: function(i) {var pane = field.Pane
-                field.Pane.Back(river, output)
+                field.Pane.Load(river, output)
 
                 var foot = page.footer.Pane, cmds = [river, "brow", i||which[river]||0]
                 cmds[2] || (output.innerHTML = ""), pane.Tickers(page.conf.refresh, cmds, function(line, index, msg) {
@@ -274,6 +274,7 @@ var page = Page({check: true,
     },
     initAction: function(page, field, option, output) {
         var river = "", storm = 0, input = "", share = ""
+        var temp = ""
         output.DisplayRaw = true
         return {
             Tutor: function() {var pane = field.Pane
@@ -290,8 +291,8 @@ var page = Page({check: true,
                     "聊天", "help target", "help target list",
                 ], 0)
             },
-            Core: function(event, line, args, cbs) {
-                var msg = ctx.Event(event)
+            Core: function(event, line, args, cbs) {var pane = field.Pane
+                var msg = pane.Event(event)
                 var plugin = event.Plugin || page.plugin && page.plugin.Plugin || {}, engine = {
                     share: function(args) {
                         return ctx.Share({"group": option.dataset.group, "names": option.dataset.names, "cmds": [
@@ -429,9 +430,9 @@ var page = Page({check: true,
                 event.shiftKey? engine._msg(): engine._run()
             },
             Show: function() {var pane = field.Pane
-                if (field.Pane.Back(river+storm, output)) {return}
+                if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}
 
-                ctx.Event(event, {}, {name: "action.show"})
+                pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
                 pane.clear(), pane.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
                     pane.Core(event, line, args, cbs)
                 })
@@ -442,10 +443,10 @@ var page = Page({check: true,
                 return layout.value
             },
             Listen: {
-                river: function(value, old) {river = value},
+                river: function(value, old) {temp = value},
                 storm: function(value, old) {
-                    field.Pane.Save(river+"."+storm, output)
-                    storm = value, field.Pane.Show()
+                    river && storm && field.Pane.Save(river+"."+storm, output)
+                    ;(river = page.river.Pane.which.get(), storm = value) && field.Pane.Show()
                 },
                 source: function(value, old) {input = value},
                 target: function(value, old) {share = value},
@@ -565,13 +566,18 @@ var page = Page({check: true,
                 prev? prev.click(): output.lastChild.click()
             },
             Show: function(which) {var pane = field.Pane
-                ctx.Event(event, {}, {name: "storm.show"})
-                pane.which.get("") == which && page.action.Pane.Show()
-                output.innerHTML = "", pane.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true)
+                var data = river && field.Pane.Load(river, output)
+                if (data) {return pane.which.set(data.which)}
+
+                pane.Event(event, {}, {name: pane.Zone("show", river)})
+                output.innerHTML = "", pane.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true, null, function(msg) {
+                    pane.which.get() == "" && pane.Select(0, msg.key[0])
+                })
             },
             Listen: {
-                river: function(value, old) {
-                    field.Pane.which.set(""), river = value, field.Pane.Show()
+                river: function(value, old) {var pane = field.Pane
+                    river && pane.Save(river, output, {which: pane.which.get()})
+                    river = value, pane.which.set(""), pane.Show()
                 },
             },
             Action: {
@@ -659,7 +665,7 @@ var page = Page({check: true,
             }]}, {name: "list", view: ["list", "table"], list: [{text: ["3. 已选命令列表", "caption"]}]},
         ]}])
 
-        var river = ""
+        var river = "", user = "", node = ""
         return {
             Select: function(com, pod) {var pane = field.Pane
                 var last = kit.AppendChild(ui.list, [{
@@ -673,16 +679,22 @@ var page = Page({check: true,
                 kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                     pane.Select(com, pod)
                 }, function(value, key, com, i, tr, event) {
-                    page.carte.Pane.Show(event, ["创建"], function(event, item) {
+                    page.carte.Pane.Show(event, shy({}, ["创建"], function(event, item) {
                         pane.Create(com.key)
-                    })
+                    }))
                 })
             },
             Append: function(msg) {var pane = field.Pane
                 kit.AppendChilds(table, [{text: ["1. 选择用户节点 ->", "caption"]}])
                 kit.AppendTable(table, msg.Table(), ["user", "node"], function(value, key, pod, i, tr, event) {
+                    pane.Event(event, {}, {name: pane.Zone("show", river, pod.user, pod.node)})
                     kit.Selector(table, "tr.select", function(item) {item.className = "normal"})
-                    tr.className = "select", pane.Run([river, pod.user, pod.node], function(msg) {
+
+                    node && field.Pane.Save(river+"."+user+"."+node, device)
+                    user = pod.user, node = pod.node, tr.className = "select"
+                    if (field.Pane.Load(river+"."+user+"."+node, device)) {return}
+
+                    pane.Run([river, pod.user, pod.node], function(msg) {
                         pane.Update(msg.Table(), pod)
                     })
                 }), table.querySelector("td").click()
@@ -693,6 +705,7 @@ var page = Page({check: true,
                 })
             },
             Show: function(name) {var pane = field.Pane
+                pane.Event(event, {}, {name: pane.Zone("show", river)})
                 pane.Dialog(), ui.name.focus(), ui.name.value = name||"nice", pane.Run([river], pane.Append)
             },
             Listen: {
