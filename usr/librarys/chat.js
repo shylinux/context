@@ -537,6 +537,9 @@ var page = Page({check: true,
                 "返回": function(event, value) {
                     page.plugin && page.plugin.Plugin.Last()
                 },
+                "调试": function(event, value) {
+                    page.debug.Pane.Show()
+                },
             },
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"],
                 "", "刷新", "清屏", "并行", "串行",
@@ -546,7 +549,7 @@ var page = Page({check: true,
             ],
             Choice: [
                 ["layout", "聊天", "办公", "工作"],
-                "刷新", "清屏", "并行", "串行",
+                "刷新", "清屏", "并行", "串行", "调试",
             ],
         }
     },

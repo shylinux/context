@@ -5,6 +5,8 @@ function Meta(zone, target, obj) {
         a.__proto__ = arguments[i], a = arguments[i]
     }
 
+    var names = obj && obj.Event && obj.Event.meta && obj.Event.meta.name && obj.Event.meta.name.concat([zone]) || [zone]
+
     // 构造对象
     var id = 1
     var conf = {}, conf_cb = {}, old
@@ -12,6 +14,9 @@ function Meta(zone, target, obj) {
     var cache = {}
     var history = []
     var meta = {__proto__: obj, target: target,
+        Event: shy("事件入口", {name: names}, function(event, msg) {
+            return ctx.Event(event, msg||{}, arguments.callee.meta)
+        }),
         ID: shy("单一序列", function() {return id++}),
         Conf: shy("配置变量", function(key, value, cb) {
             if (kit.isNone(key)) {return conf}
@@ -433,6 +438,60 @@ function Page(page) {
                 },
             }
         },
+        initDebug: function(page, field, option, output) {
+            var list = kit.AppendChilds(output, "table")
+            var caption = kit.AppendChilds(list, [{type: "caption"}]).last
+            var head = kit.AppendChild(list, [{row: ["time", "type", "main", "arg", "args"], sub: "th"}]).last
+            kit.OrderTable(list)
+            var data, types = {all: 0, event: 0, run: 0, key: 0}
+
+
+            kit.Log.meta.call.push(function(time, type, main, arg) {var Choice = field.Pane && field.Pane.Choice || []
+                if (kit.isNone(types[type])) {types[type] = 0, Choice.push(type)}
+                types[type]++
+                types.all++
+
+                data = kit.AppendChild(list, [{className: type, row: [time, type, main, arg||"", kit.List(arguments, function(item) {
+                    return typeof item == "object"? "{...}": item
+                }).slice(4).join(" ")]}]).last
+                data.scrollIntoView()
+                caption.innerHTML = kit.List(Choice.slice(1), function(item) {return item+": "+types[item]}).join(" ")
+            })
+            return {
+                Show: function() {
+                    kit.ModifyView(field, {display: field.style.display != "block"? "block": "none"})
+                },
+                clear: function() {
+                    var th = kit.AppendChilds(list, [{row: ["time", "type", "main", "arg", "args"], sub: "th"}]).last
+                },
+                Action: shy({
+                    "关闭": function() {
+                        field.Pane.Show()
+                    },
+                    "最大": function() {
+                        kit.size(field, document.body.clientWidth, document.body.clientHeight)
+                    },
+                    "最小": function() {
+                        kit.size(field, document.body.clientWidth/2, document.body.clientHeight/2)
+                    },
+                    "左边": function() {
+                        field.style.left = "0px"
+                        kit.size(field, document.body.clientWidth/2, document.body.clientHeight)
+                    },
+                    "右边": function() {
+                        field.style.left = document.body.clientWidth/2+"px"
+                        kit.size(field, document.body.clientWidth/2, document.body.clientHeight)
+                    },
+                }, function(event, type) {
+                    kit.Selector(list, "tr", function(item, index) {
+                        index == 0 || type == "all" || kit.classList.has(item, type)?
+                            kit.classList.del(item, "hide"): kit.classList.add(item, "hide")
+                    })
+                }),
+                Choice: ["关闭", "all", "event", "run", "key"],
+                Button: ["关闭", "最大", "最小", "左边", "右边"],
+            }
+        },
         initLogin: function(page, field, option, output) {
             var ui = kit.AppendChilds(option, [
                 {label: "username"}, {input: ["username"]}, {type: "br"},
@@ -648,6 +707,9 @@ function Pane(page, field) {
         },
         Run: function(cmds, cb) {ctx.Run(option.dataset, cmds, cb||pane.ondaemon)},
 
+        Show: function() {
+            kit.ModifyView(field, {display: "block"})
+        },
         Hide: function() {
             kit.ModifyView(field, {display: "none"})
         },
@@ -690,7 +752,7 @@ function Pane(page, field) {
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {
                 pane.Choice && page.carte.Pane.Show(event, shy({}, pane.Choice, function(value, meta, event) {
-                    kit._call(pane.Action[value], [event])
+                    call(value, event)
                 }))
             },
         }, function(event, key, cb) {cb(event)}),
@@ -700,7 +762,16 @@ function Pane(page, field) {
         // Event入口 1.1
         ctx.Event(event, {}, {name: name+"."+value})
         page.script("record", [name, value])
-        typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
+
+        if (pane.Action && pane.Action.meta && typeof pane.Action.meta[value] == "function") {
+            kit._call(pane.Action.meta[value], [event, value])
+        } else if (pane.Action && typeof pane.Action[value] == "function") {
+            kit._call(pane.Action[value], [event, value])
+        } else if (typeof pane.Action == "function") {
+            kit._call(pane.Action, [event, value])
+        } else if (typeof pane[value] == "function") {
+            kit._call(pane[value], [event, value])
+        }
     }
     kit.AppendAction(action, pane.Button, call)
 

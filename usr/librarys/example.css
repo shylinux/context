@@ -216,6 +216,28 @@ fieldset.dialog.Carte>div.output div.space {
     border:solid 1px gray;
     margin-top:8px;
 }
+fieldset.dialog.Debug {
+    height:300px;
+    opacity:0.8;
+}
+fieldset.dialog.Debug tr.hide {
+    display:none;
+}
+fieldset.dialog.Debug tr.event {
+    display:red;
+}
+fieldset.dialog.Debug tr.run {
+    background-color:lightgreen;
+}
+fieldset.dialog.Debug tr.key {
+    background-color:lightyellow;
+}
+fieldset.dialog.Debug>div.output table th {
+    min-width:30px;
+}
+fieldset.dialog.Debug>div.output table td {
+    min-width:10px;
+}
 
 fieldset.Login {
     font-size:28px;

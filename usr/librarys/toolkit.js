@@ -38,11 +38,12 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     Debug: shy("调试断点", {why: true, msg: true}, function(key) {
         if (arguments.callee.meta[key]) {debugger}
     }),
-    Log: shy("输出日志", {hide: {"init": true, "wss": false},
+    Log: shy("输出日志", {hide: {"init": true, "wss": false}, call: [],
         func: {debug: "debug", info: "info", parn: "warn", err: "error"},
     }, function(type, arg) {var meta = arguments.callee.meta
         var args = [kit.time().split(" ")[1]].concat(kit.List(kit.isNone(arg)? type: arguments))
         !meta.hide[args[1]] && console[meta.func[args[1]]||"log"](args)
+        kit.List(meta.call, function(cb) {kit._call(cb, args)})
         kit.Debug(args[1])
         return args.slice(1)
     }),
@@ -50,6 +51,15 @@ kit = toolkit = (function() {var kit = {__proto__: document,
 
     // HTML节点操作
     classList: {
+        has: function(obj, key) {
+            var list = obj.className? obj.className.split(" "): []
+            for (var i = 1; i < arguments.length; i++) {
+                if (list.indexOf(arguments[i]) == -1) {
+                    return false
+                }
+            }
+            return true
+        },
         add: function(obj, key) {var list = obj.className? obj.className.split(" "): []
             return obj.className = list.concat(kit.List(arguments, function(value, index) {
                 return index > 0 && list.indexOf(value) == -1? value: undefined
