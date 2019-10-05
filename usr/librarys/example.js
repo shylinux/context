@@ -377,21 +377,6 @@ function Page(page) {
             })))
         },
 
-        initCarte: function(page, field, option, output) {
-            field.onmouseleave = function(event) {field.Pane.Hide()}
-            return {
-                Show: function(event, cb) {if (!cb.list || cb.list.length == 0) {return}
-                    kit.AppendChilds(output, kit.List(cb.list, function(item) {
-                        return item === ""? {view: "space"}: {text: [item, "div", "item"], click: function(event) {
-                            kit._call(cb, [item, cb.meta, event]) && field.Pane.Hide()
-                        }}
-                    }))
-                    kit.ModifyView(field, {display: "block", left: event.x, top: event.y})
-                    event.stopPropagation()
-                    event.preventDefault()
-                },
-            }
-        },
         initToast: function(page, field, option, output) {
             return {
                 Dialog: function(width, height) {
@@ -432,6 +417,19 @@ function Page(page) {
 
                     field.Pane.Dialog(args.width||text.length*10+100, args.height||80)
                     return field.Pane.Ticker(kit.AppendChilds(output, list).tick, args.button? -1: args.duration || 3000)
+                },
+            }
+        },
+        initCarte: function(page, field, option, output) {
+            field.onmouseleave = function(event) {field.Pane.Hide()}
+            return {
+                Show: function(event, cb) {if (!cb.list || cb.list.length == 0) {return}
+                    kit.AppendActions(output, cb.list, function(value, event) {
+                        kit._call(cb, [value, cb.meta, event]) && field.Pane.Hide()
+                    }, true)
+                    kit.ModifyView(field, {display: "block", left: event.x, top: event.y})
+                    event.stopPropagation()
+                    event.preventDefault()
                 },
             }
         },
@@ -476,7 +474,7 @@ function Page(page) {
                         {"view": ["title", "div", state.title], click: function(event) {
                             cb(event, "title", state.title)
                         }},
-                        {"view": ["state"], list: list.map(function(item) {return {text: [state[item], "div"], click: function(event) {
+                        {"view": ["state"], list: list.map(function(item) {return {text: [state[item], "div", "item"], click: function(event) {
                             cb(event, item, state[item])
                         }}})},
                     ])
@@ -704,10 +702,7 @@ function Pane(page, field) {
         page.script("record", [name, value])
         typeof pane.Action == "function"? pane.Action(value, event): pane.Action[value](event, value)
     }
-    pane.Button && pane.Button.length > 0 && (kit.InsertChild(field, output, "div", pane.Button.map(function(value) {
-        return typeof value == "object"? {className: value[0], select: [value.slice(1), call]}:
-            value == ""? {view: ["space"]} :value == "br"? {type: "br"}: {button: [value, call]}
-    })).className="action")
+    kit.AppendAction(action, pane.Button, call)
 
     kit.Item(pane.Listen, function(key, cb) {page.Sync(key).change(cb)})
     option.onsubmit = function(event) {event.preventDefault()};
@@ -744,35 +739,29 @@ function Plugin(page, pane, field, inits, runs) {
 			}}]).last.focus()
 		},
         Append: shy("添加控件", function(item, name, value) {
-            var input = {type: "input", name: name || item.name || "input", data: item}
+            var count = kit.Selector(option, ".args").length
+            args && count < args.length && (value = value || args[count] || "")
+
+            var input = {plug: meta.name, type: "input", name: name || item.name || item.value || "input", data: item}
             switch (item.type) {
-                case "button":
-                    input.name = name || item.name || item.value
-                    break
-                case "upfile":
-                    item.type = "file"
-                    break
+                case "upfile": item.type = "file"; break
                 case "select":
-                    kit.classList.add(item, "args")
                     input.type = "select", input.list = item.values.map(function(value) {
                         return {type: "option", value: value, inner: value}
                     })
-                    input.value = item.value || item.values[0]
+                    item.value = value || item.value || item.values[0]
+                    kit.classList.add(item, "args")
                     break
                 case "textarea":
-                    kit.classList.add(item, "args")
                     input.type = "textarea", item.style = "height:100px;"+"width:"+(pane.target.clientWidth-30)+"px"
                     // no break
                 case "text":
+                    item.value = value || item.value || ""
                     kit.classList.add(item, "args")
                     item.autocomplete = "off"
-
-                    var count = kit.Selector(option, ".args").length
-                    args && count < args.length && (item.value = value||args[count++]||item.value||"");
                     break
             }
-            item.plug = meta.name, item.name = input.name
-            return Inputs(plugin, item, kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])[input.name]).target
+            return Inputs(plugin, input, item, kit.AppendChild(option, [{view: [item.view||""], list: [{type: "label", inner: item.label||""}, input]}])[input.name]).target
         }),
         Remove: function() {
             var list = option.querySelectorAll("input.temp")
@@ -964,8 +953,8 @@ function Plugin(page, pane, field, inits, runs) {
     kit.Log("init", "plugin", name, plugin)
     return plugin
 }
-function Inputs(plugin, item, target) {
-    var plug = item.plug, name = item.name, type = item.type
+function Inputs(plugin, meta, item, target) {
+    var plug = meta.plug, name = meta.name, type = item.type
     var input = Meta(plug+"."+name, target, item, {
         onimport: shy("导入数据", {}, [item.imports], function() {
             kit.List(arguments.callee.list, function(imports) {
@@ -1073,7 +1062,7 @@ function Inputs(plugin, item, target) {
     input.onimport()
     target.value = plugin.onformat(item.init, item.value)
     plugin.Inputs[item.name] = target, target.Input = input
-    !target.placeholder && item.name && (target.placeholder = item.name)
+    type == "text" && !target.placeholder && item.name && (target.placeholder = item.name)
     !target.title && item.placeholder && (target.title = item.placeholder)
     kit.Log("init", "input", plug+"."+name, input)
     return input

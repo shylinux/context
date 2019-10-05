@@ -3,6 +3,7 @@ package chat
 import (
 	"contexts/ctx"
 	"contexts/web"
+
 	"net/http"
 	"toolkit"
 )
@@ -28,7 +29,7 @@ func check(m *ctx.Message, arg []string) ([]string, string, bool) {
 var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h"}, Help: "默认组件"},
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h"}, Help: "用户登录"},
 		"componet": &ctx.Config{Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"name": "head",
@@ -37,6 +38,12 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					}}, "favicon": "favicon.ico", "styles": []interface{}{
 						"example.css", "chat.css",
 					}},
+				map[string]interface{}{"name": "toast",
+					"tmpl": "fieldset", "view": "Toast dialog", "init": "initToast",
+				},
+				map[string]interface{}{"name": "carte",
+					"tmpl": "fieldset", "view": "Carte dialog", "init": "initCarte",
+				},
 				map[string]interface{}{"name": "login",
 					"tmpl": "fieldset", "view": "Login dialog", "init": "initLogin",
 					"ctx": "web.chat", "cmd": "login",
@@ -78,7 +85,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 
 				map[string]interface{}{"name": "footer",
 					"tmpl": "fieldset", "view": "Footer", "init": "initFooter",
-					"title": "shycontext 地势坤，君子以厚德载物",
+					"ctx": "web.chat", "cmd": "login",
 				},
 				map[string]interface{}{"name": "tail",
 					"tmpl": "tail", "scripts": []interface{}{

@@ -444,7 +444,7 @@ var page = Page({check: true,
             Listen: {
                 river: function(value, old) {river = value},
                 storm: function(value, old) {
-                    field.Pane.Save(river+storm, output)
+                    field.Pane.Save(river+"."+storm, output)
                     storm = value, field.Pane.Show()
                 },
                 source: function(value, old) {input = value},
@@ -545,8 +545,8 @@ var page = Page({check: true,
                 "", "执行", "下载", "清空", "返回",
             ],
             Choice: [
+                ["layout", "聊天", "办公", "工作"],
                 "刷新", "清屏", "并行", "串行",
-                "", "聊天", "办公", "工作",
             ],
         }
     },

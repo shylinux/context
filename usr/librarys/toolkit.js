@@ -50,7 +50,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
 
     // HTML节点操作
     classList: {
-        add: function(obj, key) {var list = (obj.className||"").split(" ")
+        add: function(obj, key) {var list = obj.className? obj.className.split(" "): []
             return obj.className = list.concat(kit.List(arguments, function(value, index) {
                 return index > 0 && list.indexOf(value) == -1? value: undefined
             })).join(" ")
@@ -113,7 +113,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         // 基本属性: name value title
         // 基本内容: inner innerHTML
         // 基本样式: style className
-        // 基本事件: dataset click
+        // 基本事件: click dataset
         //
         // 按键: button select
         // 输入: input password
@@ -127,7 +127,8 @@ kit = toolkit = (function() {var kit = {__proto__: document,
 
         subs = subs || {}
         children.forEach(function(child, i) {if (kit.isNone(child)) {return}
-            var type = child.type || "div", name = child.name, data = child.data || {}
+            var type = child.type || "div", data = child.data || {}
+            var name = child.name || data.name
 
             kit.List([
                 "name", "value", "title",
@@ -154,9 +155,10 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                 data.onchange = function(event) {
                     kit._call(list[1], [event.target.value, event])
                 }
-                child.list = list[0].map(function(value) {
+                child.list = list[0].slice(1).map(function(value) {
                     return {type: "option", value: value, inner: value}
                 })
+                data.className = list[0][0] || ""
 
             } else if (child.input) {var list = kit.List(child.input)
                 type = "input", name = name || list[0]
@@ -241,7 +243,6 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                 }).join("")
             }
 
-            data.name = data.name || name || ""
             var node = kit.CreateNode(type, data)
             child.list && kit.AppendChild(node, child.list, subs)
             subs.first || (subs.first = node), subs.last = node
@@ -259,11 +260,25 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         return parent.insertBefore(elm, position || parent.firstElementChild)
     },
     // HTML控件操作
-    AppendAction: function(parent, list, cb) {
+    AppendActions: function(parent, list, cb, diy) {
+        parent.innerHTML = "", kit.AppendAction(parent, list, cb, diy)
+    },
+    AppendAction: function(parent, list, cb, diy) {
+        if (diy) {
+            return kit.AppendChild(parent, kit.List(list, function(item, index) {
+                return item === ""? {view: ["space"]}:
+                    typeof item == "string"? {view: ["item", "div", item], click: function(event) {
+                        kit._call(cb, [item, event])
+                    }}: item.forEach? {view: item[0], list: kit.List(item.slice(1), function(value) {return {text: [value, "div", "item"], click: function(event) {
+                        kit._call(cb, [value, event])
+                    }}})}: item
+            }))
+        }
         return kit.AppendChild(parent, kit.List(list, function(item, index) {
             return item === ""? {view: ["space"]}:
-                typeof item == "string"? {button: [item, cb]}:
-                    item.forEach? {select: [item, cb]}: item
+                typeof item == "string"? {button: [item, function(event) {
+                    kit._call(cb, [item, event])
+                }]}: item.forEach? {select: [item, cb]}: item
         }))
     },
     AppendTable: function(table, data, fields, cb, cbs) {if (!data || !fields) {return}

@@ -72,11 +72,17 @@ fieldset>div.output {
     /* max-height:800px; */
     padding:6px;
 }
+fieldset>div.output div.item {
+    padding:2px;
+}
 fieldset>div.output div.item:hover {
+    cursor:pointer;
     background-color:red;
+    border:ridge 2px yellow;
 }
 fieldset>div.output div.item.select {
     background-color:red;
+    border:ridge 2px yellow;
 }
 fieldset>div.output div.code {
     color:white;
@@ -129,41 +135,6 @@ fieldset>div.Help>div {
     overflow:auto;
 }
 
-fieldset.carte {
-    border:solid 2px red;
-    background-color:#ffffff;
-    position:absolute;
-    display:none;
-    z-index:200;
-}
-fieldset.carte>div.output>div.line {
-    border:solid 1px gray;
-    margin-top:8px;
-}
-fieldset.toast {
-    border:solid 2px red;
-    background-color:#ffffff;
-    position:absolute;
-    display:none;
-    z-index:100;
-}
-fieldset.toast>div.output {
-    padding:0 10px;
-}
-fieldset.toast>div.output>div.title {
-    font-size:12px;
-}
-fieldset.toast>div.output>div.content  {
-    word-break:break-word;
-    white-space:pre-wrap;
-    text-align:center;
-    margin:0px;
-    padding:2px;
-    font-size:16px;
-}
-fieldset.toast>div.output>div.tick {
-    font-size:12px;
-}
 fieldset.dialog {
     background-color:lightgray;
     padding:10px;
@@ -191,6 +162,61 @@ fieldset.dialog>div.create table {
     min-width:240px;
 }
 
+fieldset.dialog.Toast {
+    border:solid 2px red;
+    background-color:#ffffff;
+    position:absolute;
+    display:none;
+    z-index:100;
+}
+fieldset.dialog.Toast>div.output {
+    padding:0 10px;
+}
+fieldset.dialog.Toast>div.output>div.title {
+    font-size:12px;
+}
+fieldset.dialog.Toast>div.output>div.content  {
+    word-break:break-word;
+    white-space:pre-wrap;
+    text-align:center;
+    margin:0px;
+    padding:2px;
+    font-size:16px;
+}
+fieldset.dialog.Toast>div.output>div.tick {
+    font-size:12px;
+}
+fieldset.dialog.Carte {
+    padding:0;
+    border:solid 2px red;
+    background-color:greenyellow;
+    position:absolute;
+    display:none;
+    z-index:200;
+}
+fieldset.dialog.Carte>div.action {
+    padding:0;
+}
+fieldset.dialog.Carte>div.output {
+    padding:0;
+}
+fieldset.dialog.Carte>div.output button {
+    display:block;
+}
+fieldset.dialog.Carte>div.output select {
+    display:block;
+}
+fieldset.dialog.Carte>div.output div.layout>div {
+    float:left;
+}
+fieldset.dialog.Carte>div.output div.item {
+    padding:0px 6px;
+}
+fieldset.dialog.Carte>div.output div.space {
+    border:solid 1px gray;
+    margin-top:8px;
+}
+
 fieldset.Login {
     font-size:28px;
     z-index:20;
@@ -205,25 +231,37 @@ fieldset.Login>form.option button {
 }
 fieldset.Header {
     height:32px;
-    clear:both;
     min-width:640px;
+    clear:both;
 }
-fieldset.Header>div.output div.title {
-    float:left;
+fieldset.Header>div.action {
+    padding:0;
+}
+fieldset.Header>div.output>div.title {
     cursor:pointer;
+    float:left;
 }
-fieldset.Header>div.output div.state {
+fieldset.Header>div.output>div.title:hover {
+    background-color:red;
+}
+fieldset.Header>div.output>div.state {
     float:right;
 }
-fieldset.Header>div.output div.state div {
+fieldset.Header>div.output>div.state>div {
+    cursor:pointer;
     margin-left:5px;
     float:right;
-    cursor:pointer;
+}
+fieldset.Header>div.output>div.state>div:hover {
+    background-color:red;
 }
 fieldset.Footer {
     clear:both;
     overflow:hidden;
     height:32px;
+}
+fieldset.Footer>div.action {
+    padding:0;
 }
 fieldset.Footer>div.output div.title {
     float:left;
@@ -246,9 +284,13 @@ fieldset.Footer>div.output div.state div {
 fieldset.item {
     float:left;
 }
+fieldset.item:hover {
+    background-color:gold;
+    border:ridge 2px red;
+}
 fieldset.item.select {
     background-color:gold;
-    border:solid 2px red;
+    border:ridge 2px red;
 }
 fieldset.item>div.output {
     overflow:auto;

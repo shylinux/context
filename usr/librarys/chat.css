@@ -8,6 +8,12 @@ fieldset.Ocean div.create pre:hover {
 fieldset.River {
     float:left;
 }
+fieldset.River>div.output {
+    padding:0;
+}
+fieldset.River>div.output>div.item {
+    padding-left:6px;
+}
 fieldset.Target div.output div.item:hover {
     background-color:lightgreen;
 }
@@ -41,6 +47,12 @@ fieldset.Action div.output div.item:hover {
 }
 fieldset.Storm {
     float:right;
+}
+fieldset.Storm>div.output {
+    padding:0;
+}
+fieldset.Storm>div.output>div.item {
+    padding-left:6px;
 }
 
 fieldset.Steam table.device {
