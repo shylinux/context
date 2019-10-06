@@ -85,13 +85,19 @@ var page = Page({check: true,
             ctx.Search({"river": page.river.Pane.which.get(), "storm": page.storm.Pane.which.get(), "layout": page.action.Pane.Layout()})
         },
         user: function(event, item, value, page) {
-            var name = kit.prompt("new name")
-            name && page.login.Pane.Run(["rename", name], function(msg) {
-                page.header.Pane.State("user", name)
-            })
-        },
-        logout: function(event, item, value, page) {
-            kit.confirm("logout?") && page.login.Pane.Exit()
+            page.carte.Pane.Show(event, shy({
+                "修改昵称": function(event) {
+                    var name = kit.prompt("new name")
+                    name && page.login.Pane.Run(event, ["rename", name], function(msg) {
+                        page.header.Pane.State("user", name)
+                    })
+                },
+                "退出登录": function(event) {
+                    kit.confirm("logout?") && page.login.Pane.Exit()
+                },
+            }, ["修改昵称", "退出登录"], function(value, meta, event) {
+                meta[value](event)
+            }))
         },
     },
 
@@ -154,12 +160,12 @@ var page = Page({check: true,
                 })
             },
             Create: function(name, list) {
-                field.Pane.Run(["spawn", "", name].concat(list), function(msg) {
+                field.Pane.Run(event, ["spawn", "", name].concat(list), function(msg) {
                     field.Pane.Show(), page.river.Pane.Show(name)
                 })
             },
             Show: function(name) {var pane = field.Pane
-                pane.Dialog(), ui.name.focus(), ui.name.value = name||"good", pane.Run([], pane.Append)
+                pane.Dialog(), ui.name.focus(), ui.name.value = name||"good", pane.Run(event, [], pane.Append)
             },
             Action: {
                 "取消": function(event) {field.Pane.Show()},
@@ -184,7 +190,7 @@ var page = Page({check: true,
                     page.ocean.Pane.Show()
                 },
                 "共享": function(event) {
-                    page.login.Pane.Run(["relay", "river", "username", kit.prompt("分享给用户"), "url", ctx.Share({
+                    page.login.Pane.Run(event, ["relay", "river", "username", kit.prompt("分享给用户"), "url", ctx.Share({
                         "river": page.river.Pane.which.get(),
                         "layout": page.action.Pane.Layout(),
                     })], function(msg) {
@@ -203,7 +209,7 @@ var page = Page({check: true,
         output.DisplayTime = true
         return {
             Send: function(type, text, cb) {var pane = field.Pane
-                pane.Run([river, "flow", type, text], function(msg) {
+                pane.Run(event, [river, "flow", type, text], function(msg) {
                     pane.Show(), typeof cb == "function" && cb(msg)
                 })
             },
@@ -421,7 +427,7 @@ var page = Page({check: true,
                     },
                     _run: function() {
                         var meta = plugin && plugin.target && plugin.target.Meta || {}
-                        field.Pane.Run([meta.river||river, meta.storm||storm, meta.action].concat(args), function(msg) {
+                        field.Pane.Run(event, [meta.river||river, meta.storm||storm, meta.action].concat(args), function(msg) {
                             engine._msg(msg), typeof cbs == "function" && cbs(msg)
                         })
                     },
@@ -433,8 +439,8 @@ var page = Page({check: true,
                 if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}
 
                 pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
-                pane.clear(), pane.Update([river, storm], "plugin", ["node", "name"], "index", false, function(line, index, event, args, cbs) {
-                    pane.Core(event, line, args, cbs)
+                pane.clear(), pane.Update([river, storm], "plugin", ["name", "help"], "name", true, function(line, index, event, args, cbs) {
+                    kit.notNone(args) && pane.Core(event, line, args, cbs)
                 })
             },
             Layout: function(name) {var pane = field.Pane
@@ -550,7 +556,7 @@ var page = Page({check: true,
             ],
             Choice: [
                 ["layout", "聊天", "办公", "工作"],
-                "刷新", "清屏", "并行", "串行", "调试",
+                "", "刷新", "清屏", "并行", "串行", "调试",
             ],
         }
     },
@@ -588,7 +594,7 @@ var page = Page({check: true,
                     var user = kit.prompt("分享给用户")
                     if (user == null) {return}
 
-                    page.login.Pane.Run(["relay", "storm", "username", user, "url", ctx.Share({
+                    page.login.Pane.Run(event, ["relay", "storm", "username", user, "url", ctx.Share({
                         "river": page.river.Pane.which.get(),
                         "storm": page.storm.Pane.which.get(),
                         "layout": page.action.Pane.Layout(),
@@ -694,19 +700,19 @@ var page = Page({check: true,
                     user = pod.user, node = pod.node, tr.className = "select"
                     if (field.Pane.Load(river+"."+user+"."+node, device)) {return}
 
-                    pane.Run([river, pod.user, pod.node], function(msg) {
+                    pane.Run(event, [river, pod.user, pod.node], function(msg) {
                         pane.Update(msg.Table(), pod)
                     })
                 }), table.querySelector("td").click()
             },
             Create: function(name, list) {
-                field.Pane.Run([river, "spawn", name].concat(list||[]), function(msg) {
+                field.Pane.Run(event, [river, "spawn", name].concat(list||[]), function(msg) {
                     field.Pane.Show(), page.storm.Pane.Show(name)
                 })
             },
             Show: function(name) {var pane = field.Pane
                 pane.Event(event, {}, {name: pane.Zone("show", river)})
-                pane.Dialog(), ui.name.focus(), ui.name.value = name||"nice", pane.Run([river], pane.Append)
+                pane.Dialog(), ui.name.focus(), ui.name.value = name||"nice", pane.Run(event, [river], pane.Append)
             },
             Listen: {
                 river: function(value, old) {river = value},
@@ -726,7 +732,7 @@ var page = Page({check: true,
     init: function(page) {
 		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? page.conf.first: page.conf.mobile)
         page.footer.Pane.Order({"ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(event, item, value) {})
-        page.header.Pane.Order({"logout": "logout", "user": "", "title": "github.com/shylinux/context"}, ["logout", "user"], function(event, item, value) {
+        page.header.Pane.Order({"user": "", "title": "github.com/shylinux/context"}, ["user"], function(event, item, value) {
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show()

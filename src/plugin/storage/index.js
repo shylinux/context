@@ -1,4 +1,2 @@
-
-{init: function(page, pane, field, option, output) {
-    kit.Log("hello world")
+Plugin["storage/index.js"] = function(field, option, output) {return {
 }}

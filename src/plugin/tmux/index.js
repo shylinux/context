@@ -1,4 +1,3 @@
-
-{init: function(page, pane, field, option, output) {
-    kit.Log("hello world")
+Plugin["tmux/index.js"] = function(field, option, output) {return {
 }}
+

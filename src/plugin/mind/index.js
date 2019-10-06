@@ -1,4 +1,4 @@
-{init: function(field, option, output) {return {
+Plugin["mind/index.js"] = function(field, option, output) {return {
     ondaemon: {
         table: function(msg, cb) {if (msg.event && msg.event.type == "blur") {return}
             var plugin = field.Plugin
@@ -53,4 +53,4 @@
             }), typeof cb == "function" && cb(msg)
         },
     },
-}}}
+}}

@@ -1,5 +1,3 @@
-{init: function(run, field, option, output) {
-    kit.Log("hello world")
-    return {}
+Script["{{options . "name"}}/index.js"] = function(field, option, output) {return {
 }}
 

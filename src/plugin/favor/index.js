@@ -1,10 +1,8 @@
-{init: function(field, option, output) {
-    return {
-        share: function() {var plugin = field.Plugin
-            plugin.Run(event, ["share", args[0]], function(msg) {
-                kit.AppendChilds(output, [{img: [msg.result.join("")]}])
-                typeof cb == "function" && cb({})
-            })
-        },
-    }
+Plugin["favor/index.js"] = function(field, option, output) {return {
+    share: function(event) {var plugin = field.Plugin
+        plugin.Run(event, ["share", option.txt.value], function(msg) {
+            kit.AppendChilds(output, [{img: [msg.result.join("")]}])
+            typeof cb == "function" && cb({})
+        })
+    },
 }}

@@ -1,7 +1,7 @@
 
 fun qrcode "二维码" "index.js" public \
 	text "" name txt view long \
-	button "生成"
+	button "生成" cb share
 
     append qrcode ($1 || $referer)
 end

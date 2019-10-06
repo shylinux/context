@@ -1,6 +1,6 @@
 ctx = context = (function(kit) {var ctx = {__proto__: kit,
-    Run: shy("请求后端", {order: 0}, function(dataset, cmd, cb) {
-        var msg = ctx.Event(event, null, {name: "ctx.run"})
+    Run: shy("请求后端", {order: 0}, function(event, dataset, cmd, cb) {
+        var msg = ctx.Event(event)
 
         var option = {"cmds": cmd}
         msg.option && msg.option.forEach(function(item) {
@@ -24,10 +24,9 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
         this.POST("", option, function(msg) {
             kit.Log("run", what, "result", msg.result? msg.result[0]: "", msg)
             kit._call(cb, [msg])
-        }, msg)
+        }, msg), delete(event.msg)
     }),
     Event: shy("封装事件", {order: 0}, function(event, msg, proto) {
-        event = event || document.createEvent("Event")
         if (event.msg && !msg) {return event.msg}
 
         event.msg = msg = msg || {}, proto = proto || {}, msg.__proto__ = proto, proto.__proto__ = {
@@ -117,7 +116,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
             if (xhr.status != 200) {return}
         }
         xhr.upload.onprogress = function(event) {kit._call(detail, [event])}
-        xhr.onload = function(event) {kit._call(cb, [event, JSON.parse(xhr.responseText||'{"result":[]}')])}
+        xhr.onload = function(event) {kit._call(cb, [event, ctx.Event(event, JSON.parse(xhr.responseText||'{"result":[]}'), {name: [document.title]})])}
         xhr.open("POST", "/upload", true)
         xhr.send(data)
     }),

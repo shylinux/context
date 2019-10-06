@@ -215,6 +215,7 @@ fieldset.dialog.Carte>div.output div.item {
 fieldset.dialog.Carte>div.output div.space {
     border:solid 1px gray;
     margin-top:8px;
+    clear:both;
 }
 fieldset.dialog.Debug {
     height:300px;
@@ -264,7 +265,9 @@ fieldset.Header>div.output>div.title {
     float:left;
 }
 fieldset.Header>div.output>div.title:hover {
+    cursor:pointer;
     background-color:red;
+    border:ridge 2px yellow;
 }
 fieldset.Header>div.output>div.state {
     float:right;

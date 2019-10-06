@@ -5,7 +5,7 @@ Plugin["love/index.js"] = function(field, option, output) {return {
 		})
 	},
     show: function(event) {var plugin = field.Plugin
-		plugin.Check(undefined, function(msg) {
+		plugin.Check(event, undefined, function(msg) {
 			plugin.Run(event, [option.table.value], function(msg) {
 				kit.List(msg.Table(), function(line) {
 					kit.Selector(output, ".s"+line.when.split(" ")[0].split("-").join(""), function(item) {
@@ -27,7 +27,7 @@ Plugin["love/index.js"] = function(field, option, output) {return {
 				return kit.AppendChilds(output, list)
 			}); break
 			case "date":
-				plugin.Check(undefined, function(msg) {
+				plugin.Check(event, undefined, function(msg) {
 					kit.Selector(output, ".s"+line.when.split(" ")[0].split("-").join(""), function(item) {
 						kit.classList.add(item.parentNode, "select")
 						item.parentNode.title = line.what

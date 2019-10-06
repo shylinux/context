@@ -1,4 +1,2 @@
-{init: function(field, option, output) {
-    kit.Log("hello world")
-    return {}
+Plugin["weixin/index.js"] = function(field, option, output) {return {
 }}

@@ -33,6 +33,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         if (kit.isNone(data)) {var len = list.length
             return list[(index+len)%len]
         }
+        kit.Log("history", type, data)
         return meta[type] = list, list.push({time: Date.now(), data: data})-1
     }),
     Debug: shy("调试断点", {why: true, msg: true}, function(key) {
@@ -253,6 +254,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                 }).join("")
             }
 
+            name = name || data.className || type
             var node = kit.CreateNode(type, data)
             child.list && kit.AppendChild(node, child.list, subs)
             subs.first || (subs.first = node), subs.last = node
@@ -356,8 +358,8 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                     var name = target.parentElement.parentElement.querySelector("tr").childNodes[i].innerText
                     name.startsWith(field) && kit._call(cb, [event, item.innerText, name, item.parentNode.Meta, index])
                 }
-                kit.CopyText()
             })
+            kit.CopyText()
         }
         return true
     },
@@ -417,10 +419,16 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     },
     // HTML输入文本
     CopyText: function(text) {
+        if (text) {
+            var input = kit.AppendChild(document.body, [{type: "input", value: text}]).input
+            input.focus(), input.setSelectionRange(0, text.length)
+        }
+
         text = window.getSelection().toString()
         if (text == "") {return}
-        kit.History("txt", -1, text)
-        document.execCommand("copy")
+
+        kit.History("txt", -1) && kit.History("txt", -1).data == text || kit.History("txt", -1, text) && document.execCommand("copy")
+        input && document.body.removeChild(input)
     },
     DelText: function(target, start, count) {
         target.value = target.value.substring(0, start)+target.value.substring(start+(count||target.value.length), target.value.length)
