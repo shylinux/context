@@ -45,6 +45,9 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
                 kit.notNone(res) && (msg.result = (msg.result || []).concat(kit._call(kit.List, arguments)))
                 return msg
             },
+            Format: function() {
+                return msg.append && msg.append[0]? ["table", JSON.stringify(msg.Table())]: ["code", msg.result? msg.result.join(""): ""]
+            },
             Result: function() {return msg.result? msg.result.join(""): ""},
             Results: function() {return kit.Color(msg.Result().replace(/</g, "&lt;").replace(/>/g, "&gt;"))},
             Table: function(cb) {if (!msg.append || !msg.append.length || !msg[msg.append[0]]) {return}

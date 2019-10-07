@@ -317,6 +317,16 @@ fieldset.item.select {
     background-color:gold;
     border:ridge 2px red;
 }
+fieldset.item>form.option>div.item {
+    padding:0;
+    border:0;
+}
+fieldset.item>form.option>div.item:hover {
+    border:0;
+}
+fieldset.item>form.option>div.item.select {
+    border:0;
+}
 fieldset.item>div.output {
     overflow:auto;
 }

@@ -35,7 +35,7 @@ Plugin["love/index.js"] = function(field, option, output) {return {
 				})
 				break
 			case "detail":
-				plugin.Change(event.target, function(value) {
+				kit.Change(event.target, function(value) {
 					plugin.Run(event, ["update", option.table.value, option.index.value, line.key, value], function(msg) {
 						kit.Log("ok")
 					})

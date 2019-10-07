@@ -183,7 +183,7 @@ var page = Page({check: true,
         return {
             Show: function(which) {var pane = field.Pane
                 pane.Event(event, {}, {name: pane.Zone("show", page.who.get())})
-                output.innerHTML = "", pane.Update([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true)
+                output.innerHTML = "", pane.Appends([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true)
             },
             Action: {
                 "创建": function(event) {
@@ -419,10 +419,10 @@ var page = Page({check: true,
                     },
                     _msg: function(msg) {
                         if (msg) {
-                            var text = plugin? plugin.Reveal(msg): ""
+                            var text = msg.Format()
                             text && event.ctrlKey && page.target.Pane.Send(text[0], text[1])
                         } else {
-                            page.target.Pane.Send("field", plugin.Format())
+                            page.target.Pane.Send("field", plugin.Reveal())
                         }
                     },
                     _run: function() {
@@ -439,7 +439,7 @@ var page = Page({check: true,
                 if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}
 
                 pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
-                pane.clear(), pane.Update([river, storm], "plugin", ["name", "help"], "name", true, function(line, index, event, args, cbs) {
+                output.innerHTML = "", pane.Appends([river, storm], "plugin", ["name", "help"], "name", true, function(line, index, event, args, cbs) {
                     kit.notNone(args) && pane.Core(event, line, args, cbs)
                 })
             },
@@ -576,7 +576,7 @@ var page = Page({check: true,
                 if (data) {return pane.which.set(data.which)}
 
                 pane.Event(event, {}, {name: pane.Zone("show", river)})
-                output.innerHTML = "", pane.Update([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true, null, function(msg) {
+                output.innerHTML = "", pane.Appends([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true, null, function(msg) {
                     pane.which.get() == "" && pane.Select(0, msg.key[0])
                 })
             },
@@ -680,7 +680,7 @@ var page = Page({check: true,
                     click: function(event) {last.parentNode.removeChild(last)},
                 }]).last
             },
-            Update: function(list, pod) {var pane = field.Pane
+            Appends: function(list, pod) {var pane = field.Pane
                 kit.AppendChilds(device, [{text: ["2. 选择模块命令 ->", "caption"]}])
                 kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                     pane.Select(com, pod)
@@ -701,7 +701,7 @@ var page = Page({check: true,
                     if (field.Pane.Load(river+"."+user+"."+node, device)) {return}
 
                     pane.Run(event, [river, pod.user, pod.node], function(msg) {
-                        pane.Update(msg.Table(), pod)
+                        pane.Appends(msg.Table(), pod)
                     })
                 }), table.querySelector("td").click()
             },

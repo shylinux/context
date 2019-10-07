@@ -158,13 +158,13 @@ kit = toolkit = (function() {var kit = {__proto__: document,
             if (kit.notNone(child.button)) {var list = kit.List(child.button)
                 type = "button", name = name || list[0]
                 data.innerText = list[0], data.onclick = function(event) {
-                    kit._call(list[1], [list[0], event])
+                    kit._call(list[1], [event, list[0]])
                 }
 
             } else if (child.select) {var list = child.select
                 type = "select", name = name || list[0][0]
                 data.onchange = function(event) {
-                    kit._call(list[1], [event.target.value, event])
+                    kit._call(list[1], [event, event.target.value])
                 }
                 child.list = list[0].slice(1).map(function(value) {
                     return {type: "option", value: value, inner: value}
@@ -280,9 +280,9 @@ kit = toolkit = (function() {var kit = {__proto__: document,
             return kit.AppendChild(parent, kit.List(list, function(item, index) {
                 return item === ""? {view: ["space"]}:
                     typeof item == "string"? {view: ["item", "div", item], click: function(event) {
-                        kit._call(cb, [item, event])
+                        kit._call(cb, [event, item])
                     }}: item.forEach? {view: item[0], list: kit.List(item.slice(1), function(value) {return {text: [value, "div", "item"], click: function(event) {
-                        kit._call(cb, [value, event])
+                        kit._call(cb, [event, value])
                     }}})}: item
             }))
         }
@@ -362,6 +362,19 @@ kit = toolkit = (function() {var kit = {__proto__: document,
             kit.CopyText()
         }
         return true
+    },
+    Change: function(target, cb) {
+        var value = target.value
+        function reset(event) {
+            value != event.target.value && kit._call(cb, [event.target.value, value])
+            target.innerHTML = event.target.value
+        }
+        kit.AppendChilds(target, [{type: "input", value: target.innerText, data: {
+            onblur: reset,
+            onkeydown: function(event) {
+                page.oninput(event), event.key == "Enter" && reset(event)
+            },
+        }}]).last.focus()
     },
 
     // HTML显示文本
