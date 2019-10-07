@@ -317,7 +317,9 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         return table
     },
     RangeTable: function(table, index, sort_asc) {
-        var list = kit.Selector(table, "tr").slice(1)
+        var list = kit.Selector(table, "tr", function(tr) {
+            return tr.style.display == "none" || kit.classList.has(tr, "hide")? null: tr
+        }).slice(1)
 
         var is_time = true, is_number = true
         kit.List(list, function(tr) {
@@ -343,8 +345,9 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                     list[j] = temp
                 }
             }
-            list[i].parentElement && list[i].parentElement.removeChild(list[i])
-            table.appendChild(list[i])
+            var tbody = list[i].parentElement
+            list[i].parentElement && tbody.removeChild(list[i])
+            tbody.appendChild(list[i])
         }
     },
     OrderTable: function(table, field, cb) {if (!table) {return}
@@ -502,7 +505,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
 		}
         return list
     },
-	Opacity: function(obj, interval, list) {
+    Opacity: function(obj, interval, list) {
 		kit.List(kit.Value(list, [0, 0.2, 0.4, 0.6, 1.0]), function(value) {
 			obj.style.opacity = value
 		}, kit.Value(interval, 150))
@@ -534,7 +537,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         s = s.replace(/\033\[m/g, "</span>")
         return s
     },
-	Value: function() {
+    Value: function() {
         for (var i = 0; i < arguments.length; i++) {
             switch (arguments[i]) {
                 case undefined:

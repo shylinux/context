@@ -218,7 +218,6 @@ fieldset.dialog.Carte>div.output div.space {
     clear:both;
 }
 fieldset.dialog.Debug {
-    height:300px;
     opacity:0.8;
 }
 fieldset.dialog.Debug tr.hide {
@@ -233,11 +232,35 @@ fieldset.dialog.Debug tr.run {
 fieldset.dialog.Debug tr.key {
     background-color:lightyellow;
 }
+fieldset.dialog.Debug>div.output {
+    overflow:auto;
+    margin-top:50px;
+}
+fieldset.dialog.Debug>div.output table caption {
+    position:absolute;
+    top:50px;
+    left:20px;
+}
+fieldset.dialog.Debug>div.output table thead {
+    position:absolute;
+    top:72px;
+    left:18px;
+}
+fieldset.dialog.Debug>div.output table thead th {
+    border:solid 1px red;
+}
+fieldset.dialog.Debug>div.output table caption>span {
+    margin-right:4px;
+}
+fieldset.dialog.Debug>div.output table caption>span:hover {
+    cursor:pointer;
+    background-color:red;
+}
 fieldset.dialog.Debug>div.output table th {
-    min-width:30px;
+    min-width:60px;
 }
 fieldset.dialog.Debug>div.output table td {
-    min-width:10px;
+    min-width:60px;
 }
 
 fieldset.Login {
@@ -292,7 +315,11 @@ fieldset.Footer>div.output div.title {
     float:left;
 }
 fieldset.Footer>div.output div.magic {
-    float:left;
+    float:right;
+    margin-top:-6px;
+}
+fieldset.Footer>div.output div.magic>label {
+    margin-right:2px;
 }
 fieldset.Footer>div.output div.magic>input {
     background-color:black;
@@ -364,6 +391,9 @@ fieldset table caption {
     font-style:italic;
     border:solid 1px green;
 }
+fieldset table tbody {
+    overflow:auto;
+}
 fieldset table tr:hover {
     background-color:lightgreen;
 }
@@ -374,6 +404,7 @@ fieldset table th {
     font-family:monospace;
     background-color:lightgreen;
     cursor:pointer;
+    padding: 0 6px;
 }
 fieldset table th.order {
     background-color:red;
@@ -382,8 +413,7 @@ fieldset table th.order {
 fieldset table td {
     max-width:1200px;
     font-family:monospace;
-    padding-left: 6px;
-    padding-right: 6px;
+    padding: 0 6px;
 }
 fieldset table td.clip {
     background-color:red;

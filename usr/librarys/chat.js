@@ -101,6 +101,36 @@ var page = Page({check: true,
         },
     },
 
+    Action: {
+        "聊天": function(event, value) {
+            page.which.set(value)
+            page.onlayout(event, page.conf.layout)
+        },
+        "办公": function(event, value) {
+            page.which.set(value)
+            page.onlayout(event, page.conf.layout)
+            page.onlayout(event, {river: 0, action:300})
+        },
+        "工作": function(event, value) {
+            page.which.set(value)
+            page.onlayout(event, page.conf.layout)
+            page.onlayout(event, {river:0, action:-1})
+        },
+        "最高": function(event, value) {
+            page.which.set(value)
+            page.onlayout(event, {action: -1})
+        },
+        "最宽": function(event, value) {
+            page.which.set(value)
+            page.onlayout(event, {river:0, storm:0})
+        },
+        "最大": function(event, value) {
+            page.which.set(value)
+            page.onlayout(event, {header:0, footer:0, river:0, storm:0, action: -1})
+        },
+    },
+
+
     initOcean: function(page, field, option, output) {
         var table = kit.AppendChild(output, "table")
         var ui = kit.AppendChild(field, [{view: ["create"], list: [
@@ -233,6 +263,9 @@ var page = Page({check: true,
                     river = value, field.Pane.Show()
                 },
             },
+            Choice: [
+                ["layout", "工作", "聊天", "最高"],
+            ],
         }
     },
     initSource: function(page, field, option, output) {
@@ -283,169 +316,15 @@ var page = Page({check: true,
         var temp = ""
         output.DisplayRaw = true
         return {
-            Tutor: function() {var pane = field.Pane
-                var event = window.event
-                function loop(list, index) {
-                    if (index >= list.length) {return}
-                    kit.Log(index, list[index])
-                    pane.Core(event, {}, ["_cmd", list[index]])
-                    setTimeout(function() {loop(list, index+1)}, 1000)
-                }
-                loop([
-                    "聊天", "help", "最高", "最大", "聊天",
-                    "工作", "串行", "清空", "并行", "help storm", "help storm list", "help action", "help action list",
-                    "聊天", "help target", "help target list",
-                ], 0)
-            },
-            Core: function(event, line, args, cbs) {var pane = field.Pane
-                var msg = pane.Event(event)
-                var plugin = event.Plugin || page.plugin && page.plugin.Plugin || {}, engine = {
-                    share: function(args) {
-                        return ctx.Share({"group": option.dataset.group, "names": option.dataset.names, "cmds": [
-                            river, line.storm, line.action,  args[1]||"",
-                        ]})
-                    },
-                    wssid: function(id) {
-                        return id && (page.wssid = id)
-                    },
-                    pwd: function(name, value) {
-                        name && kit.Selector(page.action, "fieldset.item."+name, function(item) {
-                            item.Plugin.Select()
-                        })
-                        if (value) {return engine.set(value)}
-                        return [river, storm, page.plugin && page.plugin.Meta.name, page.input && page.input.name, page.input && page.input.value]
-                    },
-                    set: function(value, name) {
-                        try {
-                            if (value == undefined) {
-                                msg.append = ["name", "value"]
-                                msg.name = [], msg.value = []
-                                return kit.Selector(page.plugin, ".args", function(item) {
-                                    msg.Push("name", item.name)
-                                    msg.Push("value", item.value)
-                                    return item.name+":"+item.value
-                                })
-
-                            } else if (name == undefined) {
-                                kit.Selector(page.plugin, "input[type=button]", function(item) {
-                                    if (item.value == value) {item.click(); return value}
-                                }).length > 0 || (page.action.Pane.Action[value]?
-                                    page.action.Pane.Action[value](event, value): (page.input.value = value))
-                            } else {
-                                page.plugin.Plugin.Inputs[name].value = value
-                            }
-                        } catch (e) {
-                            engine._cmd("_cmd", [value, name])
-                        }
-                    },
-                    dir: function(rid, sid, pid, uid) {
-                        if (!rid) {
-                            return kit.Selector(page.river, "div.output>div.item>div.text>span", function(item) {
-                                return item.innerText
-                            })
-                        }
-                        if (!sid) {
-                            return kit.Selector(page.storm, "div.output>div.item>div.text>span", function(item) {
-                                return item.innerText
-                            })
-                        }
-                        if (!pid) {
-                            return kit.Selector(page.action, "fieldset.item>legend", function(item) {
-                                msg.Push("name", item.parentNode.Meta.name)
-                                msg.Push("help", item.parentNode.Meta.help)
-                                return item.innerText
-                            })
-                        }
-                        if (!uid) {
-                            return kit.Selector(page.plugin, "input", function(item) {
-                                msg.Push("name", item.name)
-                                msg.Push("value", item.value)
-                                return item.name+":"+item.value
-                            })
-                        }
-                        return [river, storm, page.plugin && page.plugin.Meta.name, page.input && page.input.name]
-                    },
-                    echo: function(one, two) {
-                        kit.Log(one, two)
-                    },
-                    helps: function() {
-                        engine.help("river")
-                        engine.help("action")
-                        engine.help("storm")
-                    },
-                    help: function() {
-                        var args = kit.List(arguments), cb, target
-                        if (args.length > 0 && page.pane && page.pane.Pane[args[0]] && page.pane.Pane[args[0]].Plugin) {
-                            cb = page.pane.Pane[args[0]].Plugin.Help, target = page.pane.Pane[args[0]], args = args.slice(1)
-                        } else if (args.length > 1 && page[args[0]] && page[args[0]].Pane[args[1]]) {
-                            cb = page[args[0]].Pane[args[1]].Plugin.Help, target = page[args[0]].Pane[args[1]], args = args.slice(2)
-                        } else if (args.length > 0 && page[args[0]]) {
-                            cb = page[args[0]].Pane.Help, target = page[args[0]], args = args.slice(1)
-                        } else {
-                            cb = page.Help, target = document.body, args
-                        }
-
-                        if (kit.Selector(target, "div.Help", function(help) {
-                            target.removeChild(help)
-                            return help
-                        }).length > 0) {return}
-
-                        var text = kit._call(cb, args)
-                        var ui = kit.AppendChild(target, [{view: ["Help"], list: [{text: [text.join(""), "div"]}]}])
-                        setTimeout(function() {target.removeChild(ui.last)}, 30000)
-                    },
-                    _split: function(str) {return str.trim().split(" ")},
-                    _cmd: function(arg) {
-                        var args = typeof arg[1] == "string"? engine._split(arg[1]): arg[1];
-                        page.script("record", args)
-                        kit.Log(["cmd"].concat(args))
-
-                        if (typeof engine[args[0]] == "function") {
-                            return kit._call(engine[args[0]], args.slice(1))
-                        }
-                        if (page.plugin && typeof page.plugin.Plugin[args[0]] == "function") {
-                            return kit._call(page.plugin.Plugin[args[0]], args.slice(1))
-                        }
-
-                        if (page.dialog && (res = page.dialog.Pane.Jshy(event, args))) {return res}
-                        if (page.pane && (res = page.pane.Pane.Jshy(event, args))) {return res}
-                        if (page.storm && (res = page.storm.Pane.Jshy(event, args))) {return res}
-                        if (page.river && (res = page.river.Pane.Jshy(event, args))) {return res}
-
-
-                        if (page && (res = page.Jshy(event, args))) {return res}
-                        if (page.plugin && (res = page.plugin.Plugin.Jshy(event, args))) {return res}
-                        return kit.Log(["warn", "not", "find"].concat(args))
-                    },
-                    _msg: function(msg) {
-                        if (msg) {
-                            var text = msg.Format()
-                            text && event.ctrlKey && page.target.Pane.Send(text[0], text[1])
-                        } else {
-                            page.target.Pane.Send("field", plugin.Reveal())
-                        }
-                    },
-                    _run: function() {
-                        var meta = plugin && plugin.target && plugin.target.Meta || {}
-                        field.Pane.Run(event, [meta.river||river, meta.storm||storm, meta.action].concat(args), function(msg) {
-                            engine._msg(msg), typeof cbs == "function" && cbs(msg)
-                        })
-                    },
-                }
-                if (args.length > 0 && engine[args[0]] && msg.Echo(engine[args[0]](args))) {typeof cbs == "function" && cbs(msg); return}
-                event.shiftKey? engine._msg(): engine._run()
-            },
             Show: function() {var pane = field.Pane
                 if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}
 
                 pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
-                output.innerHTML = "", pane.Appends([river, storm], "plugin", ["name", "help"], "name", true, function(line, index, event, args, cbs) {
-                    kit.notNone(args) && pane.Core(event, line, args, cbs)
-                })
+                output.innerHTML = "", pane.Appends([river, storm], "plugin", ["name", "help"], "name", true)
             },
             Layout: function(name) {var pane = field.Pane
                 var layout = field.querySelector("select.layout")
-                name && pane.Action[layout.value = name](window.event, layout.value)
+                name && page.Action[layout.value = name](window.event, layout.value)
                 return layout.value
             },
             Listen: {
@@ -458,33 +337,6 @@ var page = Page({check: true,
                 target: function(value, old) {share = value},
             },
             Action: {
-                "聊天": function(event, value) {
-                    page.which.set(value)
-                    page.onlayout(event, page.conf.layout)
-                },
-                "办公": function(event, value) {
-                    page.which.set(value)
-                    page.onlayout(event, page.conf.layout)
-                    page.onlayout(event, {river: 0, action:300})
-                },
-                "工作": function(event, value) {
-                    page.which.set(value)
-                    page.onlayout(event, page.conf.layout)
-                    page.onlayout(event, {river:0, action:-1})
-                },
-                "最高": function(event, value) {
-                    page.which.set(value)
-                    page.onlayout(event, {action: -1})
-                },
-                "最宽": function(event, value) {
-                    page.which.set(value)
-                    page.onlayout(event, {river:0, storm:0})
-                },
-                "最大": function(event, value) {
-                    page.which.set(value)
-                    page.onlayout(event, {header:0, footer:0, river:0, storm:0, action: -1})
-                },
-
                 "刷新": function(event, value) {
                     output.innerHTML = "", field.Pane.Show()
                 },
@@ -555,7 +407,7 @@ var page = Page({check: true,
                 "", "执行", "下载", "清空", "返回",
             ],
             Choice: [
-                ["layout", "聊天", "办公", "工作"],
+                ["layout", "工作", "聊天", "最高"],
                 "", "刷新", "清屏", "并行", "串行", "调试",
             ],
         }

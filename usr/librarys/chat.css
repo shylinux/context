@@ -39,6 +39,9 @@ fieldset.Target>div.output>div.item>div.user {
 fieldset.Source {
     overflow:hidden;
 }
+fieldset.Source div.action {
+    padding:0;
+}
 fieldset.Source div.output {
     padding:0;
 }
