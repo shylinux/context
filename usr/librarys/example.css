@@ -70,7 +70,7 @@ fieldset>div.action div.space {
 fieldset>div.output {
     clear:both;
     /* max-height:800px; */
-    padding:6px;
+    padding:5px;
 }
 fieldset>div.output div.item {
     padding:2px;

@@ -1,4 +1,4 @@
-var page = Page({check: true,
+var page = Page({
     conf: {refresh: 1000, border: 4, first: "工作", mobile: "工作", layout: {header:30, footer:30, river:100, storm:100, action:180, source:45}},
     onlayout: function(event, sizes) {
         var page = this
@@ -23,64 +23,62 @@ var page = Page({check: true,
         sizes.action == undefined && (sizes.action = page.action.offsetHeight-page.conf.border)
         sizes.source == undefined && (sizes.source = page.source.clientHeight)
         sizes.target == undefined && (sizes.target = page.target.clientHeight)
-		sizes.source == 0 && sizes.target == 0 && !kit.device.isMobile && (sizes.action = height)
+        sizes.source == 0 && sizes.target == 0 && !kit.device.isMobile && (sizes.action = height)
         page.action.Pane.Size(width, sizes.action)
         page.source.Pane.Size(width, sizes.source)
         height -= sizes.target==0? height: page.source.offsetHeight+page.action.offsetHeight
 
         page.target.Pane.Size(width, height)
     },
-    oncontrol: function(event, target, action) {
+    oncontrol: function(event) {
         var page = this
-        switch (action) {
-            case "control":
-                if (event.ctrlKey) {
-                    switch (event.key) {
-                        case "0":
-                            page.source.Pane.Select()
-                            break
-                        case "1":
-                        case "2":
-                        case "3":
-                        case "4":
-                        case "5":
-                        case "6":
-                        case "7":
-                        case "8":
-                        case "9":
-                            page.action.Pane.Select(parseInt(event.key))
-                            break
-                        case "n":
-                            page.ocean.Pane.Show()
-                            break
-                        case "m":
-                            page.steam.Pane.Show()
-                            break
-                        case "i":
-                            page.storm.Pane.Next()
-                            break
-                        case "o":
-                            page.storm.Pane.Prev()
-                            break
-                        case "b":
-                            page.action.Action["最大"](event)
-
-                    }
+        if (event.ctrlKey) {
+            switch (event.key) {
+                case "0":
+                    page.source.Pane.Select()
                     break
-                } else {
-                    switch (event.key) {
-                        case " ":
-                            page.footer.Pane.Select()
-                            break
-                        case "Escape":
-                            page.dialog && page.dialog.Pane.Show()
-                            break
-                    }
-                }
-                break
+                case "1":
+                case "2":
+                case "3":
+                case "4":
+                case "5":
+                case "6":
+                case "7":
+                case "8":
+                case "9":
+                    page.action.Pane.Select(parseInt(event.key))
+                    break
+                case "n":
+                    page.ocean.Pane.Show()
+                    break
+                case "m":
+                    page.steam.Pane.Show()
+                    break
+                case "i":
+                    page.storm.Pane.Next()
+                    break
+                case "o":
+                    page.storm.Pane.Prev()
+                    break
+                case "b":
+                    page.action.Action["最大"](event)
+
+            }
+            break
+        } else {
+            switch (event.key) {
+                case " ":
+                    page.footer.Pane.Select()
+                    break
+                case "Escape":
+                    page.dialog && page.dialog.Pane.Show()
+                    break
+            }
         }
+        break
     },
-    onaction: {
+
+    Action: {
         title: function(event, item, value, page) {
             ctx.Search({"river": page.river.Pane.which.get(), "storm": page.storm.Pane.which.get(), "layout": page.action.Pane.Layout()})
         },
@@ -99,9 +97,7 @@ var page = Page({check: true,
                 meta[value](event)
             }))
         },
-    },
 
-    Action: {
         "聊天": function(event, value) {
             page.which.set(value)
             page.onlayout(event, page.conf.layout)
@@ -129,6 +125,12 @@ var page = Page({check: true,
             page.onlayout(event, {header:0, footer:0, river:0, storm:0, action: -1})
         },
     },
+    Button: shy({"user": "", "title": ""}, ["user"], function(key, value) {var meta = arguments.callee.meta
+        return kit.isNone(key)? meta: kit.isNone(value)? meta[key]: (meta[key] = value, page.header.Pane.Show())
+    }),
+    Status: shy({"ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(key, value) {var meta = arguments.callee.meta
+        return kit.isNone(key)? meta: kit.isNone(value)? meta[key]: (meta[key] = value, page.footer.Pane.Show())
+    }),
 
     initOcean: function(page, field, option, output) {
         var table = kit.AppendChild(output, "table")
@@ -250,10 +252,8 @@ var page = Page({check: true,
 
                 var foot = page.footer.Pane, cmds = [river, "brow", i||which[river]||0]
                 cmds[2] || (output.innerHTML = ""), pane.Tickers(page.conf.refresh, cmds, function(line, index, msg) {
-                    pane.Append("", line, ["text"], "index", function(line, index, event, args, cbs) {
-                        page.action.Pane.Core(event, line, args, cbs)
-                    })
-                    foot.State("ntxt", which[river] = cmds[2] = parseInt(line.index)+1)
+                    pane.Append("", line, ["text"], "index")
+                    page.Status("ntxt", which[river] = cmds[2] = parseInt(line.index)+1)
                 })
             },
             Listen: {
@@ -427,9 +427,7 @@ var page = Page({check: true,
                 if (data) {return pane.which.set(data.which)}
 
                 pane.Event(event, {}, {name: pane.Zone("show", river)})
-                output.innerHTML = "", pane.Appends([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true, null, function(msg) {
-                    pane.which.get() == "" && pane.Select(0, msg.key[0])
-                })
+                output.innerHTML = "", pane.Appends([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true, null)
             },
             Listen: {
                 river: function(value, old) {var pane = field.Pane
@@ -456,9 +454,12 @@ var page = Page({check: true,
                         }})
                     })
                 },
+                "刷新": function(event) {
+                },
             },
             Button: ["创建", "共享"],
             Choice: ["创建", "共享"],
+            Detail: ["刷新"],
         }
     },
     initSteam: function(page, field, option, output) {
@@ -581,12 +582,11 @@ var page = Page({check: true,
         }
     },
     init: function(page) {
-		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? page.conf.first: page.conf.mobile)
-        page.footer.Pane.Order({"ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(event, item, value) {})
-        page.header.Pane.Order({"user": page.who.get(), "title": "github.com/shylinux/context"}, ["user"], function(event, item, value) {
-            page.onaction[item] && page.onaction[item](event, item, value, page)
-        })
+        page.Button("user", page.who.get())
+        page.Button("title", "github.com/shylinux/context")
+        page.Status("title", '<a href="mailto:shylinux@163.com">shylinux@163.com</a>')
         page.river.Pane.Show()
+		page.Action[ctx.Search("layout") || (kit.device.isMobile? page.conf.first: page.conf.mobile)]()
         page.WSS()
     },
 })

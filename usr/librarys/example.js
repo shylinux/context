@@ -102,7 +102,7 @@ function Meta(zone, target, obj) {
                     break
             }
 
-            var ui = kit.AppendChild(output, item? list: [{view: ["item"], data: {draggable: true}, list:list}])
+            var ui = kit.AppendChild(output, item? list: [{view: ["item"], data: {id: "item"+meta.ID(), draggable: true}, list:list}])
             return ui.item.Meta = text, ui
         }),
         Include: shy("加载脚本", function(src, cb) {src = kit.List(src)
@@ -128,7 +128,7 @@ function Meta(zone, target, obj) {
 }
 function Page(page) {
     var script = {}, record = ""
-    page = Meta([document.title], document.body, page, {
+    page = Meta([document.title], document.body, page, {check: true,
         onload: function(event) {
             // Event入口 0
             page.Event(event, {})
@@ -168,11 +168,9 @@ function Page(page) {
 
             // 事件回调
             window.onresize = function(event) {
-                page.onlayout && page.onlayout(event)
+                page.onlayout(event)
             }, document.body.onkeydown = function(event) {
-                if (page.localMap && page.localMap(event)) {return}
-                page.oncontrol && page.oncontrol(event, document.body, "control")
-
+                page.oncontrol(event) || page.onscroll(event)
             }, document.body.onkeyup = function(event) {
             }, document.body.oncontextmenu = function(event) {
             }, document.body.onmousewheel = function(event) {
@@ -258,6 +256,8 @@ function Page(page) {
             event.preventDefault()
             return true
         },
+        onlayout: function() {},
+        oncontrol: function() {},
         onscroll: function(event, target, action) {
             switch (event.key) {
                 case " ":
@@ -537,33 +537,26 @@ function Page(page) {
             }
         },
         initHeader: function(page, field, option, output) {
-            var state = {title: "github.com/shylinux/context"}, list = [], cb = function(event, item, value) {}
+            var cb = function(event, item, value) {
+                kit._call(page.Action[item], [event, item, value, page])
+            }
             field.onclick = function(event) {page.pane && page.pane.scrollTo(0, 0)}
-            page.who.change(function(value, old) {field.Pane.State("user", value)})
+            page.who.change(function(value, old) {page.Button("user", value)})
 
             return {
-                Order: function(value, order, cbs) {
-                    state = value, list = order, cb = cbs || cb, field.Pane.Show()
-                },
-                State: function(name, value) {
-                    kit.notNone(value) && (state[name] = value, field.Pane.Show())
-                    return kit.isNone(name)? state: state[name]
-                },
-                Show: function() {
+                Show: function() {var meta = page.Button.meta, list = page.Button.list
                     kit.AppendChilds(output, [
-                        {"view": ["title", "div", state.title], click: function(event) {
-                            cb(event, "title", state.title)
-                        }},
-                        {"view": ["state"], list: list.map(function(item) {return {text: [state[item], "div", "item"], click: function(event) {
-                            cb(event, item, state[item])
-                        }}})},
+                        {"view": ["title", "div", meta.title], click: cb},
+                        {"view": ["state"], list: list.map(function(item) {return {text: [meta[item], "div", "item"], click: cb}})},
                     ])
                 },
 				Help: function() {return []},
             }
         },
         initFooter: function(page, field, option, output) {
-            var state = {title: "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"}, list = [], cb = function(event, item, value) {}
+            var state = {title: "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"}, list = [], cb = function(event, item, value) {
+                kit._call(page.Action[item], [event, item, value, page])
+            }
             var ui = kit.AppendChilds(output, [
                 {"view": ["title", "div", state.title]},
                 {"view": ["state"]},
@@ -598,21 +591,15 @@ function Page(page) {
 
             return {
                 Select: function() {ui.magics.focus()},
-                Order: function(value, order, cbs) {
-                    state = value, list = order, cb = cbs || cb, field.Pane.Show()
-                },
-                State: function(name, value) {
-                    value != undefined && (state[name] = value, field.Pane.Show())
-                    return name == undefined? state: state[name]
-                },
                 Size: function(width, height) {
                     kit.size(field, width, height)
                     ui && kit.size(ui.magics, (width - ui.count.offsetWidth - ui.first.offsetWidth - ui.state.offsetWidth - 40), height-6)
                 },
-                Show: function() {
-                    kit.AppendChilds(ui.state, list.map(function(item) {return {text: [item+":"+state[item], "div"], click: function(item) {
-                        cb(event, item, state[item])
-                    }}}))
+                Show: function() {var meta = page.Status.meta, list = page.Status.list
+                    kit.AppendChilds(output, [
+                        {"view": ["title", "div", meta.title], click: cb},
+                        {"view": ["state"], list: list.map(function(item) {return {text: [item+":"+meta[item], "div", "item"], click: cb}})},
+                    ])
                     field.Pane.Size(field.clientWidth, field.clientHeight)
                 },
                 Help: function() {return []},
@@ -635,8 +622,10 @@ function Pane(page, field) {
 
     var pane = Meta(page.Zone(name), field, (page[field.dataset.init] || function() {})(page, field, option, output) || {}, {
         Appends: shy("添加列表", function(cmds, type, key, which, first, cb, cbs) {
+            var list = []
             pane.Runs(event, cmds, function(line, index, msg) {
                 var ui = pane.Append(type, line, key, which, cb)
+                list.push(ui)
                 if (typeof first == "string") {
                     (line.key == first || line.name == first || line[which] == first || line[key[0]] == first) && ui.item.click()
                 } else {
@@ -644,52 +633,56 @@ function Pane(page, field) {
                 }
                 if (index == msg[msg.append[0]].length-1) {
                     kit.Selector(output, itemkeys).length == 0 && pane.Select(0)
-                    kit._call(cbs, [msg])
+                    kit._call(cbs, [msg, list])
                 }
             })
         }),
         Append: shy("添加列表", function(type, line, key, which, cb) {type = type || line.type
-            var index = kit.Selector(output, itemkey).length
             var ui = pane.View(output, type, line, key)
 
             ui.item.onclick = function(event) { if (pane.which.get() == line[which]) {return}
-                page.script("record", [name, line[key[0]]])
                 pane.Event(event, {}, {name: pane.Zone("select", line[key[0]])})
-                kit.Selector(output, itemkeys, function(item) {kit.classList.del(item, "select")})
-                kit.Selector(output, itemkey, function(item, i) {i == index && kit.classList.add(item, "select")})
+                page.script("record", [name, line[key[0]]])
+                pane.Select(ui.item)
 
                 pane.which.set(line[which])
-                kit._call(cb, [line, index, event])
+                kit._call(cb, [event, line])
+            }
+            ui.item.ondragstart = function(event) {if (event.target != ui.item) {return}
+                event.dataTransfer.setData("item", event.target.id)
+                event.stopPropagation()
+            }
+            ui.item.ondragover = function(event) {if (event.target != ui.item) {return}
+                event.stopPropagation()
+                event.preventDefault()
+                pane.Select(ui.item)
+            }
+            ui.item.ondrop = function(event) {if (event.target != ui.item) {return}
+                var item = pane[event.dataTransfer.getData("item")]
+                output.insertBefore(item, event.target)
+                event.stopPropagation()
+            }
+            ui.item.oncontextmenu = function(event) {
+                pane.Detail && page.carte.Pane.Show(event, shy({}, pane.Detail, function(value, meta, event) {
+                    pane.Check(event, value)
+                }))
             }
 
             if (type == "plugin" && line.name || type == "field") {
-                ui.item.ondragstart = function(event) {
-                    event.stopPropagation()
-                    event.dataTransfer.setData("item", event.target.id)
-                }
-                ui.item.ondragover = function(event) {
-                    ui.item.Plugin && ui.item.Plugin.Select()
-                }
-                ui.item.ondrop = function(event) {
-                    event.stopPropagation()
-                    var item = pane[event.dataTransfer.getData("item")]
-                    output.insertBefore(item, event.target)
-                }
-
                 page.Require(line.init? line.group+"/"+line.init: "", function(init) {
                     page.Require(line.view? line.group+"/"+line.view: "", function(view) {
                         pane.Plugin(page, pane, ui.item, init, function(event, cmds, cbs) {
-                            cb? kit._call(cb, [line, index, event, cmds, cbs]):
-                                kit._call(pane.Core, [event, line, cmds, cbs])
+                            kit._call(cb||pane.Core, [event, line, cmds, cbs])
                         })
                     })
                 })
             }
-            return ui
+            return pane[ui.item.id] = ui.item, ui
         }),
         Select: shy("选择列表", function(index) {
-            kit.Selector(output, itemkey, function(item, i) {
-                i == index && item.Select()
+            kit.Selector(output, itemkey, function(item, i) {if (item != index && i != index) {return}
+                kit.Selector(output, itemkeys, function(item) {kit.classList.del(item, "select")})
+                kit.classList.add(item, "select")
             })
         }),
 
@@ -973,7 +966,7 @@ function Pane(page, field) {
             var Meta = plugin && plugin.target && plugin.target.Meta || {}
             kit.Log(["cmd"].concat(kit.List([Meta.river, Meta.storm, Meta.action])).concat(args[0] == "_cmd"? args[1]: args))
 
-            page.footer.Pane.State("ncmd", kit.History("cmd", -1, {args: args, meta: Meta}))
+            page.Status("ncmd", kit.History("cmd", -1, {args: args, meta: Meta}))
             return args.length > 0 && meta[args[0]]? kit._call(cbs, [msg.Echo(meta[args[0]](args))]):
                     args.length > 0 && engine[args[0]]? kit._call(cbs, [msg.Echo(engine[args[0]](args))]):
                         event.shiftKey? engine._msg(msg): engine._run(msg)
@@ -989,13 +982,6 @@ function Pane(page, field) {
         }),
 
         onaction: shy("事件列表", {
-            ondragover: function(event) {
-                event.preventDefault()
-            },
-            ondrop: function(event) {
-                event.preventDefault()
-                console.log(event.dataTransfer.getData("index"), "drop")
-            },
             oncontextmenu: function(event) {
                 pane.Choice && page.carte.Pane.Show(event, shy({}, pane.Choice, function(value, meta, event) {
                     pane.Check(event, value)
@@ -1078,6 +1064,9 @@ function Plugin(page, pane, field, inits, runs) {
             }).item.Plugin.Select()
         }),
 
+        Move: function() {
+            return field.nextSibling || field.parentNode.firstChild
+        },
         Next: function() {
             return field.nextSibling || field.parentNode.firstChild
         },
