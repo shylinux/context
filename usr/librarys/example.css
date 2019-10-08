@@ -224,10 +224,13 @@ fieldset.dialog.Debug tr.hide {
     display:none;
 }
 fieldset.dialog.Debug tr.event {
-    display:red;
+    background-color:red;
 }
 fieldset.dialog.Debug tr.run {
     background-color:lightgreen;
+}
+fieldset.dialog.Debug tr.wss {
+    background-color:lightblue;
 }
 fieldset.dialog.Debug tr.key {
     background-color:lightyellow;

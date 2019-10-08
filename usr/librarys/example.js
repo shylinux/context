@@ -142,7 +142,7 @@ function Page(page) {
                 document.querySelectorAll("body>fieldset").forEach(function(field) {
                     page.Pane(page, field)
                 }), page.check? page.login.Pane.Run(event, [], function(msg) {
-                    msg.result && msg.result[0]? (page.init(page), page.who.set(msg.nickname[0]))
+                    msg.result && msg.result[0]? (page.who.set(msg.nickname[0]), page.init(page))
                         :page.login.Pane.Dialog(1, 1)
                 }): page.init(page)
             }
@@ -448,7 +448,7 @@ function Page(page) {
         initDebug: function(page, field, option, output) {
             var table = kit.AppendChilds(output, "table")
             var caption = kit.AppendChild(table, [{type: "caption"}]).last
-            var head = kit.AppendChild(table, [{type: "thead", list: [{row: ["time", "type", "order", "action", "target", "args"], sub: "th"}]}]).tr
+            var head = kit.AppendChild(table, [{type: "thead", list: [{row: ["index", "time", "type", "order", "action", "target", "args"], sub: "th"}]}]).tr
             var list = kit.AppendChild(table, "tbody")
             kit.OrderTable(table)
             var last, types = {all: 0, event: 0, run: 0, key: 0}
@@ -457,9 +457,8 @@ function Page(page) {
             kit.Log.meta.call.push(function(time, type, order, action, target) {var Choice = field.Pane && field.Pane.Choice || []
                 if (kit.isNone(types[type])) {types[type] = 0, Choice.push(type)}
                 types[type]++
-                types.all++
 
-                last = kit.AppendChild(list, [{className: type, row: [time, type, order, action||"", target||"", kit.List(arguments, function(item) {
+                last = kit.AppendChild(list, [{className: type, row: [types.all++, time, type, order, action||"", target||"", kit.List(arguments, function(item) {
                     return typeof item == "object"? "{...}": item
                 }).slice(5).join(" ")]}]).last
                 field.Pane && field.Pane.Head()
@@ -621,7 +620,6 @@ function Page(page) {
         },
         Pane: Pane,
     }), page.which = page.Sync("layout"), page.who = page.Sync("username")
-
     kit.Log("init", "page", page)
     return window.onload = page.onload, page
 }
@@ -654,15 +652,16 @@ function Pane(page, field) {
             var index = kit.Selector(output, itemkey).length
             var ui = pane.View(output, type, line, key)
 
-            ui.item.onclick = function(event) {
-                if (!pane.which.set(line[which])) {return}
+            ui.item.onclick = function(event) { if (pane.which.get() == line[which]) {return}
+                page.script("record", [name, line[key[0]]])
+                pane.Event(event, {}, {name: pane.Zone("select", line[key[0]])})
                 kit.Selector(output, itemkeys, function(item) {kit.classList.del(item, "select")})
                 kit.Selector(output, itemkey, function(item, i) {i == index && kit.classList.add(item, "select")})
 
-                pane.Event(event, {}, {name: pane.Zone("select", line[key[0]])})
-                page.script("record", [name, line[key[0]]])
+                pane.which.set(line[which])
                 kit._call(cb, [line, index, event])
             }
+
             if (type == "plugin" && line.name || type == "field") {
                 ui.item.ondragstart = function(event) {
                     event.stopPropagation()
@@ -689,7 +688,9 @@ function Pane(page, field) {
             return ui
         }),
         Select: shy("选择列表", function(index) {
-            kit.Selector(output, itemkey, function(item, i) {i == index && item.click()})
+            kit.Selector(output, itemkey, function(item, i) {
+                i == index && item.Select()
+            })
         }),
 
         Show: function() {
@@ -928,7 +929,6 @@ function Pane(page, field) {
                 _split: function(str) {return str.trim().split(" ")},
                 _cmd: function(arg) {
                     var args = typeof arg[1] == "string"? engine._split(arg[1]): arg[1];
-                    kit.Log(["cmd"].concat(args))
                     page.script("record", args)
 
                     if (typeof meta[args[0]] == "function") {
@@ -962,17 +962,18 @@ function Pane(page, field) {
                 _msg: function(msg) {
                     event.ctrlKey? kit._call(page.target.Pane.Send, msg.Format()):
                         event.shiftKey && page.target.Pane.Send("field", plugin.Reveal())
-                    kit._call(cbs, [msg])
                 },
                 _run: function(msg) {
-                    var meta = plugin && plugin.target && plugin.target.Meta || {}
-                    pane.Run(event, [meta.river, meta.storm, meta.action].concat(args), function(msg) {
+                    pane.Run(event, [Meta.river, Meta.storm, Meta.action].concat(args), function(msg) {
                         kit._call(cbs, [msg]), engine._msg(msg)
                     })
                 },
             }
 
-            page.footer.Pane.State("ncmd", kit.History("cmd", -1, args))
+            var Meta = plugin && plugin.target && plugin.target.Meta || {}
+            kit.Log(["cmd"].concat(kit.List([Meta.river, Meta.storm, Meta.action])).concat(args[0] == "_cmd"? args[1]: args))
+
+            page.footer.Pane.State("ncmd", kit.History("cmd", -1, {args: args, meta: Meta}))
             return args.length > 0 && meta[args[0]]? kit._call(cbs, [msg.Echo(meta[args[0]](args))]):
                     args.length > 0 && engine[args[0]]? kit._call(cbs, [msg.Echo(engine[args[0]](args))]):
                         event.shiftKey? engine._msg(msg): engine._run(msg)
@@ -1005,10 +1006,9 @@ function Pane(page, field) {
         Plugin: Plugin,
     })
 
+    kit.Log("init", "pane", name, pane)
     kit.AppendAction(action, pane.Button, pane.Check)
     kit.Item(pane.Listen, function(key, cb) {page.Sync(key).change(cb)})
-
-    kit.Log("init", "pane", name, pane)
     return page[name] = field, field.Pane = pane
 }
 function Plugin(page, pane, field, inits, runs) {
@@ -1054,16 +1054,10 @@ function Plugin(page, pane, field, inits, runs) {
             }
             return Inputs(plugin, input, item, plugin.View(option, "input", input)[input.name]).target
         }),
-        Select: shy("选择控件", function(target) {
-            page.plugin && (kit.classList.del(page.plugin, "select"))
-            page.plugin = field, kit.classList.add(field, "select")
-            pane.which.set(name)
-
-            if (kit.isNone(target)) {return}
-
-            page.input = target || option.querySelectorAll("input")[1]
+        Select: shy("选择控件", function(target, focus) {field.onclick(event)
+            page.input = target = target || option.querySelectorAll("input")[1]
             plugin.which.set(page.input.name)
-            page.input.focus()
+            focus && page.input.focus()
         }),
         Remove: shy("删除控件", function() {
             var list = option.querySelectorAll("input.temp")
@@ -1196,10 +1190,9 @@ function Plugin(page, pane, field, inits, runs) {
         }, function(event, key, cb) {cb(event)}),
     })
 
-    plugin.Appends(inputs)
-    plugin.which = plugin.Sync("input")
-
     kit.Log("init", "plugin", name, plugin)
+    plugin.which = plugin.Sync("input")
+    plugin.Appends(inputs)
     return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
 }
 function Inputs(plugin, meta, item, target) {
@@ -1261,8 +1254,7 @@ function Inputs(plugin, meta, item, target) {
         onaction: shy("事件列表", {
             onfocus: function(event) {plugin.Select(target)},
             onblur: function(event) {type == "text" && input.which.set(target.value)},
-            onclick: function(event) {
-                type == "text"
+            onclick: function(event) {plugin.Select()
                 // Event入口 2.0
                 type == "button" && input.Event(event, {}) && kit.Value(input[item.cb], plugin[item.cb], function() {
                     plugin.Check(event)
@@ -1350,13 +1342,13 @@ function Inputs(plugin, meta, item, target) {
         }, function(event, key, cb) {cb(event)}),
         which: plugin.Sync(name),
     }, plugin)
+    kit.Log("init", "input", input.Zones(), input)
 
     input.onimport()
     target.value = input.onformat(item.init, item.value)
     type == "text" && !target.placeholder && (target.placeholder = item.name)
     type == "text" && !target.title && (target.title = item.placeholder || item.name || "")
 
-    kit.Log("init", "input", input.Zones(), input)
     return plugin.Inputs[item.name] = target, target.Input = input
 }
 function Output(plugin, type, msg, cb, target, option) {
@@ -1462,8 +1454,7 @@ function Output(plugin, type, msg, cb, target, option) {
             },
         }, function(event, key, cb) {cb(event)}),
     }, plugin)
-    output.onimport(type, msg, cb)
-
     kit.Log("init", "output", output.Zones(), output)
+    output.onimport(type, msg, cb)
     return plugin.Outputs[type] = target, target.Output = output
 }

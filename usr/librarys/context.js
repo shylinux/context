@@ -159,10 +159,10 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
     }),
     WSS: shy("响应后端", {order: 0, wssid: ""}, function(cb, onerror, onclose) {var meta = arguments.callee.meta
         var s = new WebSocket(location.protocol.replace("http", "ws")+"//"+location.host+"/wss?wssid="+meta.wssid)
-        s.onopen = function(event) {kit.Tip("wss open"), kit.Log("wss", "open")}
+        s.onopen = function(event) {kit.Tip("wss open"), ctx.Event(event, {}, {name: [document.title, "wss", "open"]})}
         s.onerror = function(event) {kit.Log("wss", "error", event), kit._call(onerror, [event])}
         s.onclose = function(event) {kit.Tip("wss close"), kit.Log("wss", "close"), kit._call(onclose, [event])}
-        s.onmessage = function(event) {
+        s.onmessage = function(event) {var order = ++meta.order
             try {
                 var msg = JSON.parse(event.data||'{}')
             } catch (e) {
@@ -170,13 +170,13 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
             }
 
             // Event入口 -1.0
-            msg = ctx.Event(event, msg, {name: [document.title, "wss", msg.detail[0]], Order: ++meta.order, Reply: function(msg) {
-                kit.Log(["wss", msg.Order, "result"].concat(msg.result).concat([msg]))
+            msg = ctx.Event(event, msg, {name: [document.title, "wss", msg.detail[0]], Order: order, Reply: function(msg) {
+                kit.Log(["wss", order, "result"].concat(msg.result).concat([msg]))
                 delete(msg.event), s.send(JSON.stringify(msg))
             }})
 
             try {
-                kit.Log(["wss", msg.Order].concat(msg.detail).concat([msg]))
+                kit.Log(["wss", order].concat(msg.detail).concat([msg]))
                 kit._call(cb, [msg])
             } catch (e) {
                 msg.Reply(kit.Log("err", e))

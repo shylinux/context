@@ -33,7 +33,6 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         if (kit.isNone(data)) {var len = list.length
             return list[(index+len)%len]
         }
-        kit.Log("history", type, data)
         return meta[type] = list, list.push({time: Date.now(), data: data})-1
     }),
     Debug: shy("调试断点", {why: true, msg: true}, function(key) {
@@ -356,7 +355,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                 if (target.tagName == "TH") {var dataset = target.dataset
                     dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
                     kit.RangeTable(table, i, dataset["sort_asc"] == "1")
-                } else {var index = 0
+                } else if (target.tagName == "TD") {var index = 0
                     kit.Selector(table, "tr", function(item, i) {item == target.parentElement && (index = i)})
                     var name = target.parentElement.parentElement.querySelector("tr").childNodes[i].innerText
                     name.startsWith(field) && kit._call(cb, [event, item.innerText, name, item.parentNode.Meta, index])
@@ -465,7 +464,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     },
 
     // 数据容器迭代
-    Push: function(list, value, check) {list = list || []
+    Push: function(list, value) {list = list || []
         return (kit.notNone||check)(value) && list.push(value), list
     },
     List: function(obj, cb, interval, cbs) {obj = typeof obj == "string"? [obj]: (obj || [])

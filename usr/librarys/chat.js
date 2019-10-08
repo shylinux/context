@@ -130,7 +130,6 @@ var page = Page({check: true,
         },
     },
 
-
     initOcean: function(page, field, option, output) {
         var table = kit.AppendChild(output, "table")
         var ui = kit.AppendChild(field, [{view: ["create"], list: [
@@ -584,7 +583,7 @@ var page = Page({check: true,
     init: function(page) {
 		page.action.Pane.Layout(ctx.Search("layout")? ctx.Search("layout"): kit.device.isMobile? page.conf.first: page.conf.mobile)
         page.footer.Pane.Order({"ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(event, item, value) {})
-        page.header.Pane.Order({"user": "", "title": "github.com/shylinux/context"}, ["user"], function(event, item, value) {
+        page.header.Pane.Order({"user": page.who.get(), "title": "github.com/shylinux/context"}, ["user"], function(event, item, value) {
             page.onaction[item] && page.onaction[item](event, item, value, page)
         })
         page.river.Pane.Show()
