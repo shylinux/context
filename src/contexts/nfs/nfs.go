@@ -539,9 +539,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"buf": &ctx.Config{Name: "buf", Value: map[string]interface{}{
 			"size": "81920",
 		}, Help: "文件缓存"},
-		"grep": &ctx.Config{Name: "grep", Value: map[string]interface{}{
-			"list": []interface{}{},
-		}, Help: "文件搜索"},
+		"grep": &ctx.Config{Name: "grep", Value: map[string]interface{}{}, Help: "文件搜索"},
 		"git": &ctx.Config{Name: "git", Value: map[string]interface{}{
 			"args":   []interface{}{},
 			"info":   map[string]interface{}{"cmds": []interface{}{"log", "status", "branch"}},
@@ -883,40 +881,41 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			}
 			return
 		}},
-		"grep": &ctx.Command{Name: "grep", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"grep": &ctx.Command{Name: "grep head|tail|hold|more table arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			hold := false
-			if len(arg) > 0 {
-				switch arg[0] {
-				case "add":
-					m.Confv("grep", "list.-2", map[string]interface{}{
-						"pos": 0, "offset": 0, "file": arg[1],
-					})
-					return
+			switch arg[0] {
+			case "add":
+				m.Confv("grep", []string{arg[1], "list", "-2"}, map[string]interface{}{
+					"pos": 0, "offset": 0, "file": arg[2],
+				})
+				return
 
-				case "head":
-					m.Confm("grep", "list", func(index int, value map[string]interface{}) {
-						if len(arg) == 1 {
-							value["offset"] = 0
-							value["pos"] = 0
-						}
-					})
-					return
+			case "head":
+				m.Confm("grep", []string{arg[1], "list"}, func(index int, value map[string]interface{}) {
+					if len(arg) == 2 {
+						value["offset"] = 0
+						value["pos"] = 0
+					}
+				})
+				return
 
-				case "tail":
-					m.Confm("grep", "list", func(index int, value map[string]interface{}) {
-						if len(arg) == 1 {
-							value["pos"] = -1
-							value["offset"] = 0
-						}
-					})
-					return
+			case "tail":
+				m.Confm("grep", []string{arg[1], "list"}, func(index int, value map[string]interface{}) {
+					if len(arg) == 2 {
+						value["pos"] = -1
+						value["offset"] = 0
+					}
+				})
+				return
 
-				case "hold":
-					hold, arg = true, arg[1:]
-				}
+			case "hold":
+				hold, arg = true, arg[1:]
+
+			case "more":
+				hold, arg = false, arg[1:]
 			}
 
-			m.Confm("grep", "list", func(index int, value map[string]interface{}) {
+			m.Confm("grep", []string{arg[0], "list"}, func(index int, value map[string]interface{}) {
 				f, e := os.Open(kit.Format(value["file"]))
 				if e != nil {
 					m.Log("warn", "%v", e)
@@ -924,38 +923,38 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 				}
 				defer f.Close()
 
-				// s, e := f.Stat()
-				// m.Assert(e)
+				s, e := f.Stat()
+				if e != nil {
+					m.Log("warn", "%v", e)
+					return
+				}
 
+				offset := kit.Int(value["offset"])
 				begin, e := f.Seek(int64(kit.Int(value["pos"])), 0)
 				if kit.Int(value["pos"]) == -1 {
 					begin, e = f.Seek(0, 2)
 				}
 				m.Assert(e)
+				file := path.Base(kit.Format(value["file"]))
 
-				n := 0
-				offset := kit.Int(value["offset"])
 				bio := bufio.NewScanner(f)
 				for i := 0; i < m.Optioni("table.limit") && bio.Scan(); i++ {
 					text := bio.Text()
-					if len(arg) == 0 || strings.Contains(text, arg[0]) {
-						m.Add("append", "index", index)
-						m.Add("append", "file", path.Base(kit.Format(value["file"])))
-						// m.Add("append", "pos",begin+int64(n))
-						// m.Add("append", "len",len(text))
-						// m.Add("append", "end",s.Size())
+					if len(arg) == 1 || strings.Contains(text, arg[1]) {
+						m.Add("append", "file", file)
+						m.Add("append", "pos", fmt.Sprintf("%d%%", (begin+int64(len(text)+1))*100/s.Size()))
 						m.Add("append", "line", offset)
 						m.Add("append", "text", text)
 					} else {
 						i--
 					}
-					n += len(text) + 1
+					begin += int64(len(text)) + 1
 					offset += 1
 				}
 
 				if !hold {
 					value["offset"] = offset
-					value["pos"] = begin + int64(n)
+					value["pos"] = begin
 				}
 			})
 			m.Table()

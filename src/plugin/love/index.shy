@@ -22,7 +22,7 @@ fun maps "每一面" "maps.js" "index.css" protected \
 	button "本地" cb Current \
     text "北京市" name city view tiny \
     text "弘源首著" name where \
-	button "搜索" cb Search action auto \
+	button "搜索" cb Search \
 	button "记录" cb Record \
 	button "展示" cb Flashs \
 	exports index ""

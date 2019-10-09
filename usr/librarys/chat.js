@@ -125,10 +125,10 @@ var page = Page({
             page.onlayout(event, {header:0, footer:0, river:0, storm:0, action: -1})
         },
     },
-    Button: shy({"user": "", "title": ""}, ["user"], function(key, value) {var meta = arguments.callee.meta
+    Button: shy({"title": "github.com/shylinux/context", "user": ""}, ["user"], function(key, value) {var meta = arguments.callee.meta
         return kit.isNone(key)? meta: kit.isNone(value)? meta[key]: (meta[key] = value, page.header.Pane.Show())
     }),
-    Status: shy({"ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(key, value) {var meta = arguments.callee.meta
+    Status: shy({title: '<a href="mailto:shylinux@163.com">shylinux@163.com</a>', "ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(key, value) {var meta = arguments.callee.meta
         return kit.isNone(key)? meta: kit.isNone(value)? meta[key]: (meta[key] = value, page.footer.Pane.Show())
     }),
 
@@ -582,11 +582,8 @@ var page = Page({
         }
     },
     init: function(page) {
-        page.Button("user", page.who.get())
-        page.Button("title", "github.com/shylinux/context")
-        page.Status("title", '<a href="mailto:shylinux@163.com">shylinux@163.com</a>')
-        page.river.Pane.Show()
 		page.Action[ctx.Search("layout") || (kit.device.isMobile? page.conf.first: page.conf.mobile)]()
+        page.river.Pane.Show()
         page.WSS()
     },
 })

@@ -38,14 +38,12 @@ return {
 		}
         var l = map.getCenter()
         plugin.Run(event, [option.table.value, option.when.value, option.what.value, option.city.value, option.where.value,
-			"longitude", trunc(l.lng), "latitude", trunc(l.lat), "scale", map.getZoom()], function(msg) {
-			plugin.msg = msg, plugin.display("table")
-        })
+			"longitude", trunc(l.lng), "latitude", trunc(l.lat), "scale", map.getZoom()])
     },
     Flashs: function() {var plugin = field.Plugin
         plugin.initMap(), plugin.Run(event, [option.table.value], function(msg) {
-            kit.List(ctx.Table(msg), plugin.place, 1000)
-        })
+            kit.List(msg.Table(), plugin.place, 1000)
+        }, true)
     },
 	place: function(line) {
 		var p = new BMap.Point(line.longitude, line.latitude)

@@ -49,7 +49,7 @@ call Keys("Statment", ["label", "goto"])
 " call Keys("SubCommand", ["import", "export", "load", "save"])
 
 " context ctx
-call Keys("Argument", ["list", "map"])
+" call Keys("Argument", ["list", "map"])
 " context mdb
 call Keys("Argument", ["dbname", "dbhelp"])
 " context aaa

@@ -27,6 +27,11 @@ legend {
 .select {
 }
 
+fieldset>form.option {
+    padding:0 5px;
+    margin-right:3px;
+    float:left;
+}
 fieldset>form.option div {
     margin-right:3px;
     float:left;
@@ -40,24 +45,24 @@ fieldset>form.option div.clear {
 fieldset>form.option label {
     margin-right:3px;
 }
-fieldset>form.option div.cmd input.args {
+fieldset>form.option input.args.cmd {
     color:white;
     background-color: black;
     width:160px;
 }
-fieldset>form.option div.char input.args {
+fieldset>form.option input.args.char {
     width:20px;
 }
-fieldset>form.option div.tiny input.args {
+fieldset>form.option input.args.tiny {
     width:40px;
 }
-fieldset>form.option div input.args {
+fieldset>form.option input.args {
     width:80px;
 }
-fieldset>form.option div.long input.args {
+fieldset>form.option input.args.long {
     width:240px;
 }
-fieldset>form.option div.full input.args {
+fieldset>form.option input.args.full {
     width:480px;
 }
 fieldset>div.action {
@@ -297,6 +302,9 @@ fieldset.Header>div.output>div.title:hover {
 }
 fieldset.Header>div.output>div.state {
     float:right;
+}
+fieldset.Header>div.output>div.state div.item {
+    padding:0;
 }
 fieldset.Header>div.output>div.state>div {
     cursor:pointer;

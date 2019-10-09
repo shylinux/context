@@ -167,6 +167,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 			"plugin": map[string]interface{}{
 				"path": "src/plugin", "template": "usr/template/plugin",
+				"list": []interface{}{"local.shy", "index.shy", "index.css", "index.js"},
 			}, "script": map[string]interface{}{
 				"path": "usr/script",
 			}, "trash": map[string]interface{}{
@@ -979,8 +980,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			p := path.Join(m.Conf("project", "plugin.path"), arg[0])
 			q := path.Join(m.Conf("publish", "path"), arg[0])
 			if _, e := os.Stat(p); e == nil && m.Assert(os.MkdirAll(q, 0777)) {
-				m.Confm("project", "plugin.list", func(index int, value map[string]interface{}) {
-					m.Cmd("nfs.copy", path.Join(q, kit.Format(value["name"])), path.Join(p, kit.Format(value["name"])))
+				m.Confm("project", "plugin.list", func(index int, value string) {
+					m.Cmd("nfs.copy", path.Join(q, value), path.Join(p, value))
 				})
 				for _, v := range arg[1:] {
 					m.Cmd("nfs.copy", path.Join(q, v), path.Join(p, v))

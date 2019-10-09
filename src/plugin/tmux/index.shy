@@ -1,10 +1,24 @@
 
-kit buffer "粘贴板" public buf \
+kit buffer "粘贴板" private buf \
 	text "0" name index imports plugin_tmux_bindex action auto \
 	text "" name txt action auto \
 	button "查看" action auto \
 	button "返回" cb Last \
     exports tmux_bindex cur
+
+fun list "列表" "" "" private \
+	text "docker" name table imports plugin_table \
+	text "" name txt \
+	text "" name cmd view long \
+	button "记录" \
+	exports tmux_cmd cmd
+
+    if $2 == "" || $3 == ""
+        copy skip ssh.data show _ fields id txt cmd
+    else
+        copy ssh.data insert _ txt _ cmd __
+    end
+end
 
 kit session "会话" private mux \
 	button "查看" action auto \
@@ -31,7 +45,7 @@ kit cmd "命令" private mux _ _ _ r \
 	text "context" imports plugin_tmux_sess \
 	text "docker" imports plugin_tmux_wins \
 	text "4" imports plugin_tmux_pane view tiny \
-	text "pwd" view full \
+	text "pwd" view full imports plugin_tmux_cmd \
 	button "执行"
 
 kit json "解析" private "nfs.json" \

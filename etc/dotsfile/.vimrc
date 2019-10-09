@@ -18,7 +18,7 @@ Plug 'easymotion/vim-easymotion'
 Plug 'gcmt/taboo.vim'
 set sessionoptions+=tabpages,globals
 
-Plug 'vim-scripts/taglist.vim'
+" Plug 'vim-scripts/taglist.vim'
 let g:Tlist_WinWidth=45
 let g:Tlist_Exit_OnlyWindow=1
 let g:Tlist_Enable_Fold_Column=0
@@ -144,6 +144,7 @@ nnoremap df :FZF<CR>
 inoremap df _
 inoremap jk <Esc>
 cnoremap jk <CR>
+cnoremap wa wa<CR>
 "}}}
 " 编程配置{{{
 set keywordprg=man\ -a
@@ -193,7 +194,10 @@ autocmd BufNewFile,BufReadPost *.js call Config("js")
 
 command! RR wa | source ~/.vimrc |e
 command! SS mksession! etc/session.vim
-source ~/.vim_local
+
+if filereadable("~/.vim_local")
+    source ~/.vim_local
+endif
 
 let g:colorscheme=1
 let g:colorlist = [ "ron", "torte", "darkblue", "peachpuff" ]

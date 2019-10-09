@@ -94,7 +94,7 @@ function Meta(zone, target, obj) {
                 case "field": text = JSON.parse(line.text)
                 case "plugin": if (!text.name) {return {}}
                     var id = "plugin"+meta.ID()
-                    list.push({view: ["item", "fieldset"], data: {id: id, draggable: true}, list: [
+                    list.push({view: ["item", "fieldset"], data: {id: id, draggable: false}, list: [
                         {text: [text.name+"("+text.help+")", "legend"]},
                         {view: ["option", "form"], list: [{type: "input", style: {"display": "none"}}]},
                         {view: ["output", "div"]},
@@ -102,7 +102,7 @@ function Meta(zone, target, obj) {
                     break
             }
 
-            var ui = kit.AppendChild(output, item? list: [{view: ["item"], data: {id: "item"+meta.ID(), draggable: true}, list:list}])
+            var ui = kit.AppendChild(output, item? list: [{view: ["item"], data: {id: "item"+meta.ID(), draggable: false}, list:list}])
             return ui.item.Meta = text, ui
         }),
         Include: shy("加载脚本", function(src, cb) {src = kit.List(src)
@@ -131,8 +131,7 @@ function Page(page) {
     page = Meta([document.title], document.body, page, {check: true,
         onload: function(event) {
             // Event入口 0
-            page.Event(event, {})
-            if (page.check && !ctx.Cookie("sessid")) {
+            if (page.Event(event, {}) && page.check && !ctx.Cookie("sessid")) {
                 // 用户登录
                 document.querySelectorAll("body>fieldset.Login").forEach(function(field) {
                     page.Pane(page, field)
@@ -147,30 +146,11 @@ function Page(page) {
                 }): page.init(page)
             }
 
-            // 微信接口
-            kit.device.isWeiXin && page.login.Pane.Run(event, ["weixin"], function(msg) {
-                msg.appid[0] && page.Include(["https://res.wx.qq.com/open/js/jweixin-1.4.0.js"], function(event) {
-                    wx.error(function(res){})
-                    wx.ready(function(){
-                        page.scanQRCode = function(cb) {
-
-                        }
-                        page.getLocation = function(cb) {
-                            wx.getLocation({success: cb})
-                        }
-                        page.openLocation = function(latitude, longitude, name) {
-                            wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
-                        }
-                    }), wx.config({jsApiList: ["closeWindow", "scanQRCode", "getLocation", "openLocation"],
-                    appId: msg.appid[0], nonceStr: msg.nonce[0], timestamp: msg.timestamp[0], signature: msg.signature[0]})
-                })
-            })
-
             // 事件回调
             window.onresize = function(event) {
                 page.onlayout(event)
             }, document.body.onkeydown = function(event) {
-                page.oncontrol(event) || page.onscroll(event)
+                // page.oncontrol(event) || page.onscroll(event)
             }, document.body.onkeyup = function(event) {
             }, document.body.oncontextmenu = function(event) {
             }, document.body.onmousewheel = function(event) {
@@ -472,7 +452,7 @@ function Page(page) {
                 Head: function() {if (kit.isNone(last)) {return}
                     caption.style.width = last.offsetWidth+"px"
                     kit.Selector(last, "td", function(item, index) {
-                        head.childNodes[index].style.width = item.offsetWidth-14+"px"
+                        head.childNodes[index] && (head.childNodes[index].style.width = item.offsetWidth-14+"px")
                     })
                 },
                 Show: function() {layout || (layout = field.Pane.Action.meta["最大"](), 1)
@@ -526,9 +506,24 @@ function Page(page) {
                 }]}, {type: "br"},
             ])
 
-            if (kit.device.isWeiXin) {
-                kit.AppendChild(output, [])
-            }
+            // 微信接口
+            kit.device.isWeiXin && page.login.Pane.Run(event, ["weixin"], function(msg) {
+                msg.appid[0] && page.Include(["https://res.wx.qq.com/open/js/jweixin-1.4.0.js"], function(event) {
+                    wx.error(function(res){})
+                    wx.ready(function(){
+                        page.scanQRCode = function(cb) {
+
+                        }
+                        page.getLocation = function(cb) {
+                            wx.getLocation({success: cb})
+                        }
+                        page.openLocation = function(latitude, longitude, name) {
+                            wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
+                        }
+                    }), wx.config({jsApiList: ["closeWindow", "scanQRCode", "getLocation", "openLocation"],
+                    appId: msg.appid[0], nonceStr: msg.nonce[0], timestamp: msg.timestamp[0], signature: msg.signature[0]})
+                })
+            })
             return {
                 Login: function(username, password, cb) {
                     field.Pane.Run(event, [username, password], function(msg) {cb(msg.result && msg.result[0] || "")})
@@ -537,28 +532,28 @@ function Page(page) {
             }
         },
         initHeader: function(page, field, option, output) {
-            var cb = function(event, item, value) {
-                kit._call(page.Action[item], [event, item, value, page])
-            }
+            var cb = function(event, item, value) {kit._call(page.Action[item], [event, item, value, page])}
             field.onclick = function(event) {page.pane && page.pane.scrollTo(0, 0)}
             page.who.change(function(value, old) {page.Button("user", value)})
 
             return {
                 Show: function() {var meta = page.Button.meta, list = page.Button.list
                     kit.AppendChilds(output, [
-                        {"view": ["title", "div", meta.title], click: cb},
-                        {"view": ["state"], list: list.map(function(item) {return {text: [meta[item], "div", "item"], click: cb}})},
+                        {"view": ["title", "div", meta.title], click: function(event) {
+                            cb(event, "title", meta.title)
+                        }},
+                        {"view": ["state"], list: list.map(function(item) {return {text: [meta[item], "div", "item"], click: function(event) {
+                            cb(event, item, meta[item])
+                        }}})},
                     ])
                 },
 				Help: function() {return []},
             }
         },
         initFooter: function(page, field, option, output) {
-            var state = {title: "<a href='mailto:shylinux@163.com'>shylinux@163.com</>"}, list = [], cb = function(event, item, value) {
-                kit._call(page.Action[item], [event, item, value, page])
-            }
+            var cb = function(event, item, value) {kit._call(page.Action[item], [event, item, value, page])}
             var ui = kit.AppendChilds(output, [
-                {"view": ["title", "div", state.title]},
+                {"view": ["title", "div", page.Status.meta.title]},
                 {"view": ["state"]},
                 {"view": ["magic"], list: [{label: "0", name: "count"}, {input: ["magics", function(event) {
                     if (event.key == "Enter" || event.ctrlKey && event.key == "j") {
@@ -596,10 +591,9 @@ function Page(page) {
                     ui && kit.size(ui.magics, (width - ui.count.offsetWidth - ui.first.offsetWidth - ui.state.offsetWidth - 40), height-6)
                 },
                 Show: function() {var meta = page.Status.meta, list = page.Status.list
-                    kit.AppendChilds(output, [
-                        {"view": ["title", "div", meta.title], click: cb},
-                        {"view": ["state"], list: list.map(function(item) {return {text: [item+":"+meta[item], "div", "item"], click: cb}})},
-                    ])
+                    kit.AppendChilds(ui.state, list.map(function(item) {return {text: [item+":"+meta[item], "div", "item"], click: function(event) {
+                        cb(event, item, meta[item])
+                    }}}))
                     field.Pane.Size(field.clientWidth, field.clientHeight)
                 },
                 Help: function() {return []},
@@ -651,6 +645,7 @@ function Pane(page, field) {
             ui.item.ondragstart = function(event) {if (event.target != ui.item) {return}
                 event.dataTransfer.setData("item", event.target.id)
                 event.stopPropagation()
+                event.preventDefault()
             }
             ui.item.ondragover = function(event) {if (event.target != ui.item) {return}
                 event.stopPropagation()
@@ -1038,7 +1033,8 @@ function Plugin(page, pane, field, inits, runs) {
                     item.autocomplete = "off"
                     break
             }
-            return Inputs(plugin, input, item, plugin.View(option, "input", input)[input.name]).target
+            kit.classList.add(item, item.view)
+            return Inputs(plugin, input, item, plugin.View(option, "input", input)[input.name], option).target
         }),
         Select: shy("选择控件", function(target, focus) {field.onclick(event)
             page.input = target = target || option.querySelectorAll("input")[1]
@@ -1127,6 +1123,14 @@ function Plugin(page, pane, field, inits, runs) {
             return kit.notNone(key)? (option[key]? option[key].value: ""):
                 kit.Selector(option, ".args", function(item, index) {return item.value})
         },
+        upload: function(event) {
+            ctx.Upload({river: meta.river, table: plugin.Option("table")}, option.upload.files[0], function(event, msg) {
+                Output(plugin, "table", msg, null, output, option)
+                plugin.ontoast("上传成功")
+            }, function(event) {
+                plugin.ontoast("上传进度 "+parseInt(event.loaded*100/event.total)+"%")
+            })
+        },
         Delay: shy("延时命令", function(time, event, text) {plugin.ontoast(text, "", -1)
             return setTimeout(function() {plugin.Runs(event)}, time)
         }),
@@ -1162,6 +1166,38 @@ function Plugin(page, pane, field, inits, runs) {
             type != meta.type && plugin.Save(meta.type, output), meta.type = type
             !plugin.Load(type, output) && Output(plugin, type || feature.display, msg || plugin.msg, cb, output, option)
         }),
+        onexport: shy("导出数据", {
+            "": function(value, name, line) {
+                return value
+            },
+            see: function(value, name, line) {
+                return value.split("/")[0]
+            },
+            you: function(value, name, line) {
+                event.Plugin = plugin
+
+                line.you && name == "status" && (line.status == "start"? function() {
+                    plugin.Delay(3000, event, line.you+" stop...") && plugin.Run(event, [option.pod.value, line.you, "stop"])
+                }(): plugin.Run(event, [option.pod.value, line.you], function(msg) {
+                    plugin.Delay(3000, event, line.you+" start...")
+                }))
+                return name == "status" || line.status == "stop" ? undefined: line.you
+            },
+            pod: function(value, name, line, list) {
+                return (option[list[0]].value? option[list[0]].value+".": "")+line.pod
+            },
+            dir: function(value, name, line) {
+                name != "path" && (value = line.path)
+                return value
+            },
+            tip: function(value, name, line) {
+                return option.tip.value + value
+            },
+        }, JSON.parse(meta.exports||'["",""]'), function(event, value, name, line) {
+            var meta = arguments.callee.meta
+            var list = arguments.callee.list
+            ;(!list[1] || list[1] == name) && page.Sync("plugin_"+list[0]).set(meta[list[2]||""](value, name, line, list))
+        }),
         onchoice: shy("菜单列表", {
             "返回": "Last",
             "添加": "Clone",
@@ -1181,10 +1217,11 @@ function Plugin(page, pane, field, inits, runs) {
 
     kit.Log("init", "plugin", name, plugin)
     plugin.which = plugin.Sync("input")
+    page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
     plugin.Appends(inputs)
-    return page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
+    return plugin
 }
-function Inputs(plugin, meta, item, target) {
+function Inputs(plugin, meta, item, target, option) {
     var plug = meta.plug, name = meta.name, type = item.type
     var input = Meta(plugin.Zone(name), target, item, {
         getLocation: function(event) {
@@ -1217,14 +1254,6 @@ function Inputs(plugin, meta, item, target) {
             return (target.value = args[0]) || plugin.Zone("value", args[0])
         },
 
-        upload: function(event) {
-            ctx.Upload({river: meta.river, table: plugin.Option("table")}, option.upload.files[0], function(event, msg) {
-                Output(plugin, "table", msg, null, output, option)
-                plugin.ontoast("上传成功")
-            }, function(event) {
-                plugin.ontoast("上传进度 "+parseInt(event.loaded*100/event.total)+"%")
-            })
-        },
         onformat: shy("数据转换", {
             none: function(value) {return value||""},
             date: function(value) {return kit.time()},
@@ -1367,38 +1396,6 @@ function Output(plugin, type, msg, cb, target, option) {
             plugin.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([text]))+'" target="_blank" download="'+name+type+'">'+name+type+'</a>', title: "下载中...", width: 200})
             kit.Selector(page.toast, "a", function(item) {item.click()})
         },
-        onexport: shy("导出数据", {
-            "": function(value, name, line) {
-                return value
-            },
-            see: function(value, name, line) {
-                return value.split("/")[0]
-            },
-            you: function(value, name, line) {
-                event.Plugin = plugin
-
-                line.you && name == "status" && (line.status == "start"? function() {
-                    plugin.Delay(3000, event, line.you+" stop...") && plugin.Run(event, [option.pod.value, line.you, "stop"])
-                }(): plugin.Run(event, [option.pod.value, line.you], function(msg) {
-                    plugin.Delay(3000, event, line.you+" start...")
-                }))
-                return name == "status" || line.status == "stop" ? undefined: line.you
-            },
-            pod: function(value, name, line, list) {
-                return (option[list[0]].value? option[list[0]].value+".": "")+line.pod
-            },
-            dir: function(value, name, line) {
-                name != "path" && (value = line.path)
-                return value
-            },
-            tip: function(value, name, line) {
-                return option.tip.value + value
-            },
-        }, JSON.parse(exports||'["",""]'), function(event, value, name, line) {
-            var meta = arguments.callee.meta
-            var list = arguments.callee.list
-            ;(!list[1] || list[1] == name) && page.Sync("plugin_"+list[0]).set(meta[list[2]||""](value, name, line, list))
-        }),
         onimport: shy("导入数据", {
             _table: function(msg, list) {
                 return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport)
