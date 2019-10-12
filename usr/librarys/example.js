@@ -1025,7 +1025,8 @@ function Plugin(page, pane, field, inits, runs) {
                     kit.classList.add(item, "args")
                     break
                 case "textarea":
-                    input.type = "textarea", item.style = "height:100px;"+"width:"+(pane.target.clientWidth-30)+"px"
+                    kit.AppendChild(option, "br")
+                    input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+(pane.target.clientWidth-30)+"px"
                     // no break
                 case "text":
                     item.value = value || item.value || ""
@@ -1283,8 +1284,8 @@ function Inputs(plugin, meta, item, target, option) {
                 type == "select" && input.Event(event, {}) && plugin.Check(event, item.action == "auto"? undefined: target)
             },
             ondblclick: function(event) {
-                var txt = kit.History("txt", -1)
-                type == "text" && txt && (target.value = txt.data.trim())
+                var txt = kit.History("txt", -1);
+                (type == "text" || type == "textarea") && txt && (target.value = txt.data.trim())
             },
             onselect: function(event) {
                 kit.CopyText()
@@ -1407,6 +1408,10 @@ function Output(plugin, type, msg, cb, target, option) {
                 target.innerHTML = "", plugin.onfigure.meta.max(target)
                 output.onimport.meta._table(msg, msg.append) || (target.innerHTML = msg.result.join(""))
                 kit._call(cb, [msg])
+            },
+            code: function(msg, cb) {
+                target.innerHTML = "", output.onimport.meta._code(msg)
+                typeof cb == "function" && cb(msg)
             },
             table: function(msg, cb) {
                 target.innerHTML = ""
