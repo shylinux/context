@@ -1038,7 +1038,7 @@ function Plugin(page, pane, field, inits, runs) {
             return Inputs(plugin, input, item, plugin.View(option, "input", input)[input.name], option).target
         }),
         Select: shy("选择控件", function(target, focus) {field.onclick(event)
-            page.input = target = target || option.querySelectorAll("input")[1]
+            page.plugin = field, page.input = target = target || option.querySelectorAll("input")[1]
             plugin.which.set(page.input.name)
             focus && page.input.focus()
         }),
@@ -1056,9 +1056,7 @@ function Plugin(page, pane, field, inits, runs) {
             return JSON.stringify(field.Meta)
         }),
         Clone: shy("复制插件", function() {
-            return pane.Append("field", {text: plugin.Reveal()}, [], "", function(line, index, event, cmds, cbs) {
-                plugin.Run(event, cmds, cbs, true)
-            }).item.Plugin.Select()
+            return pane.Append("field", {text: plugin.Reveal(), init: meta.init, view: meta.view}, [], "").item.Plugin.Select()
         }),
 
         Move: function() {
@@ -1337,7 +1335,7 @@ function Inputs(plugin, meta, item, target, option) {
                 if (event.key == "Enter" && (event.ctrlKey || item.type == "text")) {
                     // Event入口 2.1
                     input.which.set(target.value) != undefined && plugin.History(target.value, target)
-                    input.Event(event, {}) && plugin.Check(target)
+                    input.Event(event, {}) && plugin.Check(event, target)
                 }
             },
             onkeyup: function(event) {

@@ -1,4 +1,4 @@
-kit xls "表格" "index.js" "index.css" private \
+kit xls "表格" "index.js" "index.css" private "nfs.xls" \
 	text "" name title imports plugin_xls_id action auto \
 	text "" name content \
 	button "执行" \

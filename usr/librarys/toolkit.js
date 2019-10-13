@@ -35,7 +35,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         }
         return meta[type] = list, list.push({time: Date.now(), data: data})-1
     }),
-    Debug: shy("调试断点", {why: true, msg: true}, function(key) {
+    Debug: shy("调试断点", {why: true, msg: true, config: false}, function(key) {
         if (arguments.callee.meta[key]) {debugger}
     }),
     Log: shy("输出日志", {hide: {"init": true, "wss": false}, call: [],
