@@ -24,7 +24,11 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     },
     alert: function(text) {alert(JSON.stringify(text))},
     confirm: function(text) {return confirm(text)},
-    prompt: function(text) {return prompt(text)},
+    prompt: function(text, cb) {
+        var text = prompt(text)
+        text && kit._call(cb, text)
+        return text
+    },
     reload: function() {location.reload()},
     // 日志调试
     History: shy("历史记录", {lay: [], cmd: [], txt: [], key: []}, function(type, index, data) {var meta = arguments.callee.meta
@@ -642,7 +646,7 @@ function Canvas(plugin, option, output, width, height, space, msg) {
 
     var conf = {
         font: "monospace", text: "hi", tool: "stroke", style: "black",
-        type: "trend", shape: "drawText", means: "drawPoint",
+        type: "ticket", shape: "drawText", means: "drawPoint",
         limits: {scale: 3, drawPoint: 1, drawPoly: 3},
 
         axies: {style: "black", width: 2},
@@ -1229,8 +1233,8 @@ function Canvas(plugin, option, output, width, height, space, msg) {
             what.refresh()
         },
         trans: {
-            "折线图": ["type", "trend"],
             "股价图": ["type", "ticket"],
+            "折线图": ["type", "trend"],
             "柱状图": ["type", "stick"],
             "饼状图": ["type", "weight"],
 
@@ -1311,15 +1315,15 @@ function Canvas(plugin, option, output, width, height, space, msg) {
     }
 
     var action = kit.AppendAction(kit.AppendChild(output, [{view: ["action"]}]).last, [
-        ["折线图", "股价图", "柱状图", "饼状图"],
-        ["移动", "旋转", "缩放"],
-        ["文本", "直线", "折线", "矩形", "圆形", "椭圆"],
-        ["辅助点", "辅助线"],
-        ["画笔", "画刷"],
-        ["黑色", "红色", "绿色", "黄色", "蓝色", "紫色", "青色", "白色", "随机色", "默认色"],
+        ["", "股价图", "折线图", "柱状图", "饼状图"],
+        ["", "移动", "旋转", "缩放"],
+        ["", "文本", "直线", "折线", "矩形", "圆形", "椭圆"],
+        ["", "辅助点", "辅助线"],
+        ["", "画笔", "画刷"],
+        ["", "黑色", "红色", "绿色", "黄色", "蓝色", "紫色", "青色", "白色", "随机色", "默认色"],
         "", "清屏", "刷新", "播放", "回退",
         "", "标签", "快捷键",
-    ], function(value, event) {
+    ], function(event, value) {
         var map = what.trans[value]
         conf[map[0]] && (conf[map[0]] = map[1]) || what[map[0]] && what[map[0]](value, event)
         what.refresh()

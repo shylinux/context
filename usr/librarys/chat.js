@@ -93,7 +93,7 @@ var page = Page({
                 "退出登录": function(event) {
                     kit.confirm("logout?") && page.login.Pane.Exit()
                 },
-            }, ["修改昵称", "退出登录"], function(value, meta, event) {
+            }, ["修改昵称", "退出登录"], function(event, value, meta) {
                 meta[value](event)
             }))
         },
@@ -232,6 +232,7 @@ var page = Page({
                 },
             },
             Button: ["创建", "共享"],
+            Choice: ["创建", "共享"],
         }
     },
     initTarget: function(page, field, option, output) {
@@ -371,8 +372,8 @@ var page = Page({
                     page.plugin && page.plugin.Plugin.onfigure("canvas")
                 },
 
-                "添加": function(event, value) {
-                    page.plugin && page.plugin.Plugin.Clone().Select()
+                "复制": function(event, value) {
+                    page.plugin && page.plugin.Plugin.Clone()
                 },
                 "删除": function(event, value) {
                     page.plugin && page.plugin.Plugin.Delete()
@@ -402,7 +403,7 @@ var page = Page({
             Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"],
                 "", "刷新", "清屏", "并行", "串行",
 				"", ["display", "表格", "编辑", "绘图"],
-                "", "添加", "删除", "加参", "减参",
+                "", "复制", "删除", "加参", "减参",
                 "", "执行", "下载", "清空", "返回",
             ],
             Choice: [
@@ -439,13 +440,13 @@ var page = Page({
                 "创建": function(event) {
                     page.steam.Pane.Show()
                 },
-                "共享": function(event) {
+                "共享": function(event, value, meta, line) {
                     var user = kit.prompt("分享给用户")
                     if (user == null) {return}
 
                     page.login.Pane.Run(event, ["relay", "storm", "username", user, "url", ctx.Share({
                         "river": page.river.Pane.which.get(),
-                        "storm": page.storm.Pane.which.get(),
+                        "storm": line.key,
                         "layout": page.action.Pane.Layout(),
                     })], function(msg) {
                         var url = location.origin+location.pathname+"?relay="+msg.result.join("")
@@ -454,12 +455,43 @@ var page = Page({
                         }})
                     })
                 },
-                "刷新": function(event) {
+                "刷新": function(event) {var pane = field.Pane
+                    pane.Save(""), field.Pane.Show()
+                },
+                "复制": function(event, value, meta, line) {var pane = field.Pane
+                    var name = kit.prompt("名称")
+                    name && pane.Run(event, [river, "clone", name, line.key], function(msg) {
+                        field.Pane.Show(name)
+                    })
+                },
+                "删除": function(event, value, meta, line) {var pane = field.Pane
+                    kit.confirm("删除") && pane.Run(event, [river, "delete", line.key], function(msg) {
+                        field.Pane.Show()
+                    })
+                },
+                "恢复": function(event, value, meta, line) {
+                    var status = JSON.parse(line.status)
+                    kit.Selector(page.action, "fieldset.item", function(field, index) {
+                        var args = status[index].args
+                        kit.Selector(field, "input.args", function(input, index) {
+                            input.value = args[index]||""
+                        })
+                    })
+                },
+                "保存": function(event, value, meta, line) {var pane = field.Pane
+                    field.Pane.Run(event, [river, "save", pane.which.get(),
+                        JSON.stringify(kit.Selector(page.action, "fieldset.item", function(field) {
+                            return {name: field.Meta.name, args: kit.Selector(field, "input.args", function(input) {
+                                return input.value
+                            })}
+                        }))], function(msg) {
+                            page.toast.Pane.Show("保存成功")
+                        })
                 },
             },
-            Button: ["创建", "共享"],
-            Choice: ["创建", "共享"],
-            Detail: ["刷新"],
+            Button: ["刷新", "创建"],
+            Choice: ["刷新", "创建"],
+            Detail: ["保存", "恢复", "共享", "复制", "删除"],
         }
     },
     initSteam: function(page, field, option, output) {
@@ -537,8 +569,8 @@ var page = Page({
                 kit.AppendTable(device, list, ["key", "index", "name", "help"], function(value, key, com, i, tr, event) {
                     pane.Select(com, pod)
                 }, function(value, key, com, i, tr, event) {
-                    page.carte.Pane.Show(event, shy({}, ["创建"], function(event, item) {
-                        pane.Create(com.key)
+                    page.carte.Pane.Show(event, shy(pane.Action, pane.Detail, function(event, item, meta) {
+                        meta[item](event, value, key, com)
                     }))
                 })
             },
@@ -577,8 +609,16 @@ var page = Page({
                 "全选": function(event) {
                     kit.Selector(device, "tr.normal", function(item) {item.firstChild.click()})
                 },
+                "刷新": function(event) {
+                    field.Pane.Save(""), field.Pane.Show(), field.Pane.Show()
+                },
+                "创建": function(event, value, key, line) {
+                    field.Pane.Create(line.key)
+                },
             },
-            Button: ["取消", "清空", "全选"],
+            Button: ["取消", "清空", "全选", "刷新"],
+            Choice: ["取消", "清空", "全选", "刷新"],
+            Detail: ["创建"],
         }
     },
     init: function(page) {

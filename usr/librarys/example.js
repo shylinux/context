@@ -127,6 +127,7 @@ function Meta(zone, target, obj) {
     return meta
 }
 function Page(page) {
+    kit.device.isWeiXin =  true
     var script = {}, record = ""
     page = Meta([document.title], document.body, page, {check: true,
         onload: function(event) {
@@ -144,6 +145,8 @@ function Page(page) {
                     msg.result && msg.result[0]? (page.who.set(msg.nickname[0]), page.init(page))
                         :page.login.Pane.Dialog(1, 1)
                 }): page.init(page)
+                page.Button()
+                page.Status()
             }
 
             // 事件回调
@@ -411,7 +414,7 @@ function Page(page) {
                 Show: function(event, cb) {if (!cb.list || cb.list.length == 0) {return}
                     output.innerHTML = ""
                     kit.AppendActions(output, cb.list, function(event, value) {
-                        kit._call(cb, [value, cb.meta, event]) && field.Pane.Hide()
+                        kit._call(cb, [event, value, cb.meta]) && field.Pane.Hide()
                     }, true)
 
                     var pos = {display: "block", left: event.x, top: event.y}
@@ -506,25 +509,27 @@ function Page(page) {
                 }]}, {type: "br"},
             ])
 
-            // 微信接口
-            kit.device.isWeiXin && page.login.Pane.Run(event, ["weixin"], function(msg) {
-                msg.appid[0] && page.Include(["https://res.wx.qq.com/open/js/jweixin-1.4.0.js"], function(event) {
-                    wx.error(function(res){})
-                    wx.ready(function(){
-                        page.scanQRCode = function(cb) {
-
-                        }
-                        page.getLocation = function(cb) {
-                            wx.getLocation({success: cb})
-                        }
-                        page.openLocation = function(latitude, longitude, name) {
-                            wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
-                        }
-                    }), wx.config({jsApiList: ["closeWindow", "scanQRCode", "getLocation", "openLocation"],
-                    appId: msg.appid[0], nonceStr: msg.nonce[0], timestamp: msg.timestamp[0], signature: msg.signature[0]})
-                })
-            })
             return {
+                WeiXin: function() {
+                    // 微信接口
+                    kit.device.isWeiXin && page.login.Pane.Run(event, ["weixin"], function(msg) {
+                        msg.appid[0] && page.Include(["https://res.wx.qq.com/open/js/jweixin-1.4.0.js"], function(event) {
+                            wx.error(function(res){})
+                            wx.ready(function(){
+                                page.scanQRCode = function(cb) {
+
+                                }
+                                page.getLocation = function(cb) {
+                                    wx.getLocation({success: cb})
+                                }
+                                page.openLocation = function(latitude, longitude, name) {
+                                    wx.openLocation({latitude: parseFloat(latitude), longitude: parseFloat(longitude), name:name||"here"})
+                                }
+                            }), wx.config({jsApiList: ["closeWindow", "scanQRCode", "getLocation", "openLocation"],
+                                appId: msg.appid[0], nonceStr: msg.nonce[0], timestamp: msg.timestamp[0], signature: msg.signature[0]})
+                        })
+                    })
+                },
                 Login: function(username, password, cb) {
                     field.Pane.Run(event, [username, password], function(msg) {cb(msg.result && msg.result[0] || "")})
                 },
@@ -601,6 +606,7 @@ function Page(page) {
         },
         Pane: Pane,
     }), page.which = page.Sync("layout"), page.who = page.Sync("username")
+
     kit.Log("init", "page", page)
     return window.onload = page.onload, page
 }
@@ -633,6 +639,7 @@ function Pane(page, field) {
         }),
         Append: shy("添加列表", function(type, line, key, which, cb) {type = type || line.type
             var ui = pane.View(output, type, line, key)
+            if (!ui.item) {return}
 
             ui.item.onclick = function(event) { if (pane.which.get() == line[which]) {return}
                 pane.Event(event, {}, {name: pane.Zone("select", line[key[0]])})
@@ -658,8 +665,8 @@ function Pane(page, field) {
                 event.stopPropagation()
             }
             ui.item.oncontextmenu = function(event) {
-                pane.Detail && page.carte.Pane.Show(event, shy({}, pane.Detail, function(value, meta, event) {
-                    pane.Check(event, value)
+                pane.Detail && page.carte.Pane.Show(event, shy({}, pane.Detail, function(event, value, meta) {
+                    pane.Check(event, value, meta, line)
                 }))
             }
 
@@ -784,25 +791,27 @@ function Pane(page, field) {
             pane.Event(event, {}, {name: pane.Zone("click", value)})
             page.script("record", [name, value])
 
+            var cb = function() {}
             if (pane.Action && pane.Action.meta && typeof pane.Action.meta[value] == "function") {
-                kit._call(pane.Action.meta[value], [event, value])
+                cb = pane.Action.meta[value]
             } else if (pane.Action && typeof pane.Action[value] == "function") {
-                kit._call(pane.Action[value], [event, value])
+                cb = pane.Action[value]
             } else if (typeof pane.Action == "function") {
-                kit._call(pane.Action, [event, value])
+                cb = pane.Action
             } else if (typeof pane[value] == "function") {
-                kit._call(pane[value], [event, value])
+                cb = pane[value]
             }
 
             if (page.Action && page.Action.meta && typeof page.Action.meta[value] == "function") {
-                kit._call(page.Action.meta[value], [event, value])
+                cb = page.Action.meta[value]
             } else if (page.Action && typeof page.Action[value] == "function") {
-                kit._call(page.Action[value], [event, value])
+                cb = page.Action[value]
             } else if (typeof page.Action == "function") {
-                kit._call(page.Action, [event, value])
+                cb = page.Action
             } else if (typeof page[value] == "function") {
-                kit._call(page[value], [event, value])
+                cb = page[value]
             }
+            kit._call(cb, arguments)
         }),
         Tutor: function() {var pane = field.Pane
             var event = window.event
@@ -978,7 +987,7 @@ function Pane(page, field) {
 
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {
-                pane.Choice && page.carte.Pane.Show(event, shy({}, pane.Choice, function(value, meta, event) {
+                pane.Choice && page.carte.Pane.Show(event, shy({}, pane.Choice, function(event, value, meta) {
                     pane.Check(event, value)
                 }))
             },
@@ -1056,7 +1065,7 @@ function Plugin(page, pane, field, inits, runs) {
             return JSON.stringify(field.Meta)
         }),
         Clone: shy("复制插件", function() {
-            return pane.Append("field", {text: plugin.Reveal(), init: meta.init, view: meta.view}, [], "").item.Plugin.Select()
+            return pane.Append("field", {text: plugin.Reveal(), init: meta.init, view: meta.view, group: meta.group}, [], "")
         }),
 
         Move: function() {
@@ -1140,7 +1149,7 @@ function Plugin(page, pane, field, inits, runs) {
                 return item
             }).length == 0 && plugin.Runs(event, cb)
         }),
-        Last: shy("历史命令", function() {kit.notNone(plugin.History()) && plugin.Check(event)}),
+        Last: shy("历史命令", function(event) {kit.notNone(plugin.History()) && plugin.Check(event)}),
         Runs: shy("执行命令", function(event, cb) {plugin.Run(event, plugin.Option(), cb)}),
         Run: shy("执行命令", function(event, args, cb, silent) {var show = true
             page.script("record", ["action", name].concat(args))
@@ -1199,11 +1208,11 @@ function Plugin(page, pane, field, inits, runs) {
         }),
         onchoice: shy("菜单列表", {
             "返回": "Last",
-            "添加": "Clone",
+            "复制": "Clone",
             "加参": "Appends",
             "减参": "Remove",
             "删除": "Delete",
-        }, ["返回", "添加", "加参", "减参", "删除"], function(value, meta, event) {
+        }, ["返回", "复制", "加参", "减参", "删除"], function(event, value, meta) {
             kit._call(plugin, plugin[meta[value]])
             return true
         }),
@@ -1273,13 +1282,13 @@ function Inputs(plugin, meta, item, target, option) {
             onblur: function(event) {type == "text" && input.which.set(target.value)},
             onclick: function(event) {plugin.Select()
                 // Event入口 2.0
-                type == "button" && input.Event(event, {}) && kit.Value(input[item.cb], plugin[item.cb], function() {
+                type == "button" && input.Event(event, {}) && kit.Value(input[item.cb], plugin[item.cb], function(event, target) {
                     plugin.Check(event)
-                })(event, input)
+                })(event, target)
             },
             onchange: function(event) {
                 // Event入口 2.1
-                type == "select" && input.Event(event, {}) && plugin.Check(event, item.action == "auto"? undefined: target)
+               type == "select" && input.Event(event, {}) && plugin.History(target.value, target) && plugin.Check(event, item.action == "auto"? undefined: target)
             },
             ondblclick: function(event) {
                 var txt = kit.History("txt", -1);
@@ -1433,7 +1442,7 @@ function Output(plugin, type, msg, cb, target, option) {
             "绘图": "_canvas",
             "下载": "Download",
             "清空": "clear",
-        }, ["表格", "绘图", "下载", "清空"], function(value, meta, event) {
+        }, ["表格", "绘图", "下载", "清空"], function(event, value, meta) {
             kit._call(output, output[meta[value]])
             return true
         }),

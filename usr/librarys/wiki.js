@@ -1,6 +1,4 @@
-var page = Page({
-    login: true,
-    conf: {border: 4},
+var page = Page({check: false, conf: {border: 4},
     onlayout: function(event, sizes) {
         var height = document.body.clientHeight-page.conf.border
         var width = document.body.clientWidth-page.conf.border
@@ -36,6 +34,40 @@ var page = Page({
         }
     },
 
+    Action: {
+        title: function(event, item, value, page) {
+            ctx.Search("layout", ctx.Search("layout")? "": "max")
+        },
+        user: function(event, item, value, page) {
+            page.carte.Pane.Show(event, shy({
+                "修改昵称": function(event) {
+                    var name = kit.prompt("new name")
+                    name && page.login.Pane.Run(event, ["rename", name], function(msg) {
+                        page.header.Pane.State("user", name)
+                    })
+                },
+                "退出登录": function(event) {
+                    kit.confirm("logout?") && page.login.Pane.Exit()
+                },
+            }, ["修改昵称", "退出登录"], function(event, value, meta) {
+                meta[value](event)
+            }))
+        },
+        menu: function() {
+            page.text.Pane.Menu()
+        },
+        tree: function() {
+            page.tree.Pane.Tree()
+        },
+
+    },
+    Button: shy({title: "github.com/shylinux/context", tree: "tree", menu: "menu"}, ["tree", "menu"], function(key, value) {var meta = arguments.callee.meta
+        return kit.isNone(key)? meta: kit.isNone(value)? meta[key]: (meta[key] = value, page.header.Pane.Show())
+    }),
+    Status: shy({title: '<a href="mailto:shylinux@163.com">shylinux@163.com</a>', text: "0", menu: "0"}, ["text", "menu"], function(key, value) {var meta = arguments.callee.meta
+        return kit.isNone(key)? meta: kit.isNone(value)? meta[key]: (meta[key] = value, page.footer.Pane.Show())
+    }),
+
     initTree: function(page, field, form, output) {
         var ui = kit.AppendChild(output, [
             {"view": ["back"], "name": "back"}, {"view": ["gap"]},
@@ -53,7 +85,7 @@ var page = Page({
                     page.onlayout()
                 })
 
-                ctx.Run(form.dataset, [], function(msg) {
+                ctx.Run(event, form.dataset, [], function(msg) {
                     ui.back.innerHTML = "", kit.AppendChild(ui.back, [
                         {"button": ["知识", function(event) {
                             ctx.Search({"level": "", "class": "", "favor": ""})
@@ -64,12 +96,12 @@ var page = Page({
                         }]}
                     })))
 
-                    ui.tree.innerHTML = "", kit.AppendChild(ui.tree, ctx.Table(msg, function(value, index) {
+                    ui.tree.innerHTML = "", kit.AppendChild(ui.tree, msg.Table(function(value, index) {
                         return value.file.endsWith("/") && {"text": [value.file, "div"], click: function(event, target) {
                             location.hash = "", ctx.Search({"class": ctx.Search("class")+value.file, "favor": ""})
                         }}
                     }))
-                    ui.list.innerHTML = "", kit.AppendChild(ui.list, ctx.Table(msg, function(value, index) {
+                    ui.list.innerHTML = "", kit.AppendChild(ui.list, msg.Table(function(value, index) {
                         return !value.file.endsWith("/") && {"text": [value.time.substr(5, 5)+" "+value.file, "div"], click: function(event, target) {
                             location.hash = "", ctx.Search("favor", value.file)
                         }}
@@ -84,10 +116,10 @@ var page = Page({
             {"view": ["text", "div", "", "text"]},
         ])
         ui.text.onscroll = function(event) {
-            page.footer.Pane.State("text", kit.Position(ui.text))
+            page.Status("text", kit.Position(ui.text))
         }
         ui.menu.onscroll = function(event) {
-            page.footer.Pane.State("menu", kit.Position(ui.menu))
+            page.Status("menu", kit.Position(ui.menu))
         }
         return {
             Menu: function(value) {
@@ -129,11 +161,11 @@ var page = Page({
 
                 ctx.Search("layout") == "max" && (page.Conf("tree.display", "none"), page.Conf("menu.display", "none"))
 
-                ctx.Run(form.dataset, [], function(msg) {
+                ctx.Run(event, form.dataset, [], function(msg) {
                     ui.menu.innerHTML = "", ui.text.innerHTML = msg.result? msg.result.join(""): ""
                     kit.AppendChild(ui.menu, [{"tree": kit.OrderText(field, ui.text)}])
-                    page.footer.Pane.State("count", msg.visit_count)
-                    page.footer.Pane.State("visit", msg.visit_total)
+                    page.Status("count", msg.visit_count)
+                    page.Status("visit", msg.visit_total)
                     page.onlayout()
                     return
                 })
@@ -141,26 +173,8 @@ var page = Page({
         }
     },
     init: function(page) {
-        page.footer.Pane.Order({"text": "", "menu": "", "count": "0", "visit": "0"}, ["visit", "count", "menu", "text"])
-        page.header.Pane.Order({"tree": "tree", "menu": "menu"}, ["tree", "menu"], function(event, item, value) {
-            switch (item) {
-                case "menu":
-                    page.text.Pane.Menu()
-                    break
-                case "tree":
-                    page.tree.Pane.Tree()
-                    break
-                case "title":
-                    ctx.Search("layout", ctx.Search("layout")? "": "max")
-                    break
-
-                default:
-                    page.confirm("logout?") && page.login.Pane.Exit()
-            }
-        })
-        page.header.style.height = "32px"
-        page.footer.style.height = "32px"
         page.tree.Pane.Show()
         page.text.Pane.Show()
+        page.Button("tree", "tree")
     },
 })

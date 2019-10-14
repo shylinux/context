@@ -333,11 +333,13 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				return
 			}
 
+			m.Option("river", rid)
 			// 命令列表
 			if len(arg) == 0 {
 				m.Confm("flow", []string{rid, "tool"}, func(key string, value map[string]interface{}) {
 					m.Push("key", key)
 					m.Push("count", len(value["list"].([]interface{})))
+					m.Push("status", kit.Format(value["status"]))
 				})
 				m.Sort("key").Table()
 				return
@@ -350,6 +352,16 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				m.Log("info", "delete %v %v %v", rid, arg[1], str)
 				m.Conf("flow", []string{rid, "tool", arg[1]}, "")
 				m.Echo(str)
+
+			case "clone":
+				args := []string{}
+				m.Confm("flow", []string{rid, "tool", arg[2], "list"}, func(index int, value map[string]interface{}) {
+					args = append(args, kit.Format(value["node"]), kit.Format(value["group"]), kit.Format(value["index"]), kit.Format(value["name"]))
+				})
+				m.Cmdy(".steam", rid, "spawn", arg[1], args)
+
+			case "save":
+				m.Confv("flow", []string{rid, "tool", arg[1], "status"}, arg[2])
 
 			default:
 				// 命令列表
