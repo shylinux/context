@@ -360,6 +360,8 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				})
 				m.Cmdy(".steam", rid, "spawn", arg[1], args)
 
+				arg[2] = m.Conf("flow", []string{rid, "tool", arg[2], "status"})
+				fallthrough
 			case "save":
 				m.Confv("flow", []string{rid, "tool", arg[1], "status"}, arg[2])
 
