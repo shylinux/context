@@ -479,6 +479,8 @@ var page = Page({
                             return {name: field.Meta.name, args: kit.Selector(field, ".args", function(input) {
                                 return input.value
                             })}
+                        })), JSON.stringify(kit.Selector(page.action, "fieldset.item", function(field) {
+                            return {group: field.Meta.group, index: field.Meta.index, name: field.Meta.name, node: field.Meta.node}
                         }))], function(msg) {
                             page.toast.Pane.Show("保存成功")
                         })

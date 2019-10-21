@@ -363,7 +363,9 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				arg[2] = m.Conf("flow", []string{rid, "tool", arg[2], "status"})
 				fallthrough
 			case "save":
-				m.Confv("flow", []string{rid, "tool", arg[1], "status"}, arg[2])
+				if m.Confv("flow", []string{rid, "tool", arg[1], "status"}, arg[2]); kit.Select("", arg, 3) != "" {
+					m.Confv("flow", []string{rid, "tool", arg[1], "list"}, kit.UnMarshal(arg[3]))
+				}
 
 			default:
 				// 命令列表
