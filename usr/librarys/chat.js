@@ -98,19 +98,19 @@ var page = Page({
             }))
         },
 
-        "聊天": function(event, value) {
+        "工作": function(event, value) {
             page.which.set(value)
             page.onlayout(event, page.conf.layout)
+            page.onlayout(event, {river:0, action:-1})
         },
         "办公": function(event, value) {
             page.which.set(value)
             page.onlayout(event, page.conf.layout)
             page.onlayout(event, {river: 0, action:300})
         },
-        "工作": function(event, value) {
+        "聊天": function(event, value) {
             page.which.set(value)
             page.onlayout(event, page.conf.layout)
-            page.onlayout(event, {river:0, action:-1})
         },
         "最高": function(event, value) {
             page.which.set(value)
@@ -401,7 +401,7 @@ var page = Page({
                     page.debug.Pane.Show()
                 },
             },
-            Button: [["layout", "聊天", "办公", "工作", "最高", "最宽", "最大"],
+            Button: [["layout", "工作", "办公", "聊天", "最高", "最宽", "最大"],
                 "", "刷新", "清屏", "并行", "串行",
 				"", ["display", "表格", "编辑", "绘图"],
                 "", "复制", "删除", "加参", "减参",
@@ -494,7 +494,7 @@ var page = Page({
             },
             Button: ["刷新", "创建"],
             Choice: ["刷新", "创建"],
-            Detail: ["保存", "恢复", "复制", "共享", "删除"],
+            Detail: ["恢复", "保存", "复制", "共享", "删除"],
         }
     },
     initSteam: function(page, field, option, output) {
