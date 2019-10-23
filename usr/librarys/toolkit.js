@@ -444,10 +444,11 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         }
 
         text = window.getSelection().toString()
-        if (text == "") {return}
+        if (text == "") {return ""}
 
         kit.History("txt", -1) && kit.History("txt", -1).data == text || kit.History("txt", -1, text) && document.execCommand("copy")
         input && document.body.removeChild(input)
+        return text
     },
     DelText: function(target, start, count) {
         target.value = target.value.substring(0, start)+target.value.substring(start+(count||target.value.length), target.value.length)
@@ -538,6 +539,8 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
         s = s.replace(/\033\[0m/g, "</span>")
         s = s.replace(/\033\[m/g, "</span>")
+        s = s.replace(/</g, "&lt;")
+        s = s.replace(/>/g, "&gt;")
         return s
     },
     Value: function() {

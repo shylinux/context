@@ -676,7 +676,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					if e1 == nil && e2 == nil {
 						result = fmt.Sprintf("%d", v1-v2)
 					} else {
-						result = strings.Replace(arg[0], arg[1], "", -1)
+						result = strings.Replace(arg[0], arg[2], "", -1)
 					}
 				case "*":
 					result = arg[0]

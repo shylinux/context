@@ -445,3 +445,10 @@ fieldset pre code, fieldset code pre {
     display:block;
 }
 
+fieldset.item>div.output>code.div {
+}
+
+fieldset.item>div.output>div.code div.number {
+    float:left;
+}
+

@@ -1426,6 +1426,20 @@ function Output(plugin, type, msg, cb, target, option) {
                 typeof cb == "function" && cb(msg)
             },
             editor: function(msg, cb) {
+                target.innerHTML = ""
+                output.onimport.meta._table(msg, msg.append)
+                if (msg.file) {
+                    var code = kit.AppendChild(target, [{view: ["code", "table"], list: kit.List(msg.result, function(line, index) {
+                        return {view: ["line", "tr"], list: [{view: ["number", "td", index+1]}, {view: ["code", "td", kit.Color(line)], style: {"white-space": "pre"}}], click: function(event) {
+                            page.Sync("plugin_editor_file").set(msg.file[0])
+                            page.Sync("plugin_editor_index").set(index+1)
+                            page.Sync("plugin_editor_line").set(line)
+                            page.Sync("plugin_editor_word").set(kit.CopyText())
+                        }}
+                    })}])
+                }
+                typeof cb == "function" && cb(msg)
+                return
                 (target.innerHTML = "", Editor(plugin.Run, plugin, option, target, target.clientWidth-40, 400, 10, msg))
             },
             canvas: function(msg, cb) {

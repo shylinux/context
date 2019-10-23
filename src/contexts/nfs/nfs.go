@@ -623,7 +623,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"dir": &ctx.Command{Name: "dir [path [fields...]]", Help: []string{
 			"查看目录, path: 路径, fields...: 查询字段, time|type|full|path|name|tree|size|line|hash|hashs",
 			"dir_deep: 递归查询", "dir_type both|file|dir|all: 文件类型", "dir_reg reg: 正则表达式", "dir_sort field order: 排序"},
-			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2, "dir_sed": -1, "dir_select": -1},
+			Form: map[string]int{"dir_deep": 0, "dir_type": 1, "dir_reg": 1, "dir_sort": 2, "dir_sed": -1, "dir_select": -1,
+				"offset": 1, "limit": 1,
+				"match_begin": 1,
+				"match_end":   1,
+			},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if len(arg) == 0 {
 					arg = append(arg, "")
@@ -657,11 +661,34 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 								}
 							}
 							m.Log("info", "open %v", p0)
-
-							for bio := bufio.NewScanner(f); bio.Scan(); {
-								m.Echo(bio.Text())
-							}
 							m.Append("file", p)
+
+							if m.Has("match_begin") {
+								m.Option("match_begin")
+								begin, _ := regexp.Compile(m.Option("match_begin"))
+								end, _ := regexp.Compile(m.Option("match_end"))
+								start := false
+								for bio := bufio.NewScanner(f); bio.Scan(); {
+									if start = start || begin.MatchString(bio.Text()); m.Option("match_begin") == "" || start {
+										if m.Echo(bio.Text()); m.Option("match_end") != "" && end.MatchString(bio.Text()) {
+											break
+										}
+									}
+								}
+
+							} else {
+								offset := m.Optioni("offset")
+								limit := m.Optioni("limit")
+								for bio, i := bufio.NewScanner(f), 0; bio.Scan(); i++ {
+									if i >= offset && (limit == 0 || i < offset+limit) {
+										m.Echo(bio.Text())
+									}
+									m.Append("line", i+1)
+									m.Append("offset", offset)
+									m.Append("limit", limit)
+								}
+							}
+
 							m.Append("size", s.Size())
 							m.Append("time", s.ModTime().Format(m.Conf("time", "format")))
 							skip = true

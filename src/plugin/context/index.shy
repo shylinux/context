@@ -53,11 +53,12 @@ kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
 	text "usr/script" name dir imports plugin_dir action auto view long \
 	button "浏览" action auto \
 	button "返回" cb Last \
+    feature display editor \
     exports dir "" dir
 
 kit git "版本" private "ssh._route" _ "nfs.git" __ \
 	text "" name pod imports plugin_pod action auto \
     select "" values status values diff commit values values log values init action auto \
 	text "" name txt action auto \
-	button "查看" 
+	button "查看"
 

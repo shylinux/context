@@ -468,8 +468,13 @@ var page = Page({
                     var status = JSON.parse(line.status)
                     kit.Selector(page.action, "fieldset.item", function(field, index) {
                         var args = status[index].args
-                        kit.Selector(field, ".args", function(input, index) {
-                            input.value = args[index]||""
+                        args = args.slice(kit.Selector(field, ".args", function(input, index) {
+                            return input.value = args[index]||""
+                        }).length)
+
+                        kit.List(args, function(arg) {
+                            field.Plugin.Append({type: "text"}, "", arg)
+
                         })
                     })
                 },
