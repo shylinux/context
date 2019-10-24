@@ -1035,7 +1035,7 @@ function Plugin(page, pane, field, inits, runs) {
                     break
                 case "textarea":
                     kit.AppendChild(option, "br")
-                    input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+(pane.target.clientWidth-30)+"px"
+                    input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+(pane.target.clientWidth-35)+"px"
                     // no break
                 case "text":
                     item.value = value || item.value || ""

@@ -232,7 +232,7 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 			return
 		}},
 		"show": &ctx.Command{Name: "show table fields...", Help: "查询数据, table: 表名, fields: 字段, where: 查询条件, group: 聚合字段, order: 排序字段",
-			Form: map[string]int{"where": 1, "eq": 2, "in": 2, "like": 2, "begin": 2, "group": 1, "order": 1, "desc": 0, "limit": 1, "offset": 1, "other": -1},
+			Form: map[string]int{"where": 1, "eq": 2, "ne": 2, "in": 2, "like": 2, "begin": 2, "group": 1, "order": 1, "desc": 0, "limit": 1, "offset": 1, "other": -1},
 			Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				if len(arg) == 0 {
 					m.Cmdy(".query", "show tables")
@@ -250,6 +250,9 @@ var Index = &ctx.Context{Name: "mdb", Help: "数据中心",
 				}
 				for i := 0; i < len(m.Meta["eq"]); i += 2 {
 					where = append(where, fmt.Sprintf("%s='%s'", m.Meta["eq"][i], m.Meta["eq"][i+1]))
+				}
+				for i := 0; i < len(m.Meta["ne"]); i += 2 {
+					where = append(where, fmt.Sprintf("%s!='%s'", m.Meta["ne"][i], m.Meta["ne"][i+1]))
 				}
 				for i := 0; i < len(m.Meta["in"]); i += 2 {
 					where = append(where, fmt.Sprintf("%s in (%s)", m.Meta["in"][i], m.Meta["in"][i+1]))
