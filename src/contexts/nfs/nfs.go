@@ -561,6 +561,17 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 			"type":   "both",
 			"temp":   "var/tmp/file",
 			"trash":  "var/tmp/trash",
+			"mime": map[string]interface{}{
+				"js":   "txt",
+				"css":  "txt",
+				"html": "txt",
+				"shy":  "txt",
+				"py":   "txt",
+				"go":   "txt",
+				"h":    "txt",
+				"c":    "txt",
+				"gz":   "bin",
+			},
 		}, Help: "目录管理"},
 		"pwd": &ctx.Config{Name: "pwd", Value: []interface{}{
 			"", "usr/local", "usr", "var", "bin", "etc", "src", "src/plugin",
@@ -637,6 +648,8 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					return sed(m, arg[0], args)
 				}
 
+				mime := m.Conf("dir", []string{"mime", strings.TrimPrefix(path.Ext(arg[0]), ".")})
+
 				skip, find := false, false
 				m.Confm("pwd", func(index int, value string) bool {
 					p := kit.Select("./", path.Join(value, arg[0]))
@@ -649,7 +662,7 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 							dir(m, kit.Pwd(), p, 0, kit.Right(m.Has("dir_deep")),
 								dir_type, rg, fields, m.Conf("time", "format"))
 
-						} else if s.Size() > int64(m.Confi("buf", "size")) {
+						} else if mime != "txt" && (mime == "bin" || s.Size() > int64(m.Confi("buf", "size"))) {
 							m.Append("directory", p)
 
 						} else {

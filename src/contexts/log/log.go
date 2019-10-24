@@ -96,10 +96,14 @@ func (log *LOG) Start(m *ctx.Message, arg ...string) bool {
 					font := m.Conf("output", []string{"font", kit.Select("", value, 1)})
 					meta := msg.Format(m.Confv("output", []string{"meta", kit.Select("short", value, 2)}).([]interface{})...)
 
-					// 输出日志
-					fmt.Fprintln(file, fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), meta, font,
+					str := fmt.Sprintf("%d %s %s%s %s%s", m.Capi("nout", 1), meta, font,
 						kit.Format(l["action"]), fmt.Sprintf(kit.Format(l["str"]), l["arg"].([]interface{})...),
-						kit.Select("", "\033[0m", font != "")))
+						kit.Select("", "\033[0m", font != ""))
+
+					// 输出日志
+					if fmt.Fprintln(file, str); m.Confs("output", []string{"stdio", value[0]}) {
+						fmt.Println(str)
+					}
 					break loop
 				}
 			}
@@ -121,6 +125,9 @@ var Index = &ctx.Context{Name: "log", Help: "日志中心",
 		"logdir": &ctx.Config{Name: "logdir", Value: "var/log", Help: "日志目录"},
 
 		"output": &ctx.Config{Name: "output", Value: map[string]interface{}{
+			"stdio": map[string]interface{}{
+				"bench": false,
+			},
 			"file": map[string]interface{}{
 				"debug": "debug.log",
 				"bench": "bench.log",
