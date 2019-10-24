@@ -1204,7 +1204,11 @@ function Plugin(page, pane, field, inits, runs) {
         }, JSON.parse(meta.exports||'["",""]'), function(event, value, name, line) {
             var meta = arguments.callee.meta
             var list = arguments.callee.list
-            ;(!list[1] || list[1] == name) && page.Sync("plugin_"+list[0]).set(meta[list[2]||""](value, name, line, list))
+            if (list[1] && list[1] != name) {return}
+
+            for (var i = 0; i < list.length; i += 3) {
+                page.Sync("plugin_"+list[i]).set(meta[list[i+2]||""](list[i+1]? line[list[i+1]]: value, list[i+1]||name, line, list))
+            }
         }),
         onchoice: shy("菜单列表", {
             "返回": "Last",
@@ -1428,15 +1432,21 @@ function Output(plugin, type, msg, cb, target, option) {
             editor: function(msg, cb) {
                 target.innerHTML = ""
                 output.onimport.meta._table(msg, msg.append)
+                var current = page.Sync("plugin_editor_index").get()
+                target.style.maxHeight = ""
                 if (msg.file) {
+                    target.style.maxHeight = "500px"
                     var code = kit.AppendChild(target, [{view: ["code", "table"], list: kit.List(msg.result, function(line, index) {
-                        return {view: ["line", "tr"], list: [{view: ["number", "td", index+1]}, {view: ["code", "td", kit.Color(line)], style: {"white-space": "pre"}}], click: function(event) {
+                        return {view: ["line"+ (current == index+1? " select": ""), "tr"], list: [{view: ["number", "td", index+1]}, {view: ["code", "td", kit.Color(line)], style: {"white-space": "pre"}}], click: function(event) {
                             page.Sync("plugin_editor_file").set(msg.file[0])
                             page.Sync("plugin_editor_index").set(index+1)
                             page.Sync("plugin_editor_line").set(line)
                             page.Sync("plugin_editor_word").set(kit.CopyText())
                         }}
                     })}])
+                    kit.Selector(target, "tr.line.select", function(tr) {
+                        tr.scrollIntoView()
+                    })
                 }
                 typeof cb == "function" && cb(msg)
                 return
@@ -1455,9 +1465,10 @@ function Output(plugin, type, msg, cb, target, option) {
             "表格": "_table",
             "绘图": "_canvas",
             "下载": "Download",
+            "返回": "Last",
             "清空": "clear",
-        }, ["表格", "绘图", "下载", "清空"], function(event, value, meta) {
-            kit._call(output, output[meta[value]])
+        }, ["表格", "绘图", "下载", "返回", "清空"], function(event, value, meta) {
+            kit._call(output, output[meta[value]], [event])
             return true
         }),
         onaction: shy("事件列表", {

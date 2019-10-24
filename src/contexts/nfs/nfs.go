@@ -911,6 +911,9 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 		"grep": &ctx.Command{Name: "grep head|tail|hold|more table arg", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			hold := false
 			switch arg[0] {
+			case "search":
+				m.Cmdy("cli.system", "grep", arg[1:])
+
 			case "add":
 				m.Confv("grep", []string{arg[1], "list", "-2"}, map[string]interface{}{
 					"pos": 0, "offset": 0, "file": arg[2],
