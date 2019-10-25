@@ -1398,7 +1398,7 @@ function Output(plugin, type, msg, cb, target, option) {
         },
 
         Download: function() {
-            var type = ".csv", text = kit.Selector(output, "tr", function(tr) {
+            var type = ".csv", text = kit.Selector(target, "tr", function(tr) {
                 return kit.Selector(tr, "td,th", function(td) {
                     return td.innerText
                 }).join(",")
