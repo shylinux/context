@@ -177,7 +177,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
 
             try {
                 kit.Log(["wss", order].concat(msg.detail).concat([msg]))
-                kit._call(cb, [msg])
+                kit._call(cb, [event, msg])
             } catch (e) {
                 msg.Reply(kit.Log("err", e))
             }

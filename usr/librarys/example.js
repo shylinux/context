@@ -348,7 +348,7 @@ function Page(page) {
             }
         }),
         WSS: function(cb, onerror, onclose) {
-            return page.socket || (page.socket = ctx.WSS(cb || (function(m) {
+            return page.socket || (page.socket = ctx.WSS(cb || (function(event, m) {
                 if (m.detail) {
                     page.action.Pane.Core(event, m, ["_cmd", m.detail], m.Reply)
                 } else {

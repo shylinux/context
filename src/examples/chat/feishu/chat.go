@@ -16,7 +16,6 @@ func get(m *ctx.Message, arg ...string) *ctx.Message {
 	m.Option("temp_expire", -1)
 	m.Option("format", "object")
 	m.Cmdy("web.get", "feishu", arg,
-		"headers", "Authorization", "Bearer "+m.Append("access_token"),
 		"temp", "data")
 	return m
 }
@@ -24,7 +23,6 @@ func post(m *ctx.Message, arg ...string) *ctx.Message {
 	m.Option("temp_expire", -1)
 	m.Option("format", "object")
 	m.Cmdy("web.get", "method", "POST", "feishu", arg,
-		"headers", "Authorization", "Bearer "+m.Append("access_token"),
 		"content_type", "application/json",
 		"temp", "data",
 	)
@@ -102,9 +100,20 @@ var Index = &ctx.Context{Name: "feishu", Help: "飞书",
 			return
 		}},
 		"group": &ctx.Command{Name: "group", Help: "群组", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			kit.Map(kit.Chain(kit.UnMarshal(get(m.Spawn(), "chat/v2/list").Result()), "data.groups"), func(index int, value map[string]interface{}) {
-				m.Push("key", "")
+			if len(arg) == 0 {
+				kit.Map(kit.Chain(kit.UnMarshal(m.Cmdx("web.get", "feishu", "chat/v4/list", "headers", "Authorization", "Bearer "+m.Cmdx(".app", "token", "bot"))),
+					"data.groups"), "", func(index int, value map[string]interface{}) {
+					m.Push("key", value["chat_id"])
+					m.Push("name", value["name"])
+					m.Push("avatar", value["avatar"])
+				})
+				m.Table()
+			}
+			kit.Map(kit.Chain(kit.UnMarshal(m.Cmdx("web.get", "feishu", "chat/v4/info", "headers", "Authorization", "Bearer "+m.Cmdx(".app", "token", "bot"))),
+				"data.members"), "", func(index int, value map[string]interface{}) {
+				m.Push("key", value["open_id"])
 			})
+			m.Table()
 			return
 		}},
 		"user": &ctx.Command{Name: "user code|email|mobile", Help: "用户", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -175,7 +184,7 @@ var Index = &ctx.Context{Name: "feishu", Help: "飞书",
 				for i := 3; i < len(arg); i++ {
 					button := map[string]interface{}{
 						"tag": "button", "text": map[string]interface{}{
-							"tag": "plain_textlark_md", "content": arg[i],
+							"tag": "plain_text", "content": arg[i],
 						},
 						"type": "default",
 					}
@@ -193,7 +202,9 @@ var Index = &ctx.Context{Name: "feishu", Help: "飞书",
 					case "url":
 						button[arg[i+1]], i = arg[i+2], i+2
 					default:
-						button["value"], i = arg[i+1], i+1
+						button["value"], i = map[string]interface{}{
+							arg[i+1]: arg[i+2],
+						}, i+2
 					}
 
 					actions = append(actions, button)
@@ -203,7 +214,7 @@ var Index = &ctx.Context{Name: "feishu", Help: "飞书",
 				})
 
 				kit.Chain(form, "msg_type", "interactive")
-				kit.Chain(form, "content.card", map[string]interface{}{
+				kit.Chain(form, "card", map[string]interface{}{
 					"config": map[string]interface{}{
 						"wide_screen_mode": true,
 						// "title": map[string]interface{}{
@@ -211,10 +222,9 @@ var Index = &ctx.Context{Name: "feishu", Help: "飞书",
 						// },
 					},
 					"header": map[string]interface{}{
-						"title": arg[1],
-						// "title": map[string]interface{}{
-						// 	"tag": "lark_md", "content": arg[1],
-						// },
+						"title": map[string]interface{}{
+							"tag": "lark_md", "content": arg[1],
+						},
 					},
 					"elements": elements,
 				})
