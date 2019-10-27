@@ -496,11 +496,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					}
 
 					m.Cmd("ctx.config", "spide", strings.Join(arg[:3], "."), arg[3])
+				case "merge":
+					m.Echo(Merge(m, m.Confm("spide", []string{arg[0], "client"}), arg[2], arg[3:]...))
+
 				case "cookie", "header":
 					if len(arg) > 3 {
 						m.Cmd("ctx.config", "spide", strings.Join(arg[:3], "."), arg[3])
 					}
 					m.Cmdy("ctx.config", "spide", strings.Join(arg[:3], "."))
+
 				default:
 					m.Cmd("ctx.config", "spide", strings.Join(arg[:2], "."), arg[2])
 				}
@@ -704,9 +708,10 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				case parse == "json" || strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "application/javascript"):
 					// 解析数据
 					if json.NewDecoder(res.Body).Decode(&result); m.Options("temp_expire") {
-						if !m.Has("temp") {
+						if m.Log("info", "res: %v", kit.Format(result)); !m.Has("temp") {
 							m.Option("temp", "")
 						}
+						// m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
 						m.Put("option", "data", result).Cmdy("mdb.temp", "url", uri+uri_arg, "data", "data", m.Meta["temp"])
 						break
 					} else if result != nil {

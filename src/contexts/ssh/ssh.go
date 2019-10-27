@@ -1072,6 +1072,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				case "create":
 					name := arg[2]
+					if len(arg) == 3 {
+						arg = append(arg, m.Conf("runtime", "node.route"))
+					}
 					if user := m.Conf("work", []string{name, "user"}); user != "" && user != arg[3] {
 						for i := 1; i < 100; i++ {
 							name = fmt.Sprintf("%s%02d", arg[2], i)
