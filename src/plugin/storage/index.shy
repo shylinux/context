@@ -28,10 +28,10 @@ end
 
 kit data "数据库" public "ssh.data" show \
 	text "" name table imports plugin_table action auto view long \
-	text "" name index action auto \
+	text "" name index imports plugin_index action auto \
 	button "查看" action auto \
 	button "返回" cb Last \
-    exports table table
+    exports table table "" index id ""
 
 kit save "导出" private "ssh.data" export \
 	text "love" name table imports plugin_table \

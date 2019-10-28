@@ -539,8 +539,8 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
         s = s.replace(/\033\[0m/g, "</span>")
         s = s.replace(/\033\[m/g, "</span>")
-        s = s.replace(/</g, "&lt;")
-        s = s.replace(/>/g, "&gt;")
+        // s = s.replace(/</g, "&lt;")
+        // s = s.replace(/>/g, "&gt;")
         return s
     },
     Value: function() {

@@ -11,6 +11,7 @@ Plugin["love/index.js"] = function(field, option, output) {return {
 					kit.Selector(output, ".s"+line.when.split(" ")[0].split("-").join(""), function(item) {
 						kit.classList.add(item.parentNode, "select")
 						item.parentNode.title = line.what
+                        plugin.ontoast(line.what, line.where)
 					})
 				}, 200)
 			}, true)

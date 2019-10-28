@@ -1204,10 +1204,10 @@ function Plugin(page, pane, field, inits, runs) {
         }, JSON.parse(meta.exports||'["",""]'), function(event, value, name, line) {
             var meta = arguments.callee.meta
             var list = arguments.callee.list
-            if (list[1] && list[1] != name) {return}
 
             for (var i = 0; i < list.length; i += 3) {
-                page.Sync("plugin_"+list[i]).set(meta[list[i+2]||""](list[i+1]? line[list[i+1]]: value, list[i+1]||name, line, list))
+                (list[1] && line[list[1]] || list[i+1] && line[list[i+1]]) &&
+                    page.Sync("plugin_"+list[i]).set(meta[list[i+2]||""](list[i+1]? line[list[i+1]]: value, list[i+1]||name, line, list))
             }
         }),
         onchoice: shy("菜单列表", {

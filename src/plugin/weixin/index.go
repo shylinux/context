@@ -231,6 +231,8 @@ var Index = &ctx.Context{Name: "weixin", Help: "微信后台",
 	},
 }
 
+var Target = &web.WEB{Context: Index}
+
 func main() {
 	fmt.Print(cli.Index.Plugin(Index, os.Args[1:]))
 }

@@ -15,8 +15,7 @@ import (
 func get(m *ctx.Message, arg ...string) *ctx.Message {
 	m.Option("temp_expire", -1)
 	m.Option("format", "object")
-	m.Cmdy("web.get", "feishu", arg,
-		"temp", "data")
+	m.Cmdy("web.get", "feishu", arg, "temp", "data")
 	return m
 }
 func post(m *ctx.Message, arg ...string) *ctx.Message {
@@ -29,27 +28,33 @@ func post(m *ctx.Message, arg ...string) *ctx.Message {
 	return m
 }
 func parse(m *ctx.Message) {
-	var data interface{}
-	r := m.Optionv("request").(*http.Request)
-	json.NewDecoder(r.Body).Decode(&data)
-	m.Log("info", "msg: %v", kit.Formats(data))
-	m.Optionv("content_data", data)
+	data := m.Optionv("content_data")
+	if data == nil {
+		json.NewDecoder(m.Optionv("request").(*http.Request).Body).Decode(&data)
+		m.Optionv("content_data", data)
 
-	switch d := data.(type) {
-	case map[string]interface{}:
-		for k, v := range d {
-			switch d := v.(type) {
-			case map[string]interface{}:
-				for k, v := range d {
-					m.Add("option", k, v)
-				}
-			default:
-				for _, v := range kit.Trans(v) {
-					m.Add("option", "msg."+k, v)
+		switch d := data.(type) {
+		case map[string]interface{}:
+			for k, v := range d {
+				switch d := v.(type) {
+				case map[string]interface{}:
+					for k, v := range d {
+						m.Add("option", k, v)
+					}
+				default:
+					for _, v := range kit.Trans(v) {
+						m.Add("option", "msg."+k, v)
+					}
 				}
 			}
 		}
 	}
+	if kit.Map(kit.Chain(data, "action.value"), "", func(key string, value string) {
+		m.Add("option", key, value)
+	}) != nil {
+		m.Option("msg.type", "event_click")
+	}
+	m.Log("info", "msg: %v", kit.Formats(data))
 }
 
 var Index = &ctx.Context{Name: "feishu", Help: "飞书",
@@ -291,6 +296,32 @@ var Index = &ctx.Context{Name: "feishu", Help: "飞书",
 						})
 					}
 				}
+			case "event_click":
+				m.Echo(kit.Format(map[string]interface{}{
+					"header": map[string]interface{}{
+						"title": map[string]interface{}{
+							"tag": "lark_md", "content": "haha",
+						},
+					},
+					"elements": []interface{}{
+						map[string]interface{}{
+							"tag": "action",
+							"actions": []interface{}{
+								map[string]interface{}{
+									"tag":  "button",
+									"type": "default",
+									"text": map[string]interface{}{
+										"tag":     "plain_text",
+										"content": m.Time(),
+									},
+									"value": map[string]interface{}{
+										"hi": "hello",
+									},
+								},
+							},
+						},
+					},
+				}))
 			}
 			return
 		}},

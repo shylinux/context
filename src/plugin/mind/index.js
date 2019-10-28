@@ -3,7 +3,7 @@ Plugin["mind/index.js"] = function(field, option, output) {return {
         var plugin = field.Plugin
         output.innerHTML = "", msg.append && kit.OrderTable(kit.AppendTable(kit.AppendChild(output, "table"), msg.Table(), msg.append), "", function(event, value, name, line, index) {
             if (name == "id") {
-                page.Sync("plugin_"+plugin.exports[0]).set(plugin.onexport[plugin.exports[2]||""](value, name, line))
+                plugin.onexport(event, value, name, line)
 
             } else {
                 var td = event.target
@@ -25,7 +25,8 @@ Plugin["mind/index.js"] = function(field, option, output) {return {
                 }, onkeydown: function(event) {
                     switch (event.key) {
                         case "Enter":
-                            td.parentNode[event.shiftKey?"previousSibling":"nextSibling"].querySelector("td").click()
+                            var s = td.parentNode[event.shiftKey?"previousSibling":"nextSibling"]
+                            s? s.querySelector("td").click(): plugin.Runs(event)
                             break
                         case "Tab":
                             if (event.shiftKey) {

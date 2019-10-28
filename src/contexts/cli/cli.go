@@ -1051,14 +1051,22 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				}
 
 				// 加载模块
+				msg := m.Find(arg[0], false)
 				if p, e := plugin.Open(path.Join(m.Conf("publish", "path"), arg[0], "index.so")); e == nil {
 					if s, e := p.Lookup("Index"); m.Assert(e) {
-						m.Spawn(c.Register(*(s.(**ctx.Context)), nil, arg[0]).Begin(m, arg[1:]...)).Cmd("_init", arg[1:])
+						t, _ := p.Lookup("Target")
+						tt, _ := t.(ctx.Server)
+						if len(arg) > 1 {
+							c = m.Find(arg[1], true).Target()
+						}
+						msg = m.Spawn(c.Register(*(s.(**ctx.Context)), tt, arg[0]).Begin(m, arg[1:]...)).Cmd("_init", arg[1:])
+						m.Log("info", "plugin %v", msg.Cap("module"))
 					}
+				} else {
+					m.Log("warn", "plugin %v %v", arg[0], e)
 				}
 
 				// 查找模块
-				msg := m.Find(arg[0], false)
 				if msg == nil {
 					m.Log("info", "not find %s", arg[0])
 					m.Start(arg[0], "shy")
