@@ -111,18 +111,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
-				m.Echo("usage: help context [module [command|config|cache name]]\n")
-				m.Echo("     : 查看模块信息, module: 模块名, command: 模块命令, config: 模块配置, cache: 模块缓存, name: 模块参数\n")
-				m.Echo("usage: help command [name]\n")
-				m.Echo("     : 查看当前环境下命令, name: 命令名\n")
-				m.Echo("usage: help config [name]\n")
-				m.Echo("     : 查看当前环境下配置, name: 配置名\n")
-				m.Echo("usage: help cache [name]\n")
-				m.Echo("     : 查看当前环境下缓存, name: 缓存名\n")
-				m.Echo("\n")
-
 				m.Echo("^_^  Welcome to context world  ^_^\n")
-				m.Echo("Version: 1.0 A New Language, A New Framework\n")
+				m.Echo("V2.1: Miss You Forever\n")
+				m.Echo("Date: 2019.10.29 13:14:21\n")
 				m.Echo("More: https://github.com/shylinux/context\n")
 				m.Echo("More: https://shylinux.com/\n")
 				return
