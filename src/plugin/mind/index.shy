@@ -14,7 +14,7 @@ kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
     feature display editor \
     exports dir "" dir
 
-kit grep "搜索" public "nfs.grep" search _ _ "-rn" "--color" cmd_parse cut 3 ":" "file line word" \
+kit grep "搜索" public "cli.system" grep _ _ "-rn" "--color" cmd_parse cut 3 ":" "file line word" \
     text "" name txt imports plugin_editor_word \
     text "usr/local/redis-5.0.5" name dir view long \
     button "搜索" \
@@ -33,6 +33,33 @@ fun mark "标签" public \
         copy skip ssh.data show _
     else
         copy ssh.data insert _ file _ index _ word _ mark _
+    end
+end
+
+fun blog "博客" public \
+	text "" name tag \
+	text "" name url view long \
+	button "保存" action auto
+
+    if $2 == ""
+        copy skip ssh.data show blog
+    else
+        copy ssh.data insert blog tag _ url _
+    end
+end
+
+fun note "记事本" public \
+	text "" name you imports plugin_you action auto \
+	text "" name tip imports plugin_tip view long action auto \
+	button "查看" action auto \
+	button "返回" cb Last \
+    exports tip file tip \
+    feature display inner
+
+    if $2 == "" || $2 ~ ".*/$"
+        copy ssh._route _ context wiki tree __ level local/wiki
+    else
+        copy ssh._route _ context wiki text __ level local/wiki
     end
 end
 

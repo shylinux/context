@@ -1,6 +1,7 @@
 #! /bin/bash -i
 
 # 日志配置
+export ctx_err=${ctx_err:="/dev/null"}
 export ctx_log=${ctx_log:="var/log"}
 export ctx_log_debug=${ctx_log_debug:=false}
 export ctx_log_disable=${ctx_log_disable:=false}
@@ -58,7 +59,7 @@ main() {
     trap HUP hup
     log "\nstarting..."
     while true; do
-        date && ${ctx_bin} "$@" 2>error.log && break
+        date && ${ctx_bin} "$@" 2>${ctx_err} && break
         log "\n\nrestarting..." && sleep 1
     done
 }

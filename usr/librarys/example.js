@@ -288,6 +288,9 @@ function Page(page) {
                     break
             }
         },
+        title: function(title) {
+            document.title = title
+        },
 
         Require: function(file, cb) {
             if (!file || Plugin[file]) {return kit._call(cb, [Plugin[file]])}
@@ -690,6 +693,15 @@ function Pane(page, field) {
                 kit.classList.add(item, "select")
             })
         }),
+
+        Next: function() {
+            var next = output.querySelector(itemkeys).nextSibling
+            next? next.click(): output.firstChild.click()
+        },
+        Prev: function() {
+            var prev = output.querySelector(itemkeys).previousSibling
+            prev? prev.click(): output.lastChild.click()
+        },
 
         Show: function() {
             kit.ModifyView(field, {display: "block"})
@@ -1452,7 +1464,8 @@ function Output(plugin, type, msg, cb, target, option) {
                 if (msg.file) {
                     target.style.maxHeight = "500px"
                     var code = kit.AppendChild(target, [{view: ["code", "table"], list: kit.List(msg.result, function(line, index) {
-                        return {view: ["line"+ (current == index+1? " select": ""), "tr"], list: [{view: ["number", "td", index+1]}, {view: ["code", "td", kit.Color(line)], style: {"white-space": "pre"}}], click: function(event) {
+                        return {view: ["line"+ (current == index+1? " select": ""), "tr"],
+                        list: [{view: ["number", "td", index+1]}, {view: ["code", "td", kit.Origin(kit.Color(line))], style: {"white-space": "pre"}}], click: function(event) {
                             page.Sync("plugin_editor_file").set(msg.file[0])
                             page.Sync("plugin_editor_index").set(index+1)
                             page.Sync("plugin_editor_line").set(line)

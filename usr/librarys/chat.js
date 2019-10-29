@@ -413,17 +413,8 @@ var page = Page({
             ],
         }
     },
-    initStorm: function(page, field, option, output) {
-        var river = ""
+    initStorm: function(page, field, option, output) {var river = ""
         return {
-            Next: function() {
-                var next = output.querySelector("div.item.select").nextSibling
-                next? next.click(): output.firstChild.click()
-            },
-            Prev: function() {
-                var prev = output.querySelector("div.item.select").previousSibling
-                prev? prev.click(): output.lastChild.click()
-            },
             Show: function(which) {var pane = field.Pane
                 var data = river && field.Pane.Load(river, output)
                 if (data) {return pane.which.set(data.which)}

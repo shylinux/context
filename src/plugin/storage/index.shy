@@ -31,21 +31,6 @@ fun clip "剪切板" public \
     end
 end
 
-fun note "记事本" public \
-	text "" name you imports plugin_you action auto \
-	text "" name tip imports plugin_tip view long action auto \
-	button "查看" action auto \
-	button "返回" cb Last \
-    exports tip file tip \
-    feature display inner
-
-    if $2 == "" || $2 ~ ".*/$"
-        copy ssh._route _ context wiki tree __ level local/wiki
-    else
-        copy ssh._route _ context wiki text __ level local/wiki
-    end
-end
-
 kit data "数据库" public "ssh.data" show \
 	text "" name table imports plugin_table action auto view long \
 	text "" name index imports plugin_index action auto \
@@ -59,7 +44,7 @@ kit save "导出" private "ssh.data" export \
 
 kit load "导入" private "ssh.data" import \
 	text "love" name table imports plugin_table \
-	text "list.csv" name file \
+	text "etc/list.csv" name file \
 	button "导入"
 
 kit push "上传" private "web./download/" \

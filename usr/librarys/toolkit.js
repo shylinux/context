@@ -530,6 +530,11 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     notNone: function(c) {return !kit.isNone(c)},
     isSpace: function(c) {return c == " " || c == "Enter"},
     Format: function(objs) {return JSON.stringify(objs)},
+    Origin: function(s) {
+        s = s.replace(/</g, "&lt;")
+        s = s.replace(/>/g, "&gt;")
+        return s
+    },
     Color: function(s) {if (!s) {return s}
         s = s.replace(/\033\[1m/g, "<span style='font-weight:bold'>")
         s = s.replace(/\033\[36m/g, "<span style='color:#0ff'>")
@@ -539,8 +544,6 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
         s = s.replace(/\033\[0m/g, "</span>")
         s = s.replace(/\033\[m/g, "</span>")
-        // s = s.replace(/</g, "&lt;")
-        // s = s.replace(/>/g, "&gt;")
         return s
     },
     Value: function() {
