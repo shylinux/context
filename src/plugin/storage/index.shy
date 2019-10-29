@@ -1,21 +1,21 @@
 
 
 fun buffer "粘贴板" private \
-	text "0" name index imports plugin_tmux_bindex action auto \
+	text "" name index imports plugin_tmux_bindex action auto \
 	text "" name txt view long \
 	button "查看" action auto \
 	button "返回" cb Last \
     exports tmux_bindex cur
 
+    let index = $1
     if $1 == ""
-        copy cli.system tmux "list-buffer" cmd_parse cut 3 ":" "cur bytes text"
+        copy skip cli.system tmux "list-buffer" cmd_parse cut 3 ":" "cur bytes text"
         return
     end
-    if $2 == ""
-        copy cli.system tmux "show-buffer" "-b"
-        return
+    if $2 != ""
+        copy cli.system tmux "set-buffer" "-b"
     end
-    copy cli.system tmux "set-buffer" "-b"
+    return $(cli.system tmux "show-buffer" "-b" $index)
 end
 
 fun clip "剪切板" public \
@@ -59,11 +59,17 @@ kit save "导出" private "ssh.data" export \
 
 kit load "导入" private "ssh.data" import \
 	text "love" name table imports plugin_table \
-	text "" name file \
+	text "list.csv" name file \
 	button "导入"
 
 kit push "上传" private "web./download/" \
 	upfile "" name upload \
 	button "上传" cb upload \
+	button "查看"
+
+kit git "版本" private "ssh._route" _ "nfs.git" __ \
+	text "" name pod imports plugin_pod action auto \
+    select "" values status values diff commit values values log values init action auto \
+	text "" name txt action auto \
 	button "查看"
 

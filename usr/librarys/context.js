@@ -159,9 +159,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
     }),
     WSS: shy("响应后端", {order: 0, wssid: ""}, function(cb, onerror, onclose, onopen) {var meta = arguments.callee.meta
         var s = new WebSocket(location.protocol.replace("http", "ws")+"//"+location.host+"/wss?wssid="+meta.wssid)
-        s.onopen = function(event) {kit.Tip("wss open"), ctx.Event(event, {}, {name: [document.title, "wss", "open"]})}
-        s.onerror = function(event) {kit.Log("wss", "error", event), kit._call(onerror, [event])}
-        s.onclose = function(event) {kit.Tip("wss close"), kit.Log("wss", "close"), kit._call(onclose, [event])}
+        s.onerror = onerror, s.onclose = onclose, s.onopen = onopen
         s.onmessage = function(event) {var order = ++meta.order
             try {
                 var msg = JSON.parse(event.data||'{}')

@@ -242,6 +242,10 @@ func (m *Message) Result(arg ...interface{}) string {
 }
 
 func (m *Message) Push(str string, arg ...interface{}) *Message {
+	switch m.Option("table.format") {
+	case "table":
+		return m.Add("append", "key", str).Add("append", "value", arg...)
+	}
 	return m.Add("append", str, arg...)
 }
 func (m *Message) Sort(key string, arg ...string) *Message {

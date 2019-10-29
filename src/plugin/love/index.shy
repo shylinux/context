@@ -101,23 +101,3 @@ fun media "娱乐" private \
     end
 end
 
-fun wss "推送" private \
-	text "" name wss imports plugin_wss \
-	text "" name cmd view long \
-	button "推送" \
-	button "返回" cb Last \
-	exports wss key
-
-    if $2 == ""
-        copy web.wss
-    else
-        copy web.wss _ sync
-    end
-end
-
-kit pos "位置" private \
-    button "查看" cb getLocation \
-    button "显示" cb openLocation \
-	text "0.0062" name x \
-	text "0.0014" name y \
-	text "当前位置" name pos \

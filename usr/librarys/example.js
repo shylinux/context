@@ -359,10 +359,12 @@ function Page(page) {
                 page.socket.close()
 
             }), onclose || (function() {
+                page.toast.Pane.Show("WSS Close")
                 delete(page.socket), setTimeout(function() {
                     page.WSS(cb, onerror, onclose)
                 }, 1000)
             }), onopen || (function() {
+                page.toast.Pane.Show("WSS Open")
             })))
         },
 

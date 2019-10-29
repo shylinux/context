@@ -8,9 +8,31 @@ kit xls "表格" "index.js" "index.css" private context find "web.wiki" xls \
 
 kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
 	text "" name pod imports plugin_pod action auto \
-	text "usr/script" name dir imports plugin_dir action auto view long \
+	text "usr/local/redis-5.0.5/src" name dir imports plugin_dir action auto view long \
 	button "浏览" action auto \
 	button "返回" cb Last \
     feature display editor \
     exports dir "" dir
+
+kit grep "搜索" public "nfs.grep" search _ _ "-rn" "--color" cmd_parse cut 3 ":" "file line word" \
+    text "" name txt imports plugin_editor_word \
+    text "usr/local/redis-5.0.5" name dir view long \
+    button "搜索" \
+    exports dir file "" editor_file file "" editor_index line ""
+
+fun mark "标签" public \
+    text "mark" name table \
+    text "" name file imports plugin_editor_file view long \
+    text "" name index imports plugin_editor_index view tiny \
+    text "" name word imports plugin_editor_word \
+    text "" name mark view long \
+	button "操作" \
+    exports dir file "" editor_index index "" editor_word word
+
+    if $5 == ""
+        copy skip ssh.data show _
+    else
+        copy ssh.data insert _ file _ index _ word _ mark _
+    end
+end
 

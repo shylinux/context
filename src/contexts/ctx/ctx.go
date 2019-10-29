@@ -29,8 +29,9 @@ func (ctx *CTX) Begin(m *Message, arg ...string) Server {
 
 	m.Option("table.limit", 30)
 	m.Option("table.offset", 0)
+	m.Option("table.format", "object")
 	m.Optionv("ctx.form", map[string]int{
-		"table.limit": 1, "table.offset": 1,
+		"table.limit": 1, "table.offset": 1, "table.format": 1,
 	})
 
 	m.root = m
