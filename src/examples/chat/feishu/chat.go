@@ -291,6 +291,9 @@ var Index = &ctx.Context{Name: "feishu", Help: "飞书",
 					}
 				default:
 					if m.Options("open_chat_id") {
+						m.Option("username", m.Option("open_id"))
+						m.Option("sessid", m.Cmdx("aaa.user", "session", "select"))
+						m.Cmd("ssh._check", "work", "create", m.Option("username"))
 						m.Goshy([]string{m.Option("text_without_at_bot")}, 0, nil, func(msg *ctx.Message) {
 							m.Cmdy(".send", m.Option("open_chat_id"), kit.Select("你好", strings.Join(msg.Meta["result"], "")))
 						})
