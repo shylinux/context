@@ -5,3 +5,12 @@ kit xls "表格" "index.js" "index.css" private context find "web.wiki" xls \
 	button "返回" cb Last \
     feature style "mind" \
     exports xls_id id
+
+kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
+	text "" name pod imports plugin_pod action auto \
+	text "usr/script" name dir imports plugin_dir action auto view long \
+	button "浏览" action auto \
+	button "返回" cb Last \
+    feature display editor \
+    exports dir "" dir
+

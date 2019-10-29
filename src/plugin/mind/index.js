@@ -26,7 +26,7 @@ Plugin["mind/index.js"] = function(field, option, output) {return {
                     switch (event.key) {
                         case "Enter":
                             var s = td.parentNode[event.shiftKey?"previousSibling":"nextSibling"]
-                            s? s.querySelector("td").click(): plugin.Runs(event)
+                            s && s.querySelector("td").click()
                             break
                         case "Tab":
                             if (event.shiftKey) {

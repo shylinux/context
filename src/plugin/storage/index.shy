@@ -1,13 +1,33 @@
 
-fun clip "粘贴板" public \
+
+fun buffer "粘贴板" private \
+	text "0" name index imports plugin_tmux_bindex action auto \
+	text "" name txt view long \
+	button "查看" action auto \
+	button "返回" cb Last \
+    exports tmux_bindex cur
+
+    if $1 == ""
+        copy cli.system tmux "list-buffer" cmd_parse cut 3 ":" "cur bytes text"
+        return
+    end
+    if $2 == ""
+        copy cli.system tmux "show-buffer" "-b"
+        return
+    end
+    copy cli.system tmux "set-buffer" "-b"
+end
+
+fun clip "剪切板" public \
 	text "" name you imports plugin_you action auto \
+	text "" name tag \
 	text "" name txt view long \
 	button "保存" action auto
 
-    if $2 == ""
-        copy ssh._route _ data show clip
+    if $3 == ""
+        copy skip ssh._route _ data show clip
     else
-        copy ssh._route _ data insert clip txt $2
+        copy ssh._route _ data insert clip tag _ txt _
     end
 end
 

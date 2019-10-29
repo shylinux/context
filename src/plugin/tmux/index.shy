@@ -48,6 +48,12 @@ kit cmd "命令" private mux _ _ _ r \
 	text "pwd" view full imports plugin_tmux_cmd \
 	button "执行"
 
+kit list "内容" private mux _ _ _ split \
+	text "context" imports plugin_tmux_sess \
+	text "docker" imports plugin_tmux_wins \
+	text "4" imports plugin_tmux_pane action auto view tiny \
+	button "查看"
+
 kit json "解析" private "nfs.json" \
 	text "" view full \
 	button "执行"

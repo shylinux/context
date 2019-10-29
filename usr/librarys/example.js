@@ -347,7 +347,7 @@ function Page(page) {
                 return kit._call(page[args[0]], args.slice(1)) || page.Zone("function", args[0])
             }
         }),
-        WSS: function(cb, onerror, onclose) {
+        WSS: function(cb, onerror, onclose, onopen) {
             return page.socket || (page.socket = ctx.WSS(cb || (function(event, m) {
                 if (m.detail) {
                     page.action.Pane.Core(event, m, ["_cmd", m.detail], m.Reply)
@@ -362,6 +362,7 @@ function Page(page) {
                 delete(page.socket), setTimeout(function() {
                     page.WSS(cb, onerror, onclose)
                 }, 1000)
+            }), onopen || (function() {
             })))
         },
 
@@ -1206,7 +1207,7 @@ function Plugin(page, pane, field, inits, runs) {
             var list = arguments.callee.list
 
             for (var i = 0; i < list.length; i += 3) {
-                (list[1] && line[list[1]] || list[i+1] && line[list[i+1]]) &&
+                (list[1] && line[list[1]] || list[i+1] && line[list[i+1]] || list[i+2]) &&
                     page.Sync("plugin_"+list[i]).set(meta[list[i+2]||""](list[i+1]? line[list[i+1]]: value, list[i+1]||name, line, list))
             }
         }),
@@ -1281,7 +1282,19 @@ function Inputs(plugin, meta, item, target, option) {
                 })
             }), item.type == "button" && item.action == "auto" && target.click()
         }),
+        clear: function() {
+            target.value = ""
+        },
+        onchoice: shy("菜单列表", {
+            "清空": "clear",
+        }, ["清空", "清空", "清空", "清空", "清空"], function(event, value, meta) {
+            kit._call(input, input[meta[value]])
+            return true
+        }),
         onaction: shy("事件列表", {
+            oncontextmenu: function(event) {
+                plugin.oncarte(event, input.onchoice)
+            },
             onfocus: function(event) {plugin.Select(target)},
             onblur: function(event) {type == "text" && input.which.set(target.value)},
             onclick: function(event) {plugin.Select()

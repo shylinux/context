@@ -174,6 +174,15 @@ var Index = &ctx.Context{Name: "tmux", Help: "终端管理",
 			}
 
 			switch arg[3] {
+			case "split":
+				ls := strings.Split(m.Cmdx("cli.system", "tmux", "capture-pane", "-t", target, "-p"), "\n")
+				for i := 1; i < len(ls)-1; i++ {
+					for j, v := range strings.Split(ls[i], " ") {
+						m.Push(kit.Format(j), v)
+					}
+				}
+				m.Table()
+
 			case "run":
 				m.Cmd("cli.system", "tmux", "send-keys", "-t", target, "clear", "Enter")
 				time.Sleep(kit.Duration(m.Conf("mux", "cmd_timeout")))

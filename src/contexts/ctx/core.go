@@ -32,6 +32,7 @@ func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 	c.contexts[name] = s
 	s.context = c
 	s.Server = x
+	s.root = c.root
 	return s
 }
 func (c *Context) Plugin(s *Context, args []string) string {
