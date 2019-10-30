@@ -757,6 +757,11 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					m.Cmd("cli.system", "git", "clone", arg[1], "cmd_dir", m.Conf("git", "local"))
 					return
 				case "sum":
+					ts := false
+					if len(arg) > 1 && arg[1] == "total" {
+						ts, arg = true, arg[1:]
+					}
+
 					args := []string{}
 					if m.Options("git_dir") {
 						args = append(args, "-C", m.Option("git_dir"))
@@ -767,36 +772,60 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 						args = append(args, "--reverse")
 					}
 
+					var total_day time.Duration
+					begin := ""
+					total := 0
+					total_add := 0
+					total_del := 0
 					if out, e := exec.Command("git", args...).CombinedOutput(); e == nil {
 						for _, v := range strings.Split(string(out), "commit: ") {
 							if l := strings.Split(v, "\n"); len(l) > 3 {
 								fs := strings.Split(strings.TrimSpace(l[3]), ", ")
 								hs := strings.Split(l[0], " ")
-								m.Add("append", "date", hs[0])
+								m.Push("date", hs[0])
+								if total_day == 0 {
+									if t, e := time.Parse("2006-01-02", hs[0]); e == nil {
+										begin, total_day = hs[0], time.Now().Sub(t)
+									}
+								}
 
 								if adds := strings.Split(fs[1], " "); len(fs) > 2 {
 									dels := strings.Split(fs[2], " ")
-									m.Add("append", "adds", adds[0])
-									m.Add("append", "dels", dels[0])
+									total_del += kit.Int(dels[0])
+									total_add += kit.Int(adds[0])
+									m.Push("adds", adds[0])
+									m.Push("dels", dels[0])
 								} else if adds[1] == "insertions(+)" {
-									m.Add("append", "adds", adds[0])
-									m.Add("append", "dels", "0")
+									total_add += kit.Int(adds[0])
+									m.Push("adds", adds[0])
+									m.Push("dels", "0")
 								} else {
-									m.Add("append", "adds", "0")
-									m.Add("append", "dels", adds[0])
+									m.Push("adds", "0")
+									m.Push("dels", adds[0])
 								}
-								m.Add("append", "note", l[1])
-								m.Add("append", "hour", strings.Split(hs[1], ":")[0])
-								m.Add("append", "time", hs[1])
+								total++
+								m.Push("note", l[1])
+								m.Push("hour", strings.Split(hs[1], ":")[0])
+								m.Push("time", hs[1])
 							} else if len(l[0]) > 0 {
+								total++
 								hs := strings.Split(l[0], " ")
-								m.Add("append", "date", hs[0])
-								m.Add("append", "adds", 0)
-								m.Add("append", "dels", 0)
-								m.Add("append", "note", l[1])
-								m.Add("append", "hour", strings.Split(hs[1], ":")[0])
-								m.Add("append", "time", hs[1])
+								m.Push("date", hs[0])
+								m.Push("adds", 0)
+								m.Push("dels", 0)
+								m.Push("note", l[1])
+								m.Push("hour", strings.Split(hs[1], ":")[0])
+								m.Push("time", hs[1])
 							}
+						}
+						if ts {
+							m.Set("append")
+							m.Append("from", begin)
+							m.Append("days", int(total_day.Hours())/24)
+							m.Append("commit", total)
+							m.Append("adds", total_add)
+							m.Append("dels", total_del)
+							m.Append("rest", total_add-total_del)
 						}
 						m.Table()
 					} else {

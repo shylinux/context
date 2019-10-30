@@ -851,13 +851,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				})
 				m.Cmdp(0, []string{"go build"}, []string{"cli.system", "go", "get"}, list)
 
-			case "stats":
-				// 代码统计
-				m.Cmdy("nfs.dir", kit.Select("src", arg, 1), "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r", "dir_select", "group", "")
-
 			case "stat":
 				// 代码统计
 				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
+
+			case "stats":
+				// 代码统计
+				m.Cmdy("nfs.dir", kit.Select("src", arg, 1), "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r", "dir_select", "group", "")
 
 			case "trend":
 				// 提交记录
@@ -865,6 +865,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Cmdy("nfs.git", "sum", "-n", 20)
 				} else {
 					m.Cmdy("nfs.git", "sum", "-n", arg[1:])
+				}
+
+			case "trends":
+				// 提交记录
+				if len(arg) == 1 {
+					m.Cmdy("nfs.git", "sum", "total")
+				} else {
+					m.Cmdy("nfs.git", "sum", "total", "--reverse", "--since", arg[1])
 				}
 
 			case "submit":
