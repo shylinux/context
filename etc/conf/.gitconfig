@@ -1,0 +1,24 @@
+[user]
+	name = shaoying
+	email = shylinux@icloud.com
+[color]
+	ui = always
+[alias]
+	s = status
+	l = log --pretty=format:\"%C(4)%h %C(6)%ad %C(4)%an %C(6)%ar %C(4)%d %n%C(7)%s\" --date=\"format:%m/%d %R\" --shortstat --graph
+	b = branch
+	r = remote
+	m = merge
+	t = tag
+	i = commit
+	o = checkout
+	d = diff
+	a = add
+	am = commit -a -m
+[receive]
+	denyCurrentBranch = ignore
+[core]
+	editor = vim
+	ignorecase = true
+[merge]
+	tool = vimdiff

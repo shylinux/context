@@ -713,16 +713,16 @@ var Index = &ctx.Context{Name: "nfs", Help: "存储中心",
 					return false
 				})
 
-				if !find && arg[0] != "" {
-					if strings.HasSuffix(arg[0], "/") {
-						m.Assert(os.MkdirAll(arg[0], 0777))
-						m.Echo(arg[0])
-					} else if f, p, e := kit.Create(arg[0]); m.Assert(e) {
-						f.Close()
-						m.Echo(p)
-					}
-				}
-
+				// if !find && arg[0] != "" {
+				// 	if strings.HasSuffix(arg[0], "/") {
+				// 		m.Assert(os.MkdirAll(arg[0], 0777))
+				// 		m.Echo(arg[0])
+				// 	} else if f, p, e := kit.Create(arg[0]); m.Assert(e) {
+				// 		f.Close()
+				// 		m.Echo(p)
+				// 	}
+				// }
+				//
 				if m.Has("dir_sort") {
 					m.Sort(m.Meta["dir_sort"][0], m.Meta["dir_sort"][1:]...)
 				}

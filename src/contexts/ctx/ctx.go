@@ -86,6 +86,15 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 		"nmessage": &Cache{Name: "nmessage", Value: "1", Help: "消息数量"},
 	},
 	Configs: map[string]*Config{
+		"help": &Config{Name: "help", Value: map[string]interface{}{
+			"index": []interface{}{
+				"^_^  Welcome to Context world  ^_^",
+				"V2.1: Miss You Forever",
+				"Date: 2019.10.29 13:14:21",
+				"More: https://shylinux.com",
+				"More: https://github.com/shylinux/context",
+			},
+		}, Help: "帮助"},
 		"time": &Config{Name: "timer", Value: map[string]interface{}{
 			"unit": 1000, "close": "open", "format": "2006-01-02 15:04:05",
 		}, Help: "时间参数"},
@@ -111,11 +120,9 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 
 		"help": &Command{Name: "help topic", Help: "帮助", Hand: func(m *Message, c *Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
-				m.Echo("^_^  Welcome to context world  ^_^\n")
-				m.Echo("V2.1: Miss You Forever\n")
-				m.Echo("Date: 2019.10.29 13:14:21\n")
-				m.Echo("More: https://github.com/shylinux/context\n")
-				m.Echo("More: https://shylinux.com/\n")
+				m.Confm("help", "index", func(index int, value string) {
+					m.Echo(value).Echo("\n")
+				})
 				return
 			}
 
