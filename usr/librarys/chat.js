@@ -214,7 +214,9 @@ var page = Page({
         return {
             Show: function(which) {var pane = field.Pane
                 pane.Event(event, {}, {name: pane.Zone("show", page.who.get())})
-                output.innerHTML = "", pane.Appends([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true)
+                output.innerHTML = "", pane.Appends([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true, function(event, line) {
+                    page.title(line.nick)
+                })
             },
             Action: {
                 "创建": function(event) {

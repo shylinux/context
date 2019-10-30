@@ -966,30 +966,37 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if n, e := io.Copy(o, f); m.Assert(e) {
 						m.Log("upload", "file: %s %d", p, n)
 
-						code := kit.Hashs("uniq")
-						if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "meta", code)); m.Assert(e) {
-							defer o.Close()
-
-							kind := h.Header.Get("Content-Type")
-							m.Log("upload", "file: %s %d", p, n)
-							fmt.Fprintf(o, "create_time: %s\n", m.Time())
-							fmt.Fprintf(o, "create_user: %s\n", m.Option("username"))
-							fmt.Fprintf(o, "name: %s\n", h.Filename)
-							fmt.Fprintf(o, "type: %s\n", kind)
-							fmt.Fprintf(o, "hash: %s\n", name)
-							fmt.Fprintf(o, "size: %d\n", n)
-
-							m.Append("size", kit.FmtSize(n))
-							m.Append("code", code)
-							m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
-							m.Append("type", kind)
-							m.Append("hash", name)
-
-							kind = strings.Split(kind, "/")[0]
-							m.Cmd("nfs.copy", path.Join(m.Conf("web.upload", "path"), kind, code), p)
+						kind := h.Header.Get("Content-Type")
+						kind = strings.Split(kind, "/")[0]
+						if m.Options("river") {
 							m.Cmd("ssh.data", "insert", kit.Select(kind, m.Option("table")),
 								"name", h.Filename, "kind", kind, "hash", name, "size", n)
 						}
+
+						buf := bytes.NewBuffer(make([]byte, 0, 1024))
+						fmt.Fprintf(buf, "create_time: %s\n", m.Time())
+						fmt.Fprintf(buf, "create_user: %s\n", m.Option("username"))
+						fmt.Fprintf(buf, "name: %s\n", h.Filename)
+						fmt.Fprintf(buf, "type: %s\n", kind)
+						fmt.Fprintf(buf, "hash: %s\n", name)
+						fmt.Fprintf(buf, "size: %d\n", n)
+						b := buf.Bytes()
+
+						code := kit.Hashs(string(b))
+						if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "meta", code)); m.Assert(e) {
+							defer o.Close()
+
+							if n, e := o.Write(b); m.Assert(e) {
+								m.Log("upload", "file: %s %d", p, n)
+
+								m.Cmd("nfs.copy", path.Join(m.Conf("web.upload", "path"), kind, code), p)
+							}
+						}
+
+						m.Append("size", kit.FmtSize(n))
+						m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
+						m.Append("type", kind)
+						m.Append("hash", name)
 						m.Table()
 					}
 				}
@@ -1002,8 +1009,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 			kind := kit.Select("meta", kit.Select(m.Option("meta"), arg, 0))
 			file := strings.TrimPrefix(key, "/download/")
+			// 文件列表
 			if file == "" {
-				// 文件列表
 				if fs, e := ioutil.ReadDir(path.Join(m.Conf("web.upload", "path"), kind)); e == nil {
 					for _, f := range fs {
 						meta := kit.Linex(path.Join(m.Conf("web.upload", "path"), kind, f.Name()))
