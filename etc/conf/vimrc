@@ -45,7 +45,6 @@ nnoremap <Leader>; :VimuxPromptCommand<CR>
 " nnoremap <Leader>vx :VimuxInterruptRunner<CR>
 
 Plug 'fatih/vim-go'
-" Plug 'Blackrush/vim-gocode'
 Plug 'chr4/nginx.vim'
 Plug 'othree/html5.vim'
 Plug 'godlygeek/tabular'
@@ -216,6 +215,8 @@ function! BenchCode(cmd, arg)
     let l:line = "web.code." . a:cmd . " " . join(a:arg, " ")
     exe "silent !bench " l:line
 endfunction
+
+highlight Comment        cterm=reverse ctermfg=yellow
 
 " autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
 " autocmd BufWritePost * call BenchCode("counter", ["nsave", 1])
