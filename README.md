@@ -1,1 +1,1 @@
-usr/local/wiki/自然/编程/index.md
+usr/local/wiki/自然/index.md
