@@ -1,7 +1,8 @@
 
 PUBLISH=usr/publish
-BENCH=src/extend/bench.go
+BENCH=src/extend/shy.go
 BUILD=go build -o $(PUBLISH)/
+TARGET=shy
 
 install:prepare
 	GOPATH=$(PWD):$(GOPATH) go install $(BENCH) && date && echo
@@ -17,15 +18,15 @@ prepare:
 	@go get gopkg.in/gomail.v2
 
 linux_arm:
-	GOARCH=arm GOOS=linux $(BUILD)bench.linux.arm $(BENCH)
+	GOARCH=arm GOOS=linux $(BUILD)$(TARGET).linux.arm $(BENCH)
 linux32:
-	GOARCH=386 GOOS=linux $(BUILD)bench.linux.386 $(BENCH)
+	GOARCH=386 GOOS=linux $(BUILD)$(TARGET).linux.386 $(BENCH)
 linux64:
-	GOARCH=amd64 GOOS=linux $(BUILD)bench.linux.amd64 $(BENCH)
+	GOARCH=amd64 GOOS=linux $(BUILD)$(TARGET).linux.amd64 $(BENCH)
 darwin:
-	GOARCH=amd64 GOOS=darwin $(BUILD)bench.darwin.amd64 $(BENCH)
+	GOARCH=amd64 GOOS=darwin $(BUILD)$(TARGET).darwin.amd64 $(BENCH)
 win64:
-	GOARCH=amd64 GOOS=windows $(BUILD)bench.win64.exe $(BENCH)
+	GOARCH=amd64 GOOS=windows $(BUILD)$(TARGET).win64.exe $(BENCH)
 win32:
-	GOARCH=386 GOOS=windows $(BUILD)bench.win32.exe $(BENCH)
+	GOARCH=386 GOOS=windows $(BUILD)$(TARGET).win32.exe $(BENCH)
 

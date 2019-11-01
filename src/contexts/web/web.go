@@ -1110,8 +1110,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 		"/publish/": &ctx.Command{Name: "/publish/filename [upgrade script|plugin]", Help: "下载项目", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 下载程序
 			key = strings.TrimPrefix(key, "/publish/")
-			if strings.HasSuffix(key, "bench") {
-				key = key + "." + kit.Select(m.Conf("runtime", "host.GOOS"), m.Option("GOOS")) +
+			if key == "bench" {
+				key = m.Conf("runtime", "boot.ctx_app") + "." + kit.Select(m.Conf("runtime", "host.GOOS"), m.Option("GOOS")) +
 					"." + kit.Select(m.Conf("runtime", "host.GOARCH"), m.Option("GOARCH"))
 			}
 

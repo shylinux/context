@@ -175,7 +175,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "项目管理"},
 		"compile": &ctx.Config{Name: "compile", Value: map[string]interface{}{
-			"name": "bench", "bench": "src/extend/bench.go", "list": []interface{}{
+			"bench": "src/extend/shy.go", "list": []interface{}{
 				map[string]interface{}{"os": "linux", "cpu": "arm"},
 				map[string]interface{}{"os": "linux", "cpu": "386"},
 				map[string]interface{}{"os": "linux", "cpu": "amd64"},
@@ -824,85 +824,86 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			return
 		}},
 
-		"project": &ctx.Command{Name: "project init|stat|trend|submit|review|plugin [args...]", Help: "项目管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch arg[0] {
-			case "init":
-				if _, e := os.Stat(".git"); e == nil {
-					// 更新代码
-					m.Cmdp(0, []string{"git update"}, []string{"cli.system", "git"}, [][]string{
-						[]string{"stash"}, []string{"pull"}, []string{"stash", "pop"},
+		"project": &ctx.Command{Name: "project init|stat|stats|trend|trends|submit|review|plugin [args...]",
+			Help: "项目管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+				switch arg[0] {
+				case "init":
+					if _, e := os.Stat(".git"); e == nil {
+						// 更新代码
+						m.Cmdp(0, []string{"git update"}, []string{"cli.system", "git"}, [][]string{
+							[]string{"stash"}, []string{"pull"}, []string{"stash", "pop"},
+						})
+
+						// 代码状态
+						m.Cmdy("cli.system", "git", "status", "-sb", "cmd_parse", "cut")
+						return e
+					}
+
+					// 创建项目
+					m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
+						[]string{"init"}, []string{"remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
+						[]string{"stash"}, []string{"pull"}, []string{"checkout", "-f", "master"}, []string{"stash", "pop"},
 					})
 
-					// 代码状态
-					m.Cmdy("cli.system", "git", "status", "-sb", "cmd_parse", "cut")
-					return e
-				}
-
-				// 创建项目
-				m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
-					[]string{"init"}, []string{"remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
-					[]string{"stash"}, []string{"pull"}, []string{"checkout", "-f", "master"}, []string{"stash", "pop"},
-				})
-
-				// 下载依赖
-				list := [][]string{}
-				m.Confm("compile", "dep", func(index int, value string) {
-					list = append(list, []string{value})
-				})
-				m.Cmdp(0, []string{"go build"}, []string{"cli.system", "go", "get"}, list)
-
-			case "stat":
-				// 代码统计
-				m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
-
-			case "stats":
-				// 代码统计
-				m.Cmdy("nfs.dir", kit.Select("src", arg, 1), "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r", "dir_select", "group", "")
-
-			case "trend":
-				// 提交记录
-				if len(arg) == 1 {
-					m.Cmdy("nfs.git", "sum", "-n", 20)
-				} else {
-					m.Cmdy("nfs.git", "sum", "-n", arg[1:])
-				}
-
-			case "trends":
-				// 提交记录
-				if len(arg) == 1 {
-					m.Cmdy("nfs.git", "sum", "total")
-				} else {
-					m.Cmdy("nfs.git", "sum", "total", "--reverse", "--since", arg[1])
-				}
-
-			case "submit":
-				// 提交代码
-				if len(arg) > 1 {
-					m.Cmdp(0, []string{"git submit"}, []string{"cli.system", "git"}, [][]string{
-						[]string{"commit", "-am", arg[1]}, []string{"push"},
+					// 下载依赖
+					list := [][]string{}
+					m.Confm("compile", "dep", func(index int, value string) {
+						list = append(list, []string{value})
 					})
-				}
-				// 提交记录
-				m.Cmdy("nfs.git", "logs", "table.limit", "3")
+					m.Cmdp(0, []string{"go build"}, []string{"cli.system", "go", "get"}, list)
 
-			case "review":
-				// 代码修改
-				m.Cmdy("cli.system", "git", "diff")
+				case "stat":
+					// 代码统计
+					m.Cmdy("nfs.dir", "src", "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r")
 
-			case "plugin":
-				// 查看插件
-				if arg = arg[1:]; len(arg) == 0 {
-					m.Cmdy("nfs.dir", m.Conf("project", "plugin.path"), "time", "line", "name")
-					break
+				case "stats":
+					// 代码统计
+					m.Cmdy("nfs.dir", kit.Select("src", arg, 1), "dir_deep", "dir_type", "file", "dir_sort", "line", "int_r", "dir_select", "group", "")
+
+				case "trend":
+					// 提交记录
+					if len(arg) == 1 {
+						m.Cmdy("nfs.git", "sum", "-n", 20)
+					} else {
+						m.Cmdy("nfs.git", "sum", "-n", arg[1:])
+					}
+
+				case "trends":
+					// 提交记录
+					if len(arg) == 1 {
+						m.Cmdy("nfs.git", "sum", "total")
+					} else {
+						m.Cmdy("nfs.git", "sum", "total", "--reverse", "--since", arg[1])
+					}
+
+				case "submit":
+					// 提交代码
+					if len(arg) > 1 {
+						m.Cmdp(0, []string{"git submit"}, []string{"cli.system", "git"}, [][]string{
+							[]string{"commit", "-am", arg[1]}, []string{"push"},
+						})
+					}
+					// 提交记录
+					m.Cmdy("nfs.git", "logs", "table.limit", "3")
+
+				case "review":
+					// 代码修改
+					m.Cmdy("cli.system", "git", "diff")
+
+				case "plugin":
+					// 查看插件
+					if arg = arg[1:]; len(arg) == 0 {
+						m.Cmdy("nfs.dir", m.Conf("project", "plugin.path"), "time", "line", "name")
+						break
+					}
+					fallthrough
+				default:
+					m.Option("name", arg[0])
+					m.Option("help", kit.Select("plugin", arg, 1))
+					m.Cmdy("nfs.template", path.Join(m.Conf("project", "plugin.path"), arg[0])+"/", path.Join(m.Conf("project", "plugin.template"))+"/")
 				}
-				fallthrough
-			default:
-				m.Option("name", arg[0])
-				m.Option("help", kit.Select("plugin", arg, 1))
-				m.Cmdy("nfs.template", path.Join(m.Conf("project", "plugin.path"), arg[0])+"/", path.Join(m.Conf("project", "plugin.template"))+"/")
-			}
-			return
-		}},
+				return
+			}},
 		"compile": &ctx.Command{Name: "compile all|self|linux|windows|darwin|restart|plugin", Help: "项目编译", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "all":
@@ -962,7 +963,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				// 编译目标
 				if q == "" {
-					q = path.Join(m.Conf("publish", "path"), strings.Join([]string{m.Conf("compile", "name"), goos, arch}, "."))
+					q = path.Join(m.Conf("publish", "path"), strings.Join([]string{m.Conf("runtime", "boot.ctx_app"), goos, arch}, "."))
 					p = m.Cmdx("nfs.path", m.Conf("compile", "bench"))
 				}
 
@@ -1142,9 +1143,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					// 执行文件
 					if strings.HasPrefix(file, "bin/") {
 						if m.Cmd("cli.system", "chmod", "a+x", file); link == "bench" {
-							m.Cmd("cli.system", "mv", "bin/bench", fmt.Sprintf("bin/bench_%s", m.Time("20060102_150405")))
-							m.Cmd("cli.system", "mv", "bin/bench.new", "bin/bench")
-							file = "bin/bench"
+							file = "bin/" + m.Conf("runtime", "boot.ctx_app")
+							m.Cmd("cli.system", "mv", file, file+m.Time("_20060102_150405"))
+							m.Cmd("cli.system", "mv", m.Conf("upgrade", "list.bench"), file)
 						}
 						restart = true
 					}

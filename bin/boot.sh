@@ -8,7 +8,7 @@ export ctx_log_disable=${ctx_log_disable:=false}
 export ctx_gdb_enable=${ctx_gdb_enable:=false}
 
 # 目录配置
-export ctx_app=${ctx_app:="bench"}
+export ctx_app=${ctx_app:="shy"}
 export ctx_bin=${ctx_bin:=$(pwd)/bin/${ctx_app}}; [ -e $ctx_bin ] || export ctx_bin=`which ${ctx_app}`
 export ctx_root=${ctx_root:=/usr/local/context}
 export ctx_home=${ctx_home:=~/context}
