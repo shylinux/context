@@ -613,8 +613,12 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 
 	} else if strings.Contains(key, ".") {
 		arg := strings.Split(key, ".")
-		if msg, key = msg.Sess(arg[0]), arg[1]; msg != nil {
+		if msg, key = m.Sess(arg[0]), arg[1]; msg != nil {
 			msg.Option("remote_code", "")
+
+		} else if msg, key = m.Find(strings.Join(arg[0:len(arg)-1], "."), true), arg[len(arg)-1]; msg != nil {
+			msg.Option("remote_code", "")
+
 		}
 	}
 	if msg == nil {

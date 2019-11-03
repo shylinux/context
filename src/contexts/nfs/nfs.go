@@ -50,7 +50,7 @@ func dir(m *ctx.Message, root string, name string, level int, deep bool, dir_typ
 			if f, e = os.Lstat(p); e != nil {
 				m.Log("info", "%s", e)
 				continue
-			} else if (f.Mode() & os.ModeSymlink) != 0 {
+			} else if (f.Mode()&os.ModeSymlink) != 0 && f.IsDir() {
 				continue
 			}
 

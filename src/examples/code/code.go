@@ -33,8 +33,20 @@ CMD sh bin/boot.sh
 			Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				p, arg := kit.Select(".", arg[0]), arg[1:]
 				switch arg[0] {
-				case "install":
-					m.Cmd("cli.system", "apk", "add", arg[1])
+				case "init":
+					m.Cmd("cli.system", "apk", "update")
+					switch arg[1] {
+					case "build":
+						m.Cmd("cli.system", "apk", "add", "nginx")
+						m.Cmd("cli.system", "apk", "add", "redis")
+						m.Cmd("cli.system", "apk", "add", "tmux")
+						m.Cmd("cli.system", "apk", "add", "zsh")
+						m.Cmd("cli.system", "apk", "add", "git")
+						m.Cmd("cli.system", "apk", "add", "vim")
+						m.Cmd("cli.system", "apk", "add", "build-base")
+						m.Cmd("cli.system", "apk", "add", "golang")
+						m.Cmd("cli.system", "apk", "add", "mysql")
+					}
 
 				case "list":
 					m.Cmdy("nfs.dir", p, "time", "size", "path")
@@ -84,6 +96,8 @@ CMD sh bin/boot.sh
 				case "tail":
 					m.Cmdy("cli.system", "tail", path.Join(p, arg[1]))
 
+				default:
+					m.Cmdy("cli.system", arg)
 				}
 				return
 			}},
@@ -295,6 +309,11 @@ CMD sh bin/boot.sh
 			return
 		}},
 		"git": {Name: "git", Help: "版本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			prefix := []string{"cli.system", "git"}
+			switch arg[0] {
+			case "init":
+				m.Cmdy(prefix, "config", "alias.s", "status")
+			}
 			m.Echo("git")
 			return
 		}},

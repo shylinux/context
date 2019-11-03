@@ -386,6 +386,9 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     // HTML显示文本
     OrderCode: function(code) {if (!code) {return}
         code.onclick = function(event) {kit.CopyText()}
+        kit.Selector(code, "a", function(item) {
+            item.target = "_blank"
+        })
     },
     OrderLink: function(link) {link.target = "_blank"},
     OrderText: function(pane, text) {

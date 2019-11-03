@@ -160,7 +160,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "运行环境, host, init, boot, node, user, work"},
 		"system": &ctx.Config{Name: "system", Value: map[string]interface{}{
-			"timeout": "60s",
+			"timeout": "180s",
 			"env":     map[string]interface{}{},
 			"shell": map[string]interface{}{
 				"sh":  map[string]interface{}{"cmd": "bash"},

@@ -1220,7 +1220,7 @@ function Plugin(page, pane, field, inits, runs) {
             var meta = arguments.callee.meta
             var list = arguments.callee.list
 
-            for (var i = 0; i < list.length; i += 3) {if (list[i+1] == name) {
+            for (var i = 0; i < list.length; i += 3) {if (list[i+1] == name || list[i+2]) {
                 for (var i = 0; i < list.length; i += 3) {
                     page.Sync("plugin_"+list[i]).set(meta[list[i+2]||""](list[i+1]? line[list[i+1]]: value, list[i+1]||name, line, list))
                 }
@@ -1487,7 +1487,7 @@ function Output(plugin, type, msg, cb, target, option) {
             },
             inner: function(msg, cb) {
                 target.innerHTML = "", plugin.onfigure.meta.max(target)
-                output.onimport.meta._table(msg, msg.append) || (target.innerHTML = msg.result.join(""))
+                output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
                 kit._call(cb, [msg])
             },
             code: function(msg, cb) {

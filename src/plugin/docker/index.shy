@@ -1,6 +1,7 @@
-kit shell "命令" private "web.code.zsh" \
+kit shell "命令" private "ssh._route" _ "context" "find" "web.code" "zsh" \
+	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "" name cmd values list values find values grep values tail \
+	select "" name cmd values list values find values grep values tail values init \
     exports path path \
 	text "" name txt \
     feature display editor \
@@ -29,7 +30,7 @@ kit image "镜像" private "web.code.docker" "image" \
 	text "" name tag imports plugin_TAG \
     exports IMAGE_ID IMAGE_ID "" REPOSITORY REPOSITORY "" TAG TAG "" \
     feature detail "运行" "删除" "清理" \
-    button "查看" action auto
+    button "查看"
 
 kit container "容器" private "web.code.docker" "container" \
 	text "" name arg imports plugin_CONTAINER_ID \
@@ -37,10 +38,15 @@ kit container "容器" private "web.code.docker" "container" \
     feature detail "进入" "停止" "启动" "重启" "修改" "删除" "清理" \
     button "查看" action auto
 
+kit command "命令" private "web.code.docker" "container" \
+	text "" name tag imports plugin_CONTAINER_ID \
+	text "pwd" name cmd view long \
+    button "执行"
+
 kit network "网络" private "web.code.docker" "network" \
 	text "" name arg imports plugin_NETWORK_ID action auto \
     exports NETWORK_ID NETWORK_ID \
-    button "查看" action auto
+    button "查看"
 
 kit volume "存储" private "web.code.docker" "volume" \
 	text "" name arg imports plugin_CONTAINER_ID \

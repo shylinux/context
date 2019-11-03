@@ -17,6 +17,8 @@ prepare:
 	@go get github.com/skip2/go-qrcode
 	@go get gopkg.in/gomail.v2
 
+linux:
+	GOOS=linux $(BUILD)$(TARGET).linux.$(shell go env GOARCH) $(BENCH)
 linux_arm:
 	GOARCH=arm GOOS=linux $(BUILD)$(TARGET).linux.arm $(BENCH)
 linux32:
