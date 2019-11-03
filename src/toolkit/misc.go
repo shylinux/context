@@ -218,3 +218,43 @@ func List(arg interface{}, cb interface{}) {
 		}
 	}
 }
+
+func Merge(list interface{}, value string) interface{} {
+	switch val := list.(type) {
+	case nil:
+		return value
+	case string:
+		return []interface{}{val, value}
+	case []interface{}:
+		return append(val, value)
+	}
+	return list
+}
+func Contains(list interface{}, value string) bool {
+	switch val := list.(type) {
+	case nil:
+	case string:
+	case []string:
+		for _, v := range val {
+			if v == value {
+				return true
+			}
+		}
+	case []interface{}:
+	}
+	return false
+}
+func IndexOf(list interface{}, value string) int {
+	switch val := list.(type) {
+	case nil:
+	case string:
+	case []string:
+		for i, v := range val {
+			if strings.TrimSpace(v) == strings.TrimSpace(value) {
+				return i
+			}
+		}
+	case []interface{}:
+	}
+	return -1
+}

@@ -250,8 +250,15 @@ func (m *Message) Push(str string, arg ...interface{}) *Message {
 }
 func (m *Message) Sort(key string, arg ...string) *Message {
 	cmp := "str"
-	if len(arg) > 0 {
+	if len(arg) > 0 && arg[0] != "" {
 		cmp = arg[0]
+	} else {
+		cmp = "int"
+		for _, v := range m.Meta[key] {
+			if _, e := strconv.Atoi(v); e != nil {
+				cmp = "str"
+			}
+		}
 	}
 
 	number := map[int]int{}
@@ -274,7 +281,7 @@ func (m *Message) Sort(key string, arg ...string) *Message {
 		for j := i + 1; j < len(table); j++ {
 			result := false
 			switch cmp {
-			case "str":
+			case "", "str":
 				if table[i][key] > table[j][key] {
 					result = true
 				}
@@ -302,6 +309,106 @@ func (m *Message) Sort(key string, arg ...string) *Message {
 	for _, v := range table {
 		for _, k := range m.Meta["append"] {
 			m.Add("append", k, v[k])
+		}
+	}
+	return m
+}
+func (m *Message) Limit(offset, limit int) *Message {
+	l := len(m.Meta[m.Meta["append"][0]])
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > l {
+		offset = l
+	}
+	if offset+limit > l {
+		limit = l - offset
+	}
+	for _, k := range m.Meta["append"] {
+		m.Meta[k] = m.Meta[k][offset : offset+limit]
+	}
+	return m
+}
+func (m *Message) Filter(value string) *Message {
+
+	return m
+}
+func (m *Message) Group(method string, args ...string) *Message {
+
+	nrow := len(m.Meta[m.Meta["append"][0]])
+
+	keys := map[string]bool{}
+	for _, v := range args {
+		keys[v] = true
+	}
+
+	counts := []int{}
+	mis := map[int]bool{}
+	for i := 0; i < nrow; i++ {
+		counts = append(counts, 1)
+		if mis[i] {
+			continue
+		}
+	next:
+		for j := i + 1; j < nrow; j++ {
+			if mis[j] {
+				continue
+			}
+			for key := range keys {
+				if m.Meta[key][i] != m.Meta[key][j] {
+					continue next
+				}
+			}
+			for _, k := range m.Meta["append"] {
+				if !keys[k] {
+					switch method {
+					case "sum", "avg":
+						v1, e1 := strconv.Atoi(m.Meta[k][i])
+						v2, e2 := strconv.Atoi(m.Meta[k][j])
+						if e1 == nil && e2 == nil {
+							m.Meta[k][i] = fmt.Sprintf("%d", v1+v2)
+						}
+					}
+				}
+			}
+			mis[j] = true
+			counts[i]++
+		}
+	}
+
+	for i := 0; i < nrow; i++ {
+		for _, k := range m.Meta["append"] {
+			if !keys[k] {
+				switch method {
+				case "avg":
+					if v1, e1 := strconv.Atoi(m.Meta[k][i]); e1 == nil {
+						m.Meta[k][i] = strconv.Itoa(v1 / counts[i])
+					}
+				}
+			}
+		}
+	}
+	for i := 0; i < nrow; i++ {
+		m.Push("_counts", counts[i])
+	}
+
+	for i := 0; i < nrow; i++ {
+		if mis[i] {
+			for j := i + 1; j < nrow; j++ {
+				if !mis[j] {
+					for _, k := range m.Meta["append"] {
+						m.Meta[k][i] = m.Meta[k][j]
+					}
+					mis[i], mis[j] = false, true
+					break
+				}
+			}
+		}
+		if mis[i] {
+			for _, k := range m.Meta["append"] {
+				m.Meta[k] = m.Meta[k][0:i]
+			}
+			break
 		}
 	}
 	return m

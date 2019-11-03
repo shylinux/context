@@ -1,0 +1,49 @@
+kit shell "命令" private "web.code.zsh" \
+	text "" name dir imports plugin_path action auto \
+	select "" name cmd values list values find values grep values tail \
+    exports path path \
+	text "" name txt \
+    feature display editor \
+    button "搜索" \
+    button "返回" cb Last
+
+kit clip "文本" private "web.code.tmux" "" "" "" "buffer" \
+	text "" name tag imports plugin_buffer action auto \
+	text "" name txt \
+    exports buffer buffer \
+    feature detail "复制" "下载" "修改" \
+    button "查看" action auto \
+    button "返回" cb Last
+
+kit tmux "终端" private "web.code.tmux" \
+	text "context" name session imports plugin_session action auto \
+	text "" name window imports plugin_window action auto \
+	text "" name pane imports plugin_pane view char action auto \
+	text "" name cmd \
+    exports session session "" window window "" pane pane "" \
+    feature detail "复制" "下载" "修改" \
+    button "查看" action auto
+
+kit image "镜像" private "web.code.docker" "image" \
+	text "" name pos imports plugin_REPOSITORY \
+	text "" name tag imports plugin_TAG \
+    exports IMAGE_ID IMAGE_ID "" REPOSITORY REPOSITORY "" TAG TAG "" \
+    feature detail "运行" "删除" "清理" \
+    button "查看" action auto
+
+kit container "容器" private "web.code.docker" "container" \
+	text "" name arg imports plugin_CONTAINER_ID \
+    exports CONTAINER_ID CONTAINER_ID \
+    feature detail "进入" "停止" "启动" "重启" "修改" "删除" "清理" \
+    button "查看" action auto
+
+kit network "网络" private "web.code.docker" "network" \
+	text "" name arg imports plugin_NETWORK_ID action auto \
+    exports NETWORK_ID NETWORK_ID \
+    button "查看" action auto
+
+kit volume "存储" private "web.code.docker" "volume" \
+	text "" name arg imports plugin_CONTAINER_ID \
+    exports CONTAINER_ID CONTAINER_ID \
+    button "查看"
+

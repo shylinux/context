@@ -69,18 +69,38 @@ func format(m *ctx.Message, out *bytes.Buffer) {
 		}
 		m.Table()
 	case "cut":
-		c := byte(kit.Select(" ", m.Optionv("cmd_parse"), 2)[0])
+		c := byte(kit.Select(" ", m.Optionv("cmd_parse"), 1)[0])
 
 		bio := bufio.NewScanner(out)
 
+		pos := []int{}
 		heads := []string{}
 		if h := kit.Select("", m.Optionv("cmd_parse"), 3); h != "" {
 			heads = strings.Split(h, " ")
 		} else if bio.Scan() {
-			heads = kit.Split(bio.Text(), c, kit.Int(kit.Select("-1", m.Optionv("cmd_parse"), 1)))
+			h := bio.Text()
+			v := kit.Trans(m.Optionv("cmd_headers"))
+			for i := 0; i < len(v)-1; i += 2 {
+				h = strings.Replace(h, v[i], v[i+1], 1)
+			}
+
+			heads = kit.Split(h, c, kit.Int(kit.Select("-1", m.Optionv("cmd_parse"), 2)))
+			for _, v := range heads {
+				pos = append(pos, strings.Index(h, v))
+			}
 		}
 
 		for bio.Scan() {
+			if len(pos) > 0 {
+				for i, v := range pos {
+					if i == len(pos)-1 {
+						m.Add("append", heads[i], bio.Text()[v:])
+					} else {
+						m.Add("append", heads[i], bio.Text()[v:pos[i+1]])
+					}
+				}
+				continue
+			}
 			for i, v := range kit.Split(bio.Text(), c, len(heads)) {
 				m.Add("append", heads[i], v)
 			}
@@ -306,12 +326,13 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_timeout: 命令超时",
 			"cmd_active(true/false): 是否交互",
 			"cmd_daemon(true/false): 是否守护",
-			"cmd_dir: 工作目录",
 			"cmd_env key value: 环境变量",
+			"cmd_dir: 工作目录",
 			"cmd_log: 输出日志",
-			"cmd_temp arg...: 缓存结果",
-			"cmd_parse format|json|csv|cli|cut [count sep]: 解析结果",
 			"cmd_error: 输出错误",
+			"cmd_temp arg...: 缓存结果",
+			"cmd_parse format|json|csv|cli|cut [count sep headers]: 解析结果",
+			"cmd_headers",
 		}, Form: map[string]int{
 			"cmd_timeout": 1,
 			"cmd_active":  1,
@@ -323,6 +344,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			"cmd_parse":   4,
 			"cmd_error":   0,
 			"cmd_select":  -1,
+			"cmd_headers": 2,
 			"app_log":     1,
 		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 管道参数
@@ -865,7 +887,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					if len(arg) == 1 {
 						m.Cmdy("nfs.git", "sum", "-n", 20)
 					} else {
-						m.Cmdy("nfs.git", "sum", "-n", arg[1:])
+						m.Cmdy("nfs.git", "sum", "--reverse", "--since", arg[1:])
 					}
 
 				case "trends":
@@ -920,7 +942,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				// 编译项目
 				if m.Cmdy("cli.compile", ""); m.Has("bin") {
-					target := path.Join(kit.Select(os.Getenv("GOBIN"), ""), m.Conf("compile", "name"))
+					target := path.Join(kit.Select(os.Getenv("GOBIN"), ""), m.Conf("runtime", "boot.ctx_app"))
 					os.Remove(target)
 					m.Append("bin", m.Cmdx("nfs.copy", target, m.Append("bin")))
 					os.Chmod(target, 0777)

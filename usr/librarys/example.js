@@ -1220,10 +1220,12 @@ function Plugin(page, pane, field, inits, runs) {
             var meta = arguments.callee.meta
             var list = arguments.callee.list
 
-            for (var i = 0; i < list.length; i += 3) {
-                (list[1] && line[list[1]] || list[i+1] && line[list[i+1]] || list[i+2]) &&
+            for (var i = 0; i < list.length; i += 3) {if (list[i+1] == name) {
+                for (var i = 0; i < list.length; i += 3) {
                     page.Sync("plugin_"+list[i]).set(meta[list[i+2]||""](list[i+1]? line[list[i+1]]: value, list[i+1]||name, line, list))
-            }
+                }
+                break
+            }}
         }),
         onchoice: shy("菜单列表", {
             "返回": "Last",
@@ -1232,7 +1234,7 @@ function Plugin(page, pane, field, inits, runs) {
             "减参": "Remove",
             "删除": "Delete",
         }, ["返回", "复制", "加参", "减参", "删除"], function(event, value, meta) {
-            kit._call(plugin, plugin[meta[value]])
+            kit._call(plugin, plugin[meta[value]], [event])
             return true
         }),
         onaction: shy("事件列表", {
@@ -1290,7 +1292,7 @@ function Inputs(plugin, meta, item, target, option) {
         onimport: shy("导入数据", {}, [item.imports], function() {
             kit.List(arguments.callee.list, function(imports) {
                 page.Sync(imports).change(function(value) {
-                    plugin.History(target.value, target), target.value = value
+                    plugin.History(target.value, target), target.value = value.trim()
                     input.Event(event = document.createEvent("Event"))
                     item.action == "auto" && plugin.Runs(event)
                 })
@@ -1372,10 +1374,10 @@ function Inputs(plugin, meta, item, target, option) {
                     return true
                 })
 
+                // Event入口 2.1
                 if (event.key == "Enter" && (event.ctrlKey || item.type == "text")) {
-                    // Event入口 2.1
                     input.which.set(target.value) != undefined && plugin.History(target.value, target)
-                    input.Event(event, {}) && plugin.Check(event, target)
+                    input.Event(event, {}) && event.ctrlKey? plugin.Runs(event): plugin.Check(event, target)
                 }
             },
             onkeyup: function(event) {
@@ -1409,11 +1411,27 @@ function Inputs(plugin, meta, item, target, option) {
     return plugin.Inputs[item.name] = target, target.Input = input
 }
 function Output(plugin, type, msg, cb, target, option) {
-    var exports = plugin.target.Meta.exports
+    var name = plugin.target.Meta.name+"."+type
+    var feature = JSON.parse(plugin.target.Meta.feature||'{}')
+    var exports = JSON.parse(plugin.target.Meta.exports||'{}')
+
     var output = Meta(plugin.Zone(type), target, {
         _table: function() {plugin.onfigure("table")},
         _canvas: function() {plugin.onfigure("canvas")},
         clear: function() {target.innerHTML = ""},
+        Format: function() {
+            var ext = ".csv", txt = kit.Selector(target, "tr", function(tr) {
+                return kit.Selector(tr, "td,th", function(td) {
+                    return td.innerText
+                }).join(",")
+            }).join("\n");
+            type == "editor" && msg.file && (ext = ".txt", txt = msg.result.join("\n"));
+            !txt && (ext = ".txt", txt = msg.result.join(""))
+            return [name, ext, txt]
+        },
+        Copy: function(event) {
+            kit.CopyText(output.Format()[2])
+        },
 
         Jshy: function(event, args) {
             // 内部命令
@@ -1425,19 +1443,44 @@ function Output(plugin, type, msg, cb, target, option) {
         },
 
         Download: function() {
-            var type = ".csv", text = kit.Selector(target, "tr", function(tr) {
-                return kit.Selector(tr, "td,th", function(td) {
-                    return td.innerText
-                }).join(",")
-            }).join("\n")
-            !text && (type = ".txt", text = plugin.msg.result.join(""))
+            var ps = output.Format()
 
-            plugin.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([text]))+'" target="_blank" download="'+name+type+'">'+name+type+'</a>', title: "下载中...", width: 200})
+            plugin.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([ps[2]]))+'" target="_blank" download="'+ps[0]+ps[1]+'">'+ps[0]+ps[1]+'</a>', title: "下载中...", width: 200})
             kit.Selector(page.toast, "a", function(item) {item.click()})
         },
         onimport: shy("导入数据", {
             _table: function(msg, list) {
-                return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport)
+                return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport, function(event, value, name, line, index) {
+                    var td = event.target
+                    plugin.oncarte(event, shy("菜单列表", {
+                            "修改": "modify",
+                            "删除": "delete",
+                            "下载": "Download",
+                            "复制": function(event, text) {kit.CopyText(text), plugin.ontoast(text, "Copy to ClipBoard!")},
+                        }, feature.detail||["复制", "下载"], function(event, item, meta) {
+                            var text = td.innerText.trim()
+                            if (typeof meta[item] == "function") {meta[item](event, text); return}
+
+                            item == "修改"? (text = kit.AppendChilds(td, [{type: "input", value: text, data: {onkeydown: function(event) {
+                                if (event.key == "Enter") {
+                                    var id = ""
+                                    for (var i = 0; i < exports.length-1; i += 3) {
+                                        id = (id || line[exports[i+1]] || "").trim()
+                                    }
+                                    plugin.Run(event, [id, meta[item], name, event.target.value], function(msg) {
+                                        td.innerHTML = event.target.value
+                                        plugin.ontoast("修改成功")
+                                    }, true)
+                                    return
+                                }
+                            }}}]).input, text.focus(), text.setSelectionRange(0, -1)): output[meta[item]]? output[meta[item]](event): plugin.Run(event, [line[exports[1]].trim(), meta[item]||item], function(msg) {
+                                console.log(msg)
+                            })
+
+                            return true
+                        }),
+                    )
+                })
             },
             _code: function(msg) {
                 return msg.result && msg.result.length > 0 && kit.OrderCode(kit.AppendChild(target, [{view: ["code", "div", msg.Results()]}]).first)
@@ -1489,13 +1532,21 @@ function Output(plugin, type, msg, cb, target, option) {
             page.output = target
             meta[type](msg, cb)
         }),
+        ondetail: shy("菜单列表", {
+            "删除": "_table",
+            "修改": "_canvas",
+        }, ["删除", "修改"], function(event, value, meta) {
+            kit._call(output, output[meta[value]], [event])
+            return true
+        }),
         onchoice: shy("菜单列表", {
             "表格": "_table",
             "绘图": "_canvas",
+            "复制": "Copy",
             "下载": "Download",
             "返回": "Last",
             "清空": "clear",
-        }, ["表格", "绘图", "下载", "返回", "清空"], function(event, value, meta) {
+        }, ["表格", "绘图", "复制", "下载", "返回", "清空"], function(event, value, meta) {
             kit._call(output, output[meta[value]], [event])
             return true
         }),

@@ -109,3 +109,8 @@ func ExecuteFile(m *Message, w io.Writer, p string) error {
 	tmpl.ParseGlob(p)
 	return tmpl.ExecuteTemplate(w, path.Base(p), m)
 }
+func ExecuteStr(m *Message, w io.Writer, p string) error {
+	tmpl := template.New("render").Funcs(CGI)
+	tmpl, _ = tmpl.Parse(p)
+	return tmpl.Execute(w, m)
+}

@@ -1135,7 +1135,9 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 					}
 					args := arg[i : j+1]
 					if arg[i] == "feature" {
-						feature[arg[i+1]] = arg[i+2]
+						for k := 2; k < len(args); k++ {
+							feature[args[1]] = kit.Merge(feature[args[1]], args[k])
+						}
 
 					} else if arg[i] == "exports" {
 						for k := 1; k < len(args); k += 1 {
@@ -1147,14 +1149,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 							"value": kit.Select("", args, 1),
 						}
 						for k := 2; k < len(args)-1; k += 2 {
-							switch val := input[args[k]].(type) {
-							case nil:
-								input[args[k]] = args[k+1]
-							case string:
-								input[args[k]] = []interface{}{input[args[k]], args[k+1]}
-							case []interface{}:
-								input[args[k]] = append(val, args[k+1])
-							}
+							input[args[k]] = kit.Merge(input[args[k]], args[k+1])
 						}
 						inputs = append(inputs, input)
 					}
@@ -1170,6 +1165,13 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				}
 			}
 
+			ctx := m.Cap("module")
+			if strings.Contains(cmd, ".") {
+				cs := strings.Split(cmd, ".")
+				ctx = strings.Join(cs[:len(cs)-1], ".")
+				cmd = cs[len(cs)-1]
+			}
+
 			m.Confv("_index", []interface{}{-2}, map[string]interface{}{
 				"name": kit.Select("", arg, 1),
 				"help": kit.Select("", arg, 2),
@@ -1177,7 +1179,7 @@ var Index = &ctx.Context{Name: "yac", Help: "语法中心",
 				"init": init,
 				"type": right,
 
-				"ctx":     m.Cap("module"),
+				"ctx":     ctx,
 				"cmd":     cmd,
 				"args":    args,
 				"inputs":  inputs,

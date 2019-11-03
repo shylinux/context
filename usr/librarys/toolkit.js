@@ -303,7 +303,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                 var td = kit.AppendChild(tr, "td", kit.Color(row[key]))
 
 				if (key == "when") {td.className = "when"}
-                if (row[key].startsWith("http")) {
+                if ((row[key]||"").startsWith("http")) {
                     td.innerHTML = "<a href='"+row[key]+"' target='_blank'>"+row[key]+"</a>"
                 }
 
@@ -353,8 +353,8 @@ kit = toolkit = (function() {var kit = {__proto__: document,
             tbody.appendChild(list[i])
         }
     },
-    OrderTable: function(table, field, cb) {if (!table) {return}
-        table.onclick = function(event) {var target = event.target
+    OrderTable: function(table, field, cb, cbs) {if (!table) {return}
+        table.oncontextmenu = table.onclick = function(event) {var target = event.target
             target.parentElement.childNodes.forEach(function(item, i) {if (item != target) {return}
                 if (target.tagName == "TH") {var dataset = target.dataset
                     dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
@@ -362,7 +362,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                 } else if (target.tagName == "TD") {var index = 0
                     kit.Selector(table, "tr", function(item, i) {item == target.parentElement && (index = i)})
                     var name = target.parentElement.parentElement.querySelector("tr").childNodes[i].innerText
-                    name.startsWith(field) && kit._call(cb, [event, item.innerText, name, item.parentNode.Meta, index])
+                    name.startsWith(field) && kit._call(event.type=="contextmenu"? cbs: cb, [event, item.innerText, name, item.parentNode.Meta, index])
                 }
             })
             kit.CopyText()
@@ -439,7 +439,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     // HTML输入文本
     CopyText: function(text) {
         if (text) {
-            var input = kit.AppendChild(document.body, [{type: "input", value: text}]).input
+            var input = kit.AppendChild(document.body, [{type: "textarea", inner: text}]).last
             input.focus(), input.setSelectionRange(0, text.length)
         }
 
@@ -544,6 +544,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         s = s.replace(/\033\[31m/g, "<span style='color:#f00'>")
         s = s.replace(/\033\[0m/g, "</span>")
         s = s.replace(/\033\[m/g, "</span>")
+        s = s.replace(/\n/g, "<br/>")
         return s
     },
     Value: function() {

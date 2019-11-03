@@ -48,12 +48,13 @@ install() {
 
     echo
     echo
-    curl -o ${ctx_app} "$ctx_dev/publish/${ctx_app}?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} || return
+    wget -O ${ctx_app} "$ctx_dev/publish/bench?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} || return
 
     target=install && [ -n "$1" ] && target=$1
     ${md5} ${ctx_app} && ./${ctx_app} upgrade ${target} || return
 
-    mv ${ctx_app} bin/${ctx_app} && bin/boot.sh
+    mv ${ctx_app} bin/${ctx_app}
+    # && bin/boot.sh
 }
 main() {
     trap HUP hup
