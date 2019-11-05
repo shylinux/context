@@ -66,6 +66,11 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			return
 		}},
 
+		"svg": {Name: "svg", Help: "绘图", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Echo(arg[0])
+			return
+		}},
+
 		"xls": {Name: "xls", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:

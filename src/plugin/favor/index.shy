@@ -53,3 +53,9 @@ fun salary "工资单" public \
     append "结余" $rest
 end
 
+kit svg "绘图" public "web.wiki.svg" \
+	text "download/usr/script/teacherInfo.svg" name svg \
+    feature display svg \
+	button "查看"
+
+

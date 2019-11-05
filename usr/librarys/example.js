@@ -1510,6 +1510,14 @@ function Output(plugin, type, msg, cb, target, option) {
                 output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
                 kit._call(cb, [msg])
             },
+            _svg: function(target, width, height, src) {
+                target.innerHTML = '<embed src="'+src+'" width="'+width+'" height="'+height+'" type="image/svg+xml" pluginspage="http://www.adobe.com/svg/viewer/install/" />'
+            },
+            svg: function(msg, cb) {
+                plugin.onfigure.meta.size(function(width, height) {
+                    output.onimport.meta._svg(output.target, width, height*1.6, msg.result.join(""))
+                })
+            },
             editor: function(msg, cb) {
                 output.onimport.meta.table(msg, cb)
 
