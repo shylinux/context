@@ -1,3 +1,5 @@
+~code
+    config save var/tmp/vim.json vim
 ~ssh
     config save var/data/flow.json flow
     config save var/data/work.json work

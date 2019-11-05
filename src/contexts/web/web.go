@@ -207,8 +207,11 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			switch r.Header.Get("Content-Type") {
 			case "application/json":
 				var data interface{}
-				json.NewDecoder(r.Body).Decode(&data)
+				if e := json.NewDecoder(r.Body).Decode(&data); e != nil {
+					m.Log("warn", "%v", e)
+				}
 				msg.Optionv("content_data", data)
+				m.Log("info", "%v", kit.Formats(data))
 
 				switch d := data.(type) {
 				case map[string]interface{}:

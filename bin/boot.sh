@@ -48,14 +48,18 @@ install() {
 
     echo
     echo
-    wget -O ${ctx_app} "$ctx_dev/publish/bench?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} || return
+
+
+    which wget && get="wget -q -O" || get="curl -o"
+    $get ${ctx_app} "$ctx_dev/publish/bench?GOOS=$GOOS&GOARCH=$GOARCH" && chmod a+x ${ctx_app} || return
 
     target=install && [ -n "$1" ] && target=$1
-    ${md5} ${ctx_app} && ./${ctx_app} upgrade ${target} || return
+    ${md5} ${ctx_app} && $(pwd)/${ctx_app} upgrade ${target} || return
 
     mv ${ctx_app} bin/${ctx_app}
     # && bin/boot.sh
 }
+
 main() {
     trap HUP hup
     log "\nstarting..."
@@ -91,6 +95,7 @@ case $1 in
         echo "  term 停止服务"
     ;;
     install) shift && install "$@";;
+    installs) shift && install "$@" && bin/boot.sh ;;
     start) shift && main "$@";;
     "") main "$@";;
     create) mkdir -p $2; cd $2 && shift && shift && main "$@";;

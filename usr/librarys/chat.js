@@ -97,6 +97,13 @@ var page = Page({
                 meta[value](event)
             }))
         },
+        get: function(event, item, value, page) {
+            page.toast.Pane.Show(
+                "export ctx_dev="+location.protocol+"//"+location.host+" && curl $ctx_dev/publish/boot.sh | bash -s installs context" + "<br>" +
+                "export ctx_dev="+location.protocol+"//"+location.host+" && bin/boot.sh" + "<br>" +
+                "export ctx_box="+location.protocol+"//"+location.host+" && bin/node.sh" + "<br>",
+                "Copy to ClipBorad!", 30000)
+        },
 
         "工作": function(event, value) {
             page.which.set(value)
@@ -125,7 +132,7 @@ var page = Page({
             page.onlayout(event, {header:0, footer:0, river:0, storm:0, action: -1})
         },
     },
-    Button: shy({"title": "github.com/shylinux/context", "user": "", "time": ""}, ["time", "user"], function(key, value) {var meta = arguments.callee.meta
+    Button: shy({"title": "github.com/shylinux/context", "user": "", "time": "", "get": "下载"}, ["time", "user", "get"], function(key, value) {var meta = arguments.callee.meta
         return kit.isNone(key)? meta: kit.isNone(value)? meta[key]: (meta[key] = value, page.header.Pane.Show())
     }),
     Status: shy({title: '<a href="mailto:shylinux@163.com">shylinux@163.com</a>', "ncmd": "0", "ntxt": "0"}, ["ncmd", "ntxt"], function(key, value) {var meta = arguments.callee.meta

@@ -20,9 +20,9 @@ import (
 	// 应用层
 	_ "examples/chat" //会议中心
 	_ "examples/code" //代码中心
+	_ "examples/mall" //交易中心
+	_ "examples/team" //团队中心
 	_ "examples/wiki" //文档中心
-	// _ "examples/jira" //任务中心
-	// _ "examples/mall" //交易中心
 
 	// 应用层
 	_ "examples/chat/feishu" //飞书

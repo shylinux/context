@@ -426,7 +426,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					m.Push("node", value["user"])
 				})
 				m.Confm("ssh.node", func(key string, value map[string]interface{}) {
-					m.Push("user", "")
+					m.Push("user", value["type"])
 					m.Push("node", value["name"])
 				})
 				m.Table()

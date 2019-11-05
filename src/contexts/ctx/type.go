@@ -313,6 +313,48 @@ func (m *Message) Sort(key string, arg ...string) *Message {
 	}
 	return m
 }
+func (m *Message) Split(str string, arg ...string) *Message {
+	c := byte(kit.Select(" ", arg, 0)[0])
+
+	lines := strings.Split(str, "\n")
+
+	pos := []int{}
+	heads := []string{}
+	if h := kit.Select("", arg, 2); h != "" {
+		heads = strings.Split(h, " ")
+	} else {
+		h, lines = lines[0], lines[1:]
+		v := kit.Trans(m.Optionv("cmd_headers"))
+		for i := 0; i < len(v)-1; i += 2 {
+			h = strings.Replace(h, v[i], v[i+1], 1)
+		}
+
+		heads = kit.Split(h, c, kit.Int(kit.Select("-1", arg, 1)))
+		for _, v := range heads {
+			pos = append(pos, strings.Index(h, v))
+		}
+	}
+
+	for _, l := range lines {
+		if len(pos) > 0 {
+			for i, v := range pos {
+				if len(l) < v {
+					m.Add("append", heads[i], "")
+				} else if i == len(pos)-1 {
+					m.Add("append", heads[i], l[v:])
+				} else {
+					m.Add("append", heads[i], l[v:pos[i+1]])
+				}
+			}
+			continue
+		}
+		for i, v := range kit.Split(l, c, len(heads)) {
+			m.Add("append", heads[i], v)
+		}
+	}
+	m.Table()
+	return m
+}
 func (m *Message) Limit(offset, limit int) *Message {
 	l := len(m.Meta[m.Meta["append"][0]])
 	if offset < 0 {
@@ -613,7 +655,7 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 
 	} else if strings.Contains(key, ".") {
 		arg := strings.Split(key, ".")
-		if msg, key = m.Sess(arg[0]), arg[1]; msg != nil {
+		if msg, key = m.Sess(arg[0]), arg[1]; len(arg) == 2 && msg != nil {
 			msg.Option("remote_code", "")
 
 		} else if msg, key = m.Find(strings.Join(arg[0:len(arg)-1], "."), true), arg[len(arg)-1]; msg != nil {

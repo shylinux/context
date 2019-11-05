@@ -61,11 +61,11 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
         kit.Log("event", ++arguments.callee.meta.order, event.type, (proto.name||[document.title]).join("."), msg)
         return msg
     }),
-    Share: shy("共享链接", function(objs, clear) {objs = objs || {}
-        !clear && kit.Item(this.Search(), function(key, value) {objs[key] || (objs[key] = value)})
-        return location.origin+location.pathname+"?"+kit.Item(objs, function(key, value) {
+    Share: shy("共享链接", function(objs, clear) {var obj = objs || {}
+        !clear && kit.Item(this.Search(), function(key, value) {obj[key] || (obj[key] = value)})
+        return location.origin+location.pathname+(objs? "?"+kit.Item(obj, function(key, value) {
             return kit.List(value, function(value) {return key+"="+encodeURIComponent(value)}).join("&")
-        }).join("&")
+        }).join("&"): "")
     }),
 
     Search: shy("请求变量", function(key, value) {var args = {}

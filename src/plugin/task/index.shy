@@ -1,0 +1,14 @@
+kit task "任务" public "web.team.task" \
+	text "task" name table \
+	text "" name title \
+	text "" name content \
+	button "执行"
+
+kit salary "工资" public "web.mall.salary" \
+	text "salary" name table \
+	text "2019-10" name month init month \
+	text "" name total \
+	text "" name base \
+	text "" name tax \
+	button "执行"
+

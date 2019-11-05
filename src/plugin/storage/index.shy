@@ -1,23 +1,4 @@
 
-
-fun buffer "粘贴板" private \
-	text "" name index imports plugin_tmux_bindex action auto \
-	text "" name txt view long \
-	button "查看" action auto \
-	button "返回" cb Last \
-    exports tmux_bindex cur
-
-    let index = $1
-    if $1 == ""
-        copy skip cli.system tmux "list-buffer" cmd_parse cut 3 ":" "cur bytes text"
-        return
-    end
-    if $2 != ""
-        copy cli.system tmux "set-buffer" "-b"
-    end
-    return $(cli.system tmux "show-buffer" "-b" $index)
-end
-
 fun clip "剪切板" public \
 	text "" name you imports plugin_you action auto \
 	text "" name tag \

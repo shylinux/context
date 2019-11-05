@@ -1,14 +1,14 @@
-kit shell "命令" private "ssh._route" _ "context" "find" "web.code" "zsh" \
+kit shell "命令行" private "ssh._route" _ "context" "find" "web.code" "zsh" \
 	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "" name cmd values list values find values grep values tail values init \
+	select "" name cmd values list values find values tail values grep values init \
     exports path path \
 	text "" name txt \
     feature display editor \
     button "搜索" \
     button "返回" cb Last
 
-kit clip "文本" private "web.code.tmux" "" "" "" "buffer" \
+kit clip "粘贴板" private "web.code.tmux" "" "" "" "buffer" \
 	text "" name tag imports plugin_buffer action auto \
 	text "" name txt \
     exports buffer buffer \
@@ -23,7 +23,8 @@ kit tmux "终端" private "web.code.tmux" \
 	text "" name cmd \
     exports session session "" window window "" pane pane "" \
     feature detail "复制" "下载" "修改" \
-    button "查看" action auto
+    button "查看" action auto \
+    button "返回" cb Last
 
 kit image "镜像" private "web.code.docker" "image" \
 	text "" name pos imports plugin_REPOSITORY \
@@ -51,5 +52,16 @@ kit network "网络" private "web.code.docker" "network" \
 kit volume "存储" private "web.code.docker" "volume" \
 	text "" name arg imports plugin_CONTAINER_ID \
     exports CONTAINER_ID CONTAINER_ID \
+    button "查看"
+
+kit git "记录" private "ssh._route" _ "web.code.git" \
+	text "" name pod imports plugin_pod \
+	text "" name dir imports plugin_path action auto \
+	select "" name cmd values diff values status values commit values sum values init \
+    button "查看"
+
+kit vim "编辑器" private "ssh._route" _ "web.code.vim" \
+	text "" name pod imports plugin_pod \
+	select "" name cmd values opens values bufs values regs values tags \
     button "查看"
 

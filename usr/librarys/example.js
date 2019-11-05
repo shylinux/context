@@ -116,6 +116,10 @@ function Meta(zone, target, obj) {
         Event: shy("事件入口", {name: zone}, function(event, msg, proto) {
             return ctx.Event(event, msg, proto||arguments.callee.meta)
         }),
+        _call: function(key) {
+            kit._call(meta, typeof key == "function"? key: meta[key], kit.List(arguments).slice(1))
+            return true
+        },
         Zones: function(name) {return zone.concat(kit.List(arguments)).join(".")},
         Zone: function(name) {return zone.concat(kit.List(arguments))},
     }
@@ -1000,11 +1004,17 @@ function Pane(page, field) {
             ctx.Run(event, option.dataset, cmds, cb||pane.ondaemon)
         }),
 
+        onchoice: shy("菜单列表", {
+            "删除": "_table",
+            "修改": "_canvas",
+        }, ["删除", "修改"], function(event, value, meta) {
+            return pane._call(meta[value], event)
+        }),
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {
-                pane.Choice && page.carte.Pane.Show(event, shy({}, pane.Choice, function(event, value, meta) {
+                page.carte.Pane.Show(event, pane.Choice? shy({}, pane.Choice, function(event, value, meta) {
                     pane.Check(event, value)
-                }))
+                }): pane.onchoice)
             },
         }, function(event, key, cb) {cb(event)}),
         which: page.Sync(name), Listen: {}, Action: {}, Button: [], Choice: [],
@@ -1028,7 +1038,7 @@ function Plugin(page, pane, field, inits, runs) {
     kit.classList.add(field, meta.group, name, feature.style)
 
     var plugin = Meta(pane.Zone(name), field, inits && inits(field, option, output) || {}, {Inputs: {}, Outputs: {},
-        Appends: shy("添加控件", function(inputs) {
+        Appends: shy("添加控件", function(event, inputs) {
             if (inputs) {return inputs.map(function(item) {plugin.Append(item)})}
 
             var name = "args"+kit.Selector(option, "input.args.temp").length
@@ -1080,8 +1090,11 @@ function Plugin(page, pane, field, inits, runs) {
             return JSON.stringify(field.Meta)
         }),
         Clone: shy("复制插件", function() {
-            return pane.Append("field", {text: plugin.Reveal(), init: meta.init, view: meta.view, group: meta.group}, [], "")
+            return pane.Append("field", {text: plugin.Reveal(), init: meta.init, view: meta.view, group: meta.group}, [], "").item.Plugin.Select(null, true)
         }),
+        clear: function() {
+            plugin.Save(""), output.innerHTML = ""
+        },
 
         Move: function() {
             return field.nextSibling || field.parentNode.firstChild
@@ -1229,13 +1242,11 @@ function Plugin(page, pane, field, inits, runs) {
         }),
         onchoice: shy("菜单列表", {
             "返回": "Last",
-            "复制": "Clone",
-            "加参": "Appends",
-            "减参": "Remove",
+            "清空": "clear",
+            "克隆": "Clone",
             "删除": "Delete",
-        }, ["返回", "复制", "加参", "减参", "删除"], function(event, value, meta) {
-            kit._call(plugin, plugin[meta[value]], [event])
-            return true
+        }, ["返回", "清空", "克隆", "删除"], function(event, value, meta) {
+            return plugin._call(meta[value], event)
         }),
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {
@@ -1247,7 +1258,7 @@ function Plugin(page, pane, field, inits, runs) {
     kit.Log("init", "plugin", name, plugin)
     plugin.which = plugin.Sync("input")
     page[field.id] = pane[field.id] = pane[name] = field, field.Plugin = plugin
-    plugin.Appends(inputs)
+    plugin.Appends(null, inputs)
     return plugin
 }
 function Inputs(plugin, meta, item, target, option) {
@@ -1273,6 +1284,9 @@ function Inputs(plugin, meta, item, target, option) {
                 page.openLocation && page.openLocation(res.latitude+y, res.longitude+x, option.pos.value)
             })
         },
+        clear: function() {
+            target.value = ""
+        },
 
         Jshy: function(event, args) {
             // 内部命令
@@ -1286,6 +1300,7 @@ function Inputs(plugin, meta, item, target, option) {
         onformat: shy("数据转换", {
             none: function(value) {return value||""},
             date: function(value) {return kit.time()},
+            month: function(value) {return kit.time().slice(0, 7)},
         }, function(which, value) {var meta = arguments.callee.meta
             return (meta[which||"none"]||meta["none"])(value)
         }),
@@ -1298,18 +1313,17 @@ function Inputs(plugin, meta, item, target, option) {
                 })
             }), item.type == "button" && item.action == "auto" && target.click()
         }),
-        clear: function() {
-            target.value = ""
-        },
         onchoice: shy("菜单列表", {
+            "返回": "Last",
             "清空": "clear",
-        }, ["清空", "清空", "清空", "清空", "清空"], function(event, value, meta) {
-            kit._call(input, input[meta[value]])
-            return true
+            "加参": "Appends",
+            "减参": "Remove",
+        }, ["返回", "清空", "加参", "减参"], function(event, value, meta) {
+            return input._call(meta[value], event)
         }),
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {
-                plugin.oncarte(event, input.onchoice)
+                item.type != "button" && plugin.oncarte(event, input.onchoice)
             },
             onfocus: function(event) {plugin.Select(target)},
             onblur: function(event) {type == "text" && input.which.set(target.value)},
@@ -1363,7 +1377,7 @@ function Inputs(plugin, meta, item, target, option) {
                             target.scrollTo(0, plugin.target.offsetTop)
                             break
                         case "b":
-                            plugin.Appends()
+                            plugin.Appends(event)
                             break
                         case "m":
                             plugin.Clone()
@@ -1401,13 +1415,13 @@ function Inputs(plugin, meta, item, target, option) {
         }, function(event, key, cb) {cb(event)}),
         which: plugin.Sync(name),
     }, plugin)
+
     kit.Log("init", "input", input.Zones(), input)
 
     input.onimport()
     target.value = input.onformat(item.init, item.value)
     type == "text" && !target.placeholder && (target.placeholder = item.name)
     type == "text" && !target.title && (target.title = item.placeholder || item.name || "")
-
     return plugin.Inputs[item.name] = target, target.Input = input
 }
 function Output(plugin, type, msg, cb, target, option) {
@@ -1416,9 +1430,6 @@ function Output(plugin, type, msg, cb, target, option) {
     var exports = JSON.parse(plugin.target.Meta.exports||'{}')
 
     var output = Meta(plugin.Zone(type), target, {
-        _table: function() {plugin.onfigure("table")},
-        _canvas: function() {plugin.onfigure("canvas")},
-        clear: function() {target.innerHTML = ""},
         Format: function() {
             var ext = ".csv", txt = kit.Selector(target, "tr", function(tr) {
                 return kit.Selector(tr, "td,th", function(td) {
@@ -1428,6 +1439,12 @@ function Output(plugin, type, msg, cb, target, option) {
             type == "editor" && msg.file && (ext = ".txt", txt = msg.result.join("\n"));
             !txt && (ext = ".txt", txt = msg.result.join(""))
             return [name, ext, txt]
+        },
+        Download: function() {
+            var ps = output.Format()
+
+            plugin.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([ps[2]]))+'" target="_blank" download="'+ps[0]+ps[1]+'">'+ps[0]+ps[1]+'</a>', title: "下载中...", width: 200})
+            kit.Selector(page.toast, "a", function(item) {item.click()})
         },
         Copy: function(event) {
             kit.CopyText(output.Format()[2])
@@ -1442,12 +1459,6 @@ function Output(plugin, type, msg, cb, target, option) {
             return (target.value = args[0]) || plugin.Zone("value", args[0])
         },
 
-        Download: function() {
-            var ps = output.Format()
-
-            plugin.ontoast({text:'<a href="'+URL.createObjectURL(new Blob([ps[2]]))+'" target="_blank" download="'+ps[0]+ps[1]+'">'+ps[0]+ps[1]+'</a>', title: "下载中...", width: 200})
-            kit.Selector(page.toast, "a", function(item) {item.click()})
-        },
         onimport: shy("导入数据", {
             _table: function(msg, list) {
                 return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport, function(event, value, name, line, index) {
@@ -1485,11 +1496,6 @@ function Output(plugin, type, msg, cb, target, option) {
             _code: function(msg) {
                 return msg.result && msg.result.length > 0 && kit.OrderCode(kit.AppendChild(target, [{view: ["code", "div", msg.Results()]}]).first)
             },
-            inner: function(msg, cb) {
-                target.innerHTML = "", plugin.onfigure.meta.max(target)
-                output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
-                kit._call(cb, [msg])
-            },
             code: function(msg, cb) {
                 target.innerHTML = "", output.onimport.meta._code(msg)
                 typeof cb == "function" && cb(msg)
@@ -1499,9 +1505,14 @@ function Output(plugin, type, msg, cb, target, option) {
                 output.onimport.meta._table(msg, msg.append) || output.onimport.meta._code(msg)
                 typeof cb == "function" && cb(msg)
             },
+            inner: function(msg, cb) {
+                target.innerHTML = "", plugin.onfigure.meta.max(target)
+                output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
+                kit._call(cb, [msg])
+            },
             editor: function(msg, cb) {
-                target.innerHTML = ""
-                output.onimport.meta._table(msg, msg.append)
+                output.onimport.meta.table(msg, cb)
+
                 var current = page.Sync("plugin_editor_index").get()
                 target.style.maxHeight = ""
                 if (msg.file) {
@@ -1519,9 +1530,6 @@ function Output(plugin, type, msg, cb, target, option) {
                         tr.scrollIntoView()
                     })
                 }
-                typeof cb == "function" && cb(msg)
-                return
-                (target.innerHTML = "", Editor(plugin.Run, plugin, option, target, target.clientWidth-40, 400, 10, msg))
             },
             canvas: function(msg, cb) {
                 target.innerHTML = "", plugin.onfigure.meta.size(function(width, height) {
@@ -1540,15 +1548,14 @@ function Output(plugin, type, msg, cb, target, option) {
             return true
         }),
         onchoice: shy("菜单列表", {
-            "表格": "_table",
-            "绘图": "_canvas",
-            "复制": "Copy",
-            "下载": "Download",
             "返回": "Last",
             "清空": "clear",
-        }, ["表格", "绘图", "复制", "下载", "返回", "清空"], function(event, value, meta) {
-            kit._call(output, output[meta[value]], [event])
-            return true
+            "复制": "Copy",
+            "下载": "Download",
+            "绘图": function() {plugin.onfigure("canvas")},
+            "表格": function() {plugin.onfigure("table")},
+        }, ["返回", "清空", "复制", "下载", "绘图", "表格"], function(event, value, meta) {
+            return output._call(meta[value], event)
         }),
         onaction: shy("事件列表", {
             oncontextmenu: function(event) {

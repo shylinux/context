@@ -18,7 +18,7 @@ prepare:
 	@go get gopkg.in/gomail.v2
 
 linux:
-	GOOS=linux $(BUILD)$(TARGET).linux.$(shell go env GOARCH) $(BENCH)
+	GOPATH=$(PWD):$(GOPATH) GOOS=linux $(BUILD)$(TARGET).linux.$(shell go env GOARCH) $(BENCH)
 linux_arm:
 	GOARCH=arm GOOS=linux $(BUILD)$(TARGET).linux.arm $(BENCH)
 linux32:

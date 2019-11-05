@@ -361,7 +361,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						args = append(args, msg.Parse(v))
 					}
 				}
-				msg.Cmd(tool["cmd"], args, arg).CopyTo(m)
+				msg.Cmd(tool["cmd"], args, arg)
+				msg.CopyTo(m)
 
 			default:
 				m.Confm("componet", arg[0:], func(value map[string]interface{}) {

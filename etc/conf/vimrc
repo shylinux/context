@@ -218,6 +218,9 @@ endfunction
 
 highlight Comment        cterm=reverse ctermfg=yellow
 
+source ~/context/etc/conf/auto.vim
+
+
 " autocmd BufReadPost * call BenchCode("counter", ["nopen", 1])
 " autocmd BufWritePost * call BenchCode("counter", ["nsave", 1])
 "}}}

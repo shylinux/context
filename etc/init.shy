@@ -14,5 +14,9 @@
 ~nfs
     source local.shy
 
+~code
+    config load tmp/vim.json vim
+
 ~cli
+
 
