@@ -22,9 +22,9 @@ autocmd BufReadPost * call Shy("read", expand("<afile>"))
 autocmd BufWritePre * call Shy("write", expand("<afile>"))
 autocmd BufUnload * call Shy("close", expand("<afile>"))
 
-autocmd BufWritePost * call Shy("sync", "regs")
 autocmd BufWritePost * call Shy("sync", "bufs")
 autocmd BufWritePost * call Shy("sync", "tags")
+autocmd BufWritePost * call Shy("sync", "regs")
 
 " autocmd BufWinEnter * call Shy("enter", expand("<afile>"))
 " autocmd WinEnter * call Shy("enter", expand("<afile>"))

@@ -241,12 +241,26 @@ func (m *Message) Result(arg ...interface{}) string {
 	return m.Insert("result", index, arg...)
 }
 
-func (m *Message) Push(str string, arg ...interface{}) *Message {
-	switch m.Option("table.format") {
-	case "table":
-		return m.Add("append", "key", str).Add("append", "value", arg...)
+func (m *Message) Push(key interface{}, arg ...interface{}) *Message {
+	switch key := key.(type) {
+	case string:
+		switch m.Option("table.format") {
+		case "table":
+			m.Add("append", "key", key)
+			key = "value"
+		}
+		return m.Add("append", key, arg...)
+	case []string:
+		for _, key := range key {
+			switch m.Option("table.format") {
+			case "table":
+				m.Add("append", "key", key)
+				key = "value"
+			}
+			m.Add("append", key, kit.Chain(arg[0], key))
+		}
 	}
-	return m.Add("append", str, arg...)
+	return m
 }
 func (m *Message) Sort(key string, arg ...string) *Message {
 	cmp := "str"

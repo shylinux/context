@@ -852,17 +852,17 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				case "init":
 					if _, e := os.Stat(".git"); e == nil {
 						// 更新代码
-						m.Cmdp(0, []string{"git update"}, []string{"cli.system", "git"}, [][]string{
+						m.Cmdp(0, []string{"git update"}, []string{"web.code.git", ""}, [][]string{
 							[]string{"stash"}, []string{"pull"}, []string{"stash", "pop"},
 						})
 
 						// 代码状态
-						m.Cmdy("cli.system", "git", "status", "-sb", "cmd_parse", "cut")
+						m.Cmdy("web.code.git", "", "status")
 						return e
 					}
 
 					// 创建项目
-					m.Cmdp(0, []string{"git init"}, []string{"cli.system", "git"}, [][]string{
+					m.Cmdp(0, []string{"git init"}, []string{"web.code.git", ""}, [][]string{
 						[]string{"init"}, []string{"remote", "add", kit.Select("origin", arg, 1), kit.Select(m.Conf("project", "github"), arg, 2)},
 						[]string{"stash"}, []string{"pull"}, []string{"checkout", "-f", "master"}, []string{"stash", "pop"},
 					})
@@ -884,33 +884,25 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 				case "trend":
 					// 提交记录
-					if len(arg) == 1 {
-						m.Cmdy("nfs.git", "sum", "-n", 20)
-					} else {
-						m.Cmdy("nfs.git", "sum", "--reverse", "--since", arg[1:])
-					}
+					m.Cmdy("web.code.git", "", "sum", arg[1:])
 
 				case "trends":
+					m.Cmdy("web.code.git", "", "sum", "total", arg[1:])
 					// 提交记录
-					if len(arg) == 1 {
-						m.Cmdy("nfs.git", "sum", "total")
-					} else {
-						m.Cmdy("nfs.git", "sum", "total", "--reverse", "--since", arg[1])
-					}
 
 				case "submit":
 					// 提交代码
 					if len(arg) > 1 {
-						m.Cmdp(0, []string{"git submit"}, []string{"cli.system", "git"}, [][]string{
-							[]string{"commit", "-am", arg[1]}, []string{"push"},
+						m.Cmdp(0, []string{"git submit"}, []string{"web.code.git", ""}, [][]string{
+							[]string{"commit", arg[1]}, []string{"push"},
 						})
 					}
 					// 提交记录
-					m.Cmdy("nfs.git", "logs", "table.limit", "3")
+					m.Cmdy("web.code.git", "", "log", "--stat", "-n", "3")
 
 				case "review":
 					// 代码修改
-					m.Cmdy("cli.system", "git", "diff")
+					m.Cmdy("web.code.git", "", "diff")
 
 				case "plugin":
 					// 查看插件

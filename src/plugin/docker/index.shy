@@ -22,7 +22,7 @@ kit tmux "终端" private "web.code.tmux" \
 	text "" name pane imports plugin_pane view char action auto \
 	text "" name cmd \
     exports session session "" window window "" pane pane "" \
-    feature detail "复制" "下载" "修改" \
+    ueature detail "复制" "下载" "修改" \
     button "查看" action auto \
     button "返回" cb Last
 
@@ -50,8 +50,8 @@ kit network "网络" private "web.code.docker" "network" \
     button "查看"
 
 kit volume "存储" private "web.code.docker" "volume" \
-	text "" name arg imports plugin_CONTAINER_ID \
-    exports CONTAINER_ID CONTAINER_ID \
+	text "" name arg imports plugin_VOLUME_NAME \
+    exports VOLUME_NAME VOLUME_NAME \
     button "查看"
 
 kit git "记录" private "ssh._route" _ "web.code.git" \

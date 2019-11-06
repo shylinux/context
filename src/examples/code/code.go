@@ -204,6 +204,9 @@ CMD sh bin/boot.sh
 					m.Table()
 					return
 
+				case "run":
+					arg = arg[1:]
+					fallthrough
 				default:
 					m.Cmdy(prefix, "send-keys", "-t", target, strings.Join(arg[3:], " "), "Enter")
 					time.Sleep(1 * time.Second)
@@ -344,22 +347,24 @@ CMD sh bin/boot.sh
 			case "diff":
 				m.Cmdy(prefix, "diff")
 			case "status":
-				m.Cmdy(prefix, "status", "-sb", "cmd_parse", "cut", " ", "2")
+				m.Cmdy(prefix, "status", "-sb", "cmd_parse", "cut", " ", "2", "tags file")
 			case "commit":
-				if m.Cmds(prefix, "commit", "-am") {
+				if len(arg) > 1 && m.Cmds(prefix, "commit", "-am", arg[1]) {
 					break
 				}
-				fallthrough
+				m.Cmdy(prefix, "log", "--stat", "-n", "3")
 			case "sum":
 				total := false
 				if len(arg) > 1 && arg[1] == "total" {
 					total, arg = true, arg[1:]
 				}
 
-				args := []string{}
-				if args = append(args, "log", "--shortstat", "--pretty=commit: %ad %n%s", "--date=iso"); len(arg) > 1 {
-					args = append(args, "--reverse")
-					args = append(args, "--since")
+				args := []string{"log", "--shortstat", "--pretty=commit: %ad %n%s", "--date=iso", "--reverse"}
+				if len(arg) > 1 {
+					args = append(args, kit.Select("-n", "--since", strings.Contains(arg[1], "-")))
+					if strings.Contains(arg[1], "-") && !strings.Contains(arg[1], ":") {
+						arg[1] = arg[1] + " 00:00:00"
+					}
 					args = append(args, arg[1:]...)
 				} else {
 					args = append(args, "-n", "30")
@@ -429,39 +434,23 @@ CMD sh bin/boot.sh
 			switch arg[0] {
 			case "opens":
 				m.Confm("vim", "opens", func(key string, value map[string]interface{}) {
-					m.Push("time", value["time"])
-					m.Push("action", value["action"])
-					m.Push("file", value["file"])
-					m.Push("pid", value["pid"])
-					m.Push("pane", value["pane"])
-					m.Push("hostname", value["hostname"])
-					m.Push("username", value["username"])
+					m.Push([]string{"time", "action", "file", "pid", "pane", "hostname", "username"}, value)
 				})
 				m.Sort("time", "time_r").Table()
 			case "bufs":
 				m.Confm("vim", "buffer", func(key string, index int, value map[string]interface{}) {
-					m.Push("id", value["id"])
-					m.Push("name", value["name"])
-					m.Push("line", value["line"])
-					m.Push("hostname", value["hostname"])
-					m.Push("username", value["username"])
+					m.Push([]string{"id", "tag", "name", "line", "hostname", "username"}, value)
 				})
 				m.Table()
 			case "regs":
 				m.Confm("vim", "register", func(key string, index int, value map[string]interface{}) {
-					m.Push("name", value["name"])
-					m.Push("text", value["text"])
-					m.Push("hostname", value["hostname"])
-					m.Push("username", value["username"])
+					m.Push([]string{"name", "text", "hostname", "username"}, value)
 				})
 				m.Table()
 			case "tags":
 				m.Confm("vim", "tag", func(key string, index int, value map[string]interface{}) {
-					m.Push("tag", value["tag"])
-					m.Push("line", value["line"])
-					m.Push("file", value["in file/text"])
-					m.Push("hostname", value["hostname"])
-					m.Push("username", value["username"])
+					value["file"] = value["in file/text"]
+					m.Push([]string{"tag", "line", "file", "hostname", "username"}, value)
 				})
 				m.Table()
 			}
@@ -512,6 +501,7 @@ CMD sh bin/boot.sh
 								"hostname": m.Option("hostname"),
 								"username": m.Option("username"),
 								"id":       value["id"],
+								"tag":      value["tag"],
 								"name":     value["name"],
 								"line":     value["line"],
 							})
