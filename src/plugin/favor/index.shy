@@ -54,7 +54,7 @@ fun salary "工资单" public \
 end
 
 kit svg "绘图" public "web.wiki.svg" \
-	text "download/usr/script/teacherInfo.svg" name svg \
+	text "download/usr/script/teacherInfo.svg" name svg view long \
     feature display svg \
 	button "查看"
 

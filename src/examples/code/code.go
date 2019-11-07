@@ -12,19 +12,7 @@ import (
 	"toolkit"
 )
 
-var Index = &ctx.Context{Name: "code", Help: "代码中心",
-	Caches: map[string]*ctx.Cache{},
-	Configs: map[string]*ctx.Config{
-		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h"}, Help: "用户登录"},
-		"package": {Name: "package", Help: "软件包", Value: map[string]interface{}{
-			"udpate":  []interface{}{"apk", "update"},
-			"install": []interface{}{"apk", "add"},
-			"build":   []interface{}{"build-base"},
-			"develop": []interface{}{"zsh", "tmux", "git", "vim", "golang"},
-			"product": []interface{}{"nginx", "redis", "mysql"},
-		}},
-		"docker": {Name: "docker", Help: "容器", Value: map[string]interface{}{
-			"shy": `
+var Dockfile = `
 FROM {{options . "base"}}
 
 WORKDIR /home/{{options . "user"}}/context
@@ -34,23 +22,109 @@ RUN wget -q -O - $ctx_dev/publish/boot.sh | sh -s install
 
 CMD sh bin/boot.sh
 
-`,
+`
+
+var Index = &ctx.Context{Name: "code", Help: "代码中心",
+	Caches: map[string]*ctx.Cache{},
+	Configs: map[string]*ctx.Config{
+		"login": &ctx.Config{Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h"}, Help: "用户登录"},
+		"prefix": {Name: "prefix", Help: "外部命令", Value: map[string]interface{}{
+			"zsh":    []interface{}{"cli.system", "zsh"},
+			"tmux":   []interface{}{"cli.system", "tmux"},
+			"docker": []interface{}{"cli.system", "docker"},
+			"git":    []interface{}{"cli.system", "git"},
+			"vim":    []interface{}{"cli.system", "vim"},
+		}},
+		"package": {Name: "package", Help: "软件包", Value: map[string]interface{}{
+			"udpate":  []interface{}{"apk", "update"},
+			"install": []interface{}{"apk", "add"},
+			"build":   []interface{}{"build-base"},
+			"develop": []interface{}{"zsh", "tmux", "git", "vim", "golang"},
+			"product": []interface{}{"nginx", "redis", "mysql"},
+		}},
+		"docker": {Name: "docker", Help: "容器", Value: map[string]interface{}{
+			"shy": Dockfile,
 		}},
 		"git": {Name: "git", Help: "记录", Value: map[string]interface{}{
-			"alias": map[string]interface{}{
-				"s": "status",
-			},
+			"alias": map[string]interface{}{"s": "status", "b": "branch"},
 		}},
 		"vim": {Name: "vim", Help: "记录", Value: map[string]interface{}{
 			"opens": map[string]interface{}{},
 		}},
+		"zsh": {Name: "vim", Help: "记录", Value: map[string]interface{}{
+			"terminal": map[string]interface{}{},
+			"history":  map[string]interface{}{},
+		}},
 	},
 	Commands: map[string]*ctx.Command{
+		"/zsh": {Name: "/zsh", Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if !m.Has("res") {
+				switch m.Option("cmd") {
+				case "login":
+					name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
+					m.Conf("zsh", []string{"terminal", name}, map[string]interface{}{
+						"sid":      name,
+						"status":   "login",
+						"time":     m.Time(),
+						"pwd":      m.Option("pwd"),
+						"pid":      m.Option("pid"),
+						"pane":     m.Option("pane"),
+						"hostname": m.Option("hostname"),
+						"username": m.Option("username"),
+					})
+					m.Echo(name)
+					return
+				case "logout":
+					name := m.Option("sid")
+					m.Conf("zsh", []string{"terminal", name, "status"}, "logout")
+					m.Conf("zsh", []string{"terminal", name, "time"}, m.Time())
+					return
+
+				case "history":
+					switch path.Base(m.Option("SHELL")) {
+					case "zsh":
+						m.Option("arg", strings.SplitN(m.Option("arg"), ";", 2)[1])
+					}
+
+					name := m.Option("sid")
+					m.Conf("zsh", []string{"history", name, "-1"}, map[string]interface{}{
+						"sid":  name,
+						"time": m.Time(),
+						"cmd":  m.Option("arg"),
+						"pwd":  m.Option("pwd"),
+					})
+					return
+				}
+			}
+			return
+		}},
 		"zsh": {Name: "zsh dir grep key [split reg fields] [filter reg fields] [order key method] [group keys method] [sort keys method]",
 			Form: map[string]int{"split": 2, "filter": 2, "order": 2, "group": 2, "sort": 2, "limit": 2},
 			Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				p, arg := kit.Select(".", arg[0]), arg[1:]
 				switch arg[0] {
+				case "terminal":
+					m.Confm("zsh", "terminal", func(key string, value map[string]interface{}) {
+						m.Push([]string{"time", "sid", "status", "pwd", "pid", "pane", "hostname", "username"}, value)
+					})
+					m.Sort("time", "time_r").Table()
+				case "history":
+					m.Confm("zsh", "history", func(key string, index int, value map[string]interface{}) {
+						m.Push([]string{"time", "sid", "cmd", "pwd"}, value)
+					})
+					m.Sort("time", "time_r").Table()
+				case "prune":
+					ps := []string{}
+					m.Confm("zsh", []string{"terminal"}, func(key string, value map[string]interface{}) {
+						if kit.Format(value["status"]) == "logout" {
+							ps = append(ps, key)
+						}
+					})
+					for _, v := range ps {
+						m.Log("info", "prune %v %v", v, kit.Formats(m.Conf("zsh", []string{"terminal", v})))
+						m.Confv("zsh", []string{"terminal", v}, "")
+					}
+
 				case "init":
 					m.Cmd("cli.system", m.Confv("package", "upadte"))
 					for _, v := range kit.View(arg[1:], m.Confm("package")) {
@@ -58,7 +132,7 @@ CMD sh bin/boot.sh
 					}
 
 				case "list":
-					m.Cmdy("nfs.dir", p, "time", "size", "path")
+					m.Cmdy("nfs.dir", p, "time", "size", "path").Sort("time", "time_r").Table()
 
 				case "find":
 					m.Cmdy("cli.system", "find", p, "-name", arg[1], "cmd_parse", "cut", "", "1", "path")
@@ -116,7 +190,8 @@ CMD sh bin/boot.sh
 				return
 			}},
 		"tmux": {Name: "tmux [session [window [pane cmd]]]", Help: "窗口", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			prefix := []string{"cli.system", "tmux"}
+			prefix := kit.Trans(m.Confv("prefix", "tmux"))
+			// 修改信息
 			if len(arg) > 1 {
 				switch arg[1] {
 				case "modify":
@@ -129,6 +204,7 @@ CMD sh bin/boot.sh
 					return
 				}
 			}
+
 			// 查看会话
 			if m.Cmdy(prefix, "list-session", "-F", "#{session_id},#{session_name},#{session_windows},#{session_height},#{session_width}",
 				"cmd_parse", "cut", ",", "5", "id session windows height width"); len(arg) == 0 {
@@ -163,6 +239,7 @@ CMD sh bin/boot.sh
 			// 执行命令
 			target := arg[0] + ":" + arg[1] + "." + arg[2]
 			if len(arg) > 3 {
+				// 修改缓存
 				if len(arg) > 5 {
 					switch arg[5] {
 					case "modify":
@@ -173,7 +250,9 @@ CMD sh bin/boot.sh
 						return
 					}
 				}
+
 				switch arg[3] {
+				// 操作缓存
 				case "buffer":
 					if len(arg) > 5 {
 						m.Cmdy(prefix, "set-buffer", "-b", arg[4], arg[5])
@@ -191,6 +270,7 @@ CMD sh bin/boot.sh
 						}
 					}
 					return
+				// 面板列表
 				case "pane":
 					m.Cmdy(prefix, "list-panes", "-a", "cmd_parse", "cut", " ", "8", "pane_name size some lines bytes haha pane_id tag")
 					m.Meta["append"] = []string{"pane_id", "pane_name", "size", "lines", "bytes", "tag"}
@@ -203,7 +283,7 @@ CMD sh bin/boot.sh
 					m.Sort("pane_name")
 					m.Table()
 					return
-
+				// 运行命令
 				case "run":
 					arg = arg[1:]
 					fallthrough
@@ -218,7 +298,7 @@ CMD sh bin/boot.sh
 			return
 		}},
 		"docker": {Name: "docker", Help: "容器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			prefix := []string{"cli.system", "docker"}
+			prefix := kit.Trans(m.Confv("prefix", "docker"))
 			switch arg[0] {
 			case "image":
 				prefix = append(prefix, "image")
@@ -244,7 +324,7 @@ CMD sh bin/boot.sh
 				// 启动容器
 				case "运行":
 					m.Set("append").Set("result")
-					m.Cmdy("cli.system", "docker", "run", "-dt", pos+":"+tag)
+					m.Cmdy(prefix[:2], "run", "-dt", pos+":"+tag)
 					return
 				// 清理镜像
 				case "清理":
@@ -265,7 +345,7 @@ CMD sh bin/boot.sh
 					if f, _, e := kit.Create(m.Option("file")); m.Assert(e) {
 						defer f.Close()
 						if m.Assert(ctx.ExecuteStr(m, f, m.Conf("docker", arg[0]))) {
-							m.Cmdy("cli.system", "docker", "image", "build", "-f", m.Option("file"), "-t", m.Option("name"), ".")
+							m.Cmdy(prefix, "build", "-f", m.Option("file"), "-t", m.Option("name"), ".")
 						}
 					}
 				}
@@ -275,7 +355,7 @@ CMD sh bin/boot.sh
 				if len(arg) > 1 {
 					switch arg[2] {
 					case "进入":
-						m.Cmdy("cli.system", "tmux", "new-window", "-dPF", "#{session_name}:#{window_name}.1", "docker exec -it "+arg[1]+" sh")
+						m.Cmdy(m.Confv("prefix", "tmux"), "new-window", "-dPF", "#{session_name}:#{window_name}.1", "docker exec -it "+arg[1]+" sh")
 						return
 
 					case "停止":
@@ -311,12 +391,13 @@ CMD sh bin/boot.sh
 				m.Cmdy(prefix, "ls", "-a", "cmd_parse", "cut", "cmd_headers", "CONTAINER ID", "CONTAINER_ID")
 
 			case "network":
+				prefix = append(prefix, "network")
 				if len(arg) == 1 {
-					m.Cmdy("cli.system", "docker", "network", "ls", "cmd_parse", "cut", "cmd_headers", "NETWORK ID", "NETWORK_ID")
+					m.Cmdy(prefix, "ls", "cmd_parse", "cut", "cmd_headers", "NETWORK ID", "NETWORK_ID")
 					break
 				}
 
-				kit.Map(kit.Chain(kit.UnMarshal(m.Cmdx("cli.system", "docker", "network", "inspect", arg[1])), "0.Containers"), "", func(key string, value map[string]interface{}) {
+				kit.Map(kit.Chain(kit.UnMarshal(m.Cmdx(prefix, "inspect", arg[1])), "0.Containers"), "", func(key string, value map[string]interface{}) {
 					m.Push("CONTAINER_ID", key[:12])
 					m.Push("name", value["Name"])
 					m.Push("IPv4", value["IPv4Address"])
@@ -327,32 +408,62 @@ CMD sh bin/boot.sh
 
 			case "volume":
 				if len(arg) == 1 {
-					m.Cmdy("cli.system", "docker", "volume", "ls", "cmd_parse", "cut", "cmd_headers", "VOLUME NAME", "VOLUME_NAME")
+					m.Cmdy(prefix, "volume", "ls", "cmd_parse", "cut", "cmd_headers", "VOLUME NAME", "VOLUME_NAME")
 					break
 				}
 
 			default:
-				m.Cmdy("cli.system", "docker", arg)
+				m.Cmdy(prefix, arg)
 			}
 			return
 		}},
-		"git": {Name: "git", Help: "版本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			prefix, arg := []string{"cli.system", "git", "cmd_dir", kit.Select(".", arg[0])}, arg[1:]
+		"git": {Name: "git init|diff|status|commit|branch|pull|push|sum", Help: "版本", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			prefix, arg := append(kit.Trans(m.Confv("prefix", "git")), "cmd_dir", kit.Select(".", arg[0])), arg[1:]
 
 			switch arg[0] {
 			case "init":
+				if s, e := os.Stat(path.Join(prefix[len(prefix)-1], ".git")); e == nil && s.IsDir() {
+					if len(arg) > 1 {
+						m.Cmdy(prefix, "remote", "add", "-f", kit.Select("origin", arg, 2), arg[1])
+					}
+				} else if len(arg) > 1 {
+					m.Cmdy(prefix, "clone", arg[1], ".")
+				} else {
+					m.Cmdy(prefix, "init")
+				}
+
 				m.Confm("git", "alias", func(key string, value string) {
 					m.Cmdy(prefix, "config", "alias."+key, value)
 				})
+
 			case "diff":
 				m.Cmdy(prefix, "diff")
 			case "status":
 				m.Cmdy(prefix, "status", "-sb", "cmd_parse", "cut", " ", "2", "tags file")
 			case "commit":
-				if len(arg) > 1 && m.Cmds(prefix, "commit", "-am", arg[1]) {
+				if len(arg) > 1 && m.Cmdy(prefix, "commit", "-am", arg[1]).Result() == "" {
 					break
 				}
 				m.Cmdy(prefix, "log", "--stat", "-n", "3")
+			case "branch":
+				if len(arg) > 1 {
+					m.Cmd(prefix, "branch", arg[1])
+					m.Cmd(prefix, "checkout", arg[1])
+				}
+				for _, v := range strings.Split(m.Cmdx(prefix, "branch", "-v"), "\n") {
+					if len(v) > 0 {
+						m.Log("fuck", "waht %v --", v)
+						m.Push("tags", v[:2])
+						vs := strings.SplitN(strings.TrimSpace(v[2:]), " ", 2)
+						m.Push("branch", vs[0])
+						vs = strings.SplitN(strings.TrimSpace(vs[1]), " ", 2)
+						m.Push("hash", vs[0])
+						m.Push("note", strings.TrimSpace(vs[1]))
+					}
+				}
+				m.Table()
+			case "push":
+				m.Cmdy(prefix, "push")
 			case "sum":
 				total := false
 				if len(arg) > 1 && arg[1] == "total" {
@@ -449,7 +560,6 @@ CMD sh bin/boot.sh
 				m.Table()
 			case "tags":
 				m.Confm("vim", "tag", func(key string, index int, value map[string]interface{}) {
-					value["file"] = value["in file/text"]
 					m.Push([]string{"tag", "line", "file", "hostname", "username"}, value)
 				})
 				m.Table()
@@ -484,11 +594,11 @@ CMD sh bin/boot.sh
 
 						m.Split(strings.TrimPrefix(m.Option("tags"), "\n"), " ", "6").Table(func(index int, value map[string]string) {
 							m.Conf("vim", []string{"tag", name, "-1"}, map[string]interface{}{
-								"hostname":     m.Option("hostname"),
-								"username":     m.Option("username"),
-								"tag":          value["tag"],
-								"line":         value["line"],
-								"in file/text": value["in file/text"],
+								"hostname": m.Option("hostname"),
+								"username": m.Option("username"),
+								"tag":      value["tag"],
+								"line":     value["line"],
+								"file":     value["in file/text"],
 							})
 						})
 						m.Set("append").Set("result")

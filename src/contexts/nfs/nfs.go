@@ -318,13 +318,13 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		// 终端控制
 		if nfs.in = m.Optionv("bio.in").(*os.File); m.Has("bio.out") {
-			if nfs.out = m.Optionv("bio.out").(*os.File); m.Conf("runtime", "host.GOOS") != "windows" && !m.Options("daemon") {
+			if nfs.out = m.Optionv("bio.out").(*os.File); m.Options("daemon") {
+				return false
+			}
+			if m.Conf("runtime", "host.GOOS") != "windows" {
 				m.Conf("term", "use", nfs.Term(m, "init") != nil)
 				defer nfs.Term(m, "exit")
 				kit.STDIO = nfs
-
-			} else if m.Options("daemon") {
-				return false
 			}
 		}
 

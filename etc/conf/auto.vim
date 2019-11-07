@@ -1,4 +1,5 @@
-let ctx_dev = (len($ctx_dev) > 1? $ctx_dev: "http://localhost:9095") . "/code/vim"
+
+let ctx_dev = (len($ctx_dev) > 1? $ctx_dev: "http://127.0.0.1:9095") . "/code/vim"
 
 fun! ShyPost(arg)
     return system("curl -s '" . g:ctx_dev . "' -H 'Content-Type: application/json' -d '" . json_encode(a:arg) . "' 2>/dev/null")

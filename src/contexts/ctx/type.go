@@ -257,7 +257,7 @@ func (m *Message) Push(key interface{}, arg ...interface{}) *Message {
 				m.Add("append", "key", key)
 				key = "value"
 			}
-			m.Add("append", key, kit.Chain(arg[0], key))
+			m.Add("append", key, kit.Format(kit.Chain(arg[0], key)))
 		}
 	}
 	return m

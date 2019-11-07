@@ -424,7 +424,7 @@ fieldset table td {
     max-width:1200px;
     font-family:monospace;
     padding: 0 6px;
-    white-space: pre;
+    /* white-space: pre; */
 }
 fieldset table td.clip {
     background-color:red;

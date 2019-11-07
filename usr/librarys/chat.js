@@ -98,11 +98,13 @@ var page = Page({
             }))
         },
         get: function(event, item, value, page) {
-            page.toast.Pane.Show(
-                "export ctx_dev="+location.protocol+"//"+location.host+" && curl $ctx_dev/publish/boot.sh | bash -s installs context" + "<br>" +
-                "export ctx_dev="+location.protocol+"//"+location.host+" && bin/boot.sh" + "<br>" +
-                "export ctx_box="+location.protocol+"//"+location.host+" && bin/node.sh" + "<br>",
-                "Copy to ClipBorad!", 30000)
+            page.toast.Pane.Show(""
+                + "export ctx_dev="+location.protocol+"//"+location.host+" && curl -s $ctx_dev/publish/auto.sh | sh -s" + "<br>"
+                + "export ctx_dev="+location.protocol+"//"+location.host+" && curl -s $ctx_dev/publish/boot.sh | bash -s installs context" + "<br>"
+                + "export ctx_dev="+location.protocol+"//"+location.host+" && bin/boot.sh" + "<br>"
+                + "export ctx_dev="+location.protocol+"//"+location.host+" && bin/user.sh" + "<br>"
+                + "export ctx_box="+location.protocol+"//"+location.host+" && bin/node.sh" + "<br>"
+                , "Copy to ClipBorad!", 30000)
         },
 
         "工作": function(event, value) {

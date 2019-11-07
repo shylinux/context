@@ -1,3 +1,4 @@
+# 系统配置
 ~cli
     config load tmp/runtime.json runtime
 ~aaa
@@ -7,6 +8,7 @@
     config load data/work.json work
     config load data/flow.json flow
 
+# 服务配置
 ~nfs
     source etc/common.shy
 ~ssh
@@ -14,9 +16,11 @@
 ~nfs
     source local.shy
 
+# 应用配置
 ~code
+    config load tmp/zsh.json zsh
     config load tmp/vim.json vim
 
+# 终端配置
 ~cli
-
 

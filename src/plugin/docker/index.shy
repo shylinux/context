@@ -1,7 +1,7 @@
 kit shell "命令行" private "ssh._route" _ "context" "find" "web.code" "zsh" \
 	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "" name cmd values list values find values tail values grep values init \
+	select "" name cmd values list values find values tail values grep values init values terminal values history \
     exports path path \
 	text "" name txt \
     feature display editor \
@@ -57,7 +57,8 @@ kit volume "存储" private "web.code.docker" "volume" \
 kit git "记录" private "ssh._route" _ "web.code.git" \
 	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "" name cmd values diff values status values commit values sum values init \
+	select "" name cmd values diff values status values commit values branch values pull values push values sum values init \
+    exports branch branch \
     button "查看"
 
 kit vim "编辑器" private "ssh._route" _ "web.code.vim" \

@@ -1,5 +1,9 @@
+# 应用配置
 ~code
     config save var/tmp/vim.json vim
+    config save var/tmp/zsh.json zsh
+
+# 系统配置
 ~ssh
     config save var/data/flow.json flow
     config save var/data/work.json work
