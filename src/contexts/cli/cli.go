@@ -471,9 +471,6 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Echo(err.String())
 					return
 				}
-				if cmd.ProcessState.ExitCode() != 0 {
-					return
-				}
 
 				// 解析结果
 				if format(m, out); m.Has("cmd_select") {

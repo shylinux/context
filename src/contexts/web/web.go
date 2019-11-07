@@ -155,7 +155,7 @@ func (web *WEB) Login(msg *ctx.Message, w http.ResponseWriter, r *http.Request) 
 	}
 
 	// 本地用户
-	if !msg.Options("username") && kit.IsLocalIP(msg.Option("remote_ip")) && msg.Confs("web.login", "local") {
+	if !msg.Options("username") && kit.IsLocalIP(msg.Option("remote_ip")) && msg.Confs("web.login", "local") && !strings.HasPrefix(msg.Option("agent"), "curl") {
 		msg.Cmd("aaa.role", "root", "user", msg.Cmdx("ssh.work", "create"))
 		msg.Log("info", "%s: %s", msg.Option("remote_ip"), msg.Option("username", msg.Conf("runtime", "work.name")))
 		Cookie(msg, w, r)
@@ -169,6 +169,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			defer func() {
 				msg.Log("time", "serve: %v", msg.Format("cost"))
 			}()
+			msg.Option("agent", r.Header.Get("User-Agent"))
 			msg.Option("remote_addr", r.RemoteAddr)
 			msg.Option("remote_ip", r.Header.Get("remote_ip"))
 			msg.Option("index_url", r.Header.Get("index_url"))

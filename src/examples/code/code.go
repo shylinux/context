@@ -46,7 +46,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"shy": Dockfile,
 		}},
 		"git": {Name: "git", Help: "记录", Value: map[string]interface{}{
-			"alias": map[string]interface{}{"s": "status", "b": "branch"},
+			"alias":  map[string]interface{}{"s": "status", "b": "branch"},
+			"config": []interface{}{map[string]interface{}{"conf": "merge.tool", "value": "vimdiff"}},
 		}},
 		"vim": {Name: "vim", Help: "记录", Value: map[string]interface{}{
 			"opens": map[string]interface{}{},

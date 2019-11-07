@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ "$ctx_dev" = "" ] || [ "$ctx_dev" = "-" ]; then
+if [ "${ctx_dev}" = "" ] || [ "${ctx_dev}" = "-" ]; then
     ctx_dev="http://localhost:9095"
 fi
 
@@ -11,26 +11,34 @@ ctx_sid=${ctx_sid:=""}
 ctx_welcome=${ctx_welcome:="^_^  Welcome to Context world  ^_^"}
 ctx_goodbye=${ctx_goodbye:="^_^  Welcome to Context world  ^_^"}
 
+ShyLine() {
+    echo "$*"|sed -e 's/\"/\\\"/g' -e 's/\n/\\n/g'
+}
 ShyJSON() {
+    [ $# -eq 1 ] && echo \"`ShyLine "$1"`\" && return
     echo -n "{"
-    [ -n "$1" ] && echo -n \"$1\"\:\"$2\" && shift 2 && while [ -n "$1" ]; do
-        echo -n \, && echo -n \"$1\"\:\"$2\" && shift 2
+    while [ $# -gt 1 ]; do
+        echo -n \"`ShyLine "$1"`\"\:\"`ShyLine "$2"`\"
+        shift 2 && [ $# -gt 1 ] && echo -n ","
     done
     echo -n "}"
 }
 ShyPost() {
-    ShyJSON "$@" pwd "$(pwd)" sid "${ctx_sid}"| xargs -d'\n' -n1 curl -s "${ctx_url}" -H "${ctx_head}" -d 2>/dev/null
+    local data=`ShyJSON "$@" SHELL "${SHELL}" pwd "${PWD}" sid "${ctx_sid}"`
+    curl -s "${ctx_url}" -H "${ctx_head}" -d "${data}"
 }
-ShySync() {
-    case "$1" in
-        "history") tail -n0 -f $HISTFILE | while true; do read line
-            ShyPost arg "$line" cmd history SHELL $SHELL
-            echo $line
-        done;;
-    "input")
-        curl -s "${ctx_url}?cmd=input&arg=$READLINE_LINE" &>/dev/null
-        ;;
-    esac
+ShyWord() {
+    echo "$*"|sed -e 's/\ /%20/g' -e 's/\n/\\n/g'
+}
+ShyForm() {
+    while [ $# -gt 1 ]; do
+        echo -n "`ShyWord "$1"`=`ShyWord "$2"`"
+        shift 2 && [ $# -gt 1 ] && echo -n "&"
+    done
+}
+ShyGet() {
+    local data=`ShyForm "$@" SHELL "${SHELL}" pwd "${PWD}" sid "${ctx_sid}"`
+    curl -s "${ctx_url}?${data}"
 }
 Shy() {
     local ctx_res=`ShyPost cmd "$1" arg "$2"`
@@ -40,6 +48,18 @@ Shy() {
     esac
 }
 
+ShySync() {
+    case "$1" in
+        "history") tail -n0 -f $HISTFILE | while true; do read line
+            line=`ShyLine $line`
+            Shy history "$line"
+            echo $line
+        done;;
+        "input")
+            ShyGet arg "$READLINE_LINE" cmd "input" SHELL "$SHELL"
+        ;;
+    esac
+}
 
 ShyHistory() {
     case "$SHELL" in
@@ -52,12 +72,13 @@ ShyHistory() {
 }
 ShyLogout() {
     echo ${ctx_goodbye}
-    ShyPost cmd logout
+    Shy logout
 }
 ShyLogin() {
-    ctx_sid=`ShyPost cmd login pid "$$" pane "${TMUX_PANE}" hostname "$(hostname)" username "${USER}"`
+    HOST=`hostname` ctx_sid=`ShyPost cmd login pid "$$" pane "${TMUX_PANE}" hostname "${HOST}" username "${USER}"`
     echo ${ctx_welcome}
-    echo "sid: ${ctx_sid}"
+    echo "url: ${ctx_url}"
+    echo "sid: ${ctx_sid:0:6}"
     echo "pid: $$"
 }
 
