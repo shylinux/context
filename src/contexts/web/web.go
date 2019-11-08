@@ -996,12 +996,18 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								m.Cmd("nfs.copy", path.Join(m.Conf("web.upload", "path"), kind, code), p)
 							}
 						}
-
-						m.Append("size", kit.FmtSize(n))
-						m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
-						m.Append("type", kind)
-						m.Append("hash", name)
-						m.Table()
+						if !strings.HasPrefix(m.Option("agent"), "curl") {
+							m.Append("size", kit.FmtSize(n))
+							m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
+							m.Append("type", kind)
+							m.Append("hash", name)
+							m.Table()
+						} else {
+							m.Echo("code: %s\n", code)
+							m.Echo("hash: %s\n", name)
+							m.Echo("type: %s\n", kind)
+							m.Echo("size: %s\n", kit.FmtSize(n))
+						}
 					}
 				}
 			}

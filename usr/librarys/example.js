@@ -1080,6 +1080,14 @@ function Plugin(page, pane, field, inits, runs) {
             var list = option.querySelectorAll("input.temp")
             list.length > 0 && (option.removeChild(list[list.length-1].parentNode))
         }),
+        Rename: shy("命名", function() {
+            kit.prompt("控件名称", function(name) {
+                meta["help"] = name
+                kit.Selector(field, "legend", function(legend) {
+                    legend.innerHTML = meta.name+"("+meta.help+")"
+                })
+            })
+        }),
 
         Delete: shy("删除插件", function() {
             plugin.Prev().Plugin.Select(), field.parentNode.removeChild(field)
@@ -1244,8 +1252,9 @@ function Plugin(page, pane, field, inits, runs) {
             "返回": "Last",
             "清空": "clear",
             "克隆": "Clone",
+            "重命名": "Rename",
             "删除": "Delete",
-        }, ["返回", "清空", "克隆", "删除"], function(event, value, meta) {
+        }, ["返回", "清空", "重命名", "克隆", "删除"], function(event, value, meta) {
             return plugin._call(meta[value], event)
         }),
         onaction: shy("事件列表", {

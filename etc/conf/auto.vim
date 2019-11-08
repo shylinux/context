@@ -1,14 +1,21 @@
 
-let ctx_dev = (len($ctx_dev) > 1? $ctx_dev: "http://127.0.0.1:9095") . "/code/vim"
+let ctx_url = (len($ctx_dev) > 1? $ctx_dev: "http://127.0.0.1:9095") . "/code/vim"
+let ctx_head = "Content-Type: application/json"
+let ctx_sid = ""
 
 fun! ShyPost(arg)
-    return system("curl -s '" . g:ctx_dev . "' -H 'Content-Type: application/json' -d '" . json_encode(a:arg) . "' 2>/dev/null")
+    let a:arg["pwd"] = getcwd()
+    let a:arg["sid"] = g:ctx_sid
+    return system("curl -s '" . g:ctx_url . "' -H '" . g:ctx_head . "' -d '" . json_encode(a:arg) . "' 2>/dev/null")
 endfun
 
 fun! Shy(action, target)
-    let arg = {"arg": a:target, "cmd": a:action, "pwd": getcwd(), "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
+    if g:ctx_sid == ""
+        call ShyLogin()
+    endif
+    let arg = {"arg": a:target, "cmd": a:action}
     if a:action == "sync"
-        let cmd = {"tags": "tags", "bufs": "buffers", "regs": "registers", "marks": "marks"}
+        let cmd = {"tags": "tags", "fixs": "clist", "bufs": "buffers", "regs": "registers", "marks": "marks"}
         let arg[a:target] = execute(cmd[a:target])
     endif
 
@@ -19,12 +26,23 @@ fun! Shy(action, target)
     endif
 endfun
 
+fun! ShyLogout()
+    call Shy("logout", "")
+endfun
+fun! ShyLogin()
+    let arg = {"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
+    let g:ctx_sid = ShyPost(arg)
+endfun
+autocmd VimEnter * call ShyLogin()
+autocmd VimLeave * call ShyLogout()
+
 autocmd BufReadPost * call Shy("read", expand("<afile>"))
 autocmd BufWritePre * call Shy("write", expand("<afile>"))
 autocmd BufUnload * call Shy("close", expand("<afile>"))
 
-autocmd BufWritePost * call Shy("sync", "bufs")
 autocmd BufWritePost * call Shy("sync", "tags")
+autocmd BufWritePost * call Shy("sync", "fixs")
+autocmd BufWritePost * call Shy("sync", "bufs")
 autocmd BufWritePost * call Shy("sync", "regs")
 
 " autocmd BufWinEnter * call Shy("enter", expand("<afile>"))

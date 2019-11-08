@@ -887,8 +887,11 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					m.Cmdy("web.code.git", "", "sum", arg[1:])
 
 				case "trends":
-					m.Cmdy("web.code.git", "", "sum", "total", arg[1:])
 					// 提交记录
+					if len(arg) == 1 {
+						arg = append(arg, "2017-11-01")
+					}
+					m.Cmdy("web.code.git", "", "sum", "total", arg[1:])
 
 				case "submit":
 					// 提交代码

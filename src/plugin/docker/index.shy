@@ -1,11 +1,11 @@
 kit shell "命令行" private "ssh._route" _ "context" "find" "web.code" "zsh" \
 	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "" name cmd values list values find values tail values grep values init values terminal values history \
+	select "terminal" name cmd values list values find values tail values grep values init values terminal values history \
     exports path path \
 	text "" name txt \
     feature display editor \
-    button "搜索" \
+    button "搜索" action auto \
     button "返回" cb Last
 
 kit clip "粘贴板" private "web.code.tmux" "" "" "" "buffer" \
@@ -33,36 +33,36 @@ kit image "镜像" private "web.code.docker" "image" \
     feature detail "运行" "删除" "清理" \
     button "查看"
 
-kit container "容器" private "web.code.docker" "container" \
-	text "" name arg imports plugin_CONTAINER_ID \
-    exports CONTAINER_ID CONTAINER_ID \
-    feature detail "进入" "停止" "启动" "重启" "修改" "删除" "清理" \
-    button "查看" action auto
-
-kit command "命令" private "web.code.docker" "container" \
-	text "" name tag imports plugin_CONTAINER_ID \
-	text "pwd" name cmd view long \
-    button "执行"
+kit volume "存储" private "web.code.docker" "volume" \
+	text "" name arg imports plugin_VOLUME_NAME \
+    exports VOLUME_NAME VOLUME_NAME \
+    button "查看"
 
 kit network "网络" private "web.code.docker" "network" \
 	text "" name arg imports plugin_NETWORK_ID action auto \
     exports NETWORK_ID NETWORK_ID \
     button "查看"
 
-kit volume "存储" private "web.code.docker" "volume" \
-	text "" name arg imports plugin_VOLUME_NAME \
-    exports VOLUME_NAME VOLUME_NAME \
-    button "查看"
+kit command "命令" private "web.code.docker" "container" \
+	text "" name tag imports plugin_CONTAINER_ID \
+	text "pwd" name cmd view long \
+    button "执行"
+
+kit container "容器" private "web.code.docker" "container" \
+	text "" name arg imports plugin_CONTAINER_ID \
+    exports CONTAINER_ID CONTAINER_ID \
+    feature detail "进入" "停止" "启动" "重启" "修改" "删除" "清理" \
+    button "查看" action auto
 
 kit git "记录" private "ssh._route" _ "web.code.git" \
 	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "" name cmd values diff values status values commit values branch values pull values push values sum values init \
+	select "status" name cmd values diff values status values commit values branch values pull values push values sum values init \
     exports branch branch \
-    button "查看"
+    button "查看" action auto
 
 kit vim "编辑器" private "ssh._route" _ "web.code.vim" \
 	text "" name pod imports plugin_pod \
-	select "" name cmd values opens values bufs values regs values tags \
-    button "查看"
+	select "bufs" name cmd values editor values opens values tags values fixs values bufs values regs \
+    button "查看" action auto
 

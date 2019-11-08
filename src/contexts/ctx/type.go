@@ -257,7 +257,7 @@ func (m *Message) Push(key interface{}, arg ...interface{}) *Message {
 				m.Add("append", "key", key)
 				key = "value"
 			}
-			m.Add("append", key, kit.Format(kit.Chain(arg[0], key)))
+			m.Add("append", key, kit.Select(" ", kit.Format(kit.Chain(arg[0], key))))
 		}
 	}
 	return m
@@ -362,8 +362,9 @@ func (m *Message) Split(str string, arg ...string) *Message {
 			}
 			continue
 		}
-		for i, v := range kit.Split(l, c, len(heads)) {
-			m.Add("append", heads[i], v)
+		ls := kit.Split(l, c, len(heads))
+		for i, v := range heads {
+			m.Add("append", v, kit.Select("", ls, i))
 		}
 	}
 	m.Table()
