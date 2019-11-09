@@ -1,12 +1,18 @@
-kit shell "命令行" private "ssh._route" _ "context" "find" "web.code" "zsh" \
+kit dir "目录" private "ssh._route" _ "context" "find" "web.code" "zsh" \
 	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "terminal" name cmd values list values find values tail values grep values init values terminal values history \
+	select "" name cmd values list values find values tail values grep values init action auto \
     exports path path \
 	text "" name txt \
     feature display editor \
     button "搜索" action auto \
     button "返回" cb Last
+
+kit cli "命令行" private "web.code.zsh" \
+	text "" name dir imports plugin_path action auto \
+	select "terminal" values terminal values history action auto \
+    feature detail "prune" "复制" "下载" \
+    button "查看" action auto
 
 kit clip "粘贴板" private "web.code.tmux" "" "" "" "buffer" \
 	text "" name tag imports plugin_buffer action auto \
@@ -57,12 +63,12 @@ kit container "容器" private "web.code.docker" "container" \
 kit git "记录" private "ssh._route" _ "web.code.git" \
 	text "" name pod imports plugin_pod \
 	text "" name dir imports plugin_path action auto \
-	select "status" name cmd values diff values status values commit values branch values pull values push values sum values init \
+	select "status" name cmd values diff values status values commit values branch values remote values pull values push values sum values init \
     exports branch branch \
     button "查看" action auto
 
 kit vim "编辑器" private "ssh._route" _ "web.code.vim" \
 	text "" name pod imports plugin_pod \
-	select "bufs" name cmd values editor values opens values tags values fixs values bufs values regs \
+	select "bufs" name cmd values editor values opens values cmds values txts values tags values fixs values bufs values regs values marks \
     button "查看" action auto
 

@@ -17,6 +17,16 @@ prepare:
 	@go get github.com/skip2/go-qrcode
 	@go get gopkg.in/gomail.v2
 
+gotags:
+	gotags -f golang.tags -R $(GOROOT)/src
+tags:
+	gotags -f ctx.tags -R src
+tool:
+	go get github.com/nsf/gocode
+	go get github.com/jstemmer/gotags
+	go get github.com/bradfitz/goimports
+	go get github.com/Go-zh/tools/cmd/gopls
+
 linux:
 	GOPATH=$(PWD):$(GOPATH) GOOS=linux $(BUILD)$(TARGET).linux.$(shell go env GOARCH) $(BENCH)
 linux_arm:

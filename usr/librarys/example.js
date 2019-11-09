@@ -1493,7 +1493,7 @@ function Output(plugin, type, msg, cb, target, option) {
                                     }, true)
                                     return
                                 }
-                            }}}]).input, text.focus(), text.setSelectionRange(0, -1)): output[meta[item]]? output[meta[item]](event): plugin.Run(event, [line[exports[1]].trim(), meta[item]||item], function(msg) {
+                            }}}]).input, text.focus(), text.setSelectionRange(0, -1)): output[meta[item]]? output[meta[item]](event): plugin.Run(event, [(line[exports[1]]||"").trim(), meta[item]||item], function(msg) {
                                 console.log(msg)
                             })
 

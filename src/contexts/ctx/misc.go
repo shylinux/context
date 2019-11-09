@@ -1,14 +1,14 @@
 package ctx
 
 import (
+	"encoding/csv"
 	"fmt"
 	"os"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
-
-	"sort"
 	"toolkit"
 )
 
@@ -502,4 +502,79 @@ func (m *Message) ToHTML(style string) string {
 		result = append(result, "</code></pre>")
 	}
 	return strings.Join(result, "")
+}
+
+func (m *Message) Grow(key string, args interface{}, data interface{}) interface{} {
+	cache := m.Confm(key, args)
+	if cache == nil {
+		cache = map[string]interface{}{}
+	}
+	meta, ok := cache["meta"].(map[string]interface{})
+	if !ok {
+		meta = map[string]interface{}{}
+	}
+	list, _ := cache["list"].([]interface{})
+
+	list = append(list, data)
+	if len(list) > kit.Int(kit.Select(m.Conf("cache", "limit"), meta["limit"])) {
+		offset := kit.Int(meta["offset"])
+		least := kit.Int(kit.Select(m.Conf("cache", "least"), meta["least"]))
+
+		name := kit.Select(m.Option("cache.store"), meta["store"])
+		f, e := os.OpenFile(name, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+		m.Assert(e)
+		defer f.Close()
+		s, e := f.Stat()
+		m.Assert(e)
+
+		keys := []string{}
+		w := csv.NewWriter(f)
+		if s.Size() == 0 {
+			for k := range list[0].(map[string]interface{}) {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			w.Write(keys)
+			w.Flush()
+			s, e = f.Stat()
+		} else {
+			r := csv.NewReader(f)
+			keys, e = r.Read()
+		}
+
+		record, _ := meta["record"].([]interface{})
+		meta["record"] = append(record, map[string]interface{}{
+			"time":     m.Time(),
+			"offset":   offset,
+			"position": s.Size(),
+		})
+
+		end := len(list) - least
+		for i, v := range list {
+			if i >= end {
+				break
+			}
+
+			val := v.(map[string]interface{})
+
+			values := []string{}
+			for _, k := range keys {
+				values = append(values, kit.Format(val[k]))
+			}
+			w.Write(values)
+
+			if i < least {
+				list[i] = list[end+i]
+			}
+		}
+
+		m.Log("info", "save %s offset %v+%v", name, offset, end)
+		meta["offset"] = offset + end
+		list = list[:least]
+		w.Flush()
+	}
+	cache["meta"] = meta
+	cache["list"] = list
+	m.Conf(key, args, cache)
+	return list
 }

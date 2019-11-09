@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"unicode"
 )
 
 type TERM interface {
@@ -51,11 +52,11 @@ func Create(p string) (*os.File, string, error) {
 func Split(str string, c byte, n int) []string {
 	res := []string{}
 	for i, j := 0, 0; i < len(str); i++ {
-		if str[i] == c {
+		if str[i] == c || c == ' ' && unicode.IsSpace(rune(str[i])) {
 			continue
 		}
 		for j = i; j < len(str); j++ {
-			if str[j] == c {
+			if str[j] == c || c == ' ' && unicode.IsSpace(rune(str[j])) {
 				break
 			}
 		}

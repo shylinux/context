@@ -317,6 +317,15 @@ func Map(v interface{}, random string, args ...interface{}) map[string]interface
 				fun(i, val)
 			}
 		}
+	case func(map[string]interface{}, int, map[string]interface{}):
+		meta := value["meta"].(map[string]interface{})
+		list := value["list"].([]interface{})
+
+		for i := 0; i < len(list); i++ {
+			if val, ok := list[i].(map[string]interface{}); ok {
+				fun(meta, i, val)
+			}
+		}
 	case func(string, []interface{}):
 		for k, v := range value {
 			if val, ok := v.([]interface{}); ok {
@@ -365,6 +374,23 @@ func Map(v interface{}, random string, args ...interface{}) map[string]interface
 					if val, ok := v.(map[string]interface{}); ok {
 						fun(k, i, val)
 					}
+				}
+			}
+		}
+	case func(string, map[string]interface{}, int, map[string]interface{}):
+		keys := make([]string, 0, len(value))
+		for k, _ := range value {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			v := value[k].(map[string]interface{})
+			meta := v["meta"].(map[string]interface{})
+			list := v["list"].([]interface{})
+			for i, v := range list {
+				if val, ok := v.(map[string]interface{}); ok {
+					fun(k, meta, i, val)
 				}
 			}
 		}
