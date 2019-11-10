@@ -403,7 +403,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"data": {Name: "data show|save|create|insert", Help: "数据", Form: map[string]int{"format": 1, "fields": -1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"data": {Name: "data show|insert|update [table [index] [key value]...]", Help: "数据", Form: map[string]int{"format": 1, "fields": -1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				arg = append(arg, "show")
 			}
@@ -421,7 +421,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				case 2: // 关系表
 					hide := map[string]bool{"create_time": true, "update_time": true, "extra": true}
-					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list"}, func(index int, value map[string]interface{}) {
+					m.Grows("flow", []string{m.Option("river"), "data", arg[1]}, func(meta map[string]interface{}, index int, value map[string]interface{}) {
 						for k := range value {
 							if !hide[k] {
 								hide[k] = false
@@ -440,7 +440,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					if m.Meta["append"] = []string{"id", "when"}; m.Has("fields") {
 						keys = kit.Trans(m.Optionv("fields"))
 					}
-					m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list"}, func(index int, value map[string]interface{}) {
+					m.Grows("flow", []string{m.Option("river"), "data", arg[1]}, func(meta map[string]interface{}, index int, value map[string]interface{}) {
 						for _, k := range keys {
 							m.Push(k, kit.Format(value[k]))
 						}
@@ -487,7 +487,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					kit.Marshal(data["list"], path.Join(m.Conf("ssh.data", "path"), m.Option("river"), v, "/list.csv"))
 
 					l := len(data["list"].([]interface{}))
-					m.Push("table", v).Push("count", l)
+					m.Push("table", v).Push("count", l+kit.Int(kit.Chain(data["meta"], "offset")))
 					m.Log("info", "save table %s:%s %d", m.Option("river"), v, l)
 				}
 				m.Table()
@@ -507,6 +507,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						"create_user": m.Option("username"),
 						"create_time": m.Time(),
 						"create_tmpl": tmpl,
+						"store":       path.Join(m.Conf("ssh.data", "path"), m.Option("river"), arg[1], "/auto.csv"),
+						"limit":       "30",
+						"least":       "10",
 					},
 					"list": []interface{}{},
 				})
@@ -543,7 +546,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				data["id"] = id
 
 				m.Log("info", "insert %s:%s %s", m.Option("river"), arg[1], kit.Format(data))
-				m.Confv("flow", []string{m.Option("river"), "data", arg[1], "list", "-2"}, data)
+				m.Grow("flow", []string{m.Option("river"), "data", arg[1]}, data)
 				m.Cmdy("ssh.data", "save", arg[1])
 
 			case "update":

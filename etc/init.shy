@@ -19,7 +19,7 @@
 # 应用配置
 ~code
     config load tmp/zsh.json zsh
-    config load tmp/vim.json vim
+    config load tmp/vim/vim.json vim
 
 # 终端配置
 ~cli

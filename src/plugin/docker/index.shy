@@ -67,8 +67,7 @@ kit git "记录" private "ssh._route" _ "web.code.git" \
     exports branch branch \
     button "查看" action auto
 
-kit vim "编辑器" private "ssh._route" _ "web.code.vim" \
-	text "" name pod imports plugin_pod \
-	select "bufs" name cmd values editor values opens values cmds values txts values tags values fixs values bufs values regs values marks \
+kit vim "编辑器" private "web.code.vim" \
+	select "bufs" name cmd values editor values prune values opens values cmds values txts values bufs values regs values marks values tags values fixs \
     button "查看" action auto
 

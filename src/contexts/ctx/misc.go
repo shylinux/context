@@ -542,16 +542,18 @@ func (m *Message) Grow(key string, args interface{}, data interface{}) interface
 			keys, e = r.Read()
 		}
 
+		count := len(list) - least
 		record, _ := meta["record"].([]interface{})
 		meta["record"] = append(record, map[string]interface{}{
 			"time":     m.Time(),
 			"offset":   offset,
 			"position": s.Size(),
+			"count":    count,
+			"file":     name,
 		})
 
-		end := len(list) - least
 		for i, v := range list {
-			if i >= end {
+			if i >= count {
 				break
 			}
 
@@ -564,12 +566,12 @@ func (m *Message) Grow(key string, args interface{}, data interface{}) interface
 			w.Write(values)
 
 			if i < least {
-				list[i] = list[end+i]
+				list[i] = list[count+i]
 			}
 		}
 
-		m.Log("info", "save %s offset %v+%v", name, offset, end)
-		meta["offset"] = offset + end
+		m.Log("info", "save %s offset %v+%v", name, offset, count)
+		meta["offset"] = offset + count
 		list = list[:least]
 		w.Flush()
 	}
@@ -577,4 +579,90 @@ func (m *Message) Grow(key string, args interface{}, data interface{}) interface
 	cache["list"] = list
 	m.Conf(key, args, cache)
 	return list
+}
+func (m *Message) Grows(key string, args interface{}, cb interface{}) map[string]interface{} {
+	cache := m.Confm(key, args)
+	if cache == nil {
+		return nil
+	}
+	meta, ok := cache["meta"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	list, ok := cache["list"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	offset := kit.Int(kit.Select("0", m.Option("cache.offset")))
+	limit := kit.Int(kit.Select("10", m.Option("cache.limit")))
+	current := kit.Int(meta["offset"])
+	end := current + len(list) - offset
+	begin := end - limit
+
+	data := make([]interface{}, 0, limit)
+	m.Log("info", "read current %v+%d %v-%v", current, len(list), begin, end)
+	if begin < current {
+		store, _ := meta["record"].([]interface{})
+		for s := len(store) - 1; s > -1; s-- {
+			item, _ := store[s].(map[string]interface{})
+			line := kit.Int(item["offset"])
+			m.Log("info", "check history %v %v %v", s, line, item)
+			if begin < line && s > 0 {
+				continue
+			}
+
+			for ; s < len(store); s++ {
+				if begin >= end {
+					break
+				}
+				item, _ := store[s].(map[string]interface{})
+				if line+kit.Int(item["count"]) < begin {
+					continue
+				}
+
+				name := kit.Format(item["file"])
+				pos := kit.Int(item["position"])
+				line := kit.Int(item["offset"])
+				m.Log("info", "load history %v %v %v", s, line, item)
+				if f, e := os.Open(name); m.Assert(e) {
+					defer f.Close()
+					r := csv.NewReader(f)
+					heads, _ := r.Read()
+					m.Log("info", "load head %v", heads)
+
+					f.Seek(int64(pos), os.SEEK_SET)
+					r = csv.NewReader(f)
+					for i := line; i < end; i++ {
+						lines, e := r.Read()
+						if e != nil {
+							break
+						}
+
+						if i >= begin {
+							item := map[string]interface{}{}
+							for i := range heads {
+								item[heads[i]] = lines[i]
+							}
+							m.Log("info", "load line %v %v %v", i, len(data), item)
+							data = append(data, item)
+							begin = i + 1
+						} else {
+							m.Log("info", "skip line %v", i)
+						}
+					}
+				}
+			}
+			break
+		}
+	}
+
+	if begin < current {
+		begin = current
+	}
+	for i := begin - current; i < end-current; i++ {
+		m.Log("info", "cache data %v %v", i+current, list[i])
+		data = append(data, list[i])
+	}
+	return kit.Map(map[string]interface{}{"meta": meta, "list": data}, "", cb)
 }

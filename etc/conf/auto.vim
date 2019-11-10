@@ -5,28 +5,57 @@ let ctx_sid = ""
 
 fun! ShyPost(arg)
     let a:arg["buf"] = bufname("%")
+    let a:arg["buf"] = bufname("%")
     let a:arg["pwd"] = getcwd()
     let a:arg["sid"] = g:ctx_sid
     for k in keys(a:arg)
         let a:arg[k] = substitute(a:arg[k], "'", "XXXXXsingleXXXXX", "g")
     endfor
-
-    let data = json_encode(a:arg)
-    return system("curl -s '" . g:ctx_url . "' -H '" . g:ctx_head . "' -d '" . data . "' 2>/dev/null")
+    return system("curl -s '" . g:ctx_url . "' -H '" . g:ctx_head . "' -d '" .  json_encode(a:arg) . "' 2>/dev/null")
 endfun
 
 fun! ShySync(target)
     if bufname("%") == "ControlP"
         return
     end
-    if a:target == "exec"
-        call ShyPost({"cmd": "exec", "arg": getcmdline()})
+
+    if a:target == "read" || a:target == "write"
+        call ShyPost({"cmd": a:target, "arg": expand("<afile>")})
+    elseif a:target == "exec"
+        call ShyPost({"cmd": a:target, "arg": getcmdline()})
     elseif a:target == "insert"
-        call ShyPost({"cmd": "insert", "arg": getreg("."), "row": line("."), "col": col(".")})
+        call ShyPost({"cmd": a:target, "arg": getreg("."), "row": line("."), "col": col(".")})
     else
-        let cmd = {"marks": "marks", "tags": "tags", "fixs": "clist", "bufs": "buffers", "regs": "registers"}
+        let cmd = {"bufs": "buffers", "regs": "registers", "marks": "marks", "tags": "tags", "fixs": "clist"}
         call ShyPost({"cmd": "sync", "arg": a:target, "sub": execute(cmd[a:target])})
     endif
+endfun
+
+fun! ShyCheck(target)
+    if a:target == "login"
+        if g:ctx_sid == ""
+            let arg = {"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
+            let g:ctx_sid = ShyPost(arg)
+        endif
+    elseif a:target == "exec"
+        let cmd = getcmdline()
+        if cmd != ""
+            call ShySync("exec")
+            if getcmdline() == "w"
+                call ShySync("regs")
+                call ShySync("marks")
+                call ShySync("tags")
+            endif
+        endif
+    elseif a:target == "fixs"
+        let l = len(getqflist())
+        if l > 0
+            execute "copen " . (l > 10? 10: l + 1)
+            call ShySync("fixs")
+		else
+            cclose
+        end
+    end
 endfun
 
 fun! Shy(action, target)
@@ -38,47 +67,29 @@ fun! Shy(action, target)
     endif
 endfun
 
-fun! ShyCheck(target)
-    if a:target == "exec"
-        let cmd = getcmdline()
-        if cmd != ""
-            call ShySync("exec")
-            if getcmdline() == "w"
-                call ShySync("tags")
-                call ShySync("regs")
-                call ShySync("marks")
-            endif
-        endif
-    elseif a:target == "fixs"
-        if len(getqflist()) > 1
-            copen
-            call ShySync("fixs")
-		else
-            cclose
-        end
-    end
-endfun
 fun! ShyLogout()
     call Shy("logout", "")
-endfun
-fun! ShyLogin()
-    let arg = {"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
-    let g:ctx_sid = ShyPost(arg)
+    let g:ctx_sid = ""
 endfun
 
-call ShyLogin()
+call ShyCheck("login")
 autocmd VimLeave * call ShyLogout()
+
 autocmd InsertLeave * call ShySync("insert")
 autocmd CmdlineLeave * call ShyCheck("exec")
-autocmd QuickFixCmdPost * call ShyCheck("fixs")
-
-autocmd BufReadPost * call Shy("read", expand("<afile>")) | call ShySync("bufs")
+autocmd BufReadPost * call Shy("read", expand("<afile>"))
+autocmd BufReadPost * call ShySync("bufs")
 autocmd BufWritePre * call Shy("write", expand("<afile>"))
+
+autocmd QuickFixCmdPost * call ShyCheck("fixs")
+" call ShySync("bufs")
+call ShySync("regs")
+call ShySync("marks")
+call ShySync("tags")
+" call ShySync("fixs")
+
 " autocmd BufUnload * call Shy("close", expand("<afile>")) | call ShySync("bufs")
 " autocmd CmdlineLeave * 
-call ShySync("tags")
-
-
 " autocmd CompleteDone * call Shy("sync", "regs")
 " autocmd InsertEnter * call Shy("sync", "regs")
 " autocmd CmdlineEnter * call Shy("sync", "regs")
@@ -100,6 +111,5 @@ call ShySync("tags")
 " endfunction
 " call ColorNext()
 " command! NN call ColorNext()<CR>
-" command! RR wa | source ~/.vimrc |e
 " command! SS mksession! etc/session.vim
 

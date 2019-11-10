@@ -285,11 +285,6 @@ func Map(v interface{}, random string, args ...interface{}) map[string]interface
 	}
 
 	switch fun := args[0].(type) {
-	case func(map[string]interface{}):
-		if len(value) == 0 {
-			return nil
-		}
-		fun(value)
 	case func(int, string):
 		for i, v := range table {
 			fun(i, Format(v))
@@ -310,20 +305,16 @@ func Map(v interface{}, random string, args ...interface{}) map[string]interface
 				break
 			}
 		}
+	case func(map[string]interface{}):
+		if len(value) == 0 {
+			return nil
+		}
+		fun(value)
 
 	case func(int, map[string]interface{}):
 		for i := 0; i < len(table); i++ {
 			if val, ok := table[i].(map[string]interface{}); ok {
 				fun(i, val)
-			}
-		}
-	case func(map[string]interface{}, int, map[string]interface{}):
-		meta := value["meta"].(map[string]interface{})
-		list := value["list"].([]interface{})
-
-		for i := 0; i < len(list); i++ {
-			if val, ok := list[i].(map[string]interface{}); ok {
-				fun(meta, i, val)
 			}
 		}
 	case func(string, []interface{}):
@@ -377,7 +368,7 @@ func Map(v interface{}, random string, args ...interface{}) map[string]interface
 				}
 			}
 		}
-	case func(string, map[string]interface{}, int, map[string]interface{}):
+	case func(key string, meta map[string]interface{}, index int, value map[string]interface{}):
 		keys := make([]string, 0, len(value))
 		for k, _ := range value {
 			keys = append(keys, k)
@@ -392,6 +383,15 @@ func Map(v interface{}, random string, args ...interface{}) map[string]interface
 				if val, ok := v.(map[string]interface{}); ok {
 					fun(k, meta, i, val)
 				}
+			}
+		}
+	case func(meta map[string]interface{}, index int, value map[string]interface{}):
+		meta := value["meta"].(map[string]interface{})
+		list := value["list"].([]interface{})
+
+		for i := 0; i < len(list); i++ {
+			if val, ok := list[i].(map[string]interface{}); ok {
+				fun(meta, i, val)
 			}
 		}
 	}

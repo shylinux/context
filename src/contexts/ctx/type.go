@@ -354,9 +354,9 @@ func (m *Message) Split(str string, arg ...string) *Message {
 				if len(l) < v {
 					m.Add("append", heads[i], "")
 				} else if i == len(pos)-1 {
-					m.Add("append", heads[i], l[v:])
+					m.Add("append", heads[i], strings.TrimSpace(l[v:]))
 				} else {
-					m.Add("append", heads[i], l[v:pos[i+1]])
+					m.Add("append", heads[i], strings.TrimSpace(l[v:pos[i+1]]))
 				}
 			}
 			continue

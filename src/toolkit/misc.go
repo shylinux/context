@@ -259,3 +259,32 @@ func IndexOf(list interface{}, value string) int {
 	}
 	return -1
 }
+
+func Shortm(data map[string]interface{}, keys ...string) map[string]interface{} {
+	for _, k := range keys {
+		switch k {
+		case "times":
+			ls := strings.Split(Format(data["time"]), " ")
+			if len(ls) > 1 {
+				data["times"] = ls[1]
+			} else {
+				data["times"] = data["time"]
+			}
+		case "files":
+			data["files"] = path.Base(Format(data["file"]))
+		case "sids":
+			data["sids"] = Short(data["sid"], 6)
+		}
+	}
+	return data
+}
+func Short(arg interface{}, l int) string {
+	switch val := arg.(type) {
+	case string:
+		if len(val) > l {
+			return val[:l]
+		}
+		return val
+	}
+	return ""
+}
