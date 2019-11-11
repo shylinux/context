@@ -4,6 +4,8 @@ import (
 	"contexts/ctx"
 	"contexts/web"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -59,6 +61,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				"limit":  "30",
 				"least":  "10",
 			}},
+			"free": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "time sid type total used free shared buffer available",
+				"store":  "var/tmp/vim/opens.csv",
+				"limit":  "30",
+				"least":  "10",
+			}},
+			"df": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "fs size used rest per pos",
+			}},
+			"ps": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "PID TIME COMMAND",
+			}},
+			"env": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "sid name value",
+			}},
 		}},
 		"vim": {Name: "vim", Help: "编辑器", Value: map[string]interface{}{
 			"editor": map[string]interface{}{"meta": map[string]interface{}{
@@ -109,7 +126,14 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 	Commands: map[string]*ctx.Command{
 		"/zsh": {Name: "/zsh sid pwd cmd arg", Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			cmd = strings.TrimPrefix(cmd, "/")
+			if f, _, e := m.Optionv("request").(*http.Request).FormFile("sub"); e == nil {
+				defer f.Close()
+				if b, e := ioutil.ReadAll(f); e == nil {
+					m.Option("sub", string(b))
+				}
+			}
 			m.Log("info", "%v %v %v %v", cmd, m.Option("cmd"), m.Option("arg"), m.Option("sub"))
+
 			switch m.Option("cmd") {
 			case "login":
 				name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
@@ -149,7 +173,58 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"cmd":  m.Option("arg"),
 					"pwd":  m.Option("pwd"),
 				})
-				return
+			case "sync":
+				m.Conf(cmd, []string{m.Option("arg"), "hash", m.Option("sid")})
+				switch m.Option("arg") {
+				case "df":
+					m.Split(m.Option("sub"), " ", "6", "fs size used rest per pos").Table(func(index int, value map[string]string) {
+						if index > 0 {
+							m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+								"fs":   value["fs"],
+								"size": value["size"],
+								"used": value["used"],
+								"rest": value["rest"],
+								"per":  value["per"],
+								"pos":  value["pos"],
+							})
+						}
+					})
+				case "ps":
+					m.Split(m.Option("sub"), " ").Table(func(index int, value map[string]string) {
+						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+							"PID":     value["PID"],
+							"TIME":    value["TIME"],
+							"COMMAND": value["COMMAND"],
+						})
+					})
+				case "env":
+					m.Log("fuck", "what %v fuck", m.Option("sub"))
+					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), "=", "2", "name value").Table(func(index int, value map[string]string) {
+						m.Log("fuck", "what %v fuck", value)
+						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+							"name":  value["name"],
+							"value": value["value"],
+						})
+					})
+				case "free":
+					sub := strings.Replace(m.Option("sub"), "    ", "type", 1)
+					m.Split(sub, " ", "7", "type total used free shared buffer available").Table(func(index int, value map[string]string) {
+						if index > 0 {
+							m.Confv(cmd, []string{m.Option("arg"), "list", "-2"}, map[string]interface{}{
+								"time":      m.Time(),
+								"sid":       m.Option("sid"),
+								"type":      value["type"],
+								"total":     value["total"],
+								"used":      value["used"],
+								"free":      value["free"],
+								"shared":    value["shared"],
+								"buffer":    value["buffer"],
+								"available": value["available"],
+							})
+						}
+					})
+				}
+				m.Set("append").Set("result")
 			}
 			return
 		}},
@@ -197,13 +272,35 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					m.Grows(cmd, arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
 						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 					})
-					if m.Appends("times") {
+					if m.Appends("index") {
+						m.Sort("index", "int_r")
+					} else if m.Appends("time") {
+						m.Sort("time", "time_r")
+					} else if m.Appends("times") {
 						m.Sort("times", "time_r")
 					}
-					if m.Appends("time") {
-						m.Sort("time", "time_r")
-					}
 					m.Table()
+				case "env", "ps", "df":
+					if len(arg) > 3 {
+						arg[3] = strings.Join(arg[3:], " ")
+					}
+					fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 3), " ")
+					m.Confm(cmd, []string{arg[0], "hash"}, func(key string, index int, value map[string]interface{}) {
+						if value["sid"] = key; len(arg) == 1 || arg[1] == "" || strings.HasPrefix(kit.Format(value[arg[1]]), arg[2]) {
+							m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
+						}
+					})
+					m.Table()
+				case "free":
+					if len(arg) > 3 {
+						arg[3] = strings.Join(arg[3:], " ")
+					}
+					m.Option("cache.limit", kit.Select("10", arg, 1))
+					m.Option("cache.offset", kit.Select("0", arg, 2))
+					fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 3), " ")
+					m.Grows(cmd, arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
+						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
+					})
 
 				case "init":
 					m.Cmd("cli.system", m.Confv("package", "upadte"))
@@ -749,7 +846,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				switch m.Option("arg") {
 				case "bufs":
 					m.Split(strings.TrimSpace(m.Option("sub")), " ", "5", "id tag name some line").Table(func(index int, value map[string]string) {
-						m.Conf("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"buf":  value["id"],
 							"tag":  value["tag"],
 							"file": strings.TrimSuffix(strings.TrimPrefix(value["name"], "\""), "\""),
@@ -758,23 +855,24 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					})
 				case "regs":
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n--- Registers ---\n"), " ", "2", "name word").Table(func(index int, value map[string]string) {
-						m.Conf("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"word": strings.Replace(strings.Replace(value["word"], "^I", "\t", -1), "^J", "\n", -1),
 							"reg":  strings.TrimPrefix(value["name"], "\""),
 						})
 					})
 				case "marks":
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "4").Table(func(index int, value map[string]string) {
-						m.Conf("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"mark": value["mark"],
 							"line": value["line"],
 							"col":  value["col"],
 							"file": value["file/text"],
 						})
+						hello
 					})
 				case "tags":
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "6").Table(func(index int, value map[string]string) {
-						m.Conf("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"tag":  value["tag"],
 							"line": value["line"],
 							"file": value["in file/text"],
@@ -786,7 +884,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					}
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "3", "id file word").Table(func(index int, value map[string]string) {
 						vs := strings.Split(kit.Format(value["file"]), ":")
-						m.Conf("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"fix":  value["id"],
 							"file": vs[0],
 							"line": vs[1],

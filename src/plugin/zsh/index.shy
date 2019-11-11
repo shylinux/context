@@ -6,6 +6,30 @@ kit terminal "终端" private "web.code.zsh" "" terminal \
 kit history "命令" private "web.code.zsh" "" history \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
-    text "times sids cmd pwd" name fields \
+    text "times sids index cmd pwd" name fields \
+    button "查看" action auto
+
+kit df "磁盘" private "web.code.zsh" "" df \
+    text "fs" name limit view tiny \
+    text "" name offset view tiny \
+    text "sids fs size used rest per pos" name fields \
+    button "查看" action auto
+
+kit ps "进程" private "web.code.zsh" "" ps \
+    text "COMMAND" name limit view tiny \
+    text "" name offset view tiny \
+    text "sids PID TIME COMMAND" name fields \
+    button "查看" action auto
+
+kit env "环境" private "web.code.zsh" "" env \
+    text "name" name limit view tiny \
+    text "" name offset view tiny \
+    text "sids name value" name fields \
+    button "查看" action auto
+
+kit free "内存" private "web.code.zsh" "" free \
+    text "10" name limit view tiny \
+    text "0" name offset view tiny \
+    text "times sids type total used free" name fields \
     button "查看" action auto
 

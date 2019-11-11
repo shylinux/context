@@ -49,13 +49,30 @@ ShyDownload() {
     curl "${ctx_dev}/download/$1"
 }
 ShyUpdate() {
-    curl "${ctx_dev}/publish/$1"
+    curl "${ctx_dev}/publish/$1" > $1
 }
 ShyUpload() {
     curl "${ctx_dev}/upload" -F "upload=@$1"
 }
+ShyFuck() {
+    local TEMP=`mktemp /tmp/tmp.XXXXXX` && $@ > $TEMP
+    local data=`ShyForm cmd sync arg $1 SHELL "${SHELL}" pwd "${PWD}" sid "${ctx_sid}"`
+    curl "${ctx_url}?$data" -F "sub=@$TEMP"
+}
 ShySync() {
     case "$1" in
+        "df")
+            ShyFuck df
+            ;;
+        "ps")
+            ShyFuck ps
+            ;;
+        "env")
+            ShyFuck env
+            ;;
+        "free")
+            ShyFuck free
+            ;;
         "historys")
             ctx_end=`history|tail -n1|awk '{print $1}'`
             ctx_tail=`expr $ctx_end - $ctx_begin`
@@ -79,6 +96,18 @@ ShySync() {
     esac
 }
 
+ShySyncs() {
+    case "$1" in
+        "base")
+            ShySync df
+            ShySync env
+            ShySync free
+            ShySync historys
+            ;;
+        *)
+    esac
+
+}
 ShyHistory() {
     case "$SHELL" in
         "/bin/zsh")
@@ -101,6 +130,7 @@ Shy() {
 
 ShyLogout() {
     echo ${ctx_goodbye}
+    sleep 1
     Shy logout
 }
 ShyLogin() {
@@ -116,12 +146,12 @@ ShyInit() {
         "/bin/zsh");;
         *)
             ctx_begin=`history|tail -n1|awk '{print $1}'`
-            bind -x '"\C-t":ShySync historys'
+            bind -x '"\C-t":ShySyncs base'
             # bind -x '"\C-gl":ShySync input'
-            PS1="\!-\t[\u@\h]\W\$ "
+            # PS1="\!-\t[\u@\h]\W\$ "
+            PS1="\!-\t\$ "
             ;;
     esac
-
 }
 
 ShyInit && ShyLogin && trap ShyLogout EXIT
