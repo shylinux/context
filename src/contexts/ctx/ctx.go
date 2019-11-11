@@ -88,9 +88,12 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 	Configs: map[string]*Config{
 		"help": &Config{Name: "help", Value: map[string]interface{}{
 			"index": []interface{}{
+				"^_^      欢迎来到云境世界      ^_^",
 				"^_^  Welcome to Context world  ^_^",
 				"V2.1: Miss You Forever",
 				"Date: 2019.10.29 13:14:21",
+				"From: 2017.11.01 00:08:21",
+				"Meet: shylinuxc@gmail.com",
 				"More: https://shylinux.com",
 				"More: https://github.com/shylinux/context",
 			},

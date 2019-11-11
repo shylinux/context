@@ -10,7 +10,7 @@ kit dir "目录" private "ssh._route" _ "context" "find" "web.code" "zsh" \
 
 kit cli "命令行" private "web.code.zsh" \
 	text "" name dir imports plugin_path action auto \
-	select "terminal" values terminal values history action auto \
+	select "terminal" values terminal values prune values history action auto \
     feature detail "prune" "复制" "下载" \
     button "查看" action auto
 

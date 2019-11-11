@@ -26,26 +26,26 @@ fun tips "便签" private \
 end
 
 kit editor "编辑器" private "web.code.vim" editor \
-    text "times status pid pane" name fields \
+    text "times sids status pid pane" name fields \
     button "查看" action auto
 
 kit opens "文件记录" private "web.code.vim" opens \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
-    text "times action files" name fields \
+    text "times sids action files" name fields \
     button "查看" action auto
 
 kit cmds "命令记录" private "web.code.vim" cmds \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
-    text "times cmd files" name fields \
+    text "times sids cmd files" name fields \
     exports vim_word cmd \
     button "查看" action auto
 
 kit txts "插入记录" private "web.code.vim" txts \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
-    text "times word files" name fields \
+    text "times sids word files line" name fields \
     exports vim_word word \
     button "查看" action auto
 

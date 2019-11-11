@@ -37,6 +37,11 @@ fun! ShyCheck(target)
             let arg = {"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
             let g:ctx_sid = ShyPost(arg)
         endif
+    elseif a:target == "cache"
+        call ShySync("bufs")
+        call ShySync("regs")
+        call ShySync("marks")
+        call ShySync("tags")
     elseif a:target == "exec"
         let cmd = getcmdline()
         if cmd != ""
@@ -87,6 +92,7 @@ call ShySync("regs")
 call ShySync("marks")
 call ShySync("tags")
 " call ShySync("fixs")
+nnoremap <C-R> :call ShyCheck("cache")<CR>
 
 " autocmd BufUnload * call Shy("close", expand("<afile>")) | call ShySync("bufs")
 " autocmd CmdlineLeave * 

@@ -102,6 +102,7 @@ nnoremap <C-L> <C-W>l
 nnoremap <Space> :
 
 cnoremap jk <CR>
+cnoremap W w<CR>
 cnoremap wa wa<CR>
 inoremap jk <Esc>
 "}}}

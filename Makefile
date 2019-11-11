@@ -24,7 +24,7 @@ tags:
 tool:
 	go get github.com/nsf/gocode
 	go get github.com/jstemmer/gotags
-	go get github.com/bradfitz/goimports
+	# go get github.com/bradfitz/goimports
 	go get github.com/Go-zh/tools/cmd/gopls
 
 linux:

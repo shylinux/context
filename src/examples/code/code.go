@@ -50,8 +50,15 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"alias": map[string]interface{}{"s": "status", "b": "branch"},
 		}},
 		"zsh": {Name: "vim", Help: "记录", Value: map[string]interface{}{
-			"terminal": map[string]interface{}{},
-			"history":  map[string]interface{}{},
+			"terminal": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "time sid status pwd pid pane hostname username",
+			}},
+			"history": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "time sid cmd pwd",
+				"store":  "var/tmp/zsh.csv",
+				"limit":  "30",
+				"least":  "10",
+			}},
 		}},
 		"vim": {Name: "vim", Help: "编辑器", Value: map[string]interface{}{
 			"editor": map[string]interface{}{"meta": map[string]interface{}{
@@ -100,97 +107,100 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}},
 	},
 	Commands: map[string]*ctx.Command{
-		"/zsh": {Name: "/zsh", Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if !m.Has("res") {
-				switch m.Option("cmd") {
-				case "login":
-					name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
-					m.Conf("zsh", []string{"terminal", name}, map[string]interface{}{
-						"sid":      name,
-						"status":   "login",
-						"time":     m.Time(),
-						"pwd":      m.Option("pwd"),
-						"pid":      m.Option("pid"),
-						"pane":     m.Option("pane"),
-						"hostname": m.Option("hostname"),
-						"username": m.Option("username"),
-					})
-					m.Echo(name)
-					return
-				case "logout":
-					name := m.Option("sid")
-					m.Conf("zsh", []string{"terminal", name, "status"}, "logout")
-					m.Conf("zsh", []string{"terminal", name, "time"}, m.Time())
-					return
+		"/zsh": {Name: "/zsh sid pwd cmd arg", Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			cmd = strings.TrimPrefix(cmd, "/")
+			m.Log("info", "%v %v %v %v", cmd, m.Option("cmd"), m.Option("arg"), m.Option("sub"))
+			switch m.Option("cmd") {
+			case "login":
+				name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
+				m.Conf(cmd, []string{"terminal", "hash", name}, map[string]interface{}{
+					"time":     m.Time(),
+					"status":   "login",
+					"sid":      name,
+					"pwd":      m.Option("pwd"),
+					"pid":      m.Option("pid"),
+					"pane":     m.Option("pane"),
+					"hostname": m.Option("hostname"),
+					"username": m.Option("username"),
+				})
+				m.Echo(name)
+			case "logout":
+				name := m.Option("sid")
+				m.Conf(cmd, []string{"terminal", "hash", name, "time"}, m.Time())
+				m.Conf(cmd, []string{"terminal", "hash", name, "status"}, "logout")
 
-				case "historys":
-					m.Option("cache.store", "hi.csv")
-					name := m.Option("sid")
-					vs := strings.SplitN(strings.TrimSpace(m.Option("arg")), " ", 2)
-					m.Grow("zsh", []string{"history", name}, map[string]interface{}{
-						"sid":   name,
-						"time":  m.Time(),
-						"index": vs[0],
-						"cmd":   kit.Select("", vs, 1),
-						"pwd":   m.Option("pwd"),
-					})
-
-				case "history":
-					m.Option("cache.store", "hi.csv")
-					switch path.Base(m.Option("SHELL")) {
-					case "zsh":
-						m.Option("arg", strings.SplitN(m.Option("arg"), ";", 2)[1])
-					}
-
-					name := m.Option("sid")
-					m.Grow("zsh", []string{"history", name}, map[string]interface{}{
-						"sid":  name,
-						"time": m.Time(),
-						"cmd":  m.Option("arg"),
-						"pwd":  m.Option("pwd"),
-					})
-					return
+			case "historys":
+				vs := strings.SplitN(strings.TrimSpace(m.Option("arg")), " ", 2)
+				m.Grow(cmd, "history", map[string]interface{}{
+					"time":  m.Time(),
+					"sid":   m.Option("sid"),
+					"index": vs[0],
+					"cmd":   kit.Select("", vs, 1),
+					"pwd":   m.Option("pwd"),
+				})
+			case "history":
+				switch path.Base(m.Option("SHELL")) {
+				case "zsh":
+					m.Option("arg", strings.SplitN(m.Option("arg"), ";", 2)[1])
 				}
+				m.Grow(cmd, "history", map[string]interface{}{
+					"time": m.Time(),
+					"sid":  m.Option("sid"),
+					"cmd":  m.Option("arg"),
+					"pwd":  m.Option("pwd"),
+				})
+				return
 			}
 			return
 		}},
 		"zsh": {Name: "zsh dir grep key [split reg fields] [filter reg fields] [order key method] [group keys method] [sort keys method]",
 			Form: map[string]int{"split": 2, "filter": 2, "order": 2, "group": 2, "sort": 2, "limit": 2},
-			Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 				p, arg := kit.Select(".", arg[0]), arg[1:]
 				switch arg[0] {
 				case "prune":
 					ps := []string{}
-					m.Confm("zsh", []string{"terminal"}, func(key string, value map[string]interface{}) {
+					m.Confm(cmd, "terminal.hash", func(key string, value map[string]interface{}) {
 						if kit.Format(value["status"]) == "logout" {
 							ps = append(ps, key)
 						}
 					})
 					for _, v := range ps {
-						m.Log("info", "prune zsh %v %v", v, kit.Formats(m.Conf("zsh", []string{"terminal", v})))
-						m.Confv("zsh", []string{"terminal", v}, "")
+						for _, k := range []string{"terminal"} {
+							m.Log("info", "prune %v %v %v %v", cmd, k, v, kit.Formats(m.Conf(cmd, []string{k, "hash", v})))
+							m.Confv(cmd, []string{k, "hash", v}, "")
+						}
 					}
 					fallthrough
 				case "terminal":
-					m.Confm("zsh", "terminal", func(key string, value map[string]interface{}) {
-						m.Push([]string{"time", "sid", "status", "pwd", "pid", "pane", "hostname", "username"}, value)
+					fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 1), " ")
+					m.Confm(cmd, arg[0]+".hash", func(key string, value map[string]interface{}) {
+						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 					})
-					m.Sort("time", "time_r").Table()
-				case "history":
-					m.Confm("zsh", "history", func(key string, meta map[string]interface{}, index int, value map[string]interface{}) {
-						if len(arg) > 1 && !strings.HasPrefix(key, arg[1]) {
-							return
-						}
-						if sid := kit.Format(value["sid"]); len(sid) > 6 {
-							value["sid"] = sid[:6]
-						}
-						m.Push([]string{"time", "sid", "index", "cmd", "pwd"}, value)
-					})
-					if len(arg) > 1 {
-						m.Sort("index", "int_r").Table()
-					} else {
-						m.Sort("time", "time_r").Table()
+					if m.Appends("times") {
+						m.Sort("times", "time_r")
 					}
+					if m.Appends("time") {
+						m.Sort("time", "time_r")
+					}
+					m.Table()
+				case "history":
+					if len(arg) > 3 {
+						arg[3] = strings.Join(arg[3:], " ")
+					}
+					m.Option("cache.limit", kit.Select("10", arg, 1))
+					m.Option("cache.offset", kit.Select("0", arg, 2))
+					fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 3), " ")
+					m.Grows(cmd, arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
+						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
+					})
+					if m.Appends("times") {
+						m.Sort("times", "time_r")
+					}
+					if m.Appends("time") {
+						m.Sort("time", "time_r")
+					}
+					m.Table()
 
 				case "init":
 					m.Cmd("cli.system", m.Confv("package", "upadte"))
@@ -624,29 +634,30 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					}
 					m.Echo(p)
 				}
+				return
 
 			case "prune":
 				ps := []string{}
-				m.Confm("vim", "editor", func(key string, value map[string]interface{}) {
+				m.Confm("vim", "editor.hash", func(key string, value map[string]interface{}) {
 					if kit.Format(value["status"]) == "logout" {
 						ps = append(ps, key)
 					}
 				})
 				for _, v := range ps {
 					for _, k := range []string{"editor", "bufs", "regs", "marks", "tags", "fixs"} {
-						m.Log("info", "prune vim %v %v %v", k, v, kit.Formats(m.Conf("vim", []string{k, v})))
-						m.Confv("vim", []string{k, v}, "")
+						m.Log("info", "prune vim %v %v %v", k, v, kit.Formats(m.Conf("vim", []string{k, "hash", v})))
+						m.Confv("vim", []string{k, "hash", v}, "")
 					}
 				}
 				fallthrough
 			case "editor":
+				if len(arg) > 1 {
+					arg[1] = strings.Join(arg[1:], " ")
+				}
 				fields := strings.Split(kit.Select(m.Conf("vim", arg[0]+".meta.fields"), arg, 1), " ")
 				m.Confm("vim", arg[0]+".hash", func(key string, value map[string]interface{}) {
 					m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 				})
-				if m.Appends("time") {
-					m.Sort("time", "time_r")
-				}
 
 			case "opens", "cmds", "txts":
 				if len(arg) > 3 {
@@ -658,9 +669,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Grows("vim", arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
 					m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 				})
-				if m.Appends("time") {
-					m.Sort("time", "time_r")
-				}
 
 			case "bufs", "regs", "marks", "tags", "fixs":
 				if len(arg) > 3 {
@@ -672,6 +680,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 					}
 				})
+			}
+			if m.Appends("times") {
+				m.Sort("times", "time_r")
+			}
+			if m.Appends("time") {
+				m.Sort("time", "time_r")
 			}
 			m.Table()
 			return
