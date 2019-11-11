@@ -724,8 +724,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Cmdy("cli.system", "gotags", "-f", kit.Select("tags", arg, 1), "-R", kit.Select("src", arg, 0))
 			return
 		}},
-		"vim": {Name: "vim editor|prune|opens|cmds|txts|bufs|regs|marks|tags|fixs", Help: "编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"vim": {Name: "vim editor|prune|opens|cmds|txts|bufs|regs|marks|tags|fixs", Help: "编辑器", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			switch arg[0] {
+			case "favor":
+
 			case "ctag":
 				if f, p, e := kit.Create("etc/conf/tags"); m.Assert(e) {
 					defer f.Close()
@@ -738,24 +740,36 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 			case "prune":
 				ps := []string{}
-				m.Confm("vim", "editor.hash", func(key string, value map[string]interface{}) {
+				m.Confm(cmd, "editor.hash", func(key string, value map[string]interface{}) {
 					if kit.Format(value["status"]) == "logout" {
 						ps = append(ps, key)
 					}
 				})
 				for _, v := range ps {
 					for _, k := range []string{"editor", "bufs", "regs", "marks", "tags", "fixs"} {
-						m.Log("info", "prune vim %v %v %v", k, v, kit.Formats(m.Conf("vim", []string{k, "hash", v})))
-						m.Confv("vim", []string{k, "hash", v}, "")
+						m.Log("info", "prune %v %v %v %v", cmd, k, v, kit.Formats(m.Conf(cmd, []string{k, "hash", v})))
+						m.Confv(cmd, []string{k, "hash", v}, "")
 					}
 				}
 				fallthrough
 			case "editor":
-				if len(arg) > 1 {
-					arg[1] = strings.Join(arg[1:], " ")
+				if arg[2] != "" {
+					m.Conf(cmd, []string{arg[0], "hash", arg[1], "table"}, arg[2])
+					m.Conf(cmd, []string{arg[0], "hash", arg[1], "river"}, m.Option("river"))
 				}
-				fields := strings.Split(kit.Select(m.Conf("vim", arg[0]+".meta.fields"), arg, 1), " ")
-				m.Confm("vim", arg[0]+".hash", func(key string, value map[string]interface{}) {
+				if arg[1] != "" {
+					m.Option("table.format", "table")
+					m.Confm(cmd, []string{arg[0], "hash", arg[1]}, func(key string, value string) {
+						m.Push(key, value)
+					})
+					m.Sort("key")
+					break
+				}
+				if len(arg) > 3 {
+					arg[3] = strings.Join(arg[3:], " ")
+				}
+				fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 1), " ")
+				m.Confm(cmd, arg[0]+".hash", func(key string, value map[string]interface{}) {
 					m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 				})
 
@@ -765,8 +779,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 				m.Option("cache.limit", kit.Select("10", arg, 1))
 				m.Option("cache.offset", kit.Select("0", arg, 2))
-				fields := strings.Split(kit.Select(m.Conf("vim", arg[0]+".meta.fields"), arg, 3), " ")
-				m.Grows("vim", arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
+				fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 3), " ")
+				m.Grows(cmd, arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
 					m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 				})
 
@@ -774,8 +788,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				if len(arg) > 3 {
 					arg[3] = strings.Join(arg[3:], " ")
 				}
-				fields := strings.Split(kit.Select(m.Conf("vim", arg[0]+".meta.fields"), arg, 3), " ")
-				m.Confm("vim", []string{arg[0], "hash"}, func(key string, index int, value map[string]interface{}) {
+				fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 3), " ")
+				m.Confm(cmd, []string{arg[0], "hash"}, func(key string, index int, value map[string]interface{}) {
 					if value["sid"] = key; len(arg) == 1 || arg[1] == "" || strings.HasPrefix(kit.Format(value[arg[1]]), arg[2]) {
 						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 					}
@@ -790,15 +804,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Table()
 			return
 		}},
-		"/vim": {Name: "/vim sid pwd cmd arg sub", Help: "编辑器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"/vim": {Name: "/vim sid pwd cmd arg sub", Help: "编辑器", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			cmd = strings.TrimPrefix(cmd, "/")
 			m.Option("arg", strings.Replace(m.Option("arg"), "XXXXXsingleXXXXX", "'", -1))
 			m.Option("sub", strings.Replace(m.Option("sub"), "XXXXXsingleXXXXX", "'", -1))
-			m.Log("info", "vim %v %v %v", m.Option("cmd"), m.Option("arg"), m.Option("sub"))
+			m.Log("info", "%v %v %v %v", cmd, m.Option("cmd"), m.Option("arg"), m.Option("sub"))
 
 			switch m.Option("cmd") {
 			case "login":
 				name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
-				m.Conf("vim", []string{"editor", "hash", name}, map[string]interface{}{
+				m.Conf(cmd, []string{"editor", "hash", name}, map[string]interface{}{
 					"time":     m.Time(),
 					"status":   "login",
 					"sid":      name,
@@ -810,12 +825,18 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				})
 				m.Echo(name)
 			case "logout":
-				name := m.Option("sid")
-				m.Conf("vim", []string{"editor", "hash", name, "time"}, m.Time())
-				m.Conf("vim", []string{"editor", "hash", name, "status"}, "logout")
+				m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "time"}, m.Time())
+				m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "status"}, "logout")
+
+			case "favor":
+				m.Option("river", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "river"}))
+				m.Cmd("ssh.data", "show", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "table"})).Table(func(index int, value map[string]string) {
+					m.Echo("%v:%v:0:(%v): %v\n", value["file"], value["line"], value["note"], value["word"])
+				}).Set("append")
+				return
 
 			case "read", "write":
-				m.Grow("vim", "opens", map[string]interface{}{
+				m.Grow(cmd, "opens", map[string]interface{}{
 					"time":   m.Time(),
 					"sid":    m.Option("sid"),
 					"action": m.Option("cmd"),
@@ -823,7 +844,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"pwd":    m.Option("pwd"),
 				})
 			case "exec":
-				m.Grow("vim", "cmds", map[string]interface{}{
+				m.Grow(cmd, "cmds", map[string]interface{}{
 					"time": m.Time(),
 					"sid":  m.Option("sid"),
 					"cmd":  m.Option("arg"),
@@ -831,7 +852,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"pwd":  m.Option("pwd"),
 				})
 			case "insert":
-				m.Grow("vim", "txts", map[string]interface{}{
+				m.Grow(cmd, "txts", map[string]interface{}{
 					"time": m.Time(),
 					"sid":  m.Option("sid"),
 					"word": m.Option("arg"),
@@ -842,11 +863,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				})
 
 			case "sync":
-				m.Conf("vim", []string{m.Option("arg"), "hash", m.Option("sid")}, "")
+				m.Conf(cmd, []string{m.Option("arg"), "hash", m.Option("sid")}, "")
 				switch m.Option("arg") {
 				case "bufs":
 					m.Split(strings.TrimSpace(m.Option("sub")), " ", "5", "id tag name some line").Table(func(index int, value map[string]string) {
-						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"buf":  value["id"],
 							"tag":  value["tag"],
 							"file": strings.TrimSuffix(strings.TrimPrefix(value["name"], "\""), "\""),
@@ -855,24 +876,23 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					})
 				case "regs":
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n--- Registers ---\n"), " ", "2", "name word").Table(func(index int, value map[string]string) {
-						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"word": strings.Replace(strings.Replace(value["word"], "^I", "\t", -1), "^J", "\n", -1),
 							"reg":  strings.TrimPrefix(value["name"], "\""),
 						})
 					})
 				case "marks":
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "4").Table(func(index int, value map[string]string) {
-						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"mark": value["mark"],
 							"line": value["line"],
 							"col":  value["col"],
 							"file": value["file/text"],
 						})
-						hello
 					})
 				case "tags":
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "6").Table(func(index int, value map[string]string) {
-						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"tag":  value["tag"],
 							"line": value["line"],
 							"file": value["in file/text"],
@@ -884,7 +904,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					}
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "3", "id file word").Table(func(index int, value map[string]string) {
 						vs := strings.Split(kit.Format(value["file"]), ":")
-						m.Confv("vim", []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
+						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"fix":  value["id"],
 							"file": vs[0],
 							"line": vs[1],

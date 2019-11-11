@@ -26,7 +26,10 @@ fun tips "便签" private \
 end
 
 kit editor "编辑器" private "web.code.vim" editor \
+    text "" name sid imports plugin_vim_sid \
+    text "" name favor \
     text "times sids status pid pane" name fields \
+    exports vim_sid sid \
     button "查看" action auto
 
 kit opens "文件记录" private "web.code.vim" opens \

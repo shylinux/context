@@ -354,12 +354,12 @@ func (m *Message) Split(str string, arg ...string) *Message {
 		}
 		if len(pos) > 0 {
 			for i, v := range pos {
-				if i == len(pos)-1 {
+				if v < len(l) && i == len(pos)-1 {
 					m.Add("append", heads[i], strings.TrimSpace(l[v:]))
-				} else if len(l) < v || i+1 >= len(pos) || len(l) < pos[i+1] {
-					m.Add("append", heads[i], "")
-				} else {
+				} else if v < len(l) && i+1 < len(pos) && pos[i+1] < len(l) {
 					m.Add("append", heads[i], strings.TrimSpace(l[v:pos[i+1]]))
+				} else {
+					m.Add("append", heads[i], "")
 				}
 			}
 			continue
