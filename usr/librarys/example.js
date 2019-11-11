@@ -1242,6 +1242,7 @@ function Plugin(page, pane, field, inits, runs) {
             var list = arguments.callee.list
 
             for (var i = 0; i < list.length; i += 3) {if (list[i+1] == name || list[i+2]) {
+                plugin.ontoast(list[i+1]? line[list[i+1]]: value, list[i+1]||name)
                 for (var i = 0; i < list.length; i += 3) {
                     page.Sync("plugin_"+list[i]).set(meta[list[i+2]||""](list[i+1]? line[list[i+1]]: value, list[i+1]||name, line, list))
                 }
@@ -1481,12 +1482,17 @@ function Output(plugin, type, msg, cb, target, option) {
                             var text = td.innerText.trim()
                             if (typeof meta[item] == "function") {meta[item](event, text); return}
 
-                            item == "修改"? (text = kit.AppendChilds(td, [{type: "input", value: text, data: {onkeydown: function(event) {
+                            item == "修改"? (text = kit.AppendChilds(td, [{type: "input", value: text, style: {width: td.clientWidth+"px"}, data: {onkeydown: function(event) {
                                 if (event.key == "Enter") {
                                     var id = ""
                                     for (var i = 0; i < exports.length-1; i += 3) {
                                         id = (id || line[exports[i+1]] || "").trim()
                                     }
+
+                                    var msg = plugin.Event(event)
+                                    kit.Selector(option, ".args", function(item) {
+                                        msg.Option(item.name, item.value)
+                                    })
                                     plugin.Run(event, [id, meta[item], name, event.target.value], function(msg) {
                                         td.innerHTML = event.target.value
                                         plugin.ontoast("修改成功")

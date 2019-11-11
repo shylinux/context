@@ -119,14 +119,18 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			}
 			return
 		}},
-		"tip": {Name: "tip", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"tip": {Name: "tip action table index ...", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "show":
-				m.Cmdy("ssh.data", "show", arg[1], arg[2:])
+				if len(arg) == 1 || arg[2] == "" {
+					m.Cmdy("ssh.data", "show", arg[1])
+				} else {
+					m.Cmdy("ssh.data", "show", arg[1], arg[2])
+				}
 			case "insert":
-				m.Cmdy("ssh.data", "insert", arg[1], arg[2:])
+				m.Cmdy("ssh.data", "insert", arg[1], arg[3:])
 			case "update":
-				m.Cmdy("ssh.data", "update", arg[1], arg[2:])
+				m.Cmdy("ssh.data", "update", arg[1], arg[2], arg[3:])
 			}
 			return
 		}},

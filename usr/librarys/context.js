@@ -4,7 +4,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
 
         var option = {"cmds": cmd}
         msg.option && msg.option.forEach(function(item) {
-            msg.option[item] && (option[item] = msg.option[item])
+            msg[item] && (option[item] = msg[item])
         })
         for (var k in dataset) {
             option[k] = dataset[k].split(",")
@@ -47,6 +47,13 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
             },
             Format: function() {
                 return msg.append && msg.append[0]? ["table", JSON.stringify(msg.Table())]: ["code", msg.result? msg.result.join(""): ""]
+            },
+            Option: function(key, val) {
+                msg.option = msg.option || []
+                kit.List(msg.option, function(k) {
+                    if (k == key) {return k}
+                }).length > 0 || msg.option.push(key)
+                msg[key] = kit.List(arguments).slice(1)
             },
             Result: function() {return msg.result? msg.result.join(""): ""},
             Results: function() {return kit.Color(msg.Result().replace(/</g, "&lt;").replace(/>/g, "&gt;"))},
