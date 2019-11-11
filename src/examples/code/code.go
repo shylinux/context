@@ -156,6 +156,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"zsh": {Name: "zsh dir grep key [split reg fields] [filter reg fields] [order key method] [group keys method] [sort keys method]",
 			Form: map[string]int{"split": 2, "filter": 2, "order": 2, "group": 2, "sort": 2, "limit": 2},
 			Help: "终端", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+				if len(arg) == 0 {
+					arg = append(arg, "")
+				}
 				p, arg := kit.Select(".", arg[0]), arg[1:]
 				switch arg[0] {
 				case "prune":

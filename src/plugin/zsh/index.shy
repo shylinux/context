@@ -1,0 +1,11 @@
+kit terminal "终端" private "web.code.zsh" "" terminal \
+    text "times sids status pid pane hostname" name fields \
+    feature detail "prune" "复制" "下载" \
+    button "查看" action auto
+
+kit history "命令" private "web.code.zsh" "" history \
+    text "10" name limit view tiny \
+    text "0" name offset view tiny \
+    text "times sids cmd pwd" name fields \
+    button "查看" action auto
+
