@@ -74,6 +74,14 @@ fun! Shy(action, target)
     endif
 endfun
 
+fun! ShyFavor(note)
+    if a:note == "" 
+        call ShyPost({"cmd": "favor", "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
+    else
+        call ShyPost({"cmd": "favor", "note": input("note: "), "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
+    endif
+endfun
+
 fun! ShyLogout()
     call Shy("logout", "")
     let g:ctx_sid = ""
@@ -94,8 +102,11 @@ call ShySync("regs")
 call ShySync("marks")
 call ShySync("tags")
 " call ShySync("fixs")
+"
 nnoremap <C-R><C-R> :call ShyCheck("cache")<CR>
 nnoremap <C-R><C-F> :call ShyCheck("favor")<CR>
+nnoremap <C-R>F :call ShyFavor("note")<CR>
+nnoremap <C-R>f :call ShyFavor("")<CR>
 
 " autocmd BufUnload * call Shy("close", expand("<afile>")) | call ShySync("bufs")
 " autocmd CmdlineLeave * 

@@ -830,7 +830,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 			case "favor":
 				m.Option("river", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "river"}))
-				m.Cmd("ssh.data", "show", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "table"})).Table(func(index int, value map[string]string) {
+				table := m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "table"})
+
+				if m.Options("line") {
+					m.Cmd("ssh.data", "insert", table,
+						"note", m.Option("note"), "word", m.Option("arg"),
+						"file", m.Option("buf"), "line", m.Option("line"), "col", m.Option("col"),
+					)
+					return
+				}
+				m.Cmd("ssh.data", "show", table).Table(func(index int, value map[string]string) {
 					m.Echo("%v:%v:0:(%v): %v\n", value["file"], value["line"], value["note"], value["word"])
 				}).Set("append")
 				return

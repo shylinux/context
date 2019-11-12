@@ -410,6 +410,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			switch arg[0] {
 			case "show":
+				if arg[1] == "" {
+					arg = arg[:1]
+				}
 				switch len(arg) {
 				case 1: // 数据库
 					m.Confm("flow", []string{m.Option("river"), "data"}, func(key string, value map[string]interface{}) {

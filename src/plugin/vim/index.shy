@@ -1,14 +1,14 @@
 
 fun tips "便签" private \
     select "" name "action" values "show" values "insert" values "update" \
-    text "tip" name table \
+    text "tip" name table imports plugin_vim_table action auto \
     text "" name index imports plugin_view_tip_id view tiny \
     text "" name file imports plugin_vim_file view long \
     text "" name line imports plugin_vim_line view tiny \
     text "" name word imports plugin_vim_word view long \
     textarea "" name note \
     feature detail "修改" "复制" "下载" \
-    exports tip_id id "" vim_file file "" vim_line line "" vim_word word "" \
+    exports vim_table table "" tip_id id "" vim_file file "" vim_line line "" vim_word word "" \
     button "记录" action auto
 
     if $1 == "show"
@@ -26,8 +26,8 @@ fun tips "便签" private \
 end
 
 kit editor "编辑器" private "web.code.vim" editor \
-    text "" name sid imports plugin_vim_sid \
-    text "" name favor \
+    text "" name sid imports plugin_vim_sid action auto \
+    text "" name table imports plugin_vim_table \
     text "times sids status pid pane" name fields \
     exports vim_sid sid \
     button "查看" action auto
