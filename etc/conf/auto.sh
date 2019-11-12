@@ -10,7 +10,7 @@ ctx_sync=${ctx_sync:=""}
 ctx_sid=${ctx_sid:=""}
 
 ctx_welcome=${ctx_welcome:="^_^  Welcome to Context world  ^_^"}
-ctx_goodbye=${ctx_goodbye:="^_^  Welcome to Context world  ^_^"}
+ctx_goodbye=${ctx_goodbye:="^_^  Goodbye to Context world  ^_^"}
 
 ShyWord() {
     echo "$*"|sed -e 's/\ /%20/g' -e 's/\n/\\n/g'
@@ -139,17 +139,19 @@ ShyLogin() {
     echo "url: ${ctx_url}"
     echo "sid: ${ctx_sid:0:6}"
     echo "pid: $$"
+    echo "pane: $TMUX_PANE"
     echo "begin: ${ctx_begin}"
 }
 ShyInit() {
+    ctx_begin=`cat $HISTFILE|wc -l`
     case "$SHELL" in
         "/bin/zsh");;
         *)
             ctx_begin=`history|tail -n1|awk '{print $1}'`
             bind -x '"\C-t":ShySyncs base'
             # bind -x '"\C-gl":ShySync input'
-            # PS1="\!-\t[\u@\h]\W\$ "
-            PS1="\!-\t\$ "
+            PS1="\!-\t[\u@\h]\W\$ "
+            # PS1="\!-\t\$ "
             ;;
     esac
 }

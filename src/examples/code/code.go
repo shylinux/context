@@ -290,6 +290,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 							m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 						}
 					})
+					if arg[0] == "df" {
+						m.Sort("size", "int_r")
+					}
 					m.Table()
 				case "free":
 					if len(arg) > 3 {
@@ -753,11 +756,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 				fallthrough
 			case "editor":
-				if arg[2] != "" {
+				if len(arg) > 2 && arg[2] != "" {
 					m.Conf(cmd, []string{arg[0], "hash", arg[1], "table"}, arg[2])
 					m.Conf(cmd, []string{arg[0], "hash", arg[1], "river"}, m.Option("river"))
 				}
-				if arg[1] != "" {
+				if len(arg) > 1 && arg[1] != "" {
 					m.Option("table.format", "table")
 					m.Confm(cmd, []string{arg[0], "hash", arg[1]}, func(key string, value string) {
 						m.Push(key, value)

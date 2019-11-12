@@ -601,7 +601,7 @@ func (m *Message) Grows(key string, args interface{}, cb interface{}) map[string
 	begin := end - limit
 
 	data := make([]interface{}, 0, limit)
-	m.Log("info", "read current %v+%d %v-%v", current, len(list), begin, end)
+	m.Log("info", "read %v-%v from %v-%v", begin, end, current, current+len(list))
 	if begin < current {
 		store, _ := meta["record"].([]interface{})
 		for s := len(store) - 1; s > -1; s-- {
@@ -660,8 +660,8 @@ func (m *Message) Grows(key string, args interface{}, cb interface{}) map[string
 	if begin < current {
 		begin = current
 	}
+	m.Log("info", "cache %v-%v", begin-current, end-current)
 	for i := begin - current; i < end-current; i++ {
-		m.Log("info", "cache data %v %v", i+current, list[i])
 		data = append(data, list[i])
 	}
 	return kit.Map(map[string]interface{}{"meta": meta, "list": data}, "", cb)
