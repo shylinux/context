@@ -188,12 +188,7 @@ func (web *WEB) HandleCmd(m *ctx.Message, key string, cmd *ctx.Command) {
 			}
 
 			// 请求参数
-			if r.ParseMultipartForm(int64(msg.Confi("serve", "form_size"))); r.MultipartForm != nil && len(r.MultipartForm.Value) > 0 {
-				for k, v := range r.MultipartForm.Value {
-					msg.Log("info", "%s: %v", k, v)
-					msg.Add("option", k, v)
-				}
-			}
+			r.ParseMultipartForm(int64(msg.Confi("serve", "form_size")))
 			if r.ParseForm(); len(r.PostForm) > 0 {
 				for k, v := range r.PostForm {
 					msg.Log("info", "%s: %v", k, v)
@@ -978,7 +973,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						}
 
 						buf := bytes.NewBuffer(make([]byte, 0, 1024))
-						fmt.Fprintf(buf, "create_time: %s\n", m.Time())
+						fmt.Fprintf(buf, "create_time: %s\n", m.Time("2006-01-02 15:04"))
 						fmt.Fprintf(buf, "create_user: %s\n", m.Option("username"))
 						fmt.Fprintf(buf, "name: %s\n", h.Filename)
 						fmt.Fprintf(buf, "type: %s\n", kind)
@@ -1005,6 +1000,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						} else {
 							m.Echo("code: %s\n", code)
 							m.Echo("hash: %s\n", name)
+							m.Echo("time: %s\n", m.Time("2006-01-02 15:04"))
 							m.Echo("type: %s\n", kind)
 							m.Echo("size: %s\n", kit.FmtSize(n))
 						}

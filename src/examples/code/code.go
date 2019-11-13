@@ -135,6 +135,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Log("info", "%v %v %v %v", cmd, m.Option("cmd"), m.Option("arg"), m.Option("sub"))
 
 			switch m.Option("cmd") {
+			case "help":
+				m.Echo(strings.Join(kit.Trans(m.Confv("help", "index")), "\n"))
 			case "login":
 				name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
 				m.Conf(cmd, []string{"terminal", "hash", name}, map[string]interface{}{
@@ -173,6 +175,22 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"cmd":  m.Option("arg"),
 					"pwd":  m.Option("pwd"),
 				})
+			case "favor":
+				m.Option("river", m.Conf(cmd, []string{"terminal", "hash", m.Option("sid"), "river"}))
+				table := m.Conf(cmd, []string{"terminal", "hash", m.Option("sid"), "table"})
+				m.Log("info", "favor: %v table: %v", m.Option("river"), table)
+
+				if m.Options("tab") {
+					m.Cmd("ssh.data", "insert", table, "tab", m.Option("tab"),
+						"note", m.Option("note"), "word", m.Option("arg"),
+					)
+					return
+				}
+				m.Cmd("ssh.data", "show", table).Table(func(index int, value map[string]string) {
+					m.Echo("%v:%v\n%v\n", value["tab"], value["note"], value["word"])
+				}).Set("append")
+				return
+
 			case "sync":
 				m.Conf(cmd, []string{m.Option("arg"), "hash", m.Option("sid")})
 				switch m.Option("arg") {
@@ -198,9 +216,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						})
 					})
 				case "env":
-					m.Log("fuck", "what %v fuck", m.Option("sub"))
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), "=", "2", "name value").Table(func(index int, value map[string]string) {
-						m.Log("fuck", "what %v fuck", value)
 						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
 							"name":  value["name"],
 							"value": value["value"],
@@ -209,7 +225,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				case "free":
 					sub := strings.Replace(m.Option("sub"), "    ", "type", 1)
 					m.Split(sub, " ", "7", "type total used free shared buffer available").Table(func(index int, value map[string]string) {
-						if index > 0 {
+						if index == 1 {
 							m.Confv(cmd, []string{m.Option("arg"), "list", "-2"}, map[string]interface{}{
 								"time":      m.Time(),
 								"sid":       m.Option("sid"),
@@ -251,6 +267,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					}
 					fallthrough
 				case "terminal":
+					if len(arg) > 2 && arg[2] != "" {
+						m.Conf(cmd, []string{arg[0], "hash", arg[1], "table"}, arg[2])
+						m.Conf(cmd, []string{arg[0], "hash", arg[1], "river"}, m.Option("river"))
+					}
+					if len(arg) > 1 && arg[1] != "" {
+						m.Option("table.format", "table")
+						m.Confm(cmd, []string{arg[0], "hash", arg[1]}, func(key string, value string) {
+							m.Push(key, value)
+						})
+						m.Sort("key")
+						break
+					}
+					if len(arg) > 3 {
+						arg[3] = strings.Join(arg[3:], " ")
+					}
 					fields := strings.Split(kit.Select(m.Conf(cmd, arg[0]+".meta.fields"), arg, 1), " ")
 					m.Confm(cmd, arg[0]+".hash", func(key string, value map[string]interface{}) {
 						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
@@ -272,12 +303,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					m.Grows(cmd, arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
 						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 					})
-					if m.Appends("index") {
-						m.Sort("index", "int_r")
-					} else if m.Appends("time") {
+					if m.Appends("time") || m.Appends("times") {
 						m.Sort("time", "time_r")
-					} else if m.Appends("times") {
-						m.Sort("times", "time_r")
+					}
+					if m.Appends("index") {
+						// m.Sort("index", "int_r")
 					}
 					m.Table()
 				case "env", "ps", "df":
@@ -814,6 +844,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Log("info", "%v %v %v %v", cmd, m.Option("cmd"), m.Option("arg"), m.Option("sub"))
 
 			switch m.Option("cmd") {
+			case "help":
+				m.Echo(strings.Join(kit.Trans(m.Confv("help", "index")), "\n"))
 			case "login":
 				name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
 				m.Conf(cmd, []string{"editor", "hash", name}, map[string]interface{}{
