@@ -1,22 +1,17 @@
 
-fun taps "便签" private \
-    text "tap" name table imports plugin_vim_table action auto \
+kit taps "便签" private "web.code.zsh" "" favor \
+    text "" name dream imports plugin_you action auto \
+    text "tap" name table imports plugin_zsh_table action auto \
     text "" name index imports plugin_tap_id view tiny action auto \
     feature detail "修改" "复制" "下载" \
-    exports vim_table table "" tap_id id "" vim_file file "" vim_line line "" vim_word word "" \
-    button "记录" action auto
-
-    if $2 == "modify"
-        copy skip ssh.data update $table $1 $3 $4
-    else
-        copy ssh.data show
-    end
-end
+    exports zsh_table table "" tap_id id "" \
+    button "记录" action auto \
+    button "返回" cb Last
 
 kit terminal "终端" private "web.code.zsh" "" terminal \
     text "" name sid imports plugin_zsh_sid action auto \
     text "" name table imports plugin_zsh_table \
-    text "times sids status pid pane hostname" name fields \
+    text "" name you imports plugin_you \
     feature detail "prune" "复制" "下载" \
     exports zsh_sid sid \
     button "查看" action auto

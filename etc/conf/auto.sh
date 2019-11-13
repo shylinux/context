@@ -14,8 +14,6 @@ ctx_sid=${ctx_sid:=""}
 ctx_silent=${ctx_silent:=""}
 ctx_welcome=${ctx_welcome:="^_^  Welcome to Context world  ^_^"}
 ctx_goodbye=${ctx_goodbye:="^_^  Goodbye to Context world  ^_^"}
-# ctx_ps1=${ctx_ps1:="\!-$$-\t[\u@\h]\W\$ "}
-ctx_ps1=${ctx_ps1:="\!-$$-[\t]\W\$ "}
 ctx_bind=${ctx_bind:="bind -x"}
 ctx_null=${ctx_null:="false"}
 
@@ -90,7 +88,7 @@ Shy() {
 }
 
 ShyLogout() {
-    echo ${ctx_goodbye} && sleep 1 && Shy logout
+    echo ${ctx_goodbye} && sleep 1 && [ "$ctx_sid" != "" ] && Shy logout
 }
 ShyLogin() {
     HOST=`hostname` ctx_sid=`ShyPost cmd login pid "$$" pane "${TMUX_PANE}" hostname "${HOST}" username "${USER}"`
@@ -100,6 +98,11 @@ ShyFavor() {
     [ "$1" != "" ] && ctx_tab=$1
     [ "$2" != "" ] && ctx_note=$2
     ShyPost cmd favor arg "`history|tail -n2|head -n1`" tab "${ctx_tab}" note "${ctx_note}"
+}
+ShyFavors() {
+    echo -n "tab: " && read && [ "$REPLY" != "" ] && ctx_tab=$REPLY
+    echo -n "note: " && read && [ "$REPLY" != "" ] && ctx_tab=$REPLY
+    ShyFavor
 }
 ShySync() {
     [ "$ctx_sid" = "" ] && ShyLogin
@@ -155,17 +158,19 @@ ShyHelp() {
     ShyPost cmd help arg "$@"
 }
 ShyInit() {
-    [ "$ctx_begin" == "" ] && ctx_begin=`history|tail -n1|awk '{print $1}'`
+    [ "$ctx_begin" = "" ] && ctx_begin=`history|tail -n1|awk '{print $1}'`
 
     case "$SHELL" in
         "/bin/zsh")
             ctx_bind=${ctx_null}
+            PROMPT='%![%*]%c$ '
             ;;
         *)
+            PS1="\!-$$-\t[\u@\h]\W\$ "
+            PS1="\!-$$-\t\W\$ "
             ;;
     esac
 
-    PS1=${ctx_ps1}
     ${ctx_bind} '"\C-t\C-t":ShySyncs base'
 
     echo ${ctx_welcome}

@@ -53,7 +53,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}},
 		"zsh": {Name: "vim", Help: "记录", Value: map[string]interface{}{
 			"terminal": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "time sid status pwd pid pane hostname username",
+				"fields": "time sid status table dream pwd pid pane hostname username",
 			}},
 			"history": map[string]interface{}{"meta": map[string]interface{}{
 				"fields": "time sid cmd pwd",
@@ -79,7 +79,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}},
 		"vim": {Name: "vim", Help: "编辑器", Value: map[string]interface{}{
 			"editor": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "time sid status pwd pid pane hostname username",
+				"fields": "time sid status table dream pwd pid pane hostname username",
 			}},
 			"favor": map[string]interface{}{},
 			"opens": map[string]interface{}{"meta": map[string]interface{}{
@@ -177,16 +177,22 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				})
 			case "favor":
 				m.Option("river", m.Conf(cmd, []string{"terminal", "hash", m.Option("sid"), "river"}))
+				dream := m.Conf(cmd, []string{"terminal", "hash", m.Option("sid"), "dream"})
 				table := m.Conf(cmd, []string{"terminal", "hash", m.Option("sid"), "table"})
-				m.Log("info", "favor: %v table: %v", m.Option("river"), table)
+				m.Log("info", "river: %v dream: %v table: %v", m.Option("river"), dream, table)
+
+				prefix := []string{}
+				if dream != "" {
+					prefix = append(prefix, "ssh._route", dream)
+				}
 
 				if m.Options("tab") {
-					m.Cmd("ssh.data", "insert", table, "tab", m.Option("tab"),
+					m.Cmd(prefix, "ssh.data", "insert", table, "tab", m.Option("tab"),
 						"note", m.Option("note"), "word", m.Option("arg"),
 					)
 					return
 				}
-				m.Cmd("ssh.data", "show", table).Table(func(index int, value map[string]string) {
+				m.Cmd(prefix, "ssh.data", "show", table).Table(func(index int, value map[string]string) {
 					m.Echo("%v:%v\n%v\n", value["tab"], value["note"], value["word"])
 				}).Set("append")
 				return
@@ -267,6 +273,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					}
 					fallthrough
 				case "terminal":
+					if len(arg) > 3 && arg[3] != "" {
+						m.Conf(cmd, []string{arg[0], "hash", arg[1], "dream"}, arg[3])
+					}
 					if len(arg) > 2 && arg[2] != "" {
 						m.Conf(cmd, []string{arg[0], "hash", arg[1], "table"}, arg[2])
 						m.Conf(cmd, []string{arg[0], "hash", arg[1], "river"}, m.Option("river"))
@@ -310,6 +319,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						// m.Sort("index", "int_r")
 					}
 					m.Table()
+				case "favor":
+					prefix := []string{"ssh._route", arg[1], "ssh.data", "show"}
+					m.Cmdy(prefix, arg[2:])
+
 				case "env", "ps", "df":
 					if len(arg) > 3 {
 						arg[3] = strings.Join(arg[3:], " ")
@@ -759,8 +772,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}},
 		"vim": {Name: "vim editor|prune|opens|cmds|txts|bufs|regs|marks|tags|fixs", Help: "编辑器", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			switch arg[0] {
-			case "favor":
-
 			case "ctag":
 				if f, p, e := kit.Create("etc/conf/tags"); m.Assert(e) {
 					defer f.Close()
@@ -786,6 +797,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 				fallthrough
 			case "editor":
+				if len(arg) > 3 && arg[3] != "" {
+					m.Conf(cmd, []string{arg[0], "hash", arg[1], "dream"}, arg[3])
+				}
 				if len(arg) > 2 && arg[2] != "" {
 					m.Conf(cmd, []string{arg[0], "hash", arg[1], "table"}, arg[2])
 					m.Conf(cmd, []string{arg[0], "hash", arg[1], "river"}, m.Option("river"))
@@ -816,6 +830,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Grows(cmd, arg[0], func(meta map[string]interface{}, index int, value map[string]interface{}) {
 					m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
 				})
+			case "favor":
+				prefix := []string{"ssh._route", arg[1], "ssh.data", "show"}
+				m.Cmdy(prefix, arg[2:])
 
 			case "bufs", "regs", "marks", "tags", "fixs":
 				if len(arg) > 3 {
@@ -866,10 +883,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			case "favors":
 				m.Option("river", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "river"}))
 				table := m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "table"})
-				m.Log("info", "favor: %v table: %v", m.Option("river"), table)
+				dream := m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "dream"})
+				m.Log("info", "river: %v dream: %v table: %v", m.Option("river"), dream, table)
+
+				prefix := []string{}
+				if dream != "" {
+					prefix = append(prefix, "ssh._route", dream)
+				}
 
 				data := map[string][]string{}
-				m.Cmd("ssh.data", "show", table).Table(func(index int, value map[string]string) {
+				m.Cmd(prefix, "ssh.data", "show", table).Table(func(index int, value map[string]string) {
 					data[value["tab"]] = append(data[value["tab"]],
 						fmt.Sprintf("%v:%v:0:(%v): %v\n", value["file"], value["line"], value["note"], value["word"]))
 				})
@@ -881,18 +904,24 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				return
 			case "favor":
 				m.Option("river", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "river"}))
+				dream := m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "dream"})
 				table := m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "table"})
-				m.Log("info", "favor: %v table: %v", m.Option("river"), table)
+				m.Log("info", "river: %v dream: %v table: %v", m.Option("river"), dream, table)
+
+				prefix := []string{}
+				if dream != "" {
+					prefix = append(prefix, "ssh._route", dream)
+				}
 
 				if m.Options("line") {
-					m.Cmd("ssh.data", "insert", table,
+					m.Cmd(prefix, "ssh.data", "insert", table,
 						"tab", m.Option("tab"),
 						"note", m.Option("note"), "word", m.Option("arg"),
 						"file", m.Option("buf"), "line", m.Option("line"), "col", m.Option("col"),
 					)
 					return
 				}
-				m.Cmd("ssh.data", "show", table).Table(func(index int, value map[string]string) {
+				m.Cmd(prefix, "ssh.data", "show", table).Table(func(index int, value map[string]string) {
 					m.Echo("%v:%v:0:(%v): %v\n", value["file"], value["line"], value["note"], value["word"])
 				}).Set("append")
 				return

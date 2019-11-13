@@ -1,9 +1,7 @@
 
 let ctx_url = (len($ctx_dev) > 1? $ctx_dev: "http://127.0.0.1:9095") . "/code/vim"
 let ctx_head = "Content-Type: application/json"
-if !exists("g:ctx_sid")
-    let ctx_sid = ""
-end
+if !exists("g:ctx_sid") | let ctx_sid = "" | end
 
 fun! ShyPost(arg)
     let a:arg["buf"] = bufname("%")
@@ -14,6 +12,35 @@ fun! ShyPost(arg)
         let a:arg[k] = substitute(a:arg[k], "'", "XXXXXsingleXXXXX", "g")
     endfor
     return system("curl -s '" . g:ctx_url . "' -H '" . g:ctx_head . "' -d '" .  json_encode(a:arg) . "' 2>/dev/null")
+endfun
+fun! Shy(action, target)
+    let arg = {"arg": a:target, "cmd": a:action}
+    let cmd = ShyPost(arg)
+    if cmd != ""
+        let arg["res"] = execute(cmd)
+        let res = ShyPost(arg)
+    endif
+endfun
+
+fun! ShyLogout()
+    call Shy("logout", "")
+    let g:ctx_sid = ""
+endfun
+fun! ShyLogin()
+    if g:ctx_sid == ""
+        let arg = {"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
+        let g:ctx_sid = ShyPost(arg)
+    endif
+endfun
+
+if !exists("g:favor_tab") | let favor_tab = "" | endif
+if !exists("g:favor_note") | let favor_note = "" | endif
+fun! ShyFavor(note)
+    if a:note != "" 
+        let g:favor_tab = input("tab: ", g:favor_tab)
+        let g:favor_note = input("note: ", g:favor_note)
+    endif
+    call ShyPost({"cmd": "favor", "tab": g:favor_tab, "note": g:favor_note, "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
 endfun
 
 fun! ShySync(target)
@@ -34,12 +61,7 @@ fun! ShySync(target)
 endfun
 
 fun! ShyCheck(target)
-    if a:target == "login"
-        if g:ctx_sid == ""
-            let arg = {"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
-            let g:ctx_sid = ShyPost(arg)
-        endif
-    elseif a:target == "favor"
+    if a:target == "favor"
         cexpr ShyPost({"cmd": "favor"})
     elseif a:target == "favors"
         let msg = json_decode(ShyPost({"cmd": "favors"}))
@@ -75,33 +97,7 @@ fun! ShyCheck(target)
     end
 endfun
 
-fun! Shy(action, target)
-    let arg = {"arg": a:target, "cmd": a:action}
-    let cmd = ShyPost(arg)
-    if cmd != ""
-        let arg["res"] = execute(cmd)
-        let res = ShyPost(arg)
-    endif
-endfun
-
-let favor_tab = ""
-let favor_note = ""
-fun! ShyFavor(note)
-    if a:note == "" 
-        call ShyPost({"cmd": "favor", "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
-    else
-        let g:favor_tab = input("tab: ", g:favor_tab)
-        let g:favor_note = input("note: ", g:favor_note)
-        call ShyPost({"cmd": "favor", "tab": g:favor_tab, "note": g:favor_note, "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
-    endif
-endfun
-
-fun! ShyLogout()
-    call Shy("logout", "")
-    let g:ctx_sid = ""
-endfun
-
-call ShyCheck("login")
+call ShyLogin()
 autocmd VimLeave * call ShyLogout()
 
 autocmd InsertLeave * call ShySync("insert")
@@ -119,8 +115,8 @@ call ShySync("tags")
 "
 nnoremap <C-R><C-R> :call ShyCheck("cache")<CR>
 " nnoremap <C-R><C-F> :call ShyCheck("favor")<CR>
-nnoremap <C-R><C-F> :call ShyCheck("favors")<CR>
-nnoremap <C-R>F :call ShyFavor("note")<CR>
+nnoremap <C-R><C-F> :call ShyFavor("note")<CR>
+nnoremap <C-R>F :call ShyCheck("favors")<CR>
 nnoremap <C-R>f :call ShyFavor("")<CR>
 
 " autocmd BufUnload * call Shy("close", expand("<afile>")) | call ShySync("bufs")
