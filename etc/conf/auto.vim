@@ -1,7 +1,9 @@
 
 let ctx_url = (len($ctx_dev) > 1? $ctx_dev: "http://127.0.0.1:9095") . "/code/vim"
 let ctx_head = "Content-Type: application/json"
-let ctx_sid = ""
+if !exists("g:ctx_sid")
+    let ctx_sid = ""
+end
 
 fun! ShyPost(arg)
     let a:arg["buf"] = bufname("%")
@@ -39,6 +41,14 @@ fun! ShyCheck(target)
         endif
     elseif a:target == "favor"
         cexpr ShyPost({"cmd": "favor"})
+    elseif a:target == "favors"
+        let msg = json_decode(ShyPost({"cmd": "favors"}))
+        let i = 0
+        for i in range(len(msg["tab"]))
+            tabnew
+            lexpr msg["fix"][i]
+            lopen
+        endfor
     elseif a:target == "cache"
         call ShySync("bufs")
         call ShySync("regs")
@@ -74,11 +84,15 @@ fun! Shy(action, target)
     endif
 endfun
 
+let favor_tab = ""
+let favor_note = ""
 fun! ShyFavor(note)
     if a:note == "" 
         call ShyPost({"cmd": "favor", "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
     else
-        call ShyPost({"cmd": "favor", "note": input("note: "), "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
+        let g:favor_tab = input("tab: ", g:favor_tab)
+        let g:favor_note = input("note: ", g:favor_note)
+        call ShyPost({"cmd": "favor", "tab": g:favor_tab, "note": g:favor_note, "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
     endif
 endfun
 
@@ -104,7 +118,8 @@ call ShySync("tags")
 " call ShySync("fixs")
 "
 nnoremap <C-R><C-R> :call ShyCheck("cache")<CR>
-nnoremap <C-R><C-F> :call ShyCheck("favor")<CR>
+" nnoremap <C-R><C-F> :call ShyCheck("favor")<CR>
+nnoremap <C-R><C-F> :call ShyCheck("favors")<CR>
 nnoremap <C-R>F :call ShyFavor("note")<CR>
 nnoremap <C-R>f :call ShyFavor("")<CR>
 

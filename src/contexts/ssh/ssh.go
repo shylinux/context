@@ -410,7 +410,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 			switch arg[0] {
 			case "show":
-				if arg[1] == "" {
+				if len(arg) > 1 && arg[1] == "" {
 					arg = arg[:1]
 				}
 				switch len(arg) {

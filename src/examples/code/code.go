@@ -831,12 +831,30 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "time"}, m.Time())
 				m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "status"}, "logout")
 
+			case "favors":
+				m.Option("river", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "river"}))
+				table := m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "table"})
+				m.Log("info", "favor: %v table: %v", m.Option("river"), table)
+
+				data := map[string][]string{}
+				m.Cmd("ssh.data", "show", table).Table(func(index int, value map[string]string) {
+					data[value["tab"]] = append(data[value["tab"]],
+						fmt.Sprintf("%v:%v:0:(%v): %v\n", value["file"], value["line"], value["note"], value["word"]))
+				})
+
+				for k, v := range data {
+					m.Push("tab", k)
+					m.Push("fix", strings.Join(v, "\n"))
+				}
+				return
 			case "favor":
 				m.Option("river", m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "river"}))
 				table := m.Conf(cmd, []string{"editor", "hash", m.Option("sid"), "table"})
+				m.Log("info", "favor: %v table: %v", m.Option("river"), table)
 
 				if m.Options("line") {
 					m.Cmd("ssh.data", "insert", table,
+						"tab", m.Option("tab"),
 						"note", m.Option("note"), "word", m.Option("arg"),
 						"file", m.Option("buf"), "line", m.Option("line"), "col", m.Option("col"),
 					)
