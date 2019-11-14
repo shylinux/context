@@ -2,6 +2,7 @@
 ~code
     config save var/tmp/vim/vim.json vim
     config save var/tmp/zsh.json zsh
+    config save var/tmp/code.json login
 
 # 系统配置
 ~ssh

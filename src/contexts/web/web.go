@@ -968,8 +968,9 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						kind := h.Header.Get("Content-Type")
 						kind = strings.Split(kind, "/")[0]
 						if m.Options("river") {
-							m.Cmd("ssh.data", "insert", kit.Select(kind, m.Option("table")),
-								"name", h.Filename, "kind", kind, "hash", name, "size", n)
+							prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "insert"}
+							m.Cmd(prefix, kit.Select(kind, m.Option("table")), "name", h.Filename, "kind", kind, "hash", name, "size", n)
+							m.Cmd(prefix, "file", "name", h.Filename, "kind", kind, "hash", name, "size", n)
 						}
 
 						buf := bytes.NewBuffer(make([]byte, 0, 1024))
@@ -991,7 +992,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 								m.Cmd("nfs.copy", path.Join(m.Conf("web.upload", "path"), kind, code), p)
 							}
 						}
-						if !strings.HasPrefix(m.Option("agent"), "curl") {
+						if strings.HasPrefix(m.Option("agent"), "favor") {
+							m.Append("code", code)
+							m.Append("hash", name)
+							m.Append("name", h.Filename)
+							m.Append("time", m.Time("2006-01-02 15:04"))
+							m.Append("type", kind)
+							m.Append("size", kit.FmtSize(n))
+
+						} else if !strings.HasPrefix(m.Option("agent"), "curl") {
 							m.Append("size", kit.FmtSize(n))
 							m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
 							m.Append("type", kind)
@@ -1014,7 +1023,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			w := m.Optionv("response").(http.ResponseWriter)
 
 			kind := kit.Select("meta", kit.Select(m.Option("meta"), arg, 0))
-			file := strings.TrimPrefix(key, "/download/")
+			file := kit.Select(strings.TrimPrefix(key, "/download/"), arg, 1)
 			// 文件列表
 			if file == "" {
 				if fs, e := ioutil.ReadDir(path.Join(m.Conf("web.upload", "path"), kind)); e == nil {

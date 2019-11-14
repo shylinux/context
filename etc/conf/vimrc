@@ -161,7 +161,6 @@ if filereadable("~/.vim_local")
 endif
 
 cnoremap RR :source ~/.vimrc<CR>
-nnoremap <C-G> :copen<CR> :grep -rn 
 
 colorscheme torte
 highlight Comment cterm=reverse ctermfg=yellow

@@ -1,5 +1,10 @@
 
-kit taps "便签" private "web.code.zsh" "" favor \
+kit file "文件" private "web.code.favor" file \
+    text "" name dream imports plugin_you action auto \
+    text "file" name type \
+    button "查看" action auto
+
+kit taps "便签" private "web.code.favor" list \
     text "" name dream imports plugin_you action auto \
     text "tap" name table imports plugin_zsh_table action auto \
     text "" name index imports plugin_tap_id view tiny action auto \
@@ -8,7 +13,7 @@ kit taps "便签" private "web.code.zsh" "" favor \
     button "记录" action auto \
     button "返回" cb Last
 
-kit terminal "终端" private "web.code.zsh" "" terminal \
+kit terminal "终端" private "web.code.login" list \
     text "" name sid imports plugin_zsh_sid action auto \
     text "" name table imports plugin_zsh_table \
     text "" name you imports plugin_you \
@@ -16,33 +21,36 @@ kit terminal "终端" private "web.code.zsh" "" terminal \
     exports zsh_sid sid \
     button "查看" action auto
 
-kit history "命令" private "web.code.zsh" "" history \
+kit history "命令" private "web.code.trend" zsh history \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
     text "times sids index cmd pwd" name fields \
     button "查看" action auto
 
-kit df "磁盘" private "web.code.zsh" "" df \
-    text "fs" name limit view tiny \
-    text "" name offset view tiny \
-    text "sids fs size used rest per pos" name fields \
+kit free "内存" private "web.code.trend" zsh free \
+    text "10" name limit view tiny \
+    text "0" name offset view tiny \
+    text "times sids type total used free" name fields \
     button "查看" action auto
 
-kit ps "进程" private "web.code.zsh" "" ps \
-    text "COMMAND" name limit view tiny \
-    text "" name offset view tiny \
-    text "sids PID TIME COMMAND" name fields \
-    button "查看" action auto
-
-kit env "环境" private "web.code.zsh" "" env \
+kit env "环境" private "web.code.state" zsh env \
+    text "" name sid imports plugin_zsh_sid action auto \
     text "name" name limit view tiny \
     text "" name offset view tiny \
     text "sids name value" name fields \
     button "查看" action auto
 
-kit free "内存" private "web.code.zsh" "" free \
-    text "10" name limit view tiny \
-    text "0" name offset view tiny \
-    text "times sids type total used free" name fields \
+kit ps "进程" private "web.code.state" zsh ps \
+    text "" name sid imports plugin_zsh_sid action auto \
+    text "COMMAND" name limit view tiny \
+    text "" name offset view tiny \
+    text "sids PID TIME COMMAND" name fields \
+    button "查看" action auto
+
+kit df "磁盘" private "web.code.state" zsh df \
+    text "" name sid imports plugin_zsh_sid action auto \
+    text "fs" name limit view tiny \
+    text "" name offset view tiny \
+    text "sids fs size used rest per pos" name fields \
     button "查看" action auto
 

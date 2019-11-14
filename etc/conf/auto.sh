@@ -62,13 +62,16 @@ ShyPost() {
     ${ctx_curl} "${ctx_url}" -H "${ctx_head}" -d "${data}"
 }
 ShyDownload() {
-    ${ctx_curl} "${ctx_dev}/download/$1"
+    ${ctx_curl} "${ctx_url}" -F "cmd=download" -F "arg=$1" -F "sid=$ctx_sid"
 }
 ShyUpdate() {
     ${ctx_curl} "${ctx_dev}/publish/$1" > $1
 }
 ShyUpload() {
-    ${ctx_curl} "${ctx_dev}/upload" -F "upload=@$1"
+    ${ctx_curl} "${ctx_url}" -F "cmd=upload" -F "sid=$ctx_sid" -F "upload=@$1"
+}
+ShyBench() {
+    ${ctx_curl} "${ctx_dev}/publish/boot.sh" | sh -s installs context
 }
 ShySend() {
     local TEMP=`mktemp /tmp/tmp.XXXXXX` && "$@" > $TEMP
@@ -95,14 +98,15 @@ ShyLogin() {
     echo "sid: ${ctx_sid:0:6}"
 }
 ShyFavor() {
+    [ "$READLINE_LINE" != "" ] && set $READLINE_LINE && READLINE_LINE=""
     [ "$1" != "" ] && ctx_tab=$1
     [ "$2" != "" ] && ctx_note=$2
     ShyPost cmd favor arg "`history|tail -n2|head -n1`" tab "${ctx_tab}" note "${ctx_note}"
 }
 ShyFavors() {
-    echo -n "tab: " && read && [ "$REPLY" != "" ] && ctx_tab=$REPLY
-    echo -n "note: " && read && [ "$REPLY" != "" ] && ctx_tab=$REPLY
-    ShyFavor
+    [ "$READLINE_LINE" == "" ] && ShyPost cmd favor && return
+    ShyPost cmd favor >$READLINE_LINE
+    READLINE_LINE=""
 }
 ShySync() {
     [ "$ctx_sid" = "" ] && ShyLogin
@@ -167,11 +171,14 @@ ShyInit() {
             ;;
         *)
             PS1="\!-$$-\t[\u@\h]\W\$ "
-            PS1="\!-$$-\t\W\$ "
+            PS1="\e[32m\!\e[0m-$$-\e[31m$SPY_OWNER\e[0m@\e[33m$SPY_ROLE\e[0m[\e[32m\t\e[0m]\W\$ "
             ;;
     esac
 
-    ${ctx_bind} '"\C-t\C-t":ShySyncs base'
+    ${ctx_bind} '"\C-g\C-r":ShySyncs base'
+    ${ctx_bind} '"\C-g\C-f":ShyFavor'
+    ${ctx_bind} '"\C-gf":ShyFavor'
+    ${ctx_bind} '"\C-gF":ShyFavors'
 
     echo ${ctx_welcome}
     echo "url: ${ctx_url}"

@@ -1,4 +1,4 @@
-kit tips "便签" private "web.code.vim" favor \
+kit tips "便签" private "web.code.favor" list \
     text "" name dream imports plugin_you action auto \
     text "tip" name table imports plugin_vim_table action auto \
     text "" name index imports plugin_tip_id view tiny action auto \
@@ -7,7 +7,7 @@ kit tips "便签" private "web.code.vim" favor \
     button "记录" action auto \
     button "返回" cb Last
 
-kit editor "编辑器" private "web.code.vim" editor \
+kit editor "编辑器" private "web.code.login" list \
     text "" name sid imports plugin_vim_sid action auto \
     text "" name table imports plugin_vim_table \
     text "" name you imports plugin_you \
@@ -15,55 +15,60 @@ kit editor "编辑器" private "web.code.vim" editor \
     exports vim_sid sid \
     button "查看" action auto
 
-kit opens "文件记录" private "web.code.vim" opens \
+kit opens "文件记录" private "web.code.trend" vim opens \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
     text "times sids action files" name fields \
     button "查看" action auto
 
-kit cmds "命令记录" private "web.code.vim" cmds \
+kit cmds "命令记录" private "web.code.trend" vim cmds \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
     text "times sids cmd files" name fields \
     exports vim_word cmd \
     button "查看" action auto
 
-kit txts "插入记录" private "web.code.vim" txts \
+kit txts "插入记录" private "web.code.trend" vim txts \
     text "10" name limit view tiny \
     text "0" name offset view tiny \
     text "times sids word files line" name fields \
     exports vim_word word \
     button "查看" action auto
 
-kit bufs "文件缓存" private "web.code.vim" bufs \
+kit bufs "文件缓存" private "web.code.state" vim bufs \
+    text "" name sid imports plugin_vim_sid action auto \
     text "tag" name key view tiny \
     text "" name value \
     text "sids tag file line" name fields \
     exports vim_file file "" vim_line line \
     button "查看" action auto
 
-kit regs "粘贴缓存" private "web.code.vim" regs \
+kit regs "粘贴缓存" private "web.code.state" vim regs \
+    text "" name sid imports plugin_vim_sid action auto \
     text "reg" name key view tiny \
     text "" name value \
     text "sids reg word" name fields \
     exports vim_word word \
     button "查看" action auto
 
-kit marks "文件标记" private "web.code.vim" marks \
+kit marks "文件标记" private "web.code.state" vim marks \
+    text "" name sid imports plugin_vim_sid action auto \
     text "mark" name key view tiny \
     text "" name value \
     text "sids mark line file" name fields \
     exports vim_file file "" vim_line line "" \
     button "查看" action auto
 
-kit tags "语法标记" private "web.code.vim" tags \
+kit tags "语法标记" private "web.code.state" vim tags \
+    text "" name sid imports plugin_vim_sid action auto \
     text "tag" name key view tiny \
     text "" name value \
     text "sids tag line file" name fields \
     exports vim_file file "" vim_line line "" vim_word tag "" \
     button "查看" action auto
 
-kit fixs "项目索引" private "web.code.vim" fixs \
+kit fixs "项目索引" private "web.code.state" vim fixs \
+    text "" name sid imports plugin_vim_sid action auto \
     text "files" name key view tiny \
     text "" name value \
     text "sids word line file" name fields \

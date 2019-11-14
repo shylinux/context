@@ -13,40 +13,21 @@ fun! ShyPost(arg)
     endfor
     return system("curl -s '" . g:ctx_url . "' -H '" . g:ctx_head . "' -d '" .  json_encode(a:arg) . "' 2>/dev/null")
 endfun
-fun! Shy(action, target)
-    let arg = {"arg": a:target, "cmd": a:action}
-    let cmd = ShyPost(arg)
-    if cmd != ""
-        let arg["res"] = execute(cmd)
-        let res = ShyPost(arg)
-    endif
-endfun
 
 fun! ShyLogout()
-    call Shy("logout", "")
-    let g:ctx_sid = ""
+    if g:ctx_sid != ""
+        let g:ctx_sid = ShyPost({"cmd": "logout"})
+    endif
 endfun
 fun! ShyLogin()
     if g:ctx_sid == ""
-        let arg = {"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER}
-        let g:ctx_sid = ShyPost(arg)
+        let g:ctx_sid = ShyPost({"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER})
+        "hello
     endif
-endfun
-
-if !exists("g:favor_tab") | let favor_tab = "" | endif
-if !exists("g:favor_note") | let favor_note = "" | endif
-fun! ShyFavor(note)
-    if a:note != "" 
-        let g:favor_tab = input("tab: ", g:favor_tab)
-        let g:favor_note = input("note: ", g:favor_note)
-    endif
-    call ShyPost({"cmd": "favor", "tab": g:favor_tab, "note": g:favor_note, "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
 endfun
 
 fun! ShySync(target)
-    if bufname("%") == "ControlP"
-        return
-    end
+    if bufname("%") == "ControlP" | return | end
 
     if a:target == "read" || a:target == "write"
         call ShyPost({"cmd": a:target, "arg": expand("<afile>")})
@@ -59,19 +40,8 @@ fun! ShySync(target)
         call ShyPost({"cmd": "sync", "arg": a:target, "sub": execute(cmd[a:target])})
     endif
 endfun
-
 fun! ShyCheck(target)
-    if a:target == "favor"
-        cexpr ShyPost({"cmd": "favor"})
-    elseif a:target == "favors"
-        let msg = json_decode(ShyPost({"cmd": "favors"}))
-        let i = 0
-        for i in range(len(msg["tab"]))
-            tabnew
-            lexpr msg["fix"][i]
-            lopen
-        endfor
-    elseif a:target == "cache"
+    if a:target == "cache"
         call ShySync("bufs")
         call ShySync("regs")
         call ShySync("marks")
@@ -97,27 +67,60 @@ fun! ShyCheck(target)
     end
 endfun
 
+fun! ShyFavors()
+    let msg = json_decode(ShyPost({"cmd": "favors"}))
+    let i = 0
+    for i in range(len(msg["tab"]))
+        tabnew
+        lexpr msg["fix"][i]
+        lopen
+    endfor
+endfun
+fun! ShyFavor(note)
+    if !exists("g:favor_tab") | let g:favor_tab = "" | endif
+    if !exists("g:favor_note") | let g:favor_note = "" | endif
+    if a:note != "" 
+        let g:favor_tab = input("tab: ", g:favor_tab)
+        let g:favor_note = input("note: ", g:favor_note)
+    endif
+    call ShyPost({"cmd": "favor", "tab": g:favor_tab, "note": g:favor_note, "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
+endfun
+fun! ShyGrep(word)
+    if !exists("g:grep_dir") | let g:grep_dir = "./" | endif
+    let g:grep_dir = input("dir: ", g:grep_dir, "file")
+    execute "grep -rn --exclude tags --exclude '*.tags' " . a:word . " " . g:grep_dir
+endfun
+fun! ShyTag(word)
+    execute "tag " . a:word
+endfun
+
+fun! ShyHelp()
+    echo ShyPost({"cmd": "help"})
+endfun
+
 call ShyLogin()
-autocmd VimLeave * call ShyLogout()
-
-autocmd InsertLeave * call ShySync("insert")
-autocmd CmdlineLeave * call ShyCheck("exec")
-autocmd BufReadPost * call Shy("read", expand("<afile>"))
-autocmd BufReadPost * call ShySync("bufs")
-autocmd BufWritePre * call Shy("write", expand("<afile>"))
-
-autocmd QuickFixCmdPost * call ShyCheck("fixs")
 " call ShySync("bufs")
 call ShySync("regs")
 call ShySync("marks")
 call ShySync("tags")
 " call ShySync("fixs")
-"
-nnoremap <C-R><C-R> :call ShyCheck("cache")<CR>
-" nnoremap <C-R><C-F> :call ShyCheck("favor")<CR>
-nnoremap <C-R><C-F> :call ShyFavor("note")<CR>
-nnoremap <C-R>F :call ShyCheck("favors")<CR>
-nnoremap <C-R>f :call ShyFavor("")<CR>
+
+autocmd VimLeave * call ShyLogout()
+autocmd BufReadPost * call ShySync("bufs")
+autocmd BufReadPost * call ShySync("read")
+autocmd BufWritePre * call ShySync("write")
+autocmd CmdlineLeave * call ShyCheck("exec")
+autocmd QuickFixCmdPost * call ShyCheck("fixs")
+autocmd InsertLeave * call ShySync("insert")
+
+command ShyHelp echo ShyPost({"cmd": "help"})
+
+nnoremap <C-g><C-g> :call ShyGrep(expand("<cword>"))<CR>
+nnoremap <C-g><C-t> :call ShyTag(expand("<cword>"))<CR>
+nnoremap <C-g><C-r> :call ShyCheck("cache")<CR>
+nnoremap <C-g><C-f> :call ShyFavor("note")<CR>
+nnoremap <C-g>f :call ShyFavor("")<CR>
+nnoremap <C-g>F :call ShyFavors()<CR>
 
 " autocmd BufUnload * call Shy("close", expand("<afile>")) | call ShySync("bufs")
 " autocmd CmdlineLeave * 

@@ -553,14 +553,18 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Cmdy("ssh.data", "save", arg[1])
 
 			case "update":
-				table, index, prefix, arg := arg[1], kit.Int(arg[2])-1, "", arg[3:]
-				if arg[0] == "extra" {
-					prefix, arg = "extra.", arg[1:]
-				}
-				for i := 0; i < len(arg)-1; i += 2 {
-					m.Confv("flow", []string{m.Option("river"), "data", table, "list", kit.Format(index), prefix + arg[i]}, arg[i+1])
+				index := kit.Int(arg[2]) - 1 - m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "offset"})
+				table, prefix, arg := arg[1], "", arg[3:]
+				if index >= 0 {
+					if arg[0] == "extra" {
+						prefix, arg = "extra.", arg[1:]
+					}
+					for i := 0; i < len(arg)-1; i += 2 {
+						m.Confv("flow", []string{m.Option("river"), "data", table, "list", kit.Format(index), prefix + arg[i]}, arg[i+1])
+					}
 				}
 				m.Cmdy("ssh.data", "show", table, index+1)
+
 			case "import":
 				if len(arg) < 3 {
 					m.Cmdy("ssh.data", "show", arg)
