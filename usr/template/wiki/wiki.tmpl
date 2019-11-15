@@ -1,0 +1,9 @@
+
+{{define "table"}}<table>{{range $i, $line := .|table}}
+    {{if eq $i 0}}
+        <tr>{{range $k, $v := $line}}<th>{{$k}}</th>{{end}}</tr>
+    {{end}}
+    <tr>{{range $k, $v := $line}}<td>{{$v}}</td>{{end}}</tr>
+{{end}}</table>{{end}}
+
+{{define "code"}}<div>{{results .}}</div>{{end}}
