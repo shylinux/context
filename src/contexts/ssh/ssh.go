@@ -450,7 +450,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					})
 
 				default: // 记录值
-					index := kit.Int(arg[2]) - 1
+					index := kit.Int(arg[2]) - 1 - m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "offset"})
 					switch m.Option("format") {
 					case "object":
 						m.Confm("flow", []string{m.Option("river"), "data", arg[1], "list", kit.Format(index)}, func(key string, value string) {

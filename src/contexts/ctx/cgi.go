@@ -1,11 +1,13 @@
 package ctx
 
 import (
-	"html/template"
+	"text/template"
 
+	"bytes"
 	"io"
 	"path"
 	"strings"
+	"toolkit"
 )
 
 func index(name string, arg ...interface{}) interface{} {
@@ -75,6 +77,18 @@ func index(name string, arg ...interface{}) interface{} {
 }
 
 var CGI = template.FuncMap{
+	"options": func(arg ...interface{}) string {
+		switch value := index("option", arg...).(type) {
+		case string:
+			return value
+		case []string:
+			return strings.Join(value, "")
+		}
+		return ""
+	},
+	"option": func(arg ...interface{}) interface{} {
+		return index("option", arg...)
+	},
 	"conf": func(arg ...interface{}) interface{} {
 		switch m := arg[0].(type) {
 		case *Message:
@@ -90,20 +104,114 @@ var CGI = template.FuncMap{
 		}
 		return nil
 	},
-	"option": func(arg ...interface{}) interface{} {
-		return index("option", arg...)
-	},
-	"options": func(arg ...interface{}) string {
-		switch value := index("option", arg...).(type) {
-		case string:
-			return value
-		case []string:
-			return strings.Join(value, "")
+	"cmd": func(arg ...interface{}) interface{} {
+		switch m := arg[0].(type) {
+		case *Message:
+			switch c := arg[1].(type) {
+			case string:
+				return m.Cmd(c, arg[2:])
+			}
 		}
-		return ""
+		return nil
+	},
+	"append": func(arg ...interface{}) interface{} {
+		switch m := arg[0].(type) {
+		case *Message:
+			if len(arg) == 1 {
+				return m.Meta["append"]
+			}
+			if len(arg) > 1 {
+				switch c := arg[1].(type) {
+				case string:
+					if len(arg) > 2 {
+						switch i := arg[2].(type) {
+						case int:
+							return kit.Select("", m.Meta[c], i)
+						}
+					}
+					return m.Meta[c]
+				}
+			}
+		}
+		return nil
+	},
+	"result": func(arg ...interface{}) interface{} {
+		switch m := arg[0].(type) {
+		case *Message:
+			return m.Meta["result"]
+		}
+		return nil
+	},
+	"results": func(arg ...interface{}) interface{} {
+		switch m := arg[0].(type) {
+		case *Message:
+			return strings.Join(m.Meta["result"], "")
+		}
+		return nil
 	},
 }
 
+func LocalCGI(m *Message, c *Context) *template.FuncMap {
+	cgi := template.FuncMap{
+		"table": func(arg ...interface{}) interface{} {
+			if len(arg) == 0 {
+				return ""
+			}
+			switch msg := arg[0].(type) {
+			case *Message:
+				res := []map[string]string{}
+				msg.Table(func(index int, value map[string]string) {
+					res = append(res, value)
+				})
+				return res
+			case string:
+				sub := m.Spawn()
+				head := []string{}
+				for i, l := range strings.Split(strings.TrimSpace(msg), "\n") {
+					if i == 0 {
+						head = kit.Split(l, ' ', 100)
+						continue
+					}
+					for j, v := range strings.Split(l, " ") {
+						sub.Push(head[j], v)
+					}
+				}
+				return sub
+			}
+			return nil
+		},
+		"format": func(arg ...interface{}) interface{} {
+			switch msg := arg[0].(type) {
+			case *Message:
+				buffer := bytes.NewBuffer([]byte{})
+				tmpl := m.Optionv("tmpl").(*template.Template)
+				m.Assert(tmpl.ExecuteTemplate(buffer, kit.Select("table", arg, 1), msg))
+				return string(buffer.Bytes())
+			}
+			return nil
+		},
+	}
+	for k, v := range c.Commands {
+		if strings.HasPrefix(k, "/") || strings.HasPrefix(k, "_") {
+			continue
+		}
+		func(k string, v *Command) {
+			cgi[k] = func(arg ...interface{}) interface{} {
+				msg := m.Spawn()
+				v.Hand(msg, c, k, kit.Trans(arg)...)
+
+				buffer := bytes.NewBuffer([]byte{})
+				tmpl := m.Optionv("tmpl").(*template.Template)
+				m.Assert(tmpl.ExecuteTemplate(buffer, kit.Select("code", "table", len(msg.Meta["append"]) > 0), msg))
+				return string(buffer.Bytes())
+			}
+		}(k, v)
+	}
+	for k, v := range CGI {
+		cgi[k] = v
+	}
+	return &cgi
+}
 func ExecuteFile(m *Message, w io.Writer, p string) error {
 	tmpl := template.New("render").Funcs(CGI)
 	tmpl.ParseGlob(p)

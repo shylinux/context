@@ -9,8 +9,9 @@ import (
 
 	"bytes"
 	"encoding/json"
-	"html/template"
 	"path"
+	"strings"
+	"text/template"
 )
 
 var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
@@ -47,9 +48,9 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			},
 		}, Help: "组件列表"},
 
-		"level": {Name: "level", Value: "local/wiki/自然/编程", Help: "路由数量"},
-		"class": {Name: "class", Value: "", Help: "路由数量"},
-		"favor": {Name: "favor", Value: "index.md", Help: "路由数量"},
+		"level": {Name: "level", Value: "usr/local/wiki", Help: "文档路径"},
+		"class": {Name: "class", Value: "", Help: "文档目录"},
+		"favor": {Name: "favor", Value: "index.md", Help: "默认文档"},
 	},
 	Commands: map[string]*ctx.Command{
 		"tree": {Name: "tree", Help: "目录", Form: map[string]int{"level": 1, "class": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -61,8 +62,35 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			which := m.Cmdx("nfs.path", path.Join(m.Confx("level"), m.Confx("class", arg, 1), m.Confx("favor", arg, 0)))
 
 			buffer := bytes.NewBuffer([]byte{})
-			template.Must(template.ParseFiles(which)).Funcs(ctx.CGI).Execute(buffer, m)
+			tmpl := template.New("render").Funcs(*ctx.LocalCGI(m, c))
+
+			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl")))
+			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl")))
+			tmpl = template.Must(tmpl.ParseFiles(which))
+
+			m.Optionv("tmpl", tmpl)
+			m.Assert(tmpl.ExecuteTemplate(buffer, path.Base(which), m))
 			m.Echo(string(markdown.ToHTML(buffer.Bytes(), nil, nil)))
+			return
+		}},
+		"note": {Name: "note file", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) > 0 {
+				m.Cmd(kit.Select("tree", "text", strings.HasSuffix(arg[0], ".md")), arg[0])
+			} else {
+				m.Cmd("tree")
+			}
+			return
+		}},
+		"runs": {Name: "run", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy(arg).Set("append")
+			return
+		}},
+		"run": {Name: "run", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy(arg)
+			return
+		}},
+		"time": {Name: "time", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy("cli.time", "show").Set("append")
 			return
 		}},
 
@@ -116,21 +144,6 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 					data[kit.Int(arg[i])][kit.Int(arg[i+1])] = arg[i+2]
 				}
 				m.Cmdy("ssh.data", "update", "xls", arg[0], "content", kit.Format(data))
-			}
-			return
-		}},
-		"tip": {Name: "tip action table index ...", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			switch arg[0] {
-			case "show":
-				if len(arg) == 1 || arg[2] == "" {
-					m.Cmdy("ssh.data", "show", arg[1])
-				} else {
-					m.Cmdy("ssh.data", "show", arg[1], arg[2])
-				}
-			case "insert":
-				m.Cmdy("ssh.data", "insert", arg[1], arg[3:])
-			case "update":
-				m.Cmdy("ssh.data", "update", arg[1], arg[2], arg[3:])
 			}
 			return
 		}},

@@ -1493,6 +1493,10 @@ function Output(plugin, type, msg, cb, target, option) {
                                     kit.Selector(option, ".args", function(item) {
                                         msg.Option(item.name, item.value)
                                     })
+                                    if (name == "value") {
+                                        name = line.key
+                                        id = option.index.value
+                                    }
                                     plugin.Run(event, [id, meta[item], name, event.target.value], function(msg) {
                                         td.innerHTML = event.target.value
                                         plugin.ontoast("修改成功")

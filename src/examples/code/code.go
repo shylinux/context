@@ -232,7 +232,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					m.Cmdy("ssh._route", m.Option("dream"), "ssh.data", "update", m.Option("table"), arg[1], arg[3], arg[4])
 					arg = []string{"list", m.Option("dream"), m.Option("table")}
 				}
-				m.Cmdy("ssh._route", arg[1], "ssh.data", "show", arg[2:])
+				if len(arg) > 1 {
+					m.Cmdy("ssh._route", arg[1], "ssh.data", "show", arg[2:])
+					break
+				}
+				m.Cmdy("ssh.data", "show")
 			}
 			return
 		}},

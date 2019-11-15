@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -22,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 type MUX interface {
