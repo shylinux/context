@@ -1528,6 +1528,15 @@ function Output(plugin, type, msg, cb, target, option) {
                 target.innerHTML = "", plugin.onfigure.meta.max(target)
                 output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
                 kit._call(cb, [msg])
+                kit.Selector(target, ".commit", function(item) {
+                    var data = item.dataset
+                    item.oncontextmenu = function(event) {
+                        plugin.oncarte(event, shy("", {}, ["提交"], function(event, value, meta) {
+                            plugin.Run(event, [option.you.vaule||"", "commit", option.doc.value||"", data.name, "table", data.data], function(msg) {
+                            }, true)
+                        }))
+                    }
+                })
             },
             _svg: function(target, width, height, src) {
                 target.innerHTML = '<embed src="'+src+'" width="'+width+'" height="'+height+'" type="image/svg+xml" pluginspage="http://www.adobe.com/svg/viewer/install/" />'

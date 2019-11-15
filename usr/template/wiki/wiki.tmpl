@@ -1,9 +1,11 @@
 
-{{define "table"}}<table>{{range $i, $line := .|table}}
-    {{if eq $i 0}}
-        <tr>{{range $k, $v := $line}}<th>{{$k}}</th>{{end}}</tr>
-    {{end}}
-    <tr>{{range $k, $v := $line}}<td>{{$v}}</td>{{end}}</tr>
+{{define "table"}}<table class="commit" data-file='{{options . "file"}}' data-name='{{options . "name"}}' data-data='{{options . "data"}}'
+            data-commit_time='{{options . "prev_time"}}' data-commit_data='{{options . "prev_data"}}'>{{range $i, $line := .|trans}}
+{{if eq $i 0}}
+<tr>{{range $i, $v := $line}}<th>{{$v}}</th>{{end}}</tr>
+{{else}}
+<tr>{{range $i, $v := $line}}<td>{{$v}}</td>{{end}}</tr>
+{{end}}
 {{end}}</table>{{end}}
 
 {{define "code"}}<div>{{results .}}</div>{{end}}

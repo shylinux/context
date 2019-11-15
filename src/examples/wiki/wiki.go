@@ -51,6 +51,12 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		"level": {Name: "level", Value: "usr/local/wiki", Help: "文档路径"},
 		"class": {Name: "class", Value: "", Help: "文档目录"},
 		"favor": {Name: "favor", Value: "index.md", Help: "默认文档"},
+
+		"commit": {Name: "data", Value: map[string]interface{}{
+			"data": map[string]interface{}{},
+			"ship": map[string]interface{}{},
+			"head": map[string]interface{}{},
+		}, Help: "数据"},
 	},
 	Commands: map[string]*ctx.Command{
 		"tree": {Name: "tree", Help: "目录", Form: map[string]int{"level": 1, "class": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -69,15 +75,79 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			tmpl = template.Must(tmpl.ParseFiles(which))
 
 			m.Optionv("tmpl", tmpl)
-			m.Assert(tmpl.ExecuteTemplate(buffer, path.Base(which), m))
+			m.Assert(tmpl.ExecuteTemplate(buffer, m.Option("filename", path.Base(which)), m))
 			m.Echo(string(markdown.ToHTML(buffer.Bytes(), nil, nil)))
 			return
 		}},
 		"note": {Name: "note file", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 0 {
+			if len(arg) > 1 && arg[0] == "commit" {
+				m.Cmd("commit", arg[1:])
+			} else if len(arg) > 0 {
 				m.Cmd(kit.Select("tree", "text", strings.HasSuffix(arg[0], ".md")), arg[0])
 			} else {
 				m.Cmd("tree")
+			}
+			return
+		}},
+		"commit": {Name: "commit file name type text", Help: "提交", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			head := kit.Hashs(arg[0], arg[1])
+			prev := m.Conf("commit", []string{"head", head, "ship"})
+			m.Log("info", "head: %v %v", head, m.Conf("commit", []string{"head", head}))
+			if len(arg) == 2 {
+				meta := m.Confm("commit", []string{"ship", prev})
+				m.Push("time", meta["time"])
+				m.Push("data", m.Conf("commit", []string{"data", kit.Format(meta["data"])}))
+				m.Table()
+				return
+			}
+
+			data := kit.Hashs(arg[3])
+			m.Log("info", "data: %v %v", data, arg[3])
+			m.Conf("commit", []string{"data", data}, arg[3])
+
+			meta := map[string]interface{}{
+				"prev": prev,
+				"time": m.Time(),
+				"file": arg[0],
+				"name": arg[1],
+				"type": arg[2],
+				"data": data,
+			}
+			ship := kit.Hashs(kit.Format(meta))
+			m.Log("info", "ship: %v %v", ship, meta)
+			m.Conf("commit", []string{"ship", ship}, meta)
+
+			m.Log("info", "head: %v %v", head, ship)
+			m.Conf("commit", []string{"head", head, "ship"}, ship)
+			m.Echo("%v", kit.Formats(meta))
+			return
+		}},
+		"table": {Name: "table", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				return
+			}
+			switch arg[1] {
+			case "data":
+				arg = []string{arg[0], m.Conf("commit", []string{"data", arg[2]})}
+
+			default:
+				msg := m.Spawn().Cmd("commit", m.Option("filename"), arg[0])
+				m.Option("prev_data", msg.Append("data"))
+				m.Option("prev_time", msg.Append("time"))
+				m.Option("file", m.Option("filename"))
+				m.Option("name", arg[0])
+				m.Option("data", arg[1])
+			}
+
+			head := []string{}
+			for i, l := range strings.Split(strings.TrimSpace(arg[1]), "\n") {
+				if i == 0 {
+					head = kit.Split(l, ' ', 100)
+					continue
+				}
+				for j, v := range strings.Split(l, " ") {
+					m.Push(head[j], v)
+				}
 			}
 			return
 		}},

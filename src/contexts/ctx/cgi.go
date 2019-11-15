@@ -135,6 +135,21 @@ var CGI = template.FuncMap{
 		}
 		return nil
 	},
+	"trans": func(arg ...interface{}) interface{} {
+		switch m := arg[0].(type) {
+		case *Message:
+			list := [][]string{m.Meta["append"]}
+			m.Table(func(index int, value map[string]string) {
+				line := []string{}
+				for _, k := range m.Meta["append"] {
+					line = append(line, value[k])
+				}
+				list = append(list, line)
+			})
+			return list
+		}
+		return nil
+	},
 	"result": func(arg ...interface{}) interface{} {
 		switch m := arg[0].(type) {
 		case *Message:
@@ -153,33 +168,6 @@ var CGI = template.FuncMap{
 
 func LocalCGI(m *Message, c *Context) *template.FuncMap {
 	cgi := template.FuncMap{
-		"table": func(arg ...interface{}) interface{} {
-			if len(arg) == 0 {
-				return ""
-			}
-			switch msg := arg[0].(type) {
-			case *Message:
-				res := []map[string]string{}
-				msg.Table(func(index int, value map[string]string) {
-					res = append(res, value)
-				})
-				return res
-			case string:
-				sub := m.Spawn()
-				head := []string{}
-				for i, l := range strings.Split(strings.TrimSpace(msg), "\n") {
-					if i == 0 {
-						head = kit.Split(l, ' ', 100)
-						continue
-					}
-					for j, v := range strings.Split(l, " ") {
-						sub.Push(head[j], v)
-					}
-				}
-				return sub
-			}
-			return nil
-		},
 		"format": func(arg ...interface{}) interface{} {
 			switch msg := arg[0].(type) {
 			case *Message:
