@@ -91,7 +91,7 @@ Shy() {
 }
 
 ShyLogout() {
-    echo ${ctx_goodbye} && sleep 1 && [ "$ctx_sid" != "" ] && Shy logout
+    echo ${ctx_goodbye} && [ "$ctx_sid" != "" ] && Shy logout
 }
 ShyLogin() {
     HOST=`hostname` ctx_sid=`ShyPost cmd login pid "$$" pane "${TMUX_PANE}" hostname "${HOST}" username "${USER}"`

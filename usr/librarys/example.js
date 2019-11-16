@@ -1533,7 +1533,7 @@ function Output(plugin, type, msg, cb, target, option) {
                 target.innerHTML = "", plugin.onfigure.meta.max(target)
                 output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
                 kit._call(cb, [msg])
-                kit.Selector(target, ".commit", function(item) {
+                kit.Selector(target, "table.story", function(item) {
                     var data = item.dataset
                     item.oncontextmenu = function(event) {
                         plugin.oncarte(event, shy("", {

@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"path"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -57,6 +58,16 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			"node": map[string]interface{}{},
 			"head": map[string]interface{}{},
 		}, Help: "故事会"},
+
+		"template": {Name: "template", Value: map[string]interface{}{
+			"list": []interface{}{
+				`{{define "raw"}}{{.|results}}{{end}}`,
+				`{{define "title"}}{{.|results}}{{end}}`,
+				`{{define "chapter"}}{{.|results}}{{end}}`,
+				`{{define "section"}}{{.|results}}{{end}}`,
+				`{{define "block"}}<div>{{.|results}}<div>{{end}}`,
+			},
+		}, Help: "故事会"},
 	},
 	Commands: map[string]*ctx.Command{
 		"tree": {Name: "tree", Help: "目录", Form: map[string]int{"level": 1, "class": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -67,19 +78,30 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		"text": {Name: "text", Help: "文章", Form: map[string]int{"level": 1, "class": 1, "favor": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			which := m.Cmdx("nfs.path", path.Join(m.Confx("level"), m.Confx("class", arg, 1), m.Confx("favor", arg, 0)))
 
-			buffer := bytes.NewBuffer([]byte{})
 			tmpl := template.New("render").Funcs(*ctx.LocalCGI(m, c))
-
+			m.Confm("template", "list", func(index int, value string) { tmpl = template.Must(tmpl.Parse(value)) })
 			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl")))
 			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl")))
 			tmpl = template.Must(tmpl.ParseFiles(which))
-
+			for i, v := range tmpl.Templates() {
+				m.Log("fuck", "%v, %v", i, v.Name())
+			}
+			m.Optionv("title", map[string]int{})
 			m.Optionv("tmpl", tmpl)
+			m.Option("render", "")
+
+			buffer := bytes.NewBuffer([]byte{})
 			m.Assert(tmpl.ExecuteTemplate(buffer, m.Option("filename", path.Base(which)), m))
-			m.Echo(string(markdown.ToHTML(buffer.Bytes(), nil, nil)))
+			data := markdown.ToHTML(buffer.Bytes(), nil, nil)
+			m.Echo(string(data))
+			if f, p, e := kit.Create(path.Join("var/tmp/file", which)); e == nil {
+				defer f.Close()
+				f.Write(data)
+				m.Log("info", "save %v", p)
+			}
 			return
 		}},
-		"note": {Name: "note file", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"note": {Name: "note file|favor|commit", Help: "笔记", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				m.Cmd("tree")
 				return
@@ -93,7 +115,8 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			}
 			return
 		}},
-		"story": {Name: "story commit story scene enjoy happy", Help: "故事会", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+
+		"story": {Name: "story favor|commit|branch|remote story scene enjoy happy", Help: "故事会", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			switch arg[0] {
 			case "favor":
 				if len(arg) < 4 {
@@ -159,34 +182,31 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			}
 			return
 		}},
-		"table": {Name: "table", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
-			switch len(arg) {
-			case 0:
-				return
-			case 2:
-				if arg[1] != "head" {
-					break
-				}
-				fallthrough
-			case 1:
-				arg = []string{arg[0], "head", kit.Hashs(m.Option("filename"), arg[1])}
-				fallthrough
-			default:
-				switch arg[1] {
-				case "name":
-					arg = []string{arg[0], "head", kit.Hashs(m.Option("filename"), arg[2])}
-					fallthrough
-				case "head":
-					arg = []string{arg[0], "node", m.Conf("story", []string{"head", arg[2], "node"})}
-					fallthrough
-				case "node":
-					arg = []string{arg[0], "data", m.Conf("story", []string{"node", arg[2], "data"})}
-					fallthrough
-				case "data":
-					arg = []string{arg[0], m.Conf("story", []string{"data", arg[2]})}
-				}
+		"index": {Name: "index name|hash", Help: "索引", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			scene := ""
+			if hash := m.Conf("story", []string{"head", kit.Hashs(m.Option("filename"), arg[0]), "node"}); hash != "" {
+				arg[0] = hash
+			} else if hash := m.Conf("story", []string{"head", arg[0], "node"}); hash != "" {
+				arg[0] = hash
 			}
-
+			if hash := m.Conf("story", []string{"node", arg[0], "data"}); hash != "" {
+				scene = m.Conf("story", []string{"node", arg[0], "scene"})
+				arg[0] = hash
+			}
+			if data := m.Conf("story", []string{"data", arg[0]}); data != "" {
+				arg[0] = data
+			}
+			if scene != "" {
+				m.Cmdy(scene, "", arg[0])
+			} else {
+				m.Echo(arg[0])
+			}
+			return
+		}},
+		"table": {Name: "table name data", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			if len(arg) < 2 {
+				return
+			}
 			m.Option("scene", cmd)
 			m.Option("enjoy", arg[0])
 			m.Option("happy", arg[1])
@@ -203,6 +223,35 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			}
 			return
 		}},
+		"refer": {Name: "refer", Help: "链接地址", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			m.Set("option", "render", "raw").Echo("%s: %s", arg[0], arg[1])
+			return
+		}},
+
+		"title": {Name: "title text", Help: "一级标题", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			m.Set("option", "render", cmd).Echo(kit.Select("", arg, 0))
+			return
+		}},
+		"chapter": {Name: "chaper text", Help: "二级标题", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			prefix := ""
+			if title, ok := m.Optionv("title").(map[string]int); ok {
+				title["chapter"]++
+				title["section"] = 0
+				prefix = strconv.Itoa(title["chapter"]) + " "
+			}
+			m.Set("option", "render", cmd).Echo(prefix + kit.Select("", arg, 0))
+			return
+		}},
+		"section": {Name: "section text", Help: "三级标题", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			prefix := ""
+			if title, ok := m.Optionv("title").(map[string]int); ok {
+				title["section"]++
+				prefix = strconv.Itoa(title["chapter"]) + "." + strconv.Itoa(title["section"]) + " "
+			}
+			m.Set("option", "render", cmd).Echo(prefix + kit.Select("", arg, 0))
+			return
+		}},
+
 		"runs": {Name: "run", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmdy(arg).Set("append")
 			return
@@ -220,7 +269,6 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			m.Echo(arg[0])
 			return
 		}},
-
 		"xls": {Name: "xls", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch len(arg) {
 			case 0:

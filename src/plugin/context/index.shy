@@ -4,6 +4,7 @@ kit project "项目" private \
 	text "" name see imports plugin_see action auto \
 	button "执行" \
 	button "返回" cb Last \
+    feature detail "加载" "复制" "下载" \
     exports see name see
 
 kit compile "编译" private \

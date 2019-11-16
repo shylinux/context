@@ -28,7 +28,11 @@ func index(name string, arg ...interface{}) interface{} {
 			}
 		case string:
 			if len(arg) == 2 {
-				return m.Optionv(value)
+				if name == "option" {
+					return m.Optionv(value)
+				} else {
+					return m.Append(value)
+				}
 			}
 
 			switch val := arg[2].(type) {
@@ -114,6 +118,15 @@ var CGI = template.FuncMap{
 		}
 		return nil
 	},
+	"appends": func(arg ...interface{}) interface{} {
+		switch value := index("append", arg...).(type) {
+		case string:
+			return value
+		case []string:
+			return strings.Join(value, "")
+		}
+		return ""
+	},
 	"append": func(arg ...interface{}) interface{} {
 		switch m := arg[0].(type) {
 		case *Message:
@@ -184,14 +197,16 @@ func LocalCGI(m *Message, c *Context) *template.FuncMap {
 			continue
 		}
 		func(k string, v *Command) {
-			cgi[k] = func(arg ...interface{}) interface{} {
-				msg := m.Spawn()
-				v.Hand(msg, c, k, kit.Trans(arg)...)
+			cgi[k] = func(arg ...interface{}) (res interface{}) {
+				m.TryCatch(m.Spawn(), true, func(msg *Message) {
+					v.Hand(msg, c, k, kit.Trans(arg)...)
 
-				buffer := bytes.NewBuffer([]byte{})
-				tmpl := m.Optionv("tmpl").(*template.Template)
-				m.Assert(tmpl.ExecuteTemplate(buffer, kit.Select("code", "table", len(msg.Meta["append"]) > 0), msg))
-				return string(buffer.Bytes())
+					buffer := bytes.NewBuffer([]byte{})
+					m.Assert(m.Optionv("tmpl").(*template.Template).ExecuteTemplate(buffer,
+						kit.Select(kit.Select("code", "table", len(msg.Meta["append"]) > 0), msg.Option("render")), msg))
+					res = string(buffer.Bytes())
+				})
+				return
 			}
 		}(k, v)
 	}
