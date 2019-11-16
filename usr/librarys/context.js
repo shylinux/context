@@ -58,8 +58,15 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
             Result: function() {return msg.result? msg.result.join(""): ""},
             Results: function() {return kit.Color(msg.Result().replace(/</g, "&lt;").replace(/>/g, "&gt;"))},
             Table: function(cb) {if (!msg.append || !msg.append.length || !msg[msg.append[0]]) {return}
-                return kit.List(msg[msg.append[0]], function(value, index, array) {var one = {}
-                    msg.append.forEach(function(key) {one[key] = msg[key][index]})
+                var max = "", len = 0
+                kit.List(msg.append, function(key, index) {
+                    if (msg[key].length > len) {
+                        max = key, len = msg[key].length
+                    }
+                })
+
+                return kit.List(msg[max], function(value, index, array) {var one = {}
+                    msg.append.forEach(function(key) {one[key] = msg[key][index]||""})
                     return kit._call(cb, [one, index, array])
                 })
             },

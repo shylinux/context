@@ -363,6 +363,10 @@ kit = toolkit = (function() {var kit = {__proto__: document,
                     kit.Selector(table, "tr", function(item, i) {item == target.parentElement && (index = i)})
                     var name = target.parentElement.parentElement.querySelector("tr").childNodes[i].innerText
                     name.startsWith(field) && kit._call(event.type=="contextmenu"? cbs: cb, [event, item.innerText, name, item.parentNode.Meta, index])
+                } else if (target.parentNode.tagName == "TD"){
+                    kit.Selector(table, "tr", function(item, i) {item == target.parentElement.parentElement && (index = i)})
+                    var name = target.parentElement.parentElement.parentElement.querySelector("tr").childNodes[i].innerText
+                    name.startsWith(field) && kit._call(event.type=="contextmenu"? cbs: cb, [event, item.innerText, name, item.parentNode.Meta, index])
                 }
             })
             kit.CopyText()

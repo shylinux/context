@@ -1059,9 +1059,9 @@ function Plugin(page, pane, field, inits, runs) {
                     kit.classList.add(item, "args")
                     break
                 case "textarea":
-                    var half = parseInt(item.half||"1")||1
+                    var half = parseFloat(item.half||"1")||1
                     kit.AppendChild(option, "br")
-                    input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+((pane.target.clientWidth-35)/half)+"px"
+                    input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+parseInt(((pane.target.clientWidth-35)/half))+"px"
                     // no break
                 case "text":
                     item.value = value || item.value || ""
@@ -1483,6 +1483,10 @@ function Output(plugin, type, msg, cb, target, option) {
                             var text = td.innerText.trim()
                             if (typeof meta[item] == "function") {meta[item](event, text); return}
 
+                            var msg = plugin.Event(event)
+                            kit.Selector(option, ".args", function(item) {
+                                msg.Option(item.name, item.value)
+                            })
                             item == "修改"? (text = kit.AppendChilds(td, [{type: "input", value: text, style: {width: td.clientWidth+"px"}, data: {onkeydown: function(event) {
                                 if (event.key == "Enter") {
                                     var id = ""
@@ -1504,7 +1508,7 @@ function Output(plugin, type, msg, cb, target, option) {
                                     }, true)
                                     return
                                 }
-                            }}}]).input, text.focus(), text.setSelectionRange(0, -1)): output[meta[item]]? output[meta[item]](event): plugin.Run(event, [(line[exports[1]]||"").trim(), meta[item]||item], function(msg) {
+                            }}}]).input, text.focus(), text.setSelectionRange(0, -1)): output[meta[item]]? output[meta[item]](event): plugin.Run(event, [td.dataset.id||(line[exports[1]]||"").trim(), meta[item]||item], function(msg) {
                                 console.log(msg)
                             })
 
