@@ -1,11 +1,3 @@
-kit note "记事本" public "ssh._route" _ "web.wiki.note" \
-	text "" name you imports plugin_you action auto \
-	text "" name doc imports plugin_doc view long action auto \
-	button "查看" action auto \
-	button "返回" cb Last \
-    exports doc file \
-    feature display inner
-
 kit tips "便签" private "web.code.favor" list \
     text "" name dream imports plugin_you action auto \
     text "tip" name table imports plugin_vim_table action auto \

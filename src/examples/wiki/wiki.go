@@ -52,11 +52,11 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		"class": {Name: "class", Value: "", Help: "文档目录"},
 		"favor": {Name: "favor", Value: "index.md", Help: "默认文档"},
 
-		"commit": {Name: "data", Value: map[string]interface{}{
+		"story": {Name: "story", Value: map[string]interface{}{
 			"data": map[string]interface{}{},
-			"ship": map[string]interface{}{},
+			"node": map[string]interface{}{},
 			"head": map[string]interface{}{},
-		}, Help: "数据"},
+		}, Help: "故事会"},
 	},
 	Commands: map[string]*ctx.Command{
 		"tree": {Name: "tree", Help: "目录", Form: map[string]int{"level": 1, "class": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -80,64 +80,116 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			return
 		}},
 		"note": {Name: "note file", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) > 1 && arg[0] == "commit" {
-				m.Cmd("commit", arg[1:])
-			} else if len(arg) > 0 {
-				m.Cmd(kit.Select("tree", "text", strings.HasSuffix(arg[0], ".md")), arg[0])
-			} else {
+			if len(arg) == 0 {
 				m.Cmd("tree")
+				return
+			}
+
+			switch arg[0] {
+			case "favor", "commit":
+				m.Cmd("story", arg[0], arg[1:])
+			default:
+				m.Cmd(kit.Select("tree", "text", strings.HasSuffix(arg[0], ".md")), arg[0])
 			}
 			return
 		}},
-		"commit": {Name: "commit file name type text", Help: "提交", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			head := kit.Hashs(arg[0], arg[1])
-			prev := m.Conf("commit", []string{"head", head, "ship"})
-			m.Log("info", "head: %v %v", head, m.Conf("commit", []string{"head", head}))
-			if len(arg) == 2 {
-				meta := m.Confm("commit", []string{"ship", prev})
-				m.Push("time", meta["time"])
-				m.Push("data", m.Conf("commit", []string{"data", kit.Format(meta["data"])}))
+		"story": {Name: "story commit story scene enjoy happy", Help: "故事会", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			switch arg[0] {
+			case "favor":
+				if len(arg) < 4 {
+					m.Cmdy("ssh.data", "show", arg[1:])
+					break
+				}
+
+				head := kit.Hashs(arg[2], arg[4])
+				prev := m.Conf(cmd, []string{"head", head, "node"})
+				m.Cmdy("ssh.data", "insert", arg[1], "story", arg[2], "scene", arg[3], "enjoy", arg[4], "node", prev)
+
+			case "commit":
+				head := kit.Hashs(arg[1], arg[3])
+				prev := m.Conf(cmd, []string{"head", head, "node"})
+				m.Log("info", "head: %v %#v", head, prev)
+
+				if len(arg) > 4 {
+					data := kit.Hashs(arg[4])
+					m.Log("info", "data: %v %v", data, arg[4])
+					if m.Conf(cmd, []string{"node", prev, "data"}) != data {
+						m.Conf(cmd, []string{"data", data}, arg[4])
+
+						meta := map[string]interface{}{
+							"time":  m.Time(),
+							"story": arg[1],
+							"scene": arg[2],
+							"enjoy": arg[3],
+							"data":  data,
+							"prev":  prev,
+						}
+						node := kit.Hashs(kit.Format(meta))
+						m.Log("info", "node: %v %v", node, meta)
+						m.Conf(cmd, []string{"node", node}, meta)
+
+						m.Log("info", "head: %v %v", head, node)
+						m.Conf(cmd, []string{"head", head, "node"}, node)
+						m.Echo("%v", kit.Formats(meta))
+						break
+					}
+				}
+
+				for prev != "" {
+					node := m.Confm(cmd, []string{"node", prev})
+					m.Push("node", kit.Short(prev, 6))
+					m.Push("time", node["time"])
+					m.Push("data", m.Conf(cmd, []string{"data", kit.Format(node["data"])}))
+					prev = kit.Format(node["prev"])
+				}
 				m.Table()
 				return
+
+			case "branch":
+				m.Confm(cmd, "head", func(key string, value map[string]interface{}) {
+					node := kit.Format(value["node"])
+					m.Push("key", kit.Short(key, 6))
+					m.Push("story", m.Conf(cmd, []string{"node", node, "story"}))
+					m.Push("scene", m.Conf(cmd, []string{"node", node, "scene"}))
+					m.Push("enjoy", m.Conf(cmd, []string{"node", node, "enjoy"}))
+					m.Push("node", kit.Short(value["node"], 6))
+				})
+				m.Table()
+			case "remote":
 			}
-
-			data := kit.Hashs(arg[3])
-			m.Log("info", "data: %v %v", data, arg[3])
-			m.Conf("commit", []string{"data", data}, arg[3])
-
-			meta := map[string]interface{}{
-				"prev": prev,
-				"time": m.Time(),
-				"file": arg[0],
-				"name": arg[1],
-				"type": arg[2],
-				"data": data,
-			}
-			ship := kit.Hashs(kit.Format(meta))
-			m.Log("info", "ship: %v %v", ship, meta)
-			m.Conf("commit", []string{"ship", ship}, meta)
-
-			m.Log("info", "head: %v %v", head, ship)
-			m.Conf("commit", []string{"head", head, "ship"}, ship)
-			m.Echo("%v", kit.Formats(meta))
 			return
 		}},
-		"table": {Name: "table", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			if len(arg) == 0 {
+		"table": {Name: "table", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			switch len(arg) {
+			case 0:
 				return
-			}
-			switch arg[1] {
-			case "data":
-				arg = []string{arg[0], m.Conf("commit", []string{"data", arg[2]})}
-
+			case 2:
+				if arg[1] != "head" {
+					break
+				}
+				fallthrough
+			case 1:
+				arg = []string{arg[0], "head", kit.Hashs(m.Option("filename"), arg[1])}
+				fallthrough
 			default:
-				msg := m.Spawn().Cmd("commit", m.Option("filename"), arg[0])
-				m.Option("prev_data", msg.Append("data"))
-				m.Option("prev_time", msg.Append("time"))
-				m.Option("file", m.Option("filename"))
-				m.Option("name", arg[0])
-				m.Option("data", arg[1])
+				switch arg[1] {
+				case "name":
+					arg = []string{arg[0], "head", kit.Hashs(m.Option("filename"), arg[2])}
+					fallthrough
+				case "head":
+					arg = []string{arg[0], "node", m.Conf("story", []string{"head", arg[2], "node"})}
+					fallthrough
+				case "node":
+					arg = []string{arg[0], "data", m.Conf("story", []string{"node", arg[2], "data"})}
+					fallthrough
+				case "data":
+					arg = []string{arg[0], m.Conf("story", []string{"data", arg[2]})}
+				}
 			}
+
+			m.Option("scene", cmd)
+			m.Option("enjoy", arg[0])
+			m.Option("happy", arg[1])
 
 			head := []string{}
 			for i, l := range strings.Split(strings.TrimSpace(arg[1]), "\n") {

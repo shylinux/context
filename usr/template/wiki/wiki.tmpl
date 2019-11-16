@@ -1,6 +1,6 @@
 
-{{define "table"}}<table class="commit" data-file='{{options . "file"}}' data-name='{{options . "name"}}' data-data='{{options . "data"}}'
-            data-commit_time='{{options . "prev_time"}}' data-commit_data='{{options . "prev_data"}}'>{{range $i, $line := .|trans}}
+{{define "table"}}<table class="commit" data-scene='{{options . "scene"}}'
+    data-enjoy='{{options . "enjoy"}}' data-happy='{{options . "happy"}}'>{{range $i, $line := .|trans}}
 {{if eq $i 0}}
 <tr>{{range $i, $v := $line}}<th>{{$v}}</th>{{end}}</tr>
 {{else}}

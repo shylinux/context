@@ -1059,8 +1059,9 @@ function Plugin(page, pane, field, inits, runs) {
                     kit.classList.add(item, "args")
                     break
                 case "textarea":
+                    var half = parseInt(item.half||"1")||1
                     kit.AppendChild(option, "br")
-                    input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+(pane.target.clientWidth-35)+"px"
+                    input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+((pane.target.clientWidth-35)/half)+"px"
                     // no break
                 case "text":
                     item.value = value || item.value || ""
@@ -1531,9 +1532,26 @@ function Output(plugin, type, msg, cb, target, option) {
                 kit.Selector(target, ".commit", function(item) {
                     var data = item.dataset
                     item.oncontextmenu = function(event) {
-                        plugin.oncarte(event, shy("", {}, ["提交"], function(event, value, meta) {
-                            plugin.Run(event, [option.you.vaule||"", "commit", option.doc.value||"", data.name, "table", data.data], function(msg) {
-                            }, true)
+                        plugin.oncarte(event, shy("", {
+                            "提交": function(event) {
+                                plugin.Run(event, [option.dream.value, "commit", option.story.value, data.scene, data.enjoy, data.happy], function(msg) {
+                                }, true)
+                            },
+                            "复制": function(event) {
+                                plugin.ontoast(kit.CopyText(data.happy))
+                            },
+                            "收藏": function(event) {
+                                kit.prompt("收藏到", function(table) {
+                                    plugin.Run(event, [option.dream.value, "favor", table, option.story.value, data.scene, data.enjoy, data.happy], function(msg) {
+                                    }, true)
+                                })
+                            },
+                            "共享": function(event) {
+                                plugin.Run(event, [option.dream.value, "share", option.story.value, data.scene, data.enjoy, data.happy], function(msg) {
+                                }, true)
+                            },
+                        }, ["提交", "复制", "收藏", "共享"], function(event, value, meta) {
+                            meta[value](event)
                         }))
                     }
                 })

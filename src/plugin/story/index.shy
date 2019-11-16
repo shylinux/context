@@ -1,0 +1,41 @@
+kit note "记事本" public "ssh._route" _ "web.wiki.note" \
+	text "" name dream imports plugin_dream action auto \
+	text "" name story imports plugin_story view long action auto \
+	button "查看" action auto \
+	button "返回" cb Last \
+    exports story file \
+    feature display inner
+
+kit favor "收藏夹" public "ssh._route" _ "web.wiki.story" favor \
+    text "" name dream imports plugin_you action auto \
+    text "see" name table imports plugin_story_table action auto \
+    text "" name index imports plugin_story_id view tiny action auto \
+    feature detail "修改" "复制" "下载" \
+    exports story_table table "" story_id id "" \
+    button "记录" action auto \
+    button "返回" cb Last
+
+kit commit "记录" public "ssh._route" _ "web.wiki.story" commit \
+	text "" name dream imports plugin_dream \
+	text "" name story imports plugin_story \
+	text "table" name sence \
+	text "hello" name enjoy \
+	textarea "" name happy half 4 \
+	button "提交"
+
+kit branch "分支" public "ssh._route" _ "web.wiki.story" branch \
+	text "" name dream imports plugin_dream \
+	button "查看"
+
+kit remote "仓库" public "ssh._route" _ "web.wiki.story" remote \
+	text "" name dream imports plugin_dream \
+	button "查看"
+
+kit xls "表格" "index.js" "index.css" private "web.wiki.xls" \
+	text "" name scene imports plugin_xls_id action auto \
+	text "" name content \
+	button "执行" \
+	button "返回" cb Last \
+    feature style "mind" \
+    exports xls_id id
+

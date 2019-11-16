@@ -21,6 +21,8 @@
     config load tmp/code.json login
     config load tmp/zsh.json zsh
     config load tmp/vim/vim.json vim
+~wiki
+    config load tmp/story.json story
 
 # 终端配置
 ~cli

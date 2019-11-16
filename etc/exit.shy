@@ -1,4 +1,6 @@
 # 应用配置
+~wiki
+    config save var/tmp/story.json story
 ~code
     config save var/tmp/vim/vim.json vim
     config save var/tmp/zsh.json zsh
