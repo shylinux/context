@@ -1,0 +1,40 @@
+fun date "每一天" "index.js" "index.css" protected \
+	text "love" name "table" imports plugin_table view tiny \
+	text "2019-10-16" name "起始时间" \
+	text "" name "截止时间" init date \
+	button "日历" action auto \
+	button "记录" cb data \
+	button "展示" cb show \
+	exports index ""
+
+    if $2 == "" || $3 == ""
+        copy skip ssh.data show _ fields id when where what
+    else
+        copy skip cli.date $2 nature $3 space true format '<span class="%s">%s</span>' "s20060102"
+    end
+end
+
+kit progress "任务进度" public "web.team.task" progress \
+	text "task" name table \
+    feature detail prepare action cancel finish \
+	button "查看"
+
+kit create "创建任务" public "web.team.task" \
+	text "task" name table \
+	text "" name index \
+	select "3" name level values 1 values 2 values 3 values 4 values 5 \
+	select "prepare" name status values prepare values action values finish values cancel \
+	text "" name begin_time init date \
+	text "" name close_time init date \
+	text "" name target view full \
+	textarea "" name detail half "1.5" \
+	button "添加"
+
+kit select "查看任务" public "web.team.task" \
+	text "task" name table imports pluing_table \
+	text "" name index imports plugin_task_id action auto \
+	button "查看" action auto \
+    button "返回" cb Last \
+    feature detail "修改" "复制" "下载" \
+    exports task_id id
+
