@@ -84,7 +84,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl")))
 			tmpl = template.Must(tmpl.ParseFiles(which))
 			for i, v := range tmpl.Templates() {
-				m.Log("fuck", "%v, %v", i, v.Name())
+				m.Log("info", "%v, %v", i, v.Name())
 			}
 			m.Optionv("title", map[string]int{})
 			m.Optionv("tmpl", tmpl)
@@ -217,14 +217,14 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 					head = kit.Split(l, ' ', 100)
 					continue
 				}
-				for j, v := range strings.Split(l, " ") {
+				for j, v := range kit.Split(l, ' ', 100) {
 					m.Push(head[j], v)
 				}
 			}
 			return
 		}},
 		"refer": {Name: "refer", Help: "链接地址", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
-			m.Set("option", "render", "raw").Echo("%s: %s", arg[0], arg[1])
+			m.Set("option", "render", "raw").Echo(`%s: <a href="%s" target="_blank">%s</a>`, arg[0], arg[1], arg[1])
 			return
 		}},
 

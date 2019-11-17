@@ -1,3 +1,2 @@
-Script["feature/index.js"] = function(field, option, output) {return {
+Plugin["feature/index.js"] = function(field, option, output) {return {
 }}
-

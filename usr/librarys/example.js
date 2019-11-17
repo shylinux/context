@@ -63,7 +63,7 @@ function Meta(zone, target, obj) {
             return datas[name]
         }),
         View: shy("添加视图", function(output, type, line, key) {
-            var text = line, list = [], item = false
+            var text = line, list = [], item = false, style = ""
             switch (type) {
                 case "icon":
                     list.push({img: [line[key[0]]]})
@@ -88,6 +88,7 @@ function Meta(zone, target, obj) {
                     break
 
                 case "input":
+                    style = " "+line.type
                     list.push(line)
                     break
 
@@ -102,8 +103,8 @@ function Meta(zone, target, obj) {
                     break
             }
 
-            var ui = kit.AppendChild(output, item? list: [{view: ["item"], data: {id: "item"+meta.ID(), draggable: false}, list:list}])
-            return ui.item.Meta = text, ui
+            var ui = kit.AppendChild(output, item? list: [{view: ["item"+style], data: {id: "item"+meta.ID(), draggable: false}, list:list}])
+            return ui["item"+style].Meta = text, ui
         }),
         Include: shy("加载脚本", function(src, cb) {src = kit.List(src)
             function next(event) {src.length > 1? meta.Include(src.slice(1), cb): cb(event)}
@@ -1048,6 +1049,9 @@ function Plugin(page, pane, field, inits, runs) {
             var count = kit.Selector(option, ".args").length
             args && count < args.length && (value = value || args[count] || "")
 
+            item.before && kit.AppendChild(option, item.before)
+            item && item.width && (item.style = {}, item.style.width = item.width)
+            item.view == "full" && kit.AppendChild(option, "br")
             var input = {plug: meta.name, type: "input", name: name || item.name || item.value || "input", data: item}
             switch (item.type) {
                 case "upfile": item.type = "file"; break
@@ -1060,7 +1064,6 @@ function Plugin(page, pane, field, inits, runs) {
                     break
                 case "textarea":
                     var half = parseFloat(item.half||"1")||1
-                    kit.AppendChild(option, "br")
                     input.type = "textarea", item.style = "height:"+(item.height||"50px")+";width:"+parseInt(((pane.target.clientWidth-35)/half))+"px"
                     // no break
                 case "text":

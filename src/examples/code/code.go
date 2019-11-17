@@ -865,6 +865,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Option("arg", strings.Replace(m.Option("arg"), "XXXXXsingleXXXXX", "'", -1))
 			m.Option("sub", strings.Replace(m.Option("sub"), "XXXXXsingleXXXXX", "'", -1))
 			m.Log("info", "%v %v %v %v", cmd, m.Option("cmd"), m.Option("arg"), m.Option("sub"))
+			m.Option("river", m.Conf("login", []string{"hash", m.Option("sid"), "river"}))
+			m.Option("dream", m.Conf("login", []string{"hash", m.Option("sid"), "dream"}))
 
 			switch m.Option("cmd") {
 			case "help":
@@ -873,6 +875,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Cmd("login", "init", cmd)
 			case "logout":
 				m.Cmd("login", "exit")
+			case "tasklet":
+				m.Cmd("web.team.task", "create", "task", "3", "add", "action", m.Time(), m.Time("10m"), m.Option("arg"), m.Option("sub"))
+
 			case "favors":
 				data := map[string][]string{}
 				m.Cmd(".favor", "post").Table(func(index int, value map[string]string) {

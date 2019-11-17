@@ -65,6 +65,10 @@ fieldset>form.option input.args.long {
 fieldset>form.option input.args.full {
     width:480px;
 }
+fieldset>form.option div.item.textarea {
+    float:left;
+    clear:both;
+}
 fieldset>div.action {
     padding:6px;
 }

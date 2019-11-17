@@ -16,19 +16,21 @@ end
 
 kit progress "任务进度" public "web.team.task" progress \
 	text "task" name table \
-    feature detail prepare action cancel finish \
-	button "查看"
+	text "30" name limit \
+	text "0" name offset \
+    feature detail action finish cancel prepare \
+	button "查看" action auto
 
-kit create "创建任务" public "web.team.task" \
+kit create "创建任务" public "web.team.task" create \
 	text "task" name table \
-	text "" name index \
 	select "3" name level values 1 values 2 values 3 values 4 values 5 \
-	select "prepare" name status values prepare values action values finish values cancel \
-	text "" name begin_time init date \
-	text "" name close_time init date \
-	text "" name target view full \
-	textarea "" name detail half "1.5" \
-	button "添加"
+	select "" name class values add values opt values fix \
+	select "" name status values prepare values action values finish values cancel \
+	text "" name begin_time init date width "108px" before br \
+	text "" name close_time init date width "108px" \
+	text "" name target view long before br \
+	textarea "" name detail half "4" \
+	button "添加" before br
 
 kit select "查看任务" public "web.team.task" \
 	text "task" name table imports pluing_table \

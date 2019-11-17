@@ -403,7 +403,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			}
 			return
 		}},
-		"data": {Name: "data show|insert|update [table [index] [key value]...]", Help: "数据", Form: map[string]int{"format": 1, "fields": -1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"data": {Name: "data show|insert|update [table [index] [key value]...]", Help: "数据", Form: map[string]int{
+			"format": 1, "fields": -1,
+		}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				arg = append(arg, "show")
 			}

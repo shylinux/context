@@ -85,6 +85,9 @@ fun! ShyFavor(note)
     endif
     call ShyPost({"cmd": "favor", "tab": g:favor_tab, "note": g:favor_note, "arg": getline("."), "line": getpos(".")[1], "col": getpos(".")[2]})
 endfun
+fun! ShyTask()
+    call ShyPost({"cmd": "tasklet", "arg": input("target: "), "sub": input("detail: ")})
+endfun
 fun! ShyGrep(word)
     if !exists("g:grep_dir") | let g:grep_dir = "./" | endif
     let g:grep_dir = input("dir: ", g:grep_dir, "file")
@@ -116,7 +119,8 @@ autocmd InsertLeave * call ShySync("insert")
 command ShyHelp echo ShyPost({"cmd": "help"})
 
 nnoremap <C-g><C-g> :call ShyGrep(expand("<cword>"))<CR>
-nnoremap <C-g><C-t> :call ShyTag(expand("<cword>"))<CR>
+" nnoremap <C-g><C-t> :call ShyTag(expand("<cword>"))<CR>
+nnoremap <C-g><C-t> :call ShyTask()<CR>
 nnoremap <C-g><C-r> :call ShyCheck("cache")<CR>
 nnoremap <C-g><C-f> :call ShyFavor("note")<CR>
 nnoremap <C-g>f :call ShyFavor("")<CR>
