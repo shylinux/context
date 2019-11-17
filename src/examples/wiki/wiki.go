@@ -210,6 +210,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			m.Option("scene", cmd)
 			m.Option("enjoy", arg[0])
 			m.Option("happy", arg[1])
+			m.Option("render", cmd)
 
 			head := []string{}
 			for i, l := range strings.Split(strings.TrimSpace(arg[1]), "\n") {
@@ -220,6 +221,20 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				for j, v := range kit.Split(l, ' ', 100) {
 					m.Push(head[j], v)
 				}
+			}
+			return
+		}},
+		"order": {Name: "order", Help: "列表", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			if len(arg) < 2 {
+				return
+			}
+			m.Option("scene", cmd)
+			m.Option("enjoy", arg[0])
+			m.Option("happy", arg[1])
+			m.Option("render", cmd)
+
+			for _, l := range strings.Split(strings.TrimSpace(arg[1]), "\n") {
+				m.Push("list", l)
 			}
 			return
 		}},

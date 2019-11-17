@@ -6,7 +6,7 @@ fi
 
 ctx_url=$ctx_dev"/code/zsh"
 ctx_get=${ctx_get:="wget -q"}
-ctx_curl=${ctx_curl:="curl -s"}
+ctx_curl=${ctx_curl:="curl"}
 ctx_head=${ctx_head:="Content-Type: application/json"}
 ctx_sync=${ctx_sync:=""}
 ctx_sid=${ctx_sid:=""}
@@ -59,24 +59,24 @@ ShyPost() {
     else
         local data=`ShyJSON "$@" SHELL "${SHELL}" pwd "${PWD}" sid "${ctx_sid}"`
     fi
-    ${ctx_curl} "${ctx_url}" -H "${ctx_head}" -d "${data}"
+    ${ctx_curl} -s "${ctx_url}" -H "${ctx_head}" -d "${data}"
 }
 ShyDownload() {
-    ${ctx_curl} "${ctx_url}" -F "cmd=download" -F "arg=$1" -F "sid=$ctx_sid"
+    ${ctx_curl} -s "${ctx_url}" -F "cmd=download" -F "arg=$1" -F "sid=$ctx_sid"
 }
 ShyUpdate() {
-    ${ctx_curl} "${ctx_dev}/publish/$1" > $1
+    ${ctx_curl} -s "${ctx_dev}/publish/$1" > $1
 }
 ShyUpload() {
-    ${ctx_curl} "${ctx_url}" -F "cmd=upload" -F "sid=$ctx_sid" -F "upload=@$1"
+    ${ctx_curl} -s "${ctx_url}" -F "cmd=upload" -F "sid=$ctx_sid" -F "upload=@$1"
 }
 ShyBench() {
-    ${ctx_curl} "${ctx_dev}/publish/boot.sh" | sh -s installs context
+    ${ctx_curl} -s "${ctx_dev}/publish/boot.sh" | sh -s installs context
 }
 ShySend() {
     local TEMP=`mktemp /tmp/tmp.XXXXXX` && "$@" > $TEMP
     ShyRight "$ctx_silent" || cat $TEMP
-    ${ctx_curl} "${ctx_url}" -F "cmd=sync" -F "arg=$1" -F "args=$*" -F "sub=@$TEMP"\
+    ${ctx_curl} -s "${ctx_url}" -F "cmd=sync" -F "arg=$1" -F "args=$*" -F "sub=@$TEMP"\
         -F "SHELL=${SHELL}" -F "pwd=${PWD}" -F "sid=${ctx_sid}"
 }
 ShyRun() {
@@ -104,8 +104,8 @@ ShyFavor() {
     ShyPost cmd favor arg "`history|tail -n2|head -n1`" tab "${ctx_tab}" note "${ctx_note}"
 }
 ShyFavors() {
-    [ "$READLINE_LINE" == "" ] && ShyPost cmd favor && return
-    ShyPost cmd favor >$READLINE_LINE
+    [ "$READLINE_LINE" = "" ] && ShyPost cmd favor tab "$1" && return
+    ShyPost cmd favor tab "$1" >$READLINE_LINE
     READLINE_LINE=""
 }
 ShySync() {

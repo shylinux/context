@@ -8,4 +8,9 @@
     {{end}}
 {{end}}</table>{{end}}
 
+{{define "order"}}<ul class="story" data-scene='{{options . "scene"}}'
+        data-enjoy='{{options . "enjoy"}}' data-happy='{{options . "happy"}}'>
+{{range $i, $line := .Meta.list}}<li>{{$line}}</li>{{end}}
+</ul>{{end}}
+
 {{define "code"}}<div>{{results .}}</div>{{end}}

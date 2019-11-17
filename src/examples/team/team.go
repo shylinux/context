@@ -43,13 +43,17 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 
 			case "create":
 				// 创建任务
-				if len(arg) < 9 {
-					arg = append(arg, "")
+				if len(arg) > 7 {
+					if len(arg) < 9 {
+						arg = append(arg, "")
+					}
+					m.Cmdy("ssh.data", "insert", arg[1], "level", arg[2], "class", arg[3],
+						"status", arg[4], "begin_time", arg[5], "close_time", arg[6],
+						"target", arg[7], "detail", arg[8], arg[9:])
 				}
-				m.Cmdy("ssh.data", "insert", arg[1], "level", arg[2], "class", arg[3],
-					"status", arg[4], "begin_time", arg[5], "close_time", arg[6],
-					"target", arg[7], "detail", arg[8], arg[9:])
 
+				arg = []string{arg[1]}
+				fallthrough
 			default:
 				// 修改任务
 				if len(arg) > 1 && arg[1] == "modify" {

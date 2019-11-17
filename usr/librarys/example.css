@@ -457,3 +457,6 @@ fieldset.item>div.output>div.code div.number {
     float:left;
 }
 
+fieldset ul.story li:hover {
+    background-color:red;
+}

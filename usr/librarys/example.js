@@ -1433,8 +1433,8 @@ function Inputs(plugin, meta, item, target, option) {
     kit.Log("init", "input", input.Zones(), input)
 
     input.onimport()
-    target.value = input.onformat(item.init, item.value)
-    type == "text" && !target.placeholder && (target.placeholder = item.name)
+    target.value = input.onformat(item.init, item.value);
+    (type == "text" || type == "textarea") && !target.placeholder && (target.placeholder = item.name)
     type == "text" && !target.title && (target.title = item.placeholder || item.name || "")
     return plugin.Inputs[item.name] = target, target.Input = input
 }
@@ -1536,12 +1536,13 @@ function Output(plugin, type, msg, cb, target, option) {
                 target.innerHTML = "", plugin.onfigure.meta.max(target)
                 output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
                 kit._call(cb, [msg])
-                kit.Selector(target, "table.story", function(item) {
+                kit.Selector(target, ".story", function(item) {
                     var data = item.dataset
                     item.oncontextmenu = function(event) {
                         plugin.oncarte(event, shy("", {
                             "提交": function(event) {
                                 plugin.Run(event, [option.dream.value, "commit", option.story.value, data.scene, data.enjoy, data.happy], function(msg) {
+                                    plugin.ontoast(msg.Result())
                                 }, true)
                             },
                             "复制": function(event) {

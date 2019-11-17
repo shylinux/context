@@ -6,17 +6,20 @@ kit file "文件" private "web.code.favor" file \
 
 kit taps "便签" private "web.code.favor" list \
     text "" name dream imports plugin_you action auto \
-    text "tap" name table imports plugin_zsh_table action auto \
+    text "tap" name favor imports plugin_zsh_favor action auto \
     text "" name index imports plugin_tap_id view tiny action auto \
     feature detail "修改" "复制" "下载" \
-    exports zsh_table table "" tap_id id "" \
+    exports zsh_favor table "" tap_id id "" \
     button "记录" action auto \
     button "返回" cb Last
 
 kit terminal "终端" private "web.code.login" list \
     text "" name sid imports plugin_zsh_sid action auto \
-    text "" name table imports plugin_zsh_table \
-    text "" name you imports plugin_you \
+    text "" name dream imports plugin_you \
+    text "tap" name favor imports plugin_zsh_favor \
+    text "miss.md" name story imports plugin_story \
+    text "task" name stage imports plugin_stage \
+    text "feed" name order imports plugin_order \
     feature detail "prune" "复制" "下载" \
     exports zsh_sid sid \
     button "查看" action auto
