@@ -893,7 +893,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			case "logout":
 				m.Cmd("login", "exit")
 			case "tasklet":
-				m.Cmd("web.team.task", "create", "task", "3", "add", "action", m.Time(), m.Time("10m"), m.Option("arg"), m.Option("sub"))
+				m.Cmd("ssh._route", m.Option("dream"), "web.team.task", "create", "task", "3", "add", "action", m.Time(), m.Time("10m"), m.Option("arg"), m.Option("sub"))
 
 			case "favors":
 				data := map[string][]string{}

@@ -80,8 +80,8 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 
 			tmpl := template.New("render").Funcs(*ctx.LocalCGI(m, c))
 			m.Confm("template", "list", func(index int, value string) { tmpl = template.Must(tmpl.Parse(value)) })
-			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl")))
-			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Conf("route", "template_dir"), m.Cap("route"), "/*.tmpl")))
+			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Cmdx("nfs.path", m.Conf("route", "template_dir")), "/*.tmpl")))
+			tmpl = template.Must(tmpl.ParseGlob(path.Join(m.Cmdx("nfs.path", m.Conf("route", "template_dir")), m.Cap("route"), "/*.tmpl")))
 			tmpl = template.Must(tmpl.ParseFiles(which))
 			for i, v := range tmpl.Templates() {
 				m.Log("info", "%v, %v", i, v.Name())

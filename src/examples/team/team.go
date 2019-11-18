@@ -14,10 +14,10 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 		"task": {Name: "task create table level class status begin_time close_time target detail arg...", Help: "任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "progress":
-				// 任务进度
-				if len(arg) > 2 {
+				if len(arg) > 2 && arg[1] != "" {
 					switch arg[2] {
 					case "prepare", "action", "cancel", "finish":
+						prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "update"}
 						time := "close_time"
 						switch arg[2] {
 						case "prepare", "action":
@@ -28,10 +28,12 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 							time = "update_time"
 						}
 
-						m.Cmd("ssh.data", "update", m.Option("table"), arg[1], "status", arg[2], time, m.Time())
+						// 更新任务
+						m.Cmd(prefix, m.Option("table"), arg[1], "status", arg[2], time, m.Time())
 						arg = []string{arg[0], m.Option("table")}
 					}
 				}
+				// 任务进度
 				m.Option("cache.limit", kit.Select("30", arg, 2))
 				m.Option("cache.offset", kit.Select("0", arg, 3))
 				m.Meta["append"] = []string{"prepare", "action", "cancel", "finish"}
@@ -55,7 +57,7 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 				arg = []string{arg[1]}
 				fallthrough
 			default:
-				// 修改任务
+				// 更新任务
 				if len(arg) > 1 && arg[1] == "modify" {
 					m.Cmdy("ssh.data", "update", m.Option("table"), m.Option("index"), arg[2], arg[3])
 					break

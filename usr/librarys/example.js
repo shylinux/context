@@ -1072,6 +1072,9 @@ function Plugin(page, pane, field, inits, runs) {
                     item.autocomplete = "off"
                     break
             }
+            kit.List((item.clist||"").split(" "), function(value) {
+                kit.classList.add(item, value)
+            })
             kit.classList.add(item, item.view)
             return Inputs(plugin, input, item, plugin.View(option, "input", input)[input.name], option).target
         }),

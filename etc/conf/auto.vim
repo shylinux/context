@@ -71,7 +71,14 @@ fun! ShyFavors()
     let msg = json_decode(ShyPost({"cmd": "favors"}))
     let i = 0
     for i in range(len(msg["tab"]))
-        tabnew
+        if msg["tab"][i] == ""
+            continue
+        endif
+        if exists(":TabooOpen")
+            execute "TabooOpen " . msg["tab"][i]
+        else
+            tabnew
+        endif
         lexpr msg["fix"][i]
         lopen
     endfor
@@ -91,7 +98,7 @@ endfun
 fun! ShyGrep(word)
     if !exists("g:grep_dir") | let g:grep_dir = "./" | endif
     let g:grep_dir = input("dir: ", g:grep_dir, "file")
-    execute "grep -rn --exclude tags --exclude '*.tags' " . a:word . " " . g:grep_dir
+    execute "grep -rn --exclude tags --exclude '\..*' --exclude '*.tags' " . a:word . " " . g:grep_dir
 endfun
 fun! ShyTag(word)
     execute "tag " . a:word

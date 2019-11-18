@@ -104,9 +104,8 @@ ShyFavor() {
     ShyPost cmd favor arg "`history|tail -n2|head -n1`" tab "${ctx_tab}" note "${ctx_note}"
 }
 ShyFavors() {
-    [ "$READLINE_LINE" = "" ] && ShyPost cmd favor tab "$1" && return
-    ShyPost cmd favor tab "$1" >$READLINE_LINE
-    READLINE_LINE=""
+    [ "$READLINE_LINE" != "" ] && set $READLINE_LINE && READLINE_LINE=""
+    ShyPost cmd favor tab "$1"
 }
 ShySync() {
     [ "$ctx_sid" = "" ] && ShyLogin
@@ -172,6 +171,8 @@ ShyInit() {
         *)
             PS1="\!-$$-\t[\u@\h]\W\$ "
             PS1="\e[32m\!\e[0m-$$-\e[31m$SPY_OWNER\e[0m@\e[33m$SPY_ROLE\e[0m[\e[32m\t\e[0m]\W\$ "
+            PS1="\!-$$-\t[\u@\h]\W\$ "
+            PS1="\!-$$-\u@\h[\t]\W\$ "
             ;;
     esac
 

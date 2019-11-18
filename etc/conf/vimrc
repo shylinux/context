@@ -18,6 +18,7 @@ let g:ctrlp_cmd='CtrlPBuffer'
 Plug 'vim-scripts/tComment'
 Plug 'tpope/vim-fugitive'
 Plug 'gcmt/taboo.vim'
+set sessionoptions+=tabpages,globals
 
 Plug 'fatih/vim-go'
 Plug 'fatih/vim-go'
@@ -30,7 +31,6 @@ Plug 'plasticboy/vim-markdown'
 " Plug 'ntpeters/vim-better-whitespace'
 " Plug 'easymotion/vim-easymotion'
 "
-" set sessionoptions+=tabpages,globals
 "
 " let g:Tlist_WinWidth=45
 " let g:Tlist_Exit_OnlyWindow=1

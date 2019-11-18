@@ -1,5 +1,5 @@
 kit note "记事本" public "ssh._route" _ "web.wiki.note" \
-	text "" name dream imports plugin_dream action auto \
+	text "" name dream imports plugin_you action auto \
 	text "miss.md" name story imports plugin_story view long action auto \
 	button "查看" action auto \
 	button "返回" cb Last \
@@ -16,7 +16,7 @@ kit favor "收藏夹" public "ssh._route" _ "web.wiki.story" favor \
     button "返回" cb Last
 
 kit commit "记录" public "ssh._route" _ "web.wiki.story" commit \
-	text "" name dream imports plugin_dream \
+	text "" name dream imports plugin_you \
 	text "miss.md" name story imports plugin_story \
 	text "table" name sence \
 	text "hello" name enjoy \
@@ -24,11 +24,11 @@ kit commit "记录" public "ssh._route" _ "web.wiki.story" commit \
 	button "提交"
 
 kit branch "分支" public "ssh._route" _ "web.wiki.story" branch \
-	text "" name dream imports plugin_dream \
+	text "" name dream imports plugin_you \
 	button "查看"
 
 kit remote "仓库" public "ssh._route" _ "web.wiki.story" remote \
-	text "" name dream imports plugin_dream \
+	text "" name dream imports plugin_you \
 	button "查看"
 
 kit xls "表格" "index.js" "index.css" private "web.wiki.xls" \

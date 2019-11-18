@@ -14,14 +14,16 @@ fun date "每一天" "index.js" "index.css" protected \
     end
 end
 
-kit progress "任务进度" public "web.team.task" progress \
+kit progress "任务进度" public "ssh._route" _ "web.team.task" progress \
+	text "" name dream imports plugin_you \
 	text "task" name table \
 	text "30" name limit \
 	text "0" name offset \
     feature detail action finish cancel prepare \
 	button "查看" action auto
 
-kit create "创建任务" public "web.team.task" create \
+kit create "创建任务" public "ssh._route" _ "web.team.task" create \
+	text "" name dream imports plugin_you \
 	text "task" name table \
 	select "3" name level values 1 values 2 values 3 values 4 values 5 \
 	select "" name class values add values opt values fix \
@@ -32,7 +34,8 @@ kit create "创建任务" public "web.team.task" create \
 	textarea "" name detail half "4" \
 	button "添加" before br
 
-kit select "查看任务" public "web.team.task" \
+kit select "查看任务" public "ssh._route" _ "web.team.task" \
+	text "" name dream imports plugin_you \
 	text "task" name table imports pluing_table \
 	text "" name index imports plugin_task_id action auto \
 	button "查看" action auto \
