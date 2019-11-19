@@ -92,13 +92,13 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 
 			buffer := bytes.NewBuffer([]byte{})
 			m.Assert(tmpl.ExecuteTemplate(buffer, m.Option("filename", path.Base(which)), m))
-			data := markdown.ToHTML(buffer.Bytes(), nil, nil)
-			m.Echo(string(data))
 			if f, p, e := kit.Create(path.Join("var/tmp/file", which)); e == nil {
 				defer f.Close()
-				f.Write(data)
+				f.Write(buffer.Bytes())
 				m.Log("info", "save %v", p)
 			}
+			data := markdown.ToHTML(buffer.Bytes(), nil, nil)
+			m.Echo(string(data))
 			return
 		}},
 		"note": {Name: "note file|favor|commit", Help: "笔记", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -268,6 +268,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		}},
 
 		"runs": {Name: "run", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Option("render", "code")
 			m.Cmdy(arg).Set("append")
 			return
 		}},

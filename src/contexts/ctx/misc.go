@@ -522,7 +522,9 @@ func (m *Message) Grow(key string, args interface{}, data interface{}) interface
 
 		name := kit.Select(m.Option("cache.store"), meta["store"])
 		f, e := os.OpenFile(name, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-		m.Assert(e)
+		if e != nil {
+			f, _, e = kit.Create(name)
+		}
 		defer f.Close()
 		s, e := f.Stat()
 		m.Assert(e)

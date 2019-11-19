@@ -69,7 +69,7 @@ func format(m *ctx.Message, out *bytes.Buffer) {
 		}
 		m.Table()
 	case "cut":
-		c := byte(kit.Select(" ", m.Optionv("cmd_parse"), 1)[0])
+		c := rune(kit.Select(" ", m.Optionv("cmd_parse"), 1)[0])
 
 		bio := bufio.NewScanner(out)
 
@@ -253,7 +253,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "服务升级"},
 		"missyou": &ctx.Config{Name: "missyou", Value: map[string]interface{}{
-			"path": "usr/local/work",
+			"path":  "usr/local/work",
+			"local": "usr/local",
 		}, Help: "任务管理"},
 	},
 	Commands: map[string]*ctx.Command{
@@ -1216,6 +1217,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				switch kit.Select("", arg, 1) {
 				case "stop":
 					m.Cmdy("ssh._route", arg[0], "context", "cli", "quit", 0)
+					m.Cmd("web.code.dream", "exit", arg[0])
 				default:
 					m.Echo(arg[0])
 				}
@@ -1241,6 +1243,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			// 启动服务
 			m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "start", args)
+			m.Cmd("web.code.dream", "init", arg[0], kit.Select(topic, arg, 1))
 			return
 		}},
 		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

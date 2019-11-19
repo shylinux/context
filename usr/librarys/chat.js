@@ -326,6 +326,9 @@ var page = Page({
         var river = "", storm = 0, input = "", share = ""
         var temp = ""
         output.DisplayRaw = true
+        page.Sync("plugin_you").change(function(value) {
+            page.title(value)
+        })
         return {
             Show: function() {var pane = field.Pane
                 if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}

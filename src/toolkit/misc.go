@@ -49,21 +49,22 @@ func Create(p string) (*os.File, string, error) {
 	return f, p, e
 }
 
-func Split(str string, c byte, n int) []string {
+func Split(str string, c rune, n int) []string {
 	res := []string{}
-	for i, j := 0, 0; i < len(str); i++ {
-		if str[i] == c || c == ' ' && unicode.IsSpace(rune(str[i])) {
+	list := []rune(str)
+	for i, j := 0, 0; i < len(list); i++ {
+		if list[i] == c || c == ' ' && unicode.IsSpace(list[i]) {
 			continue
 		}
-		for j = i; j < len(str); j++ {
-			if str[j] == c || c == ' ' && unicode.IsSpace(rune(str[j])) {
+		for j = i; j < len(list); j++ {
+			if list[j] == c || c == ' ' && unicode.IsSpace(list[j]) {
 				break
 			}
 		}
 		if n == len(res)+1 {
-			j = len(str)
+			j = len(list)
 		}
-		res, i = append(res, str[i:j]), j
+		res, i = append(res, string(list[i:j])), j
 	}
 	return res
 }

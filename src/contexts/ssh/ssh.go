@@ -351,7 +351,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				msg.Option("river", arg[3])
 				msg.Option("storm", arg[1])
 				kit.Map(tool["inputs"], "", func(index int, value map[string]interface{}) {
-					if name := kit.Format(value["name"]); name != "" {
+					if name := kit.Format(value["name"]); name != "" && m.Option(name) != "" {
 						m.Log("info", "%v: %v", name, m.Option(name))
 						msg.Option(name, m.Option(name))
 					}
@@ -571,6 +571,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Cmdy("ssh.data", "save", arg[1])
 
 			case "update":
+				if arg[2] == "" {
+					break
+				}
 				offset := m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "offset"})
 				index := kit.Int(arg[2]) - 1 - offset
 				table, prefix, arg := arg[1], "", arg[3:]

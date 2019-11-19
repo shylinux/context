@@ -331,7 +331,7 @@ func (m *Message) Sort(key string, arg ...string) *Message {
 	return m
 }
 func (m *Message) Split(str string, arg ...string) *Message {
-	c := byte(kit.Select(" ", arg, 0)[0])
+	c := rune(kit.Select(" ", arg, 0)[0])
 	lines := strings.Split(str, "\n")
 
 	pos := []int{}

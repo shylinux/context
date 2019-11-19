@@ -79,6 +79,14 @@ ShySend() {
     ${ctx_curl} -s "${ctx_url}" -F "cmd=sync" -F "arg=$1" -F "args=$*" -F "sub=@$TEMP"\
         -F "SHELL=${SHELL}" -F "pwd=${PWD}" -F "sid=${ctx_sid}"
 }
+ShySends() {
+    local cmd=$1 && shift
+    local arg=$2 && shift
+    local TEMP=`mktemp /tmp/tmp.XXXXXX` && echo "$@" > $TEMP
+    ShyRight "$ctx_silent" || cat $TEMP
+    ${ctx_curl} -s "${ctx_url}" -F "cmd=$cmd" -F "arg=$arg" -F "sub=@$TEMP" \
+        -F "SHELL=${SHELL}" -F "pwd=${PWD}" -F "sid=${ctx_sid}"
+}
 ShyRun() {
     ctx_silent=false ShySend "$@"
 }
@@ -122,9 +130,7 @@ ShySync() {
             ctx_tail=`expr $ctx_end - $ctx_begin`
             ShyEcho "sync $ctx_begin-$ctx_end count $ctx_tail to $ctx_dev"
             history|tail -n $ctx_tail |while read line; do
-                line=`ShyLine $line`
-                ShyPost arg "$line" cmd historys FORMAT "$HISTTIMEFORMAT"
-                ShyEcho $line
+                ShySends historys sub "$line"
             done
             ctx_begin=$ctx_end
             ;;

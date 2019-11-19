@@ -460,3 +460,10 @@ fieldset.item>div.output>div.code div.number {
 fieldset ul.story li:hover {
     background-color:red;
 }
+fieldset div.output div.story {
+    font-family:monospace;
+    font-size:16px;
+    white-space:pre;
+    padding:16px;
+    border:solid 2px green;
+}

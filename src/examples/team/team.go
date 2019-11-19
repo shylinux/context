@@ -17,6 +17,7 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 				if len(arg) > 2 && arg[1] != "" {
 					switch arg[2] {
 					case "prepare", "action", "cancel", "finish":
+						prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "update"}
 						time := "close_time"
 						switch arg[2] {
 						case "prepare", "action":
@@ -28,7 +29,7 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 						}
 
 						// 更新任务
-						m.Cmd("ssh.data", "update", m.Option("table"), arg[1], "status", arg[2], time, m.Time())
+						m.Cmd(prefix, m.Option("table"), arg[1], "status", arg[2], time, m.Time())
 						arg = []string{arg[0], m.Option("table")}
 					}
 				}
@@ -51,7 +52,6 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 					m.Cmdy("ssh.data", "insert", arg[1], "level", arg[2], "class", arg[3],
 						"status", arg[4], "begin_time", arg[5], "close_time", arg[6],
 						"target", arg[7], "detail", arg[8], arg[9:])
-					break
 				}
 
 				arg = []string{arg[1]}
@@ -59,7 +59,7 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 			default:
 				// 更新任务
 				if len(arg) > 1 && arg[1] == "modify" {
-					m.Cmdy("ssh.data", "update", m.Option("table"), m.Option("index"), arg[2], arg[3])
+					m.Cmdy("ssh.data", "update", m.Option("table"), arg[0], arg[2], arg[3])
 					break
 				}
 

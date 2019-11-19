@@ -117,8 +117,50 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"limit": 6,
 			"least": 3,
 		}},
+		"dream": {Name: "dream", Help: "使命必达", Value: map[string]interface{}{
+			"hello": map[string]interface{}{
+				"git": []interface{}{"clone https://github.com/shylinux/context"},
+				"tmux": []interface{}{
+					"split-window -t $dream:1.1",
+					"new-window -t $dream:2",
+					"split-window -t $dream:2.1",
+					"new-window -t $dream:3",
+					"split-window -t $dream:3.1",
+				},
+			},
+		}},
 	},
 	Commands: map[string]*ctx.Command{
+		"dream": {Name: "dream", Help: "使令必达", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			switch arg[0] {
+			case "init":
+				// 检查会话
+				tmux := kit.Trans(m.Confv("prefix", "tmux"))
+				if !m.Cmds(tmux, "has-session", "-t", arg[1]) {
+					break
+				}
+
+				// 下载代码
+				topic := kit.Select("hello", arg, 2)
+				home := path.Join(m.Conf("missyou", "path"), arg[1], m.Conf("missyou", "local"))
+				git := kit.Trans(m.Confv("prefix", "git"), "cmd_dir", home)
+				m.Confm("dream", []string{topic, "git"}, func(index int, value string) {
+					value = strings.Replace(value, "$dream", arg[1], -1)
+					m.Cmdx(git, strings.Split(value, " "))
+				})
+
+				// 创建终端
+				m.Cmds(tmux, "new-session", "-ds", arg[1], "cmd_env", "TMUX", "", "cmd_dir", home)
+				m.Confm("dream", []string{topic, "tmux"}, func(index int, value string) {
+					value = strings.Replace(value, "$dream", arg[1], -1)
+					m.Cmdx(tmux, strings.Split(value, " "), "cmd_dir", home)
+				})
+
+			case "exit":
+			}
+			return
+		}},
+
 		"login": {Name: "login open|init|list|exit|quit", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 
 			switch kit.Select("list", arg, 0) {
@@ -228,7 +270,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Set("append")
 			case "file":
 				// 文件列表
-				m.Cmd("ssh.data", "show", arg[1:]).Table(func(index int, value map[string]string) {
+				m.Cmd("ssh.data", "show", arg[1]).Table(func(index int, value map[string]string) {
 					m.Push("id", value["id"])
 					m.Push("kind", value["kind"])
 					m.Push("name", value["name"])
@@ -250,10 +292,14 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 			case "list":
 				if len(arg) > 2 && arg[2] == "modify" {
-					m.Cmdy("ssh.data", "update", m.Option("favor"), arg[1], arg[3], arg[4])
+					m.Cmdy("ssh._route", m.Option("dream"), "ssh.data", "update", m.Option("favor"), arg[1], arg[3], arg[4])
 					arg = []string{"list", m.Option("dream"), m.Option("favor")}
 				}
-				m.Cmdy("ssh.data", "show", arg[1:])
+				if len(arg) > 1 {
+					m.Cmdy("ssh._route", arg[1], "ssh.data", "show", arg[2:])
+					break
+				}
+				m.Cmdy("ssh.data", "show")
 			}
 			return
 		}},
