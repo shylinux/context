@@ -1213,7 +1213,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			// 任务管理
-			if m.Confs("ssh.node", arg[0]) {
+			if m.Option("dream", arg[0]); m.Confs("ssh.node", arg[0]) {
 				switch kit.Select("", arg, 1) {
 				case "stop":
 					m.Cmdy("ssh._route", arg[0], "context", "cli", "quit", 0)
@@ -1234,7 +1234,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"cmd_dir", p,
 				"cmd_daemon", "true",
 				"cmd_env", "PATH", os.Getenv("PATH"),
-				"cmd_env", "ctx_type", kit.Select(topic, arg, 1),
+				"cmd_env", "ctx_type", m.Option("topic", kit.Select(topic, arg, 1)),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
@@ -1243,7 +1243,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 
 			// 启动服务
 			m.Cmdy("cli.system", path.Join(m.Conf("runtime", "boot.ctx_home"), "bin/node.sh"), "start", args)
-			m.Cmd("web.code.dream", "init", arg[0], kit.Select(topic, arg, 1))
+			if share := m.Cmdx("web.code.dream", "init", arg[0]); share != "" {
+				m.Cmd("nfs.save", path.Join(p, m.Conf("missyou", "local"), "share.txt"), share)
+			}
 			return
 		}},
 		"version": &ctx.Command{Name: "version", Help: "", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

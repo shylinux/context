@@ -26,6 +26,9 @@ fun! ShyLogin()
     endif
 endfun
 
+fun! ShyDream(target)
+    call ShyPost({"cmd": "dream", "arg": a:target})
+endfun
 fun! ShySync(target)
     if bufname("%") == "ControlP" | return | end
 

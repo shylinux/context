@@ -119,7 +119,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}},
 		"dream": {Name: "dream", Help: "使命必达", Value: map[string]interface{}{
 			"hello": map[string]interface{}{
-				"git": []interface{}{"clone https://github.com/shylinux/context"},
+				"ship": []interface{}{"tip", "miss.md", "task", "feed"},
+				"git":  []interface{}{"clone https://github.com/shylinux/context"},
 				"tmux": []interface{}{
 					"split-window -t $dream:1.1",
 					"new-window -t $dream:2",
@@ -129,9 +130,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				},
 			},
 		}},
+		"share": {Name: "share", Help: "共享链接", Value: map[string]interface{}{}},
 	},
 	Commands: map[string]*ctx.Command{
-		"dream": {Name: "dream", Help: "使令必达", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+		"dream": {Name: "dream", Help: "使命必达", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			switch arg[0] {
 			case "init":
 				// 检查会话
@@ -141,26 +143,69 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 
 				// 下载代码
-				topic := kit.Select("hello", arg, 2)
 				home := path.Join(m.Conf("missyou", "path"), arg[1], m.Conf("missyou", "local"))
 				git := kit.Trans(m.Confv("prefix", "git"), "cmd_dir", home)
-				m.Confm("dream", []string{topic, "git"}, func(index int, value string) {
+				m.Confm("dream", []string{m.Option("topic"), "git"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmdx(git, strings.Split(value, " "))
 				})
 
 				// 创建终端
-				m.Cmds(tmux, "new-session", "-ds", arg[1], "cmd_env", "TMUX", "", "cmd_dir", home)
-				m.Confm("dream", []string{topic, "tmux"}, func(index int, value string) {
+				m.Cmds(tmux, "new-session", "-ds", arg[1], "cmd_dir", home,
+					"cmd_env", "TMUX", "", "cmd_env", "ctx_share", m.Cmdx("dream", "share"))
+				m.Confm("dream", []string{m.Option("topic"), "tmux"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmdx(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
+
+				arg = []string{"share"}
+				fallthrough
+			case "share":
+				if len(arg) == 1 {
+					m.Confm("dream", []string{kit.Select("hello", m.Option("topic")), "ship"}, func(index int, value string) {
+						arg = append(arg, value)
+					})
+				}
+				for i := 0; i < 10; i++ {
+					h := kit.Hashs("uniq")[:6]
+					if m.Confs("share", []string{"hash", h}) {
+						continue
+					}
+					m.Conf("share", []string{"hash", h}, map[string]interface{}{
+						"river":  m.Option("river"),
+						"dream":  m.Option("dream"),
+						"favor":  kit.Select("tip", arg, 1),
+						"story":  kit.Select("miss.md", arg, 2),
+						"stage":  kit.Select("task", arg, 3),
+						"order":  kit.Select("feed", arg, 4),
+						"expire": m.Time("10m", "stamp"),
+					})
+					m.Echo(h)
+					break
+				}
+
+			case "bind":
+				m.Confm("share", []string{"hash", arg[1]}, func(value map[string]interface{}) {
+					m.Conf("login", []string{"hash", m.Option("sid"), "ship"}, value)
+				})
+
+			case "list":
+				m.Confm("share", "hash", func(key string, value map[string]interface{}) {
+					m.Push("key", key)
+					m.Push("river", value["river"])
+					m.Push("dream", value["dream"])
+					m.Push("favor", value["favor"])
+					m.Push("story", value["story"])
+					m.Push("stage", value["stage"])
+					m.Push("order", value["order"])
+					m.Push("expire", value["expire"])
+				})
+				m.Table()
 
 			case "exit":
 			}
 			return
 		}},
-
 		"login": {Name: "login open|init|list|exit|quit", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 
 			switch kit.Select("list", arg, 0) {
@@ -932,6 +977,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Echo(strings.Join(kit.Trans(m.Confv("help", "index")), "\n"))
 			case "login":
 				m.Cmd("login", "init", cmd)
+			case "dream":
+				m.Cmd("dream", "bind", m.Option("arg"))
 			case "logout":
 				m.Cmd("login", "exit")
 			case "tasklet":
