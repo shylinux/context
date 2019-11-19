@@ -1,4 +1,4 @@
-kit tips "便签" private "web.code.favor" list \
+kit tips "便签" private "_:web.code.favor" list \
     text "" name dream imports plugin_you action auto \
     text "tip" name favor imports plugin_vim_favor action auto \
     text "" name index imports plugin_tip_id view tiny action auto \

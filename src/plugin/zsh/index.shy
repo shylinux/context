@@ -1,10 +1,10 @@
 
-kit file "文件" private "web.code.favor" file \
+kit file "文件" private "_:web.code.favor" file \
     text "" name dream imports plugin_you action auto \
     text "file" name type \
     button "查看" action auto
 
-kit taps "便签" private "web.code.favor" list \
+kit taps "便签" private "_:web.code.favor" list \
     text "" name dream imports plugin_you action auto \
     text "tap" name favor imports plugin_zsh_favor action auto \
     text "" name index imports plugin_tap_id view tiny action auto \

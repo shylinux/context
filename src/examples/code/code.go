@@ -228,7 +228,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Set("append")
 			case "file":
 				// 文件列表
-				m.Cmd("ssh._route", arg[1], "ssh.data", "show", arg[2]).Table(func(index int, value map[string]string) {
+				m.Cmd("ssh.data", "show", arg[1:]).Table(func(index int, value map[string]string) {
 					m.Push("id", value["id"])
 					m.Push("kind", value["kind"])
 					m.Push("name", value["name"])
@@ -250,14 +250,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 			case "list":
 				if len(arg) > 2 && arg[2] == "modify" {
-					m.Cmdy("ssh._route", m.Option("dream"), "ssh.data", "update", m.Option("favor"), arg[1], arg[3], arg[4])
+					m.Cmdy("ssh.data", "update", m.Option("favor"), arg[1], arg[3], arg[4])
 					arg = []string{"list", m.Option("dream"), m.Option("favor")}
 				}
-				if len(arg) > 1 {
-					m.Cmdy("ssh._route", arg[1], "ssh.data", "show", arg[2:])
-					break
-				}
-				m.Cmdy("ssh.data", "show")
+				m.Cmdy("ssh.data", "show", arg[1:])
 			}
 			return
 		}},

@@ -666,7 +666,10 @@ func (m *Message) Cmd(args ...interface{}) *Message {
 	msg := m
 	if strings.Contains(key, ":") {
 		ps := strings.Split(key, ":")
-		msg, key, arg = msg.Sess("ssh"), "_route", append([]string{"sync", ps[0], ps[1]}, arg...)
+		if ps[0] == "_" {
+			ps[0], arg = arg[0], arg[1:]
+		}
+		msg, key, arg = m.Sess("ssh"), "_route", append([]string{"sync", ps[0], ps[1]}, arg...)
 		defer func() { m.Copy(msg, "append").Copy(msg, "result") }()
 		m.Hand = true
 

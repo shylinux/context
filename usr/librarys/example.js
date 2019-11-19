@@ -1493,31 +1493,40 @@ function Output(plugin, type, msg, cb, target, option) {
                             kit.Selector(option, ".args", function(item) {
                                 msg.Option(item.name, item.value)
                             })
-                            item == "修改"? (text = kit.AppendChilds(td, [{type: "input", value: text, style: {width: td.clientWidth+"px"}, data: {onkeydown: function(event) {
-                                if (event.key == "Enter") {
-                                    var id = ""
-                                    for (var i = 0; i < exports.length-1; i += 3) {
-                                        id = (id || line[exports[i+1]] || "").trim()
-                                    }
+                            var cmd = []
+                            option.dream && cmd.push(option.dream.value)
+                            if (item == "修改") {
+                                text = kit.AppendChilds(td, [{type: "input", value: text, style: {width: td.clientWidth+"px"}, data: {onkeydown: function(event) {
+                                    if (event.key == "Enter") {
+                                        var id = ""
+                                        for (var i = 0; i < exports.length-1; i += 3) {
+                                            id = (id || line[exports[i+1]] || "").trim()
+                                        }
 
-                                    var msg = plugin.Event(event)
-                                    kit.Selector(option, ".args", function(item) {
-                                        msg.Option(item.name, item.value)
-                                    })
-                                    if (name == "value") {
-                                        name = line.key
-                                        id = option.index.value
+                                        var msg = plugin.Event(event)
+                                        kit.Selector(option, ".args", function(item) {
+                                            msg.Option(item.name, item.value)
+                                        })
+                                        if (name == "value") {
+                                            name = line.key
+                                            id = option.index.value
+                                        }
+                                        cmd.push(id, meta[item], name, event.target.value)
+                                        plugin.Run(event, cmd, function(msg) {
+                                            td.innerHTML = event.target.value
+                                            plugin.ontoast("修改成功")
+                                        }, true)
+                                        return
                                     }
-                                    plugin.Run(event, [id, meta[item], name, event.target.value], function(msg) {
-                                        td.innerHTML = event.target.value
-                                        plugin.ontoast("修改成功")
-                                    }, true)
-                                    return
-                                }
-                            }}}]).input, text.focus(), text.setSelectionRange(0, -1)): output[meta[item]]? output[meta[item]](event): plugin.Run(event, [td.dataset.id||(line[exports[1]]||"").trim(), meta[item]||item], function(msg) {
-                                console.log(msg)
-                            })
-
+                                }}}]).input, text.focus(), text.setSelectionRange(0, -1)
+                            } else if (output[meta[item]]) {
+                                output[meta[item]](event)
+                            } else {
+                                cmd.push(td.dataset.id||(line[exports[1]]||"").trim(), meta[item]||item)
+                                plugin.Run(event, cmd, function(msg) {
+                                    console.log(msg)
+                                })
+                            }
                             return true
                         }),
                     )

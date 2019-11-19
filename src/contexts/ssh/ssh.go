@@ -334,7 +334,14 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 					}
 				}
 
+				prefix := []string{}
 				msg := m.Find(kit.Format(tool["ctx"]))
+				if strings.Contains(kit.Format(tool["ctx"]), ":") {
+					ps := strings.Split(kit.Format(tool["ctx"]), ":")
+					prefix = append(prefix, "_route", ps[0], "context", "find", ps[1])
+					msg = m.Sess("ssh")
+				}
+
 				if option, ok := tool["options"].(map[string]interface{}); ok {
 					for k, v := range option {
 						msg.Option(k, v)
@@ -345,6 +352,9 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				msg.Option("storm", arg[1])
 
 				arg = arg[4:]
+				if len(prefix) > 0 && prefix[1] == "_" {
+					prefix[1], arg = arg[0], arg[1:]
+				}
 				args := []string{}
 				for _, v := range kit.Trans(tool["args"]) {
 					if strings.HasPrefix(v, "__") {
@@ -361,7 +371,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						args = append(args, msg.Parse(v))
 					}
 				}
-				msg.Cmd(tool["cmd"], args, arg)
+				msg.Cmd(prefix, tool["cmd"], args, arg)
 				msg.CopyTo(m)
 
 			default:
@@ -555,7 +565,8 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				m.Cmdy("ssh.data", "save", arg[1])
 
 			case "update":
-				index := kit.Int(arg[2]) - 1 - m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "offset"})
+				offset := m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "offset"})
+				index := kit.Int(arg[2]) - 1 - offset
 				table, prefix, arg := arg[1], "", arg[3:]
 				if index >= 0 {
 					if arg[0] == "extra" {
@@ -565,7 +576,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Confv("flow", []string{m.Option("river"), "data", table, "list", kit.Format(index), prefix + arg[i]}, arg[i+1])
 					}
 				}
-				m.Cmdy("ssh.data", "show", table, index+1)
+				m.Cmdy("ssh.data", "show", table, index+1+offset)
 
 			case "import":
 				if len(arg) < 3 {
