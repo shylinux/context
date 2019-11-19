@@ -350,6 +350,12 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 
 				msg.Option("river", arg[3])
 				msg.Option("storm", arg[1])
+				kit.Map(tool["inputs"], "", func(index int, value map[string]interface{}) {
+					if name := kit.Format(value["name"]); name != "" {
+						m.Log("info", "%v: %v", name, m.Option(name))
+						msg.Option(name, m.Option(name))
+					}
+				})
 
 				arg = arg[4:]
 				if len(prefix) > 0 && prefix[1] == "_" {

@@ -147,6 +147,9 @@ func (m *Message) Detail(arg ...interface{}) string {
 	return m.Insert("detail", index, arg...)
 }
 func (m *Message) Option(key string, arg ...interface{}) string {
+	if m == nil {
+		return ""
+	}
 	if len(arg) > 0 {
 		m.Insert(key, 0, arg...)
 		if _, ok := m.Meta[key]; ok {
