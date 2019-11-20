@@ -102,7 +102,7 @@ ShyLogout() {
     echo ${ctx_goodbye} && [ "$ctx_sid" != "" ] && Shy logout
 }
 ShyLogin() {
-    HOST=`hostname` ctx_sid=`ShyPost cmd login pid "$$" pane "${TMUX_PANE}" hostname "${HOST}" username "${USER}"`
+    HOST=`hostname` ctx_sid=`ShyPost cmd login share "${ctx_share}" pid "$$" pane "${TMUX_PANE}" hostname "${HOST}" username "${USER}"`
     echo "sid: ${ctx_sid:0:6}"
 }
 ShyFavor() {

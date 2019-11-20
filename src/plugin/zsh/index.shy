@@ -16,10 +16,7 @@ kit taps "便签" private "_:web.code.favor" list \
 kit terminal "终端" private "web.code.login" list \
     text "" name sid imports plugin_zsh_sid action auto \
     text "" name dream imports plugin_you \
-    text "tap" name favor imports plugin_zsh_favor \
-    text "miss.md" name story imports plugin_story \
-    text "task" name stage imports plugin_stage \
-    text "feed" name order imports plugin_order \
+    text "" name topic imports plugin_see \
     feature detail "prune" "复制" "下载" \
     exports zsh_sid sid \
     button "查看" action auto

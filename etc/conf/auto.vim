@@ -21,8 +21,7 @@ fun! ShyLogout()
 endfun
 fun! ShyLogin()
     if g:ctx_sid == ""
-        let g:ctx_sid = ShyPost({"cmd": "login", "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER})
-        "hello
+        let g:ctx_sid = ShyPost({"cmd": "login", "share": $ctx_share, "pid": getpid(), "pane": $TMUX_PANE, "hostname": hostname(), "username": $USER})
     endif
 endfun
 

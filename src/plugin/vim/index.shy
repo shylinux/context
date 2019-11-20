@@ -10,10 +10,7 @@ kit tips "便签" private "_:web.code.favor" list \
 kit editor "编辑器" private "web.code.login" list \
     text "" name sid imports plugin_vim_sid action auto \
     text "" name dream imports plugin_you \
-    text "tip" name favor imports plugin_vim_favor \
-    text "miss.md" name story imports plugin_story \
-    text "task" name stage imports plugin_stage \
-    text "feed" name order imports plugin_order \
+    text "" name topic imports plugin_see \
     feature detail "prune" "复制" "下载" \
     exports vim_sid sid \
     button "查看" action auto
