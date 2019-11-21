@@ -118,10 +118,29 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"least": 3,
 		}},
 		"dream": {Name: "dream", Help: "使命必达", Value: map[string]interface{}{
+			"layout": map[string]interface{}{
+				"three": []interface{}{
+					"split-window -t $dream:1.1",
+					"split-window -v -t $dream:1.2",
+					"rename-window -t $dream:1 source",
+					"select-layout -t $dream:1 main-horizontal",
+
+					"new-window -t $dream:2 -n docker",
+					"split-window -t $dream:2.1",
+					"split-window -v -t $dream:2.2",
+					"select-layout -t $dream:2 main-horizontal",
+
+					"new-window -t $dream:3 -n online",
+					"split-window -t $dream:3.1",
+					"split-window -v -t $dream:3.2",
+					"select-layout -t $dream:3 main-horizontal",
+				},
+			},
 			"topic": map[string]interface{}{
 				"hello": map[string]interface{}{
-					"ship": []interface{}{"tip", "miss.md", "task", "feed"},
-					"git":  []interface{}{"clone https://github.com/shylinux/context"},
+					"ship":   []interface{}{"tip", "miss.md", "task", "feed"},
+					"git":    []interface{}{"clone https://github.com/shylinux/context"},
+					"layout": []interface{}{},
 					"tmux": []interface{}{
 						"split-window -t $dream:1.1",
 						"new-window -t $dream:2",
@@ -143,11 +162,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				if !m.Cmds(tmux, "has-session", "-t", arg[1]) {
 					break
 				}
+				topic := kit.Select("hello", kit.Select(m.Option("topic"), arg, 2))
 
 				// 下载代码
 				home := path.Join(m.Conf("missyou", "path"), arg[1], m.Conf("missyou", "local"))
 				git := kit.Trans(m.Confv("prefix", "git"), "cmd_dir", home)
-				m.Confm("dream", []string{"topic", m.Option("topic"), "git"}, func(index int, value string) {
+				m.Confm("dream", []string{"topic", topic, "git"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmdx(git, strings.Split(value, " "))
 				})
@@ -156,16 +176,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Cmds(tmux, "set-environment", "-g", "ctx_share", m.Cmdx("dream", "share"))
 				m.Cmds(tmux, "new-session", "-ds", arg[1], "cmd_dir", home, "cmd_env", "TMUX", "")
 				m.Cmds(tmux, "set-environment", "-t", arg[1], "ctx_share", m.Cmdx("dream", "share"))
-				m.Confm("dream", []string{"topic", m.Option("topic"), "tmux"}, func(index int, value string) {
+				m.Confm("dream", []string{"layout", m.Conf("dream", []string{"topic", m.Option("topic"), "layout", "0"})}, func(index int, value string) {
+					value = strings.Replace(value, "$dream", arg[1], -1)
+					m.Cmdx(tmux, strings.Split(value, " "), "cmd_dir", home)
+				})
+				m.Confm("dream", []string{"topic", topic, "tmux"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmdx(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
 
-				arg = []string{"share"}
+				arg = []string{"share", topic}
 				fallthrough
 			case "share":
+				topic := kit.Select("hello", kit.Select(m.Option("topic"), arg, 1))
 				if len(arg) == 1 {
-					m.Confm("dream", []string{"topic", kit.Select("hello", m.Option("topic")), "ship"}, func(index int, value string) {
+					m.Confm("dream", []string{"topic", kit.Select("hello", topic), "ship"}, func(index int, value string) {
 						arg = append(arg, value)
 					})
 				}

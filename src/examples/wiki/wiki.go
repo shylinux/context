@@ -273,6 +273,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			return
 		}},
 		"run": {Name: "run", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Option("render", "raw")
 			m.Cmdy(arg)
 			return
 		}},

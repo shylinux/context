@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime"
 	"strings"
 	"time"
 	"toolkit"
@@ -36,13 +35,11 @@ func (c *Context) Register(s *Context, x Server, args ...interface{}) *Context {
 	return s
 }
 func (c *Context) Plugin(s *Context, args []string) string {
-	runtime.GOMAXPROCS(8)
-
 	c.Register(s, nil)
 	m := Pulse.Spawn(s)
 	// m := &Message{code: 0, time: time.Now(), source: s, target: s, Meta: map[string][]string{}}
 	// kit.DisableLog = true
-	// m.Option("log.disable", true)
+	m.Option("log.disable", false)
 	m.Option("bio.modal", "action")
 
 	if len(args) == 0 {
@@ -50,7 +47,7 @@ func (c *Context) Plugin(s *Context, args []string) string {
 		m.Echo("命令列表:\n")
 		for k, v := range s.Commands {
 			if !strings.HasPrefix(k, "_") {
-				m.Echo("  %s: %s\n    %v\n\n", k, v.Name, v.Help)
+				m.Echo("--%s: %s\n    %v\n\n", k, v.Name, v.Help)
 			}
 		}
 		m.Echo("配置列表:\n")

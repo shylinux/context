@@ -19,9 +19,9 @@ func (m *Message) Log(action string, str string, arg ...interface{}) *Message {
 		kit.Log("error", fmt.Sprintf("stack: %s", m.Format("stack")))
 	}
 
-	if m.Options("log.disable") {
-		return m
-	}
+	// if m.Options("log.disable") {
+	// 	return m
+	// }
 
 	if l := m.Sess("log", false); l != nil {
 		if log, ok := l.target.Server.(LOGGER); ok {

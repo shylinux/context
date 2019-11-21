@@ -192,6 +192,7 @@ ShyInit() {
     echo "pid: $$"
     echo "pane: $TMUX_PANE"
     echo "begin: ${ctx_begin}"
+    echo "share: ${ctx_share}"
 }
 
 ShyInit && trap ShyLogout EXIT

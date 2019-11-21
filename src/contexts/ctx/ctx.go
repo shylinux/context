@@ -339,10 +339,10 @@ var Index = &Context{Name: "ctx", Help: "模块中心", Server: &CTX{},
 					}
 					value = m.Confv(arg[0], arg[1])
 				} else if len(arg) > 2 && arg[2] == "list" {
-					for i := 3; i < len(arg)-1; i += 1 {
+					for i := 3; i < len(arg); i += 1 {
 						m.Confv(arg[0], []interface{}{arg[1], -2}, arg[i])
 					}
-					value = m.Confv(arg[0], arg[1])
+					return
 				} else if len(arg) > 1 && arg[1] == "list" {
 					for i := 2; i < len(arg)-1; i += 1 {
 						m.Confv(arg[0], -2, arg[i])
