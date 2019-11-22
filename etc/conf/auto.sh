@@ -8,14 +8,12 @@ ctx_url=$ctx_dev"/code/zsh"
 ctx_get=${ctx_get:="wget -q"}
 ctx_curl=${ctx_curl:="curl"}
 ctx_head=${ctx_head:="Content-Type: application/json"}
-ctx_sync=${ctx_sync:=""}
 ctx_sid=${ctx_sid:=""}
 
 ctx_silent=${ctx_silent:=""}
+ctx_err=${ctx_err:="/dev/null"}
 ctx_welcome=${ctx_welcome:="^_^  Welcome to Context world  ^_^"}
 ctx_goodbye=${ctx_goodbye:="^_^  Goodbye to Context world  ^_^"}
-ctx_bind=${ctx_bind:="bind -x"}
-ctx_null=${ctx_null:="false"}
 
 ShyRight() {
     [ "$1" = "" ] && return 1
@@ -26,6 +24,9 @@ ShyRight() {
 }
 ShyEcho() {
     ShyRight "$ctx_silent" || echo "$@"
+}
+ShyLog() {
+    echo "$@" > $ctx_err
 }
 
 ShyWord() {
@@ -64,11 +65,8 @@ ShyPost() {
 ShyDownload() {
     ${ctx_curl} -s "${ctx_url}" -F "cmd=download" -F "arg=$1" -F "sid=$ctx_sid"
 }
-ShyUpdate() {
-    ${ctx_curl} -s "${ctx_dev}/publish/$1" > $1
-}
 ShyUpload() {
-    ${ctx_curl} -s "${ctx_url}" -F "cmd=upload" -F "sid=$ctx_sid" -F "upload=@$1"
+    ${ctx_curl} -s "${ctx_url}" -F "cmd=upload" -F "upload=@$1" -F "sid=$ctx_sid"
 }
 ShyBench() {
     ${ctx_curl} -s "${ctx_dev}/publish/boot.sh" | sh -s installs context
@@ -107,9 +105,8 @@ ShyLogin() {
 }
 ShyFavor() {
     [ "$READLINE_LINE" != "" ] && set $READLINE_LINE && READLINE_LINE=""
-    [ "$1" != "" ] && ctx_tab=$1
-    [ "$2" != "" ] && ctx_note=$2
-    ShyPost cmd favor arg "`history|tail -n2|head -n1`" tab "${ctx_tab}" note "${ctx_note}"
+    [ "$1" != "" ] && ctx_tab=$1; [ "$2" != "" ] && ctx_note=$2
+    ShyPost cmd favor arg "`history|tail -n1|head -n1`" tab "${ctx_tab}" note "${ctx_note}"
 }
 ShyFavors() {
     [ "$READLINE_LINE" != "" ] && set $READLINE_LINE && READLINE_LINE=""
@@ -119,17 +116,12 @@ ShySync() {
     [ "$ctx_sid" = "" ] && ShyLogin
 
     case "$1" in
-        "historys") tail -n0 -f $HISTFILE | while true; do read line
-                line=`ShyLine $line`
-                ShyPost arg "$line" cmd history FORMAT "$HISTTIMEFORMAT"
-                echo $line
-            done
-            ;;
         "history")
             ctx_end=`history|tail -n1|awk '{print $1}'`
-            ctx_tail=`expr $ctx_end - $ctx_begin`
-            ShyEcho "sync $ctx_begin-$ctx_end count $ctx_tail to $ctx_dev"
-            history|tail -n $ctx_tail |while read line; do
+            ctx_begin=${ctx_begin:=$ctx_end}
+            ctx_count=`expr $ctx_end - $ctx_begin`
+            ShyEcho "sync $ctx_begin-$ctx_end count $ctx_count to $ctx_dev"
+            history|tail -n $ctx_count |while read line; do
                 ShySends historys sub "$line"
             done
             ctx_begin=$ctx_end
@@ -140,28 +132,13 @@ ShySync() {
 ShySyncs() {
     case "$1" in
         "base")
-            ShySync df
-            ShySync env
-            ShySync free
+            ShySync df &>/dev/null
+            ShySync env &>/dev/null
+            ShySync free &>/dev/null
             ShySync history
             ;;
         *)
     esac
-}
-ShyHistory() {
-    case "$SHELL" in
-        "/bin/zsh")
-            ShySync df
-            ShySync env
-            ShySync free
-            ShySync historys &>/dev/null &
-            ctx_sync=$!
-            ;;
-        *) ;;
-    esac
-}
-ShyRecord() {
-    script $1
 }
 ShyHelp() {
     ShyPost cmd help arg "$@"
@@ -171,7 +148,6 @@ ShyInit() {
 
     case "$SHELL" in
         "/bin/zsh")
-            ctx_bind=${ctx_null}
             PROMPT='%![%*]%c$ '
             ;;
         *)
@@ -182,17 +158,21 @@ ShyInit() {
             ;;
     esac
 
-    ${ctx_bind} '"\C-g\C-r":ShySyncs base'
-    ${ctx_bind} '"\C-g\C-f":ShyFavor'
-    ${ctx_bind} '"\C-gf":ShyFavor'
-    ${ctx_bind} '"\C-gF":ShyFavors'
+    if bind &>/dev/null; then
+        bind -x '"\C-G\C-R":ShySyncs base'
+        bind -x '"\C-G\C-F":ShyFavor'
+        bind -x '"\C-Gf":ShyFavor'
+        bind -x '"\C-GF":ShyFavors'
+    elif bindkey &>/dev/null; then
+        bindkey -s '\C-G\C-R' 'ShySyncs base\n'
+        setopt nosharehistory
+    fi
 
-    echo ${ctx_welcome}
     echo "url: ${ctx_url}"
     echo "pid: $$"
-    echo "pane: $TMUX_PANE"
     echo "begin: ${ctx_begin}"
     echo "share: ${ctx_share}"
+    echo "pane: $TMUX_PANE"
 }
 
 ShyInit && trap ShyLogout EXIT

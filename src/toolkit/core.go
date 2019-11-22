@@ -43,6 +43,9 @@ func Duration(arg ...string) time.Duration {
 	return d
 }
 func Hash(arg ...interface{}) (string, []string) {
+	if len(arg) == 0 {
+		arg = append(arg, "uniq")
+	}
 	args := []string{}
 	for _, v := range Trans(arg...) {
 		switch v {

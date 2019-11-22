@@ -245,22 +245,25 @@ func (m *Message) Result(arg ...interface{}) string {
 }
 
 func (m *Message) Push(key interface{}, arg ...interface{}) *Message {
+	keys := []string{}
 	switch key := key.(type) {
 	case string:
+		keys = strings.Split(key, " ")
+	case []string:
+		keys = key
+	}
+
+	for _, key := range keys {
 		switch m.Option("table.format") {
 		case "table":
 			m.Add("append", "key", key)
 			key = "value"
 		}
-		return m.Add("append", key, arg...)
-	case []string:
-		for _, key := range key {
-			switch m.Option("table.format") {
-			case "table":
-				m.Add("append", "key", key)
-				key = "value"
-			}
-			m.Add("append", key, kit.Select(" ", kit.Format(kit.Chain(arg[0], key))))
+		switch value := arg[0].(type) {
+		case map[string]interface{}:
+			m.Add("append", key, kit.Select(" ", kit.Format(kit.Chain(value, key))))
+		default:
+			m.Add("append", key, arg...)
 		}
 	}
 	return m

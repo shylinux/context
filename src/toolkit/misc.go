@@ -289,3 +289,13 @@ func Short(arg interface{}, l int) string {
 	}
 	return ""
 }
+
+func ShortKey(list map[string]interface{}, min int, arg ...interface{}) string {
+	h := Hashs(arg...)
+	for i := min; i < len(h); i++ {
+		if _, ok := list[h[:i]]; !ok {
+			return h[:i]
+		}
+	}
+	return h
+}

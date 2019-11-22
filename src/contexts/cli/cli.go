@@ -253,8 +253,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			},
 		}, Help: "服务升级"},
 		"missyou": {Name: "missyou", Value: map[string]interface{}{
-			"path":  "usr/local/work",
-			"local": "usr/local",
+			"path": "usr/local/work", "local": "usr/local",
 		}, Help: "任务管理"},
 		"imq": {Name: "imq", Value: map[string]interface{}{
 			"data": map[string]interface{}{
@@ -1209,7 +1208,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 		}},
 		"missyou": {Name: "missyou [topic] [name [action]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 任务主题
-			topic := "hello"
+			topic := "index"
 			if len(arg) > 0 && (arg[0] == "" || m.Cmds("nfs.path", path.Join(m.Conf("cli.project", "plugin.path"), arg[0]))) {
 				topic, arg = arg[0], arg[1:]
 			}
@@ -1220,14 +1219,14 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 					name := strings.TrimSuffix(value["name"], "/")
 					m.Push("create_time", value["time"])
 					m.Push("you", name)
-					m.Push("status", kit.Select("stop", "start", m.Confs("nfs.node", name)))
+					m.Push("status", kit.Select("stop", "start", m.Confs("ssh.node", name)))
 				})
 				m.Sort("you", "str_r").Sort("status").Table()
 				return
 			}
 
 			// 任务命名
-			if !strings.Contains(arg[0], "-") {
+			if m.Option("topic", topic); !strings.Contains(arg[0], "-") {
 				arg[0] = m.Time("20060102-") + arg[0]
 			}
 
@@ -1235,8 +1234,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			if m.Option("dream", arg[0]); m.Confs("ssh.node", arg[0]) {
 				switch kit.Select("", arg, 1) {
 				case "stop":
-					m.Cmdy("ssh._route", arg[0], "context", "cli", "quit", 0)
-					m.Cmd("web.code.dream", "exit", arg[0])
+					m.Cmdy("ssh._route", arg[0], "cli.quit", 0)
 				default:
 					m.Echo(arg[0])
 				}
@@ -1253,7 +1251,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"cmd_dir", p,
 				"cmd_daemon", "true",
 				"cmd_env", "PATH", os.Getenv("PATH"),
-				"cmd_env", "ctx_type", m.Option("topic", kit.Select(topic, arg, 1)),
+				"cmd_env", "ctx_type", m.Option("topic"),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),

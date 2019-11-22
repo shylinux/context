@@ -120,9 +120,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"dream": {Name: "dream", Help: "使命必达", Value: map[string]interface{}{
 			"layout": map[string]interface{}{
 				"three": []interface{}{
+					"rename-window -t $dream:1 source",
 					"split-window -t $dream:1.1",
 					"split-window -v -t $dream:1.2",
-					"rename-window -t $dream:1 source",
 					"select-layout -t $dream:1 main-horizontal",
 
 					"new-window -t $dream:2 -n docker",
@@ -137,24 +137,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				},
 			},
 			"topic": map[string]interface{}{
-				"hello": map[string]interface{}{
+				"index": map[string]interface{}{
 					"ship":   []interface{}{"tip", "miss.md", "task", "feed"},
 					"git":    []interface{}{"clone https://github.com/shylinux/context"},
-					"layout": []interface{}{},
-					"tmux": []interface{}{
-						"split-window -t $dream:1.1",
-						"new-window -t $dream:2",
-						"split-window -t $dream:2.1",
-						"new-window -t $dream:3",
-						"split-window -t $dream:3.1",
+					"layout": []interface{}{"three"}, "tmux": []interface{}{
+						"send-keys -t $dream.1.1 pwd",
 					},
 				},
 			},
-			"share": map[string]interface{}{},
+			"share": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "river dream favor story stage order expire",
+			}},
 		}},
 	},
 	Commands: map[string]*ctx.Command{
-		"dream": {Name: "dream", Help: "使命必达", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+		"dream": {Name: "dream init name [topic]", Help: "使命必达", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			switch arg[0] {
 			case "init":
 				// 检查会话
@@ -162,71 +159,53 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				if !m.Cmds(tmux, "has-session", "-t", arg[1]) {
 					break
 				}
-				topic := kit.Select("hello", kit.Select(m.Option("topic"), arg, 2))
 
 				// 下载代码
 				home := path.Join(m.Conf("missyou", "path"), arg[1], m.Conf("missyou", "local"))
+				topic := kit.Select("index", kit.Select(m.Option("topic"), arg, 2))
 				git := kit.Trans(m.Confv("prefix", "git"), "cmd_dir", home)
 				m.Confm("dream", []string{"topic", topic, "git"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
-					m.Cmdx(git, strings.Split(value, " "))
+					m.Cmd(git, strings.Split(value, " "))
 				})
 
 				// 创建终端
-				m.Cmds(tmux, "set-environment", "-g", "ctx_share", m.Cmdx("dream", "share"))
-				m.Cmds(tmux, "new-session", "-ds", arg[1], "cmd_dir", home, "cmd_env", "TMUX", "")
-				m.Cmds(tmux, "set-environment", "-t", arg[1], "ctx_share", m.Cmdx("dream", "share"))
-				m.Confm("dream", []string{"layout", m.Conf("dream", []string{"topic", m.Option("topic"), "layout", "0"})}, func(index int, value string) {
+				share := m.Cmdx("dream", "share", topic)
+				m.Cmd(tmux, "set-environment", "-g", "ctx_share", share)
+				m.Cmd(tmux, "new-session", "-ds", arg[1], "cmd_dir", home, "cmd_env", "TMUX", "")
+				m.Cmd(tmux, "set-environment", "-t", arg[1], "ctx_share", share)
+				m.Confm("dream", []string{"layout", m.Conf("dream", []string{"topic", topic, "layout", "0"})}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
-					m.Cmdx(tmux, strings.Split(value, " "), "cmd_dir", home)
+					m.Cmd(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
 				m.Confm("dream", []string{"topic", topic, "tmux"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
-					m.Cmdx(tmux, strings.Split(value, " "), "cmd_dir", home)
+					m.Cmd(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
+				m.Echo(share)
 
-				arg = []string{"share", topic}
-				fallthrough
 			case "share":
-				topic := kit.Select("hello", kit.Select(m.Option("topic"), arg, 1))
-				if len(arg) == 1 {
-					m.Confm("dream", []string{"topic", kit.Select("hello", topic), "ship"}, func(index int, value string) {
+				// 模板参数
+				topic := kit.Select("index", kit.Select(m.Option("topic"), arg, 1))
+				m.Confm("dream", []string{"topic", topic, "ship"}, func(index int, value string) {
+					if len(arg) < index+3 {
 						arg = append(arg, value)
-					})
-				}
-				for i := 0; i < 10; i++ {
-					h := kit.Hashs("uniq")[:6]
-					if m.Confs("dream", []string{"share", "hash", h}) {
-						continue
+					} else if arg[index+2] == "" {
+						arg[index+2] = value
 					}
-					m.Conf("dream", []string{"share", "hash", h}, map[string]interface{}{
-						"river":  m.Option("river"),
-						"dream":  m.Option("dream"),
-						"favor":  kit.Select("tip", arg, 1),
-						"story":  kit.Select("miss.md", arg, 2),
-						"stage":  kit.Select("task", arg, 3),
-						"order":  kit.Select("feed", arg, 4),
-						"expire": m.Time("10m", "stamp"),
-					})
-					m.Echo(h)
-					break
-				}
-
-			case "bind":
-				m.Confm("dream", []string{"share", "hash", arg[1]}, func(value map[string]interface{}) {
-					m.Conf("login", []string{"hash", m.Option("sid"), "ship"}, value)
 				})
+				// 共享链接
+				h := kit.ShortKey(m.Confm("dream", []string{"share", "hash"}), 6)
+				m.Confv("dream", []string{"share", "hash", h}, map[string]interface{}{
+					"river": m.Option("river"), "dream": m.Option("dream"),
+					"favor": arg[2], "story": arg[3], "stage": arg[4], "order": arg[5],
+					"expire": m.Time("10m", "stamp"),
+				})
+				m.Echo(h)
 
 			case "list":
 				m.Confm("dream", "share.hash", func(key string, value map[string]interface{}) {
-					m.Push("key", key)
-					m.Push("river", value["river"])
-					m.Push("dream", value["dream"])
-					m.Push("favor", value["favor"])
-					m.Push("story", value["story"])
-					m.Push("stage", value["stage"])
-					m.Push("order", value["order"])
-					m.Push("expire", value["expire"])
+					m.Push("key", key).Push(m.Conf("dream", "share.meta.fields"), value)
 				})
 				m.Table()
 
