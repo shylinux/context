@@ -9,7 +9,7 @@
 
     <link rel="shortcut icon" type="image/ico" href="/static/librarys/{{options . "favicon"}}">
 {{range $index, $lib := option . "styles"}}
-    <link rel="stylesheet" type="text/css" href="/static/librarys/{{$lib}}"></link>
+    <link rel="stylesheet" type="text/css" href="/static/librarys/{{$lib}}">
 {{end}}
 </head>
 <body>
@@ -18,7 +18,7 @@
 {{define "fieldset"}}
     <fieldset class="{{options . "view"}}" data-init="{{options . "init"}}">
         <form class="option" data-names="{{options . "name"}}" data-group="{{options . "group"}}">
-              <input style="display:none"></input>
+              <input style="display:none">
         </form>
         <div class="action"></div>
         <div class="output"></div>

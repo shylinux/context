@@ -64,7 +64,6 @@ var page = Page({
                     page.action.Action["最大"](event)
 
             }
-            break
         } else {
             switch (event.key) {
                 case " ":
@@ -75,7 +74,6 @@ var page = Page({
                     break
             }
         }
-        break
     },
 
     Action: {

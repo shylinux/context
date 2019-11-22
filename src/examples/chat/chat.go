@@ -5,6 +5,7 @@ import (
 	"contexts/web"
 
 	"net/http"
+	"strings"
 	"toolkit"
 )
 
@@ -97,6 +98,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				},
 			},
 		}, Help: "组件列表"},
+		"share": &ctx.Config{Name: "share", Value: map[string]interface{}{
+			"meta": map[string]interface{}{
+				"fields": "id time share type code remote_ip",
+				"store":  "var/tmp/share.csv",
+				"limit":  30, "least": 10,
+			},
+			"hash": map[string]interface{}{},
+			"list": []interface{}{},
+		}, Help: "共享链接"},
 	},
 	Commands: map[string]*ctx.Command{
 		"login": &ctx.Command{Name: "login [username password]", Help: "登录", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
@@ -460,6 +470,49 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			default:
 				m.Cmdy("ssh._route", arg[1], "tool")
 			}
+			return
+		}},
+
+		"/share/": &ctx.Command{Name: "/share/", Help: "共享链接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			h := strings.TrimPrefix(key, "/share/")
+			m.Confm("share", []string{"hash", h}, func(value map[string]interface{}) {
+				switch kit.Format(value["type"]) {
+				case "file":
+					m.Cmdy("/download/" + h)
+				case "wiki":
+					m.Cmdy("web.wiki.note", kit.Format(value["code"]))
+				}
+				m.Grow("share", nil, map[string]interface{}{
+					"time":      m.Time(),
+					"share":     h,
+					"type":      value["type"],
+					"code":      value["code"],
+					"sid":       m.Option("sid"),
+					"agent":     m.Option("agent"),
+					"sessid":    m.Option("sessid"),
+					"username":  m.Option("username"),
+					"remote_ip": m.Option("remote_ip"),
+				})
+			})
+			return
+		}},
+		"share": &ctx.Command{Name: "share type code", Help: "共享链接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			if len(arg) == 0 {
+				fields := strings.Split(m.Conf("share", "meta.fields"), " ")
+				m.Grows("share", nil, func(meta map[string]interface{}, index int, value map[string]interface{}) {
+					m.Push(fields, value)
+				})
+				m.Table()
+				return
+			}
+			h := kit.Hashs("uniq")
+			m.Confv("share", []string{"hash", h}, map[string]interface{}{
+				"from": m.Option("username"),
+				"time": m.Time(),
+				"type": arg[0],
+				"code": arg[1],
+			})
+			m.Echo(h)
 			return
 		}},
 	},

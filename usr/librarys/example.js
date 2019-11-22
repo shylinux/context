@@ -139,7 +139,7 @@ function Page(page) {
             // Event入口 0
             if (page.Event(event, {}) && page.check && !ctx.Cookie("sessid")) {
                 // 用户登录
-                document.querySelectorAll("body>fieldset.Login").forEach(function(field) {
+                kit.Selector(document, "body>fieldset.Login", function(field) {
                     page.Pane(page, field)
                 }), page.login.Pane.Dialog(1, 1)
             } else {
@@ -1479,7 +1479,7 @@ function Output(plugin, type, msg, cb, target, option) {
         onimport: shy("导入数据", {
             _table: function(msg, list) {
                 return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport, function(event, value, name, line, index) {
-                    var td = event.target
+                    var td = event.target;
                     plugin.oncarte(event, shy("菜单列表", {
                             "修改": "modify",
                             "删除": "delete",
@@ -1528,7 +1528,7 @@ function Output(plugin, type, msg, cb, target, option) {
                                 })
                             }
                             return true
-                        }),
+                        })
                     )
                 })
             },

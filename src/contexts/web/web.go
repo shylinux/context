@@ -967,11 +967,6 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 
 						kind := h.Header.Get("Content-Type")
 						kind = strings.Split(kind, "/")[0]
-						if m.Options("river") {
-							prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "insert"}
-							m.Cmd(prefix, kit.Select(kind, m.Option("table")), "name", h.Filename, "kind", kind, "hash", name, "size", n)
-							m.Cmd(prefix, "file", "name", h.Filename, "kind", kind, "hash", name, "size", n)
-						}
 
 						buf := bytes.NewBuffer(make([]byte, 0, 1024))
 						fmt.Fprintf(buf, "create_time: %s\n", m.Time("2006-01-02 15:04"))
@@ -983,6 +978,12 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						b := buf.Bytes()
 
 						code := kit.Hashs(string(b))
+						if m.Options("river") {
+							prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "insert"}
+							m.Cmd(prefix, kit.Select(kind, m.Option("table")), "name", h.Filename, "kind", kind, "hash", name, "size", n)
+							m.Cmd(prefix, "file", "name", h.Filename, "kind", kind, "hash", name, "size", n, "code", code)
+						}
+
 						if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "meta", code)); m.Assert(e) {
 							defer o.Close()
 

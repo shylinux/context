@@ -7,7 +7,6 @@
 ~ssh
     config load data/work.json work
     config load data/flow.json flow
-
 # 服务配置
 ~nfs
     source etc/common.shy
@@ -23,9 +22,12 @@
     config load tmp/vim/vim.json vim
 ~wiki
     config load tmp/story.json story
+~chat
+    config load tmp/share.json share
 
 # 终端配置
 ~cli
 
-~wiki
 ~code
+~wiki
+~chat

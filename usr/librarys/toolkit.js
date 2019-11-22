@@ -262,7 +262,7 @@ kit = toolkit = (function() {var kit = {__proto__: document,
             child.list && kit.AppendChild(node, child.list, subs)
             subs.first || (subs.first = node), subs.last = node
             name && (subs[name] = node)
-            parent.append(node)
+            parent && parent.append && parent.append(node)
         })
         return subs
     },

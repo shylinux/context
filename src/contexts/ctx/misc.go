@@ -506,6 +506,9 @@ func (m *Message) ToHTML(style string) string {
 
 func (m *Message) Grow(key string, args interface{}, data interface{}) interface{} {
 	cache := m.Confm(key, args)
+	if args == nil {
+		cache = m.Confm(key)
+	}
 	if cache == nil {
 		cache = map[string]interface{}{}
 	}
@@ -579,11 +582,18 @@ func (m *Message) Grow(key string, args interface{}, data interface{}) interface
 	}
 	cache["meta"] = meta
 	cache["list"] = list
-	m.Conf(key, args, cache)
+	if args == nil {
+		m.Conf(key, cache)
+	} else {
+		m.Conf(key, args, cache)
+	}
 	return list
 }
 func (m *Message) Grows(key string, args interface{}, cb interface{}) map[string]interface{} {
 	cache := m.Confm(key, args)
+	if args == nil {
+		cache = m.Confm(key)
+	}
 	if cache == nil {
 		return nil
 	}

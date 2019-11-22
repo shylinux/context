@@ -346,10 +346,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 文件列表
 				m.Cmd("ssh.data", "show", arg[1]).Table(func(index int, value map[string]string) {
 					m.Push("id", value["id"])
+					m.Push("time", value["create_time"])
 					m.Push("kind", value["kind"])
 					m.Push("name", value["name"])
 					m.Push("size", kit.FmtSize(int64(kit.Int(value["size"]))))
-					m.Push("file", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, value["hash"], value["name"]))
+					m.Push("file", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, kit.Select(value["hash"], value["code"]), value["name"]))
 					m.Push("hash", value["hash"])
 				})
 				m.Table()

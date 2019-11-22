@@ -1,4 +1,6 @@
 # 应用配置
+~chat
+    config save var/tmp/share.json share
 ~wiki
     config save var/tmp/story.json story
 ~code
