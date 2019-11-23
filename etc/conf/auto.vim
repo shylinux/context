@@ -5,7 +5,7 @@ if !exists("g:ctx_sid") | let ctx_sid = "" | end
 fun! ShySend(arg)
     if has_key(a:arg, "sub") && a:arg["sub"] != ""
         let temp = tempname()
-        call writefile([a:arg["sub"]], temp)
+        call writefile(split(a:arg["sub"], "\n"), temp, "b")
         let a:arg["sub"] = "@" . temp
     endif
 
@@ -66,16 +66,6 @@ fun! ShyCheck(target)
         call ShySync("regs")
         call ShySync("marks")
         call ShySync("tags")
-    elseif a:target == "exec"
-        let cmd = getcmdline()
-        if cmd != ""
-            call ShySync("exec")
-            if getcmdline() == "w"
-                call ShySync("regs")
-                call ShySync("marks")
-                call ShySync("tags")
-            endif
-        endif
     elseif a:target == "fixs"
         let l = len(getqflist())
         if l > 0
@@ -93,64 +83,26 @@ endfun
 fun! ShyGrep(word)
     if !exists("g:grep_dir") | let g:grep_dir = "./" | endif
     let g:grep_dir = input("dir: ", g:grep_dir, "file")
-    execute "grep -rn --exclude tags --exclude '\..*' --exclude '*.tags' " . a:word . " " . g:grep_dir
+    execute "grep -rn --exclude tags --exclude '*.tags' " . a:word . " " . g:grep_dir
 endfun
 fun! ShyTag(word)
     execute "tag " . a:word
 endfun
-
 fun! ShyHelp()
     echo ShySend({"cmd": "help"})
 endfun
 
 call ShyLogin()
-" " call ShySync("bufs")
-" call ShySync("regs")
-" call ShySync("marks")
-" call ShySync("tags")
-" " call ShySync("fixs")
-"
-" autocmd VimLeave * call ShyLogout()
-" autocmd BufReadPost * call ShySync("bufs")
-" hello
+autocmd VimLeave * call ShyLogout()
+autocmd BufReadPost * call ShySync("bufs")
 autocmd BufReadPost * call ShySync("read")
 autocmd BufWritePre * call ShySync("write")
-autocmd CmdlineLeave * call ShyCheck("exec")
-" autocmd QuickFixCmdPost * call ShyCheck("fixs")
+autocmd CmdlineLeave * call ShySync("exec")
+autocmd QuickFixCmdPost * call ShyCheck("fixs")
 autocmd InsertLeave * call ShySync("insert")
-"
-" command! ShyHelp echo ShyPost({"cmd": "help"})
-"
-" nnoremap <C-g><C-g> :call ShyGrep(expand("<cword>"))<CR>
-" " nnoremap <C-g><C-t> :call ShyTag(expand("<cword>"))<CR>
-" nnoremap <C-g><C-t> :call ShyTask()<CR>
-" nnoremap <C-g><C-r> :call ShyCheck("cache")<CR>
-" nnoremap <C-g><C-f> :call ShyFavor("note")<CR>
-" nnoremap <C-g>f :call ShyFavor("")<CR>
-" nnoremap <C-g>F :call ShyFavors()<CR>
-"
-" autocmd BufUnload * call Shy("close", expand("<afile>")) | call ShySync("bufs")
-" autocmd CmdlineLeave * 
-" autocmd CompleteDone * call Shy("sync", "regs")
-" autocmd InsertEnter * call Shy("sync", "regs")
-" autocmd CmdlineEnter * call Shy("sync", "regs")
-" autocmd BufWinEnter * call Shy("enter", expand("<afile>"))
-" autocmd WinEnter * call Shy("enter", expand("<afile>"))
-" autocmd WinLeave * call Shy("leave", expand("<afile>"))
-" autocmd CursorMoved * call Shy("line", getcurpos()[1])
-" autocmd InsertCharPre * call Shy("char", v:char)
-"
-" let g:colorscheme=1
-" let g:colorlist = [ "ron", "torte", "darkblue", "peachpuff" ]
-" function! ColorNext()
-"     if g:colorscheme >= len(g:colorlist)
-"         let g:colorscheme = 0
-"     endif
-"     let g:scheme = g:colorlist[g:colorscheme]
-"     exec "colorscheme " . g:scheme
-"     let g:colorscheme = g:colorscheme+1
-" endfunction
-" call ColorNext()
-" command! NN call ColorNext()<CR>
-" command! SS mksession! etc/session.vim
+nnoremap <C-G><C-G> :call ShyGrep(expand("<cword>"))<CR>
+nnoremap <C-G><C-R> :call ShyCheck("cache")<CR>
+nnoremap <C-G><C-F> :call ShyFavor()<CR>
+nnoremap <C-G>f :call ShyFavors()<CR>
+nnoremap <C-G><C-T> :call ShyTask()<CR>
 

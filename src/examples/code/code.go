@@ -50,6 +50,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"git": {Name: "git", Help: "记录", Value: map[string]interface{}{
 			"alias": map[string]interface{}{"s": "status", "b": "branch"},
 		}},
+		"cache": {Name: "cache", Help: "缓存默认的全局配置", Value: map[string]interface{}{
+			"store": "var/tmp/hi.csv",
+			"limit": 6,
+			"least": 3,
+		}},
+
 		"zsh": {Name: "zsh", Help: "命令行", Value: map[string]interface{}{
 			"history": map[string]interface{}{"meta": map[string]interface{}{
 				"fields": "time sid cmd pwd",
@@ -94,25 +100,20 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}},
 
 			"bufs": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "sid buf tag file line",
+				"fields": "buf tag file line",
 			}},
 			"regs": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "sid reg word",
+				"fields": "reg word",
 			}},
 			"marks": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "sid mark line col file",
+				"fields": "mark line col file",
 			}},
 			"tags": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "sid tag line file",
+				"fields": "tag line file",
 			}},
 			"fixs": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "sid fix file line word",
+				"fields": "fix file line word",
 			}},
-		}},
-		"cache": {Name: "cache", Help: "缓存默认的全局配置", Value: map[string]interface{}{
-			"store": "var/tmp/hi.csv",
-			"limit": 6,
-			"least": 3,
 		}},
 
 		"login": {Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h", "meta": map[string]interface{}{
@@ -387,7 +388,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 			return
 		}},
-		"state": {Name: "state post|list", Help: "状态", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+		"state": {Name: "state post|list agent type", Help: "状态", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			switch arg[0] {
 			case "post":
 				data := map[string]interface{}{}
@@ -406,6 +407,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						return
 					}
 					if value["sid"] = key; len(arg) < 6 || arg[4] == "" || strings.HasPrefix(kit.Format(value[arg[4]]), arg[5]) {
+						m.Push("sid", key)
 						m.Push(fields, value)
 					}
 				})
@@ -951,7 +953,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					m.Echo(p)
 				}
 				return
-
 			}
 			return
 		}},
@@ -990,65 +991,50 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			case "read", "write":
 				m.Cmd("trend", "post", "vim.opens", "sid", m.Option("sid"),
 					"action", m.Option("cmd"), "file", m.Option("arg"), "pwd", m.Option("pwd"))
-
 			case "exec":
 				m.Cmd("trend", "post", "vim.cmds", "sid", m.Option("sid"),
 					"cmd", m.Option("sub"), "file", m.Option("buf"), "pwd", m.Option("pwd"))
 			case "insert":
 				m.Cmd("trend", "post", "vim.txts", "sid", m.Option("sid"),
 					"word", m.Option("sub"), "line", m.Option("row"), "col", m.Option("col"), "file", m.Option("buf"), "pwd", m.Option("pwd"))
-
 			case "tasklet":
-				m.Cmd("ssh._route", m.Option("dream"), "web.team.task", "create", "task", "3", "add", "action", m.Time(), m.Time("10m"), m.Option("arg"), m.Option("sub"))
+				m.Cmd("ssh._route", m.Option("dream"), "web.team.task", "create", "task",
+					"3", "add", "action", m.Time(), m.Time("10m"), m.Option("arg"), m.Option("sub"))
 
 			case "sync":
-				m.Conf(cmd, []string{m.Option("arg"), "hash", m.Option("sid")}, "")
+				m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid")}, []interface{}{})
 				switch m.Option("arg") {
 				case "bufs":
-					m.Split(strings.TrimSpace(m.Option("sub")), " ", "5", "id tag name some line").Table(func(index int, value map[string]string) {
-						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-							"buf":  value["id"],
-							"tag":  value["tag"],
-							"file": strings.TrimSuffix(strings.TrimPrefix(value["name"], "\""), "\""),
-							"line": value["line"],
-						})
+					m.Split(m.Option("sub"), " ", "5", "id tag name some line").Table(func(index int, value map[string]string) {
+						m.Cmd("state", "post", cmd, m.Option("arg"),
+							"buf", value["id"], "tag", value["tag"], "line", value["line"],
+							"file", strings.TrimSuffix(strings.TrimPrefix(value["name"], "\""), "\""))
 					})
 				case "regs":
-					m.Split(strings.TrimPrefix(m.Option("sub"), "\n--- Registers ---\n"), " ", "2", "name word").Table(func(index int, value map[string]string) {
-						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-							"word": strings.Replace(strings.Replace(value["word"], "^I", "\t", -1), "^J", "\n", -1),
-							"reg":  strings.TrimPrefix(value["name"], "\""),
-						})
+					m.Split(strings.TrimPrefix(m.Option("sub"), "--- Registers ---\n"), " ", "2", "name word").Table(func(index int, value map[string]string) {
+						m.Cmd("state", "post", cmd, m.Option("arg"),
+							"reg", strings.TrimPrefix(value["name"], "\""),
+							"word", strings.Replace(strings.Replace(value["word"], "^I", "\t", -1), "^J", "\n", -1))
 					})
 				case "marks":
-					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "4").Table(func(index int, value map[string]string) {
-						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-							"mark": value["mark"],
-							"line": value["line"],
-							"col":  value["col"],
-							"file": value["file/text"],
-						})
+					m.Split(m.Option("sub"), " ", "4").Table(func(index int, value map[string]string) {
+						m.Cmd("state", "post", cmd, m.Option("arg"),
+							"mark", value["mark"], "line", value["line"], "col", value["col"],
+							"file", value["file/text"])
 					})
 				case "tags":
-					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "6").Table(func(index int, value map[string]string) {
-						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-							"tag":  value["tag"],
-							"line": value["line"],
-							"file": value["in file/text"],
-						})
+					m.Split(strings.TrimSuffix(m.Option("sub"), ">"), " ", "6").Table(func(index int, value map[string]string) {
+						m.Cmd("state", "post", cmd, m.Option("arg"),
+							"tag", value["tag"], "line", value["line"], "file", value["in file/text"])
 					})
 				case "fixs":
 					if strings.HasPrefix(m.Option("sub"), "\nError") {
 						break
 					}
-					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), " ", "3", "id file word").Table(func(index int, value map[string]string) {
+					m.Split(m.Option("sub"), " ", "3", "id file word").Table(func(index int, value map[string]string) {
 						vs := strings.Split(kit.Format(value["file"]), ":")
-						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-							"fix":  value["id"],
-							"file": vs[0],
-							"line": vs[1],
-							"word": value["word"],
-						})
+						m.Cmd("state", "post", cmd, m.Option("arg"),
+							"fix", value["id"], "file", vs[0], "line", vs[1], "word", value["word"])
 					})
 				}
 				m.Set("append").Set("result")
