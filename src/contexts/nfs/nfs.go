@@ -2,6 +2,7 @@ package nfs
 
 import (
 	"bufio"
+	"bytes"
 	"contexts/ctx"
 	"crypto/md5"
 	"crypto/sha1"
@@ -234,7 +235,7 @@ func (nfs *NFS) Recv(line string) (field string, value string) {
 	m.Assert(e)
 	return
 }
-func (nfs *NFS) Send(meta string, arg ...interface{}) *NFS {
+func (nfs *NFS) Send(w io.Writer, meta string, arg ...interface{}) *NFS {
 	m := nfs.Context.Message()
 
 	line := "\n"
@@ -247,7 +248,7 @@ func (nfs *NFS) Send(meta string, arg ...interface{}) *NFS {
 					j = len(text)
 				}
 				line = fmt.Sprintf("%s: %s\n", url.QueryEscape(meta), url.QueryEscape(kit.Format(text[i:j])))
-				n, e := fmt.Fprint(nfs.io, line)
+				n, e := fmt.Fprint(w, line)
 				m.Assert(e)
 				m.Capi("nwrite", n)
 				m.Log("send", "%d [%s]", len(line), line)
@@ -258,7 +259,7 @@ func (nfs *NFS) Send(meta string, arg ...interface{}) *NFS {
 		}
 	}
 
-	n, e := fmt.Fprint(nfs.io, line)
+	n, e := fmt.Fprint(w, line)
 	m.Assert(e)
 	m.Capi("nwrite", n)
 	m.Log("send", "%d [%s]", len(line), line)
@@ -383,16 +384,18 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 			code, meta, body = msg.Optioni("remote_code"), "result", "append"
 		}
 
-		nfs.Send("code", code)
+		buf := bytes.NewBuffer(make([]byte, 0, 1024))
+		nfs.Send(buf, "_code", code)
 		for _, v := range msg.Meta[meta] {
-			nfs.Send(meta, v)
+			nfs.Send(buf, meta, v)
 		}
 		for _, k := range msg.Meta[body] {
 			for _, v := range msg.Meta[k] {
-				nfs.Send(k, v)
+				nfs.Send(buf, k, v)
 			}
 		}
-		nfs.Send("")
+		nfs.Send(buf, "")
+		buf.WriteTo(nfs.io)
 	})
 
 	// 消息接收队列
@@ -403,7 +406,7 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 
 		m.TryCatch(m, true, func(m *ctx.Message) {
 			switch field, value := nfs.Recv(bio.Text()); field {
-			case "code":
+			case "_code":
 				msg, code = m.Sess("ms_target"), value
 				msg.Meta = map[string][]string{}
 
@@ -427,8 +430,8 @@ func (nfs *NFS) Start(m *ctx.Message, arg ...string) bool {
 						})
 					})
 				} else { // 接收响应
-					m.Set("option", "code", code).Gos(msg, func(msg *ctx.Message) {
-						if h, ok := nfs.hand[kit.Int(m.Option("code"))]; ok {
+					m.Set("option", "_code", code).Gos(msg, func(msg *ctx.Message) {
+						if h, ok := nfs.hand[kit.Int(m.Option("_code"))]; ok {
 							h.CopyFuck(msg, "result").CopyFuck(msg, "append").Back(h)
 						}
 					})

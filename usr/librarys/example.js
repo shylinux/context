@@ -1495,6 +1495,7 @@ function Output(plugin, type, msg, cb, target, option) {
                             })
                             var cmd = []
                             option.dream && cmd.push(option.dream.value)
+                            option.table && cmd.push(option.table.value)
                             if (item == "修改") {
                                 text = kit.AppendChilds(td, [{type: "input", value: text, style: {width: td.clientWidth+"px"}, data: {onkeydown: function(event) {
                                     if (event.key == "Enter") {

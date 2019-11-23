@@ -30,9 +30,6 @@ CMD sh bin/boot.sh
 var Index = &ctx.Context{Name: "code", Help: "代码中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"login": {Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h", "meta": map[string]interface{}{
-			"fields": "time sid type status ship.dream ship.stage pwd pid pane hostname username",
-		}}, Help: "用户登录"},
 		"prefix": {Name: "prefix", Help: "外部命令", Value: map[string]interface{}{
 			"zsh":    []interface{}{"cli.system", "zsh"},
 			"tmux":   []interface{}{"cli.system", "tmux"},
@@ -70,10 +67,10 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				"fields": "sid name value",
 			}},
 			"ps": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "PID TIME COMMAND",
+				"fields": "sid UID PID PPID TTY CMD",
 			}},
 			"df": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "fs size used rest per pos",
+				"fields": "sid fs size used rest per pos",
 			}},
 		}},
 		"vim": {Name: "vim", Help: "编辑器", Value: map[string]interface{}{
@@ -117,6 +114,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"limit": 6,
 			"least": 3,
 		}},
+
+		"login": {Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h", "meta": map[string]interface{}{
+			"fields": "time sid type status ship.dream ship.stage pwd pid pane hostname username",
+			"script": "usr/script",
+		}}, Help: "用户登录"},
 		"dream": {Name: "dream", Help: "使命必达", Value: map[string]interface{}{
 			"layout": map[string]interface{}{
 				"three": []interface{}{
@@ -148,6 +150,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"share": map[string]interface{}{"meta": map[string]interface{}{
 				"fields": "river dream favor story stage order expire",
 			}},
+			"favor": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "tab note word file line col",
+			}},
 		}},
 	},
 	Commands: map[string]*ctx.Command{
@@ -164,21 +169,21 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				home := path.Join(m.Conf("missyou", "path"), arg[1], m.Conf("missyou", "local"))
 				topic := kit.Select("index", kit.Select(m.Option("topic"), arg, 2))
 				git := kit.Trans(m.Confv("prefix", "git"), "cmd_dir", home)
-				m.Confm("dream", []string{"topic", topic, "git"}, func(index int, value string) {
+				m.Confm(cmd, []string{"topic", topic, "git"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmd(git, strings.Split(value, " "))
 				})
 
 				// 创建终端
-				share := m.Cmdx("dream", "share", topic)
+				share := m.Cmdx(cmd, "share", topic)
 				m.Cmd(tmux, "set-environment", "-g", "ctx_share", share)
 				m.Cmd(tmux, "new-session", "-ds", arg[1], "cmd_dir", home, "cmd_env", "TMUX", "")
 				m.Cmd(tmux, "set-environment", "-t", arg[1], "ctx_share", share)
-				m.Confm("dream", []string{"layout", m.Conf("dream", []string{"topic", topic, "layout", "0"})}, func(index int, value string) {
+				m.Confm(cmd, []string{"layout", m.Conf(cmd, []string{"topic", topic, "layout", "0"})}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmd(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
-				m.Confm("dream", []string{"topic", topic, "tmux"}, func(index int, value string) {
+				m.Confm(cmd, []string{"topic", topic, "tmux"}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmd(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
@@ -187,7 +192,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			case "share":
 				// 模板参数
 				topic := kit.Select("index", kit.Select(m.Option("topic"), arg, 1))
-				m.Confm("dream", []string{"topic", topic, "ship"}, func(index int, value string) {
+				m.Confm(cmd, []string{"topic", topic, "ship"}, func(index int, value string) {
 					if len(arg) < index+3 {
 						arg = append(arg, value)
 					} else if arg[index+2] == "" {
@@ -195,17 +200,17 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					}
 				})
 				// 共享链接
-				h := kit.ShortKey(m.Confm("dream", []string{"share", "hash"}), 6)
-				m.Confv("dream", []string{"share", "hash", h}, map[string]interface{}{
+				h := kit.ShortKey(m.Confm(cmd, []string{"share", "hash"}), 6)
+				m.Confv(cmd, []string{"share", "hash", h}, map[string]interface{}{
 					"river": m.Option("river"), "dream": m.Option("dream"),
 					"favor": arg[2], "story": arg[3], "stage": arg[4], "order": arg[5],
-					"expire": m.Time("10m", "stamp"),
+					"topic": topic, "share": h, "expire": m.Time("10m", "stamp"),
 				})
 				m.Echo(h)
 
 			case "list":
-				m.Confm("dream", "share.hash", func(key string, value map[string]interface{}) {
-					m.Push("key", key).Push(m.Conf("dream", "share.meta.fields"), value)
+				m.Confm(cmd, "share.hash", func(key string, value map[string]interface{}) {
+					m.Push("key", key).Push(m.Conf(cmd, "share.meta.fields"), value)
 				})
 				m.Table()
 
@@ -218,17 +223,20 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			switch kit.Select("list", arg, 0) {
 			case "open":
 			case "init":
-				if m.Option("sid") != "" && m.Confs(cmd, []string{"hash", m.Option("sid")}) {
-					m.Echo(m.Option("sid"))
-					return
+				if m.Option("sid") != "" {
+					if m.Confs(cmd, []string{"hash", m.Option("sid"), "status"}) {
+						m.Conf(cmd, []string{"hash", m.Option("sid"), "status"}, "login")
+						m.Echo(m.Option("sid"))
+						return
+					}
 				}
 
 				// 添加终端
-				name := kit.Hashs(m.Option("pid"), m.Option("hostname"), m.Option("username"))
-				m.Conf(cmd, []string{"hash", name}, map[string]interface{}{
+				h := kit.ShortKey(m.Confm(cmd, "hash"), 6, m.Option("pid"), m.Option("hostname"), m.Option("username"))
+				m.Conf(cmd, []string{"hash", h}, map[string]interface{}{
 					"time":     m.Time(),
-					"type":     kit.Select("vim", arg, 1),
 					"status":   "login",
+					"type":     kit.Select("vim", arg, 1),
 					"ship":     m.Confv("dream", []string{"share", "hash", m.Option("share")}),
 					"pwd":      m.Option("pwd"),
 					"pid":      m.Option("pid"),
@@ -236,50 +244,52 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"hostname": m.Option("hostname"),
 					"username": m.Option("username"),
 				})
-				m.Echo(name)
+				m.Echo(h)
 
 			case "list":
-				// 清理终端
-				if len(arg) > 3 && arg[3] == "prune" {
-					m.Cmd(".prune", m.Conf("login", []string{"hash", arg[2], "type"}), arg[2])
-					arg = arg[:1]
+				if len(arg) > 4 {
+					sid := kit.Select(m.Option("sid"), arg[3])
+					switch arg[4] {
+					case "prune":
+						// 清理终端
+						m.Cmd(".prune", m.Conf("login", []string{"hash", sid, "type"}), sid)
+						arg = arg[:2]
+					case "modify":
+						// 修改终端
+						m.Conf(cmd, []string{"hash", sid, arg[5]}, arg[6])
+						arg = arg[:2]
+					}
 				}
 
 				// 终端列表
-				if len(arg) == 1 || arg[1] == "" {
+				if len(arg) == 2 || arg[2] == "" {
 					fields := strings.Split(m.Conf(cmd, "meta.fields"), " ")
 					m.Confm(cmd, "hash", func(key string, value map[string]interface{}) {
-						value["sid"] = key
-						m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
+						if arg[1] == "" || arg[1] == kit.Format(value["type"]) {
+							value["sid"] = key
+							m.Push(fields, value)
+						}
 					})
 					m.Table()
 					break
 				}
 
-				// 终端数据
-				if len(arg) > 6 && arg[6] != "" {
-					m.Conf(cmd, []string{"hash", arg[1], "ship", "order"}, arg[6])
-				}
-				if len(arg) > 5 && arg[5] != "" {
-					m.Conf(cmd, []string{"hash", arg[1], "ship", "stage"}, arg[5])
-				}
-				if len(arg) > 4 && arg[4] != "" {
-					m.Conf(cmd, []string{"hash", arg[1], "ship", "story"}, arg[4])
+				// 终端绑定
+				if len(arg) > 4 && arg[4] != "" && arg[4] != m.Conf(cmd, []string{"hash", arg[2], "ship", "topic"}) && m.Confs(cmd, []string{"hash", arg[2]}) {
+					share := m.Cmdx("dream", "share", arg[4:])
+					m.Conf(cmd, []string{"hash", arg[2], "ship"},
+						m.Confv("dream", []string{"share", "hash", share}))
 				}
 				if len(arg) > 3 && arg[3] != "" {
-					m.Conf(cmd, []string{"hash", arg[1], "ship", "favor"}, arg[3])
-					m.Conf(cmd, []string{"hash", arg[1], "ship", "river"}, m.Option("river"))
-				}
-				if len(arg) > 2 && arg[2] != "" {
-					m.Conf(cmd, []string{"hash", arg[1], "ship", "dream"}, arg[2])
+					m.Conf(cmd, []string{"hash", arg[2], "ship", "dream"}, arg[3])
 				}
 
 				// 终端详情
 				m.Option("table.format", "table")
-				m.Confm(cmd, []string{"hash", arg[1], "ship"}, func(key string, value string) {
+				m.Confm(cmd, []string{"hash", arg[2], "ship"}, func(key string, value string) {
 					m.Push("ship."+key, value)
 				})
-				m.Confm(cmd, []string{"hash", arg[1]}, func(key string, value string) {
+				m.Confm(cmd, []string{"hash", arg[2]}, func(key string, value string) {
 					if key != "ship" {
 						m.Push(key, value)
 					}
@@ -288,13 +298,15 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 			case "exit":
 				// 退出终端
-				m.Conf(cmd, []string{"hash", m.Option("sid"), "status"}, "logout")
-				m.Conf(cmd, []string{"hash", m.Option("sid"), "time"}, m.Time())
+				if m.Confs(cmd, []string{"hash", m.Option("sid")}) {
+					m.Conf(cmd, []string{"hash", m.Option("sid"), "status"}, "logout")
+					m.Conf(cmd, []string{"hash", m.Option("sid"), "time"}, m.Time())
+				}
 			case "quit":
 			}
 			return
 		}},
-		"favor": {Name: "favor post|list", Help: "收藏", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+		"favor": {Name: "favor download|upload|file|post|list", Help: "收藏", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			switch arg[0] {
 			case "download":
 				// 下载文件
@@ -304,16 +316,19 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 				// 下载列表
 				m.Cmd("ssh._route", m.Option("dream"), "ssh.data", "show", "file").Table(func(index int, value map[string]string) {
-					m.Echo("%v %v %v\n", value["hash"], kit.FmtSize(int64(kit.Int(value["size"]))), value["name"])
+					m.Push("hash", value["hash"])
+					m.Push("time", value["upload_time"])
+					m.Push("size", kit.FmtSize(int64(kit.Int(value["size"]))))
+					m.Push("name", value["name"])
 				})
+				m.Table().Set("append")
 
 			case "upload":
 				// 上传文件
-				m.Option("agent", "favor")
 				if m.Cmd("/upload"); m.Options("dream") {
-					// 转发文件
-					m.Cmd("ssh._route", m.Option("dream"), "web.get", "dev",
-						"/download/"+m.Append("hash"), "save", "usr/script/"+m.Append("name"))
+					// 下发文件
+					m.Cmd("ssh._route", m.Option("dream"), "web.get", "dev", "/download/"+m.Append("hash"),
+						"save", m.Conf("login", "script")+"/"+m.Append("name"))
 				}
 				m.Echo("code: %s\n", m.Append("code"))
 				m.Echo("hash: %s\n", m.Append("hash"))
@@ -321,71 +336,80 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Echo("type: %s\n", m.Append("type"))
 				m.Echo("size: %s\n", m.Append("size"))
 				m.Set("append")
+
 			case "file":
 				// 文件列表
-				m.Cmd("ssh.data", "show", arg[1]).Table(func(index int, value map[string]string) {
+				if len(arg) > 2 && arg[2] != "" {
+					m.Cmdy("ssh.data", "show", arg[1:3])
+					break
+				}
+				m.Cmd("ssh.data", "show", arg[1:]).Table(func(index int, value map[string]string) {
 					m.Push("id", value["id"])
-					m.Push("time", value["create_time"])
-					m.Push("kind", value["kind"])
+					m.Push("time", value["upload_time"])
 					m.Push("name", value["name"])
 					m.Push("size", kit.FmtSize(int64(kit.Int(value["size"]))))
 					m.Push("file", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, kit.Select(value["hash"], value["code"]), value["name"]))
-					m.Push("hash", value["hash"])
+					m.Push("hash", kit.Short(value["hash"], 6))
 				})
 				m.Table()
 
 			case "post":
 				// 上传记录
-				m.Log("info", "river: %v dream: %v favor: %v", m.Option("river"), m.Option("dream"), m.Option("favor"))
-
-				if prefix := []string{"ssh._route", m.Option("dream"), "ssh.data"}; len(arg) > 1 {
-					m.Cmdy(prefix, "insert", m.Option("favor"), arg[1:])
-				} else {
-					m.Cmdy(prefix, "show", m.Option("favor"))
+				if len(arg) < 3 || arg[2] == "" {
+					break
 				}
+				args := []string{}
+				for i, v := range strings.Split(kit.Select("tab note word file line", m.Conf("dream", "favor.meta.fields")), " ") {
+					args = append(args, v, kit.Select("", arg, i+2))
+				}
+				m.Cmdy("ssh.data", "insert", arg[1], args)
 
 			case "list":
-				if len(arg) > 2 && arg[2] == "modify" {
-					m.Cmdy("ssh.data", "update", m.Option("favor"), arg[1], arg[3], arg[4])
-					arg = []string{"list", m.Option("favor"), arg[1]}
+				if len(arg) > 3 && arg[3] == "modify" {
+					m.Cmd("ssh.data", "update", arg[1], arg[2], arg[4], arg[5])
+					arg = arg[:3]
 				}
 				m.Cmdy("ssh.data", "show", arg[1:])
 			}
 			return
 		}},
-		"trend": {Name: "trend type item limit offset fields...", Help: "趋势", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
-			if len(arg) > 4 {
-				arg[4] = strings.Join(arg[4:], " ")
-			}
-			m.Option("cache.limit", kit.Select("10", arg, 2))
-			m.Option("cache.offset", kit.Select("0", arg, 3))
-			fields := strings.Split(kit.Select(m.Conf(arg[0], arg[1]+".meta.fields"), arg, 4), " ")
+		"trend": {Name: "trend post|list", Help: "趋势", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			switch arg[0] {
+			case "post":
+				m.Cmdy("ssh.data", "insert", arg[1], arg[2:])
 
-			m.Grows(arg[0], arg[1], func(meta map[string]interface{}, index int, value map[string]interface{}) {
-				m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
-			})
-
-			if m.Appends("time") {
-				m.Sort("time", "time_r")
-			} else if m.Appends("times") {
-				m.Sort("times", "time_r")
+			case "list":
+				if len(arg) > 3 && arg[3] == "modify" {
+					m.Cmd("ssh.data", "update", arg[1], arg[2], arg[4], arg[5])
+					arg = arg[:3]
+				}
+				m.Cmdy("ssh.data", "show", arg[1:])
 			}
-			if m.Appends("index") {
-				// m.Sort("index", "int_r")
-			}
-			m.Table()
 			return
 		}},
-		"state": {Name: "trend type item sid key value fields...", Help: "趋势", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
-			if len(arg) > 5 {
-				arg[5] = strings.Join(arg[5:], " ")
-			}
-			fields := strings.Split(kit.Select(m.Conf(arg[0], arg[1]+".meta.fields"), arg, 5), " ")
-			m.Confm(arg[0], []string{arg[1], "hash"}, func(key string, index int, value map[string]interface{}) {
-				if value["sid"] = key; len(arg) == 2 || arg[2] == "" || strings.HasPrefix(kit.Format(value[arg[3]]), arg[4]) {
-					m.Push(fields, kit.Shortm(value, "times", "files", "sids"))
+		"state": {Name: "state post|list", Help: "状态", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			switch arg[0] {
+			case "post":
+				data := map[string]interface{}{}
+				for i := 3; i < len(arg)-1; i += 2 {
+					kit.Chain(data, arg[i], arg[i+1])
 				}
-			})
+				m.Confv(arg[1], []string{arg[2], "hash", m.Option("sid"), "-2"}, data)
+
+			case "list":
+				if len(arg) > 6 {
+					arg[6] = strings.Join(arg[6:], " ")
+				}
+				fields := strings.Split(kit.Select(m.Conf(arg[1], arg[2]+".meta.fields"), arg, 6), " ")
+				m.Confm(arg[1], []string{arg[2], "hash"}, func(key string, index int, value map[string]interface{}) {
+					if arg[3] != "" && key != arg[3] {
+						return
+					}
+					if value["sid"] = key; len(arg) < 6 || arg[4] == "" || strings.HasPrefix(kit.Format(value[arg[4]]), arg[5]) {
+						m.Push(fields, value)
+					}
+				})
+			}
 			return
 		}},
 		"prune": {Name: "prune type sid...", Help: "清理", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
@@ -433,91 +457,52 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			case "download":
 				m.Cmd("favor", "download", m.Option("arg"))
 			case "favor":
+				m.Log("info", "river: %v dream: %v favor: %v", m.Option("river"), m.Option("dream"), m.Option("favor"))
 				// 添加收藏
+				prefix := []string{"ssh._route", m.Option("dream"), "web.code.favor"}
 				if m.Options("arg") {
 					m.Option("arg", strings.SplitN(strings.TrimSpace(m.Option("arg")), " ", 2)[1])
-					m.Cmd("favor", "post", "tab", m.Option("tab"), "note", m.Option("note"), "word", m.Option("arg"))
+					m.Cmdy(prefix, "post", m.Option("favor"), m.Option("tab"), m.Option("note"), m.Option("arg"))
 					m.Set("append")
 					break
 				}
 
 				// 生成脚本
 				m.Echo("#/bin/sh\n\n")
-				m.Cmd(".favor", "post").Table(func(index int, value map[string]string) {
-					if !m.Options("tab") || value["tab"] == m.Option("tab") {
-						m.Echo("# %v:%v\n%v\n\n", value["tab"], value["note"], value["word"])
-					}
+				m.Cmd(prefix, "list", m.Option("favor"), "", kit.Select("10", m.Option("limit")), "0", "tab", m.Option("tab")).Table(func(index int, value map[string]string) {
+					m.Echo("# %v:%v\n%v\n\n", value["tab"], value["note"], value["word"])
 				})
 
-			case "historys":
-				vs := strings.SplitN(strings.TrimSpace(m.Option("arg")), " ", 2)
-				m.Grow(cmd, "history", map[string]interface{}{
-					"time":  m.Time(),
-					"sid":   m.Option("sid"),
-					"index": vs[0],
-					"cmd":   kit.Select("", vs, 1),
-					"pwd":   m.Option("pwd"),
-				})
 			case "history":
-				switch path.Base(m.Option("SHELL")) {
-				case "zsh":
-					m.Option("arg", strings.SplitN(m.Option("arg"), ";", 2)[1])
-				default:
-					m.Option("arg", strings.SplitN(strings.TrimSpace(m.Option("arg")), " ", 2)[1])
-				}
-				m.Grow(cmd, "history", map[string]interface{}{
-					"time": m.Time(),
-					"sid":  m.Option("sid"),
-					"cmd":  m.Option("arg"),
-					"pwd":  m.Option("pwd"),
-				})
+				vs := strings.SplitN(strings.TrimSpace(m.Option("arg")), " ", 2)
+				m.Cmd("trend", "post", "zsh.history", "sid", m.Option("sid"),
+					"num", vs[0], "cmd", kit.Select("", vs, 1), "pwd", m.Option("pwd"))
+				m.Set("append").Set("result")
 
 			case "sync":
-				m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid")}, "")
+				m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid")}, []interface{}{})
 				switch m.Option("arg") {
 				case "free":
 					sub := strings.Replace(m.Option("sub"), "    ", "type", 1)
 					m.Split(sub, " ", "7", "type total used free shared buffer available").Table(func(index int, value map[string]string) {
 						if index == 1 {
-							m.Confv(cmd, []string{m.Option("arg"), "list", "-2"}, map[string]interface{}{
-								"time":      m.Time(),
-								"sid":       m.Option("sid"),
-								"type":      value["type"],
-								"total":     value["total"],
-								"used":      value["used"],
-								"free":      value["free"],
-								"shared":    value["shared"],
-								"buffer":    value["buffer"],
-								"available": value["available"],
-							})
+							m.Cmd("trend", "post", "zsh.free", value)
 						}
 					})
 				case "env":
 					m.Split(strings.TrimPrefix(m.Option("sub"), "\n"), "=", "2", "name value").Table(func(index int, value map[string]string) {
-						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-							"name":  value["name"],
-							"value": value["value"],
-						})
+						m.Cmd("state", "post", cmd, m.Option("arg"), value)
 					})
 				case "ps":
-					m.Split(m.Option("sub"), " ").Table(func(index int, value map[string]string) {
-						m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-							"PID":     value["PID"],
-							"TIME":    value["TIME"],
-							"COMMAND": value["COMMAND"],
-						})
+					m.Split(m.Option("sub"), " ", "8", "UID PID PPID C STIME TTY TIME CMD").Table(func(index int, value map[string]string) {
+						if index > 0 {
+							m.Cmd("state", "post", cmd, m.Option("arg"), value)
+						}
 					})
 				case "df":
 					m.Split(m.Option("sub"), " ", "6", "fs size used rest per pos").Table(func(index int, value map[string]string) {
 						if index > 0 {
-							m.Confv(cmd, []string{m.Option("arg"), "hash", m.Option("sid"), "-2"}, map[string]interface{}{
-								"fs":   value["fs"],
-								"size": value["size"],
-								"used": value["used"],
-								"rest": value["rest"],
-								"per":  value["per"],
-								"pos":  value["pos"],
-							})
+							m.Cmd("state", "post", cmd, m.Option("arg"), value)
 						}
 					})
 				}
@@ -972,8 +957,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		}},
 		"/vim": {Name: "/vim sid pwd cmd arg sub", Help: "编辑器", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			cmd = strings.TrimPrefix(cmd, "/")
-			m.Option("arg", strings.Replace(m.Option("arg"), "XXXXXsingleXXXXX", "'", -1))
-			m.Option("sub", strings.Replace(m.Option("sub"), "XXXXXsingleXXXXX", "'", -1))
+			if f, _, e := m.Optionv("request").(*http.Request).FormFile("sub"); e == nil {
+				defer f.Close()
+				if b, e := ioutil.ReadAll(f); e == nil {
+					m.Option("sub", string(b))
+				}
+			}
 			m.Log("info", "%v %v %v %v", cmd, m.Option("cmd"), m.Option("arg"), m.Option("sub"))
 			m.Confm("login", []string{"hash", m.Option("sid"), "ship"}, func(key string, value string) { m.Option(key, value) })
 
@@ -982,63 +971,35 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				m.Echo(strings.Join(kit.Trans(m.Confv("help", "index")), "\n"))
 			case "login":
 				m.Cmd("login", "init", cmd)
-			case "dream":
-				m.Cmd("dream", "bind", m.Option("arg"))
 			case "logout":
 				m.Cmd("login", "exit")
-			case "tasklet":
-				m.Cmd("ssh._route", m.Option("dream"), "web.team.task", "create", "task", "3", "add", "action", m.Time(), m.Time("10m"), m.Option("arg"), m.Option("sub"))
-
-			case "favors":
-				data := map[string][]string{}
-				m.Cmd(".favor", "post").Table(func(index int, value map[string]string) {
-					data[value["tab"]] = append(data[value["tab"]],
-						fmt.Sprintf("%v:%v:0:(%v): %v", value["file"], value["line"], value["note"], value["word"]))
-				})
-
-				for k, v := range data {
-					m.Push("tab", k)
-					m.Push("fix", strings.Join(v, "\n"))
-				}
-				return
 			case "favor":
-				if m.Options("tab") {
-					m.Cmd("favor", "post", "tab", m.Option("tab"), "note", m.Option("note"), "word", m.Option("arg"),
-						"file", m.Option("buf"), "line", m.Option("line"), "col", m.Option("col"),
-					)
-					return
+				m.Log("info", "river: %v dream: %v favor: %v", m.Option("river"), m.Option("dream"), m.Option("favor"))
+				prefix := []string{"ssh._route", m.Option("dream"), "web.code.favor"}
+				if m.Options("arg") {
+					m.Cmd(prefix, "post", m.Option("favor"), m.Option("tab"), m.Option("note"), m.Option("arg"),
+						m.Option("buf"), m.Option("line"), m.Option("col"))
+					m.Set("append")
+					break
 				}
-				m.Cmd(".favor", "post").Table(func(index int, value map[string]string) {
-					m.Echo("%v:%v:0:(%v): %v\n", value["file"], value["line"], value["note"], value["word"])
+
+				m.Cmd(prefix, "list", m.Option("favor"), "", kit.Select("10", m.Option("limit")), "0", "tab", m.Option("tab")).Table(func(index int, value map[string]string) {
+					m.Echo("%v\n", value["tab"]).Echo("%v:%v:%v:(%v): %v\n", value["file"], value["line"], value["col"], value["note"], value["word"])
 				})
-				return
 
 			case "read", "write":
-				m.Grow(cmd, "opens", map[string]interface{}{
-					"time":   m.Time(),
-					"sid":    m.Option("sid"),
-					"action": m.Option("cmd"),
-					"file":   m.Option("arg"),
-					"pwd":    m.Option("pwd"),
-				})
+				m.Cmd("trend", "post", "vim.opens", "sid", m.Option("sid"),
+					"action", m.Option("cmd"), "file", m.Option("arg"), "pwd", m.Option("pwd"))
+
 			case "exec":
-				m.Grow(cmd, "cmds", map[string]interface{}{
-					"time": m.Time(),
-					"sid":  m.Option("sid"),
-					"cmd":  m.Option("arg"),
-					"file": m.Option("buf"),
-					"pwd":  m.Option("pwd"),
-				})
+				m.Cmd("trend", "post", "vim.cmds", "sid", m.Option("sid"),
+					"cmd", m.Option("sub"), "file", m.Option("buf"), "pwd", m.Option("pwd"))
 			case "insert":
-				m.Grow(cmd, "txts", map[string]interface{}{
-					"time": m.Time(),
-					"sid":  m.Option("sid"),
-					"word": m.Option("arg"),
-					"line": m.Option("row"),
-					"col":  m.Option("col"),
-					"file": m.Option("buf"),
-					"pwd":  m.Option("pwd"),
-				})
+				m.Cmd("trend", "post", "vim.txts", "sid", m.Option("sid"),
+					"word", m.Option("sub"), "line", m.Option("row"), "col", m.Option("col"), "file", m.Option("buf"), "pwd", m.Option("pwd"))
+
+			case "tasklet":
+				m.Cmd("ssh._route", m.Option("dream"), "web.team.task", "create", "task", "3", "add", "action", m.Time(), m.Time("10m"), m.Option("arg"), m.Option("sub"))
 
 			case "sync":
 				m.Conf(cmd, []string{m.Option("arg"), "hash", m.Option("sid")}, "")

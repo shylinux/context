@@ -440,34 +440,7 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						m.Push("count", len(value["list"].([]interface{})))
 					})
 
-				case 2: // 关系表
-					hide := map[string]bool{"create_time": true, "update_time": true, "extra": true}
-					m.Grows("flow", []string{m.Option("river"), "data", arg[1]}, func(meta map[string]interface{}, index int, value map[string]interface{}) {
-						for k := range value {
-							if !hide[k] {
-								hide[k] = false
-							}
-						}
-					})
-
-					keys := []string{}
-					for k, hide := range hide {
-						if !hide {
-							keys = append(keys, k)
-						}
-					}
-					sort.Strings(keys)
-
-					if m.Meta["append"] = []string{"id", "when"}; m.Has("fields") {
-						keys = kit.Trans(m.Optionv("fields"))
-					}
-					m.Grows("flow", []string{m.Option("river"), "data", arg[1]}, func(meta map[string]interface{}, index int, value map[string]interface{}) {
-						for _, k := range keys {
-							m.Push(k, kit.Format(value[k]))
-						}
-					})
-
-				default: // 记录值
+				case 3: // 记录行
 					index := kit.Int(arg[2]) - 1 - m.Confi("flow", []string{m.Option("river"), "data", arg[1], "meta", "offset"})
 					switch m.Option("format") {
 					case "object":
@@ -492,6 +465,40 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						})
 						m.Sort("key")
 					}
+				default: // 关系表
+					m.Option("cache.limit", kit.Select("10", arg, 3))
+					m.Option("cache.offend", kit.Select("0", arg, 4))
+					m.Option("cache.match", kit.Select("", arg, 5))
+					m.Option("cache.value", kit.Select("", arg, 6))
+
+					keys := []string{}
+					if m.Meta["append"] = []string{"id", "when"}; m.Has("fields") {
+						keys = kit.Trans(m.Optionv("fields"))
+					} else {
+						// 字段查询
+						hide := map[string]bool{"create_time": true, "update_time": true, "extra": true}
+						m.Grows("flow", []string{m.Option("river"), "data", arg[1]}, func(meta map[string]interface{}, index int, value map[string]interface{}) {
+							for k := range value {
+								if !hide[k] {
+									hide[k] = false
+								}
+							}
+						})
+						// 字段排序
+						for k, hide := range hide {
+							if !hide {
+								keys = append(keys, k)
+							}
+						}
+						sort.Strings(keys)
+					}
+
+					// 查询数据
+					m.Grows("flow", []string{m.Option("river"), "data", arg[1]}, func(meta map[string]interface{}, index int, value map[string]interface{}) {
+						for _, k := range keys {
+							m.Push(k, kit.Format(value[k]))
+						}
+					})
 				}
 				m.Table()
 

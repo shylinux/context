@@ -1303,7 +1303,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			m.Confv("imq", imq)
 			m.Gos(m.Spawn(), func(msg *ctx.Message) {
 				for <-imq.q {
-					m.Option("cache.offset", 0)
+					m.Option("cache.offend", 0)
 					m.Option("cache.limit", m.Confi("imq", "meta.count")-m.Confi("imq", "meta.current")+1)
 					m.Grows("imq", "data", func(meta map[string]interface{}, index int, value map[string]interface{}) {
 						m.Log("info", "imq %d %v", index, value)

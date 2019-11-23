@@ -1,56 +1,73 @@
 
 kit file "文件" private "_:web.code.favor" file \
     text "" name dream imports plugin_you action auto \
-    text "file" name type \
-    button "查看" action auto
-
-kit taps "便签" private "_:web.code.favor" list \
-    text "" name dream imports plugin_you action auto \
-    text "tap" name favor imports plugin_zsh_favor action auto \
-    text "" name index imports plugin_tap_id view tiny action auto \
-    feature detail "修改" "复制" "下载" \
-    exports zsh_favor table "" tap_id id "" \
-    button "记录" action auto \
+    text "file" name table view tiny \
+    text "" name index imports plugin_zsh_block action auto view tiny \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
+    exports zsh_block id \
+    button "查看" action auto \
     button "返回" cb Last
 
-kit terminal "终端" private "web.code.login" list \
+kit tips "便签" private "_:web.code.favor" list \
+    text "" name dream imports plugin_you action auto \
+    text "tip" name table view tiny \
+    text "" name index imports plugin_zsh_favor view tiny action auto \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
+    feature detail "修改" "复制" "下载" \
+    exports zsh_favor id \
+    button "查看" action auto \
+    button "返回" cb Last
+
+kit favor "收藏" private "_:web.code.favor" post \
+    text "" name dream imports plugin_you \
+    text "tip" name table view tiny \
+    text "" name tab \
+    text "" name note \
+    text "" name word imports plugin_zsh_cmd \
+    button "添加" 
+
+kit terminal "终端" private "web.code.login" list zsh \
     text "" name sid imports plugin_zsh_sid action auto \
     text "" name dream imports plugin_you \
     text "" name topic imports plugin_see \
-    feature detail "prune" "复制" "下载" \
+    feature detail "prune" "修改" "复制" "下载" \
     exports zsh_sid sid \
-    button "查看" action auto
+    button "查看" action auto \
+    button "返回" cb Last
 
-kit history "命令" private "web.code.trend" zsh history \
-    text "10" name limit view tiny \
-    text "0" name offset view tiny \
-    text "times sids index cmd pwd" name fields \
-    button "查看" action auto
+kit history "命令" private "web.code.trend" list "zsh.history" \
+    text "" name index imports plugin_zsh_history view tiny action auto \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
+    exports zsh_history id "" zsh_cmd cmd "" \
+    button "查看" action auto \
+    button "返回" cb Last
 
-kit free "内存" private "web.code.trend" zsh free \
-    text "10" name limit view tiny \
-    text "0" name offset view tiny \
-    text "times sids type total used free" name fields \
-    button "查看" action auto
+kit free "内存" private "web.code.trend" list "zsh.free" \
+    text "" name index imports plugin_zsh_free view tiny action auto \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
+    exports zsh_free id \
+    button "查看" action auto \
+    button "返回" cb Last
 
-kit env "环境" private "web.code.state" zsh env \
+kit env "环境" private "web.code.state" list zsh env \
     text "" name sid imports plugin_zsh_sid action auto \
-    text "name" name limit view tiny \
-    text "" name offset view tiny \
-    text "sids name value" name fields \
+    text "name" name match view tiny \
+    text "" name value view tiny \
     button "查看" action auto
 
-kit ps "进程" private "web.code.state" zsh ps \
+kit ps "进程" private "web.code.state" list zsh ps \
     text "" name sid imports plugin_zsh_sid action auto \
-    text "COMMAND" name limit view tiny \
-    text "" name offset view tiny \
-    text "sids PID TIME COMMAND" name fields \
+    text "PPID" name match view tiny \
+    text "" name value view tiny \
     button "查看" action auto
 
-kit df "磁盘" private "web.code.state" zsh df \
+kit df "磁盘" private "web.code.state" list zsh df \
     text "" name sid imports plugin_zsh_sid action auto \
-    text "fs" name limit view tiny \
-    text "" name offset view tiny \
-    text "sids fs size used rest per pos" name fields \
+    text "fs" name match view tiny \
+    text "" name value view tiny \
     button "查看" action auto
 

@@ -1,39 +1,57 @@
 kit tips "便签" private "_:web.code.favor" list \
     text "" name dream imports plugin_you action auto \
-    text "tip" name favor imports plugin_vim_favor action auto \
-    text "" name index imports plugin_tip_id view tiny action auto \
+    text "tip" name favor view tiny \
+    text "" name index imports plugin_vim_favor view tiny action auto \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
     feature detail "修改" "复制" "下载" \
-    exports vim_favor table "" tip_id id "" \
-    button "记录" action auto \
+    exports vim_favor id \
+    button "查看" action auto \
     button "返回" cb Last
 
-kit editor "编辑器" private "web.code.login" list \
+kit favor "收藏" private "_:web.code.favor" post \
+    text "" name dream imports plugin_you \
+    text "tip" name table view tiny \
+    text "" name tab \
+    text "" name note \
+    text "" name word imports plugin_vim_word \
+    text "" name file imports plugin_vim_file \
+    text "" name line imports plugin_vim_line view tiny \
+    text "" name col imports plugin_vim_col view tiny \
+    button "添加" 
+
+kit editor "编辑器" private "web.code.login" list vim \
     text "" name sid imports plugin_vim_sid action auto \
     text "" name dream imports plugin_you \
     text "" name topic imports plugin_see \
     feature detail "prune" "复制" "下载" \
     exports vim_sid sid \
-    button "查看" action auto
+    button "查看" action auto \
+    button "返回" cb Last
 
-kit opens "文件记录" private "web.code.trend" vim opens \
-    text "10" name limit view tiny \
-    text "0" name offset view tiny \
-    text "times sids action files" name fields \
-    button "查看" action auto
+kit opens "文件记录" private "web.code.trend" list "vim.opens" \
+    text "" name index imports plugin_vim_opens view tiny action auto \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
+    exports vim_opens id "" vim_file file \
+    button "查看" action auto \
+    button "返回" cb Last
 
-kit cmds "命令记录" private "web.code.trend" vim cmds \
-    text "10" name limit view tiny \
-    text "0" name offset view tiny \
-    text "times sids cmd files" name fields \
-    exports vim_word cmd \
-    button "查看" action auto
+kit cmds "命令记录" private "web.code.trend" list "vim.cmds" \
+    text "" name index imports plugin_vim_cmds view tiny action auto \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
+    exports vim_cmds id "" vim_file file \
+    button "查看" action auto \
+    button "返回" cb Last
 
-kit txts "插入记录" private "web.code.trend" vim txts \
-    text "10" name limit view tiny \
-    text "0" name offset view tiny \
-    text "times sids word files line" name fields \
-    exports vim_word word \
-    button "查看" action auto
+kit txts "插入记录" private "web.code.trend" list "vim.txts" \
+    text "" name index imports plugin_vim_txts view tiny action auto \
+    text "" name limit view tiny \
+    text "" name offend view tiny \
+    exports vim_txts id "" vim_word word "" vim_file file "" vim_line line "" vim_col col "" \
+    button "查看" action auto \
+    button "返回" cb Last
 
 kit bufs "文件缓存" private "web.code.state" vim bufs \
     text "" name sid imports plugin_vim_sid action auto \

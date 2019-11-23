@@ -606,10 +606,12 @@ func (m *Message) Grows(key string, args interface{}, cb interface{}) map[string
 		return nil
 	}
 
-	offset := kit.Int(kit.Select("0", m.Option("cache.offset")))
+	offend := kit.Int(kit.Select("0", m.Option("cache.offend")))
 	limit := kit.Int(kit.Select("10", m.Option("cache.limit")))
+	match := kit.Select("", m.Option("cache.match"))
+	value := kit.Select("", m.Option("cache.value"))
 	current := kit.Int(meta["offset"])
-	end := current + len(list) - offset
+	end := current + len(list) - offend
 	begin := end - limit
 
 	data := make([]interface{}, 0, limit)
@@ -657,7 +659,9 @@ func (m *Message) Grows(key string, args interface{}, cb interface{}) map[string
 								item[heads[i]] = lines[i]
 							}
 							m.Log("info", "load line %v %v %v", i, len(data), item)
-							data = append(data, item)
+							if match == "" || strings.Contains(kit.Format(item[match]), value) {
+								data = append(data, item)
+							}
 							begin = i + 1
 						} else {
 							m.Log("info", "skip line %v", i)
@@ -674,7 +678,9 @@ func (m *Message) Grows(key string, args interface{}, cb interface{}) map[string
 	}
 	m.Log("info", "cache %v-%v", begin-current, end-current)
 	for i := begin - current; i < end-current; i++ {
-		data = append(data, list[i])
+		if match == "" || strings.Contains(kit.Format(kit.Chain(list[i], match)), value) {
+			data = append(data, list[i])
+		}
 	}
 	return kit.Map(map[string]interface{}{"meta": meta, "list": data}, "", cb)
 }

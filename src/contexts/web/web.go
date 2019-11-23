@@ -952,22 +952,22 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			}
 			return
 		}},
-		"/upload": &ctx.Command{Name: "/upload", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"/upload": &ctx.Command{Name: "/upload key", Help: "上传文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
-			if f, h, e := r.FormFile("upload"); m.Assert(e) {
+			if f, h, e := r.FormFile(kit.Select("upload", arg, 0)); m.Assert(e) {
 				defer f.Close()
 
+				// 上传文件
 				name := kit.Hashx(f)
 				if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "list", name)); m.Assert(e) {
 					defer o.Close()
 
 					f.Seek(0, os.SEEK_SET)
 					if n, e := io.Copy(o, f); m.Assert(e) {
-						m.Log("upload", "file: %s %d", p, n)
+						m.Log("upload", "list: %s %d", p, n)
 
-						kind := h.Header.Get("Content-Type")
-						kind = strings.Split(kind, "/")[0]
-
+						// 文件摘要
+						kind := strings.Split(h.Header.Get("Content-Type"), "/")[0]
 						buf := bytes.NewBuffer(make([]byte, 0, 1024))
 						fmt.Fprintf(buf, "create_time: %s\n", m.Time("2006-01-02 15:04"))
 						fmt.Fprintf(buf, "create_user: %s\n", m.Option("username"))
@@ -977,82 +977,81 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 						fmt.Fprintf(buf, "size: %d\n", n)
 						b := buf.Bytes()
 
+						// 保存摘要
 						code := kit.Hashs(string(b))
-						if m.Options("river") {
-							prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "insert"}
-							m.Cmd(prefix, kit.Select(kind, m.Option("table")), "name", h.Filename, "kind", kind, "hash", name, "size", n)
-							m.Cmd(prefix, "file", "name", h.Filename, "kind", kind, "hash", name, "size", n, "code", code)
-						}
-
 						if o, p, e := kit.Create(path.Join(m.Conf("web.upload", "path"), "meta", code)); m.Assert(e) {
 							defer o.Close()
 
 							if n, e := o.Write(b); m.Assert(e) {
-								m.Log("upload", "file: %s %d", p, n)
-
+								m.Log("upload", "meta: %s %d", p, n)
 								m.Cmd("nfs.copy", path.Join(m.Conf("web.upload", "path"), kind, code), p)
 							}
 						}
-						if strings.HasPrefix(m.Option("agent"), "favor") {
-							m.Append("code", code)
-							m.Append("hash", name)
-							m.Append("name", h.Filename)
-							m.Append("time", m.Time("2006-01-02 15:04"))
-							m.Append("type", kind)
-							m.Append("size", kit.FmtSize(n))
 
-						} else if !strings.HasPrefix(m.Option("agent"), "curl") {
+						// 文件索引
+						if m.Options("river") {
+							prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "insert"}
+							suffix := []string{"code", code, "kind", kind, "name", h.Filename, "hash", name, "size", kit.Format(n), "upload_time", m.Time("2006-01-02 15:04")}
+							m.Cmd(prefix, kit.Select(kind, m.Option("table")), suffix)
+							m.Cmd(prefix, "file", suffix)
+						}
+
+						// 返回信息
+						if !strings.HasPrefix(m.Option("agent"), "curl") {
 							m.Append("size", kit.FmtSize(n))
 							m.Append("link", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, code, h.Filename))
 							m.Append("type", kind)
 							m.Append("hash", name)
-							m.Table()
 						} else {
-							m.Echo("code: %s\n", code)
-							m.Echo("hash: %s\n", name)
-							m.Echo("time: %s\n", m.Time("2006-01-02 15:04"))
-							m.Echo("type: %s\n", kind)
-							m.Echo("size: %s\n", kit.FmtSize(n))
+							m.Append("code", code)
+							m.Append("type", kind)
+							m.Append("name", h.Filename)
+							m.Append("size", kit.FmtSize(n))
+							m.Append("time", m.Time("2006-01-02 15:04"))
+							m.Append("hash", name)
 						}
 					}
 				}
 			}
 			return
 		}},
-		"/download/": &ctx.Command{Name: "/download/", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"/download/": &ctx.Command{Name: "/download/hash [meta [hash]]", Help: "下载文件", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			r := m.Optionv("request").(*http.Request)
 			w := m.Optionv("response").(http.ResponseWriter)
 
 			kind := kit.Select("meta", kit.Select(m.Option("meta"), arg, 0))
 			file := kit.Select(strings.TrimPrefix(key, "/download/"), arg, 1)
-			// 文件列表
 			if file == "" {
-				if fs, e := ioutil.ReadDir(path.Join(m.Conf("web.upload", "path"), kind)); e == nil {
-					for _, f := range fs {
-						meta := kit.Linex(path.Join(m.Conf("web.upload", "path"), kind, f.Name()))
-						m.Push("time", meta["create_time"])
-						m.Push("user", meta["create_user"])
-						m.Push("size", kit.FmtSize(int64(kit.Int(meta["size"]))))
-						if kind == "image" {
-							m.Push("name", f.Name())
-						} else {
-							m.Push("name", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, f.Name(), meta["name"]))
-						}
-						m.Push("hash", meta["hash"][:8])
-					}
-					m.Sort("time", "time_r").Table()
+				if m.Option("userrole") != "root" {
+					return
 				}
+				// 文件列表
+				m.Cmd("nfs.dir", path.Join(m.Conf("web.upload", "path"), kind)).Table(func(index int, value map[string]string) {
+					name := path.Base(value["path"])
+					meta := kit.Linex(value["path"])
+					m.Push("time", meta["create_time"])
+					m.Push("user", meta["create_user"])
+					m.Push("size", kit.FmtSize(int64(kit.Int(meta["size"]))))
+					if kind == "image" {
+						m.Push("name", name)
+					} else {
+						m.Push("name", fmt.Sprintf(`<a href="/download/%s" target="_blank">%s</a>`, name, meta["name"]))
+					}
+					m.Push("hash", meta["hash"][:8])
+
+				})
+				m.Sort("time", "time_r").Table()
 				return
 			}
 
-			// 直接下载
 			if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), "list", file)); p != "" {
+				// 直接下载
 				m.Log("info", "download %s direct", p)
 				http.ServeFile(w, r, p)
 				return
 			}
-			// 下载文件
 			if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), kind, file)); p != "" {
+				// 下载文件
 				meta := kit.Linex(p)
 				if p := m.Cmdx("nfs.path", path.Join(m.Conf("web.upload", "path"), "list", meta["hash"])); p != "" {
 					m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", meta["hash"]))
@@ -1068,8 +1067,8 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 				return
 			}
 
-			// 任意文件
 			if p := m.Cmdx("nfs.path", file); p != "" {
+				// 任意文件
 				m.Log("info", "download %s %s", p, m.Cmdx("nfs.hash", p))
 				http.ServeFile(w, r, p)
 			}

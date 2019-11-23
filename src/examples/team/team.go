@@ -35,7 +35,7 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 				}
 				// 任务进度
 				m.Option("cache.limit", kit.Select("30", arg, 2))
-				m.Option("cache.offset", kit.Select("0", arg, 3))
+				m.Option("cache.offend", kit.Select("0", arg, 3))
 				m.Meta["append"] = []string{"prepare", "action", "cancel", "finish"}
 				m.Cmd("ssh.data", "show", arg[1]).Table(func(index int, value map[string]string) {
 					m.Push(value["status"],
@@ -52,6 +52,7 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 					m.Cmdy("ssh.data", "insert", arg[1], "level", arg[2], "class", arg[3],
 						"status", arg[4], "begin_time", arg[5], "close_time", arg[6],
 						"target", arg[7], "detail", arg[8], arg[9:])
+					break
 				}
 
 				arg = []string{arg[1]}

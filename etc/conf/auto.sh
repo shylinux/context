@@ -101,16 +101,18 @@ ShyLogout() {
 }
 ShyLogin() {
     HOST=`hostname` ctx_sid=`ShyPost cmd login share "${ctx_share}" pid "$$" pane "${TMUX_PANE}" hostname "${HOST}" username "${USER}"`
-    echo "sid: ${ctx_sid:0:6}"
+    [ "$ctx_begin" = "" ] && ctx_begin=`history|tail -n1|awk '{print $1}'` && echo "begin: ${ctx_begin}"
+    echo "sid: ${ctx_sid}"
 }
 ShyFavor() {
     [ "$READLINE_LINE" != "" ] && set $READLINE_LINE && READLINE_LINE=""
-    [ "$1" != "" ] && ctx_tab=$1; [ "$2" != "" ] && ctx_note=$2
-    ShyPost cmd favor arg "`history|tail -n1|head -n1`" tab "${ctx_tab}" note "${ctx_note}"
+    [ "$1" != "" ] && ctx_tab=$1 && shift; [ "$1" != "" ] && ctx_note=$1 && shift
+    [ "$1" != "" ] && ctx_word=$1 || ctx_word=`history|tail -n1|head -n1`
+    ShyPost cmd favor arg "${ctx_word}" tab "${ctx_tab}" note "${ctx_note}"
 }
 ShyFavors() {
     [ "$READLINE_LINE" != "" ] && set $READLINE_LINE && READLINE_LINE=""
-    ShyPost cmd favor tab "$1"
+    ShyPost cmd favor tab "$1" limit "$2"
 }
 ShySync() {
     [ "$ctx_sid" = "" ] && ShyLogin
@@ -122,10 +124,11 @@ ShySync() {
             ctx_count=`expr $ctx_end - $ctx_begin`
             ShyEcho "sync $ctx_begin-$ctx_end count $ctx_count to $ctx_dev"
             history|tail -n $ctx_count |while read line; do
-                ShySends historys sub "$line"
+                ShySends history sub "$line"
             done
             ctx_begin=$ctx_end
             ;;
+        ps) ShySend ps -ef  ;;
         *) ShySend "$@"
     esac
 }
@@ -133,6 +136,7 @@ ShySyncs() {
     case "$1" in
         "base")
             ShySync df &>/dev/null
+            ShySync ps &>/dev/null
             ShySync env &>/dev/null
             ShySync free &>/dev/null
             ShySync history
