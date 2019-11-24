@@ -533,6 +533,9 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         return list
     },
     // 数据类型转换
+    Trans: function(c) {
+        return typeof c == "string"? c.split(" "): c
+    },
     isNone: function(c) {return c === undefined || c === null},
     notNone: function(c) {return !kit.isNone(c)},
     isSpace: function(c) {return c == " " || c == "Enter"},

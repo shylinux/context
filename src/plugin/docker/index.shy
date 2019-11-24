@@ -36,7 +36,7 @@ kit image "镜像" private "web.code.docker" "image" \
 	text "" name pos imports plugin_REPOSITORY \
 	text "" name tag imports plugin_TAG \
     exports IMAGE_ID IMAGE_ID "" REPOSITORY REPOSITORY "" TAG TAG "" \
-    feature detail "运行" "删除" "清理" \
+    feature detail "运行" "清理" "删除" "创建" \
     button "查看"
 
 kit volume "存储" private "web.code.docker" "volume" \
@@ -49,16 +49,18 @@ kit network "网络" private "web.code.docker" "network" \
     exports NETWORK_ID NETWORK_ID \
     button "查看"
 
-kit command "命令" private "web.code.docker" "container" \
-	text "" name tag imports plugin_CONTAINER_ID \
-	text "pwd" name cmd view long \
-    button "执行"
-
 kit container "容器" private "web.code.docker" "container" \
 	text "" name arg imports plugin_CONTAINER_ID \
     exports CONTAINER_ID CONTAINER_ID \
-    feature detail "进入" "停止" "启动" "重启" "修改" "删除" "清理" \
+    feature detail "进入" "停止" "启动" "重启" "清理" "修改" "删除" \
     button "查看" action auto
+
+kit command "命令" private "web.code.docker" "command" \
+	text "" name tag imports plugin_CONTAINER_ID \
+    select "" name pkg values "apk apt yum" \
+    select "" name cmd values "base" \
+	text "" name arg view long \
+    button "执行"
 
 kit git "记录" private "ssh._route" _ "web.code.git" \
 	text "" name pod imports plugin_pod \

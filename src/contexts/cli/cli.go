@@ -157,6 +157,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"web_port": ":9095",
 				"ssh_port": ":9090",
 				"username": "shy",
+				"version":  "2.1",
 			},
 		}, Help: "运行环境, host, init, boot, node, user, work"},
 		"system": {Name: "system", Value: map[string]interface{}{

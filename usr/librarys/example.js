@@ -1056,6 +1056,7 @@ function Plugin(page, pane, field, inits, runs) {
             switch (item.type) {
                 case "upfile": item.type = "file"; break
                 case "select":
+                    item.values = kit.Trans(item.values)
                     input.type = "select", input.list = item.values.map(function(value) {
                         return {type: "option", value: value, inner: value}
                     })

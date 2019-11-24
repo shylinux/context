@@ -38,6 +38,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"vim":    []interface{}{"cli.system", "vim"},
 		}},
 		"package": {Name: "package", Help: "软件包", Value: map[string]interface{}{
+			"apk": map[string]interface{}{"update": "update", "install": "add",
+				"base": []interface{}{"curl", "bash"},
+			},
+			"apt": map[string]interface{}{"update": "update", "install": "install -y",
+				"base": []interface{}{"wget", "curl"},
+			},
+			"yum": map[string]interface{}{"update": "update -y", "install": "install",
+				"base": []interface{}{"wget"},
+			},
+
 			"udpate":  []interface{}{"apk", "update"},
 			"install": []interface{}{"apk", "add"},
 			"build":   []interface{}{"build-base"},
@@ -45,7 +55,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"product": []interface{}{"nginx", "redis", "mysql"},
 		}},
 		"docker": {Name: "docker", Help: "容器", Value: map[string]interface{}{
-			"shy": Dockfile,
+			"template": map[string]interface{}{"shy": Dockfile},
+			"output":   "etc/Dockerfile",
 		}},
 		"git": {Name: "git", Help: "记录", Value: map[string]interface{}{
 			"alias": map[string]interface{}{"s": "status", "b": "branch"},
@@ -692,13 +703,13 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Echo(strings.TrimSpace(m.Cmdx(prefix, "capture-pane", "-pt", target)))
 			return
 		}},
-		"docker": {Name: "docker", Help: "容器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"docker": {Name: "docker image|volume|network|container", Help: "容器", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			prefix := kit.Trans(m.Confv("prefix", "docker"))
 			switch arg[0] {
 			case "image":
 				prefix = append(prefix, "image")
-				pos := kit.Select("shy", arg, 1)
-				tag := kit.Select("2.1", arg, 2)
+				pos := kit.Select(m.Conf("runtime", "boot.ctx_app"), arg, 1)
+				tag := kit.Select(m.Conf("runtime", "boot.version"), arg, 2)
 
 				// 查看镜像
 				if m.Cmdy(prefix, "ls", "cmd_parse", "cut", "cmd_headers", "IMAGE ID", "IMAGE_ID"); len(arg) == 1 {
@@ -732,22 +743,43 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				// 创建镜像
 				default:
 					m.Option("base", pos+":"+tag)
-					m.Option("name", arg[0]+":"+kit.Select("2.1", arg, 1))
-					m.Option("host", "http://"+m.Conf("runtime", "boot.hostname")+".local:9095")
-					m.Option("user", kit.Select("shy", arg, 2))
-					m.Option("file", "etc/Dockerfile")
+					pos = kit.Select(m.Conf("runtime", "boot.ctx_app"), arg, 0)
+					m.Option("name", pos+":"+m.Time("20060102"))
+					m.Option("file", m.Conf("docker", "output"))
+					m.Option("user", kit.Select(m.Conf("runtime", "boot.username"), arg, 1))
+					m.Option("host", "http://"+m.Conf("runtime", "boot.hostname")+".local"+m.Conf("runtime", "boot.web_port"))
 
 					if f, _, e := kit.Create(m.Option("file")); m.Assert(e) {
 						defer f.Close()
-						if m.Assert(ctx.ExecuteStr(m, f, m.Conf("docker", arg[0]))) {
+						if m.Assert(ctx.ExecuteStr(m, f, m.Conf("docker", "template."+arg[0]))) {
 							m.Cmdy(prefix, "build", "-f", m.Option("file"), "-t", m.Option("name"), ".")
 						}
 					}
 				}
 
+			case "volume":
+				if prefix = append(prefix, "volume"); len(arg) == 1 {
+					m.Cmdy(prefix, "ls", "cmd_parse", "cut", "cmd_headers", "VOLUME NAME", "VOLUME_NAME")
+					break
+				}
+
+			case "network":
+				if prefix = append(prefix, "network"); len(arg) == 1 {
+					m.Cmdy(prefix, "ls", "cmd_parse", "cut", "cmd_headers", "NETWORK ID", "NETWORK_ID")
+					break
+				}
+
+				kit.Map(kit.Chain(kit.UnMarshal(m.Cmdx(prefix, "inspect", arg[1])), "0.Containers"), "", func(key string, value map[string]interface{}) {
+					m.Push("CONTAINER_ID", key[:12])
+					m.Push("name", value["Name"])
+					m.Push("IPv4", value["IPv4Address"])
+					m.Push("IPv6", value["IPV4Address"])
+					m.Push("Mac", value["MacAddress"])
+				})
+				m.Table()
+
 			case "container":
-				prefix = append(prefix, "container")
-				if len(arg) > 1 {
+				if prefix = append(prefix, "container"); len(arg) > 1 {
 					switch arg[2] {
 					case "进入":
 						m.Cmdy(m.Confv("prefix", "tmux"), "new-window", "-dPF", "#{session_name}:#{window_name}.1", "docker exec -it "+arg[1]+" sh")
@@ -775,36 +807,25 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						m.Cmd(prefix, "rm", arg[1])
 
 					default:
-						if len(arg) > 2 {
-							m.Cmdy(prefix, "exec", arg[1], arg[2:])
-						} else {
+						if len(arg) == 2 {
 							m.Cmdy(prefix, "inspect", arg[1])
+							return
 						}
+						m.Cmdy(prefix, "exec", arg[1], arg[2:])
 						return
 					}
 				}
 				m.Cmdy(prefix, "ls", "-a", "cmd_parse", "cut", "cmd_headers", "CONTAINER ID", "CONTAINER_ID")
 
-			case "network":
-				prefix = append(prefix, "network")
-				if len(arg) == 1 {
-					m.Cmdy(prefix, "ls", "cmd_parse", "cut", "cmd_headers", "NETWORK ID", "NETWORK_ID")
-					break
-				}
-
-				kit.Map(kit.Chain(kit.UnMarshal(m.Cmdx(prefix, "inspect", arg[1])), "0.Containers"), "", func(key string, value map[string]interface{}) {
-					m.Push("CONTAINER_ID", key[:12])
-					m.Push("name", value["Name"])
-					m.Push("IPv4", value["IPv4Address"])
-					m.Push("IPv6", value["IPV4Address"])
-					m.Push("Mac", value["MacAddress"])
-				})
-				m.Table()
-
-			case "volume":
-				if len(arg) == 1 {
-					m.Cmdy(prefix, "volume", "ls", "cmd_parse", "cut", "cmd_headers", "VOLUME NAME", "VOLUME_NAME")
-					break
+			case "command":
+				switch arg[3] {
+				case "base":
+					m.Echo("\n0[%s]$ %s %s\n", time.Now().Format("15:04:05"), arg[2], m.Conf("package", arg[2]+".update"))
+					m.Cmdy(prefix, "exec", arg[1], arg[2], strings.Split(m.Conf("package", arg[2]+".update"), " "))
+					m.Confm("package", []string{arg[2], arg[3]}, func(index int, value string) {
+						m.Echo("\n%d[%s]$ %s %s %s\n", index+1, time.Now().Format("15:04:05"), arg[2], m.Conf("package", arg[2]+".install"), value)
+						m.Cmdy(prefix, "exec", arg[1], arg[2], strings.Split(m.Conf("package", arg[2]+".install"), " "), value)
+					})
 				}
 
 			default:
