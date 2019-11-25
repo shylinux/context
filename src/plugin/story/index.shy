@@ -1,3 +1,9 @@
+kit share "共享" public "web.chat.share" \
+    select "" name type values "wiki file" \
+	text "miss.md" name story imports plugin_story view long \
+	text "" name dream imports plugin_you \
+	button "共享"
+
 kit note "记事本" public "ssh._route" _ "web.wiki.note" \
 	text "" name dream imports plugin_you action auto \
 	text "miss.md" name story imports plugin_story view long action auto \

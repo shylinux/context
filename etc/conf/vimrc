@@ -20,7 +20,7 @@ Plug 'tpope/vim-fugitive'
 Plug 'gcmt/taboo.vim'
 set sessionoptions+=tabpages,globals
 
-Plug 'fatih/vim-go'
+let g:go_highlight_functions=1
 Plug 'fatih/vim-go'
 let g:go_version_warning=0
 Plug 'chr4/nginx.vim'
@@ -165,3 +165,5 @@ cnoremap RR :source ~/.vimrc<CR>
 colorscheme torte
 highlight Comment cterm=reverse ctermfg=yellow
 "}}}
+"
+nnoremap <F3> :NERDTreeToggle<CR>

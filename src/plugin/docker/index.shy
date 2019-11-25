@@ -23,14 +23,21 @@ kit clip "粘贴板" private "web.code.tmux" "" "" "" "buffer" \
     button "返回" cb Last
 
 kit tmux "终端" private "web.code.tmux" \
-	text "context" name session imports plugin_session action auto \
+	text "" name session imports plugin_session action auto \
 	text "" name window imports plugin_window action auto \
 	text "" name pane imports plugin_pane view char action auto \
-	text "" name cmd \
     exports session session "" window window "" pane pane "" \
-    ueature detail "复制" "下载" "修改" \
     button "查看" action auto \
     button "返回" cb Last
+
+kit tmuxs "终端" private "web.code.tmux" \
+	text "" name session imports plugin_session \
+	text "" name window imports plugin_window \
+	text "" name pane imports plugin_pane view char \
+	select "" name cmd values "favor buffer pane run"\
+	text "" name arg \
+    ueature detail "复制" "下载" "修改" \
+    button "执行"
 
 kit image "镜像" private "web.code.docker" "image" \
 	text "" name pos imports plugin_REPOSITORY \

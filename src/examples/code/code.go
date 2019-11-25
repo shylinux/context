@@ -58,6 +58,15 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			"template": map[string]interface{}{"shy": Dockfile},
 			"output":   "etc/Dockerfile",
 		}},
+		"tmux": {Name: "tmux", Help: "终端", Value: map[string]interface{}{
+			"favor": map[string]interface{}{
+				"index": []interface{}{
+					"ctx_dev ctx_share",
+					"curl -s $ctx_dev/publish/auto.sh >auto.sh",
+					"source auto.sh",
+				},
+			},
+		}},
 		"git": {Name: "git", Help: "记录", Value: map[string]interface{}{
 			"alias": map[string]interface{}{"s": "status", "b": "branch"},
 		}},
@@ -159,6 +168,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					},
 				},
 			},
+			"session": map[string]interface{}{"meta": map[string]interface{}{
+				"fields": "river dream favor story stage order expire",
+			}},
 			"share": map[string]interface{}{"meta": map[string]interface{}{
 				"fields": "river dream favor story stage order expire",
 			}},
@@ -186,11 +198,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					m.Cmd(git, strings.Split(value, " "))
 				})
 
+				// 创建文档
+				m.Cmd("cli.system", "mkdir", "-p", path.Join(home, "wiki"))
+				m.Cmd("cli.system", "touch", path.Join(home, "wiki/miss.md"))
+
 				// 创建终端
 				share := m.Cmdx(cmd, "share", topic)
 				m.Cmd(tmux, "set-environment", "-g", "ctx_share", share)
 				m.Cmd(tmux, "new-session", "-ds", arg[1], "cmd_dir", home, "cmd_env", "TMUX", "")
 				m.Cmd(tmux, "set-environment", "-t", arg[1], "ctx_share", share)
+				m.Cmd(tmux, "set-environment", "-t", arg[1], "ctx_dev", os.Getenv("ctx_self"))
 				m.Confm(cmd, []string{"layout", m.Conf(cmd, []string{"topic", topic, "layout", "0"})}, func(index int, value string) {
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmd(tmux, strings.Split(value, " "), "cmd_dir", home)
@@ -199,6 +216,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmd(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
+				m.Conf("dream", "session."+m.Option("dream")+"."+"share", share)
 				m.Echo(share)
 
 			case "share":
@@ -658,11 +676,29 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 
 				switch arg[3] {
-				// 操作缓存
-				case "buffer":
-					if len(arg) > 5 {
-						m.Cmdy(prefix, "set-buffer", "-b", arg[4], arg[5])
+				case "favor":
+					env := m.Cmdx(prefix, "show-environment", "-g") + m.Cmdx(prefix, "show-environment")
+					for _, l := range strings.Split(env, "\n") {
+						if strings.HasPrefix(l, "ctx_") {
+							v := strings.SplitN(l, "=", 2)
+							m.Option(v[0], v[1])
+						}
 					}
+
+					m.Confm("tmux", "favor."+kit.Select("index", arg, 4), func(index int, value string) {
+						if index == 0 {
+							keys := strings.Split(value, " ")
+							value = "export"
+							for _, k := range keys {
+								value += " " + k + "=" + m.Option(k)
+							}
+
+						}
+						m.Cmdy(prefix, "send-keys", "-t", target, value, "Enter")
+					})
+
+				case "buffer":
+					// 操作缓存
 					if len(arg) > 4 {
 						m.Cmdy(prefix, "show-buffer", "-b", arg[4])
 						return
@@ -676,8 +712,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						}
 					}
 					return
-				// 面板列表
 				case "pane":
+					// 面板列表
 					m.Cmdy(prefix, "list-panes", "-a", "cmd_parse", "cut", " ", "8", "pane_name size some lines bytes haha pane_id tag")
 					m.Meta["append"] = []string{"pane_id", "pane_name", "size", "lines", "bytes", "tag"}
 					m.Table(func(index int, value map[string]string) {
@@ -689,13 +725,15 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					m.Sort("pane_name")
 					m.Table()
 					return
-				// 运行命令
 				case "run":
+					// 运行命令
 					arg = arg[1:]
 					fallthrough
 				default:
-					m.Cmdy(prefix, "send-keys", "-t", target, strings.Join(arg[3:], " "), "Enter")
-					time.Sleep(1 * time.Second)
+					if len(arg) > 3 {
+						m.Cmdy(prefix, "send-keys", "-t", target, strings.Join(arg[3:], " "), "Enter")
+						time.Sleep(1 * time.Second)
+					}
 				}
 			}
 

@@ -518,7 +518,7 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 			Form: map[string]int{
 				"which": 1, "method": 1, "args": 1, "headers": 2,
 				"content_type": 1, "content_data": 1, "body": 1, "file": 2,
-				"parse": 1, "temp": -1, "temp_expire": 1, "save": 1,
+				"parse": 1, "temp": -1, "temp_expire": 1, "save": 1, "saves": 1,
 			}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 				// 查看配置
 				if len(arg) == 0 {
@@ -725,6 +725,15 @@ var Index = &ctx.Context{Name: "web", Help: "应用中心",
 					if buf, e := ioutil.ReadAll(res.Body); m.Assert(e) {
 						m.Echo(string(buf))
 					}
+				}
+				if m.Options("saves") {
+					f, p, e := kit.Create(m.Option("saves"))
+					m.Assert(e)
+					defer f.Close()
+					for _, v := range m.Meta["result"] {
+						f.WriteString(v)
+					}
+					m.Set("result").Echo(p)
 				}
 				return
 			}},

@@ -480,7 +480,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				case "file":
 					m.Cmdy("/download/" + h)
 				case "wiki":
-					m.Cmdy("web.wiki.note", kit.Format(value["code"]))
+					m.Cmdy("ssh._route", value["dream"], "web.wiki.note", value["code"])
 				}
 				m.Grow("share", nil, map[string]interface{}{
 					"time":      m.Time(),
@@ -496,7 +496,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			})
 			return
 		}},
-		"share": &ctx.Command{Name: "share type code", Help: "共享链接", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"share": &ctx.Command{Name: "share type code", Help: "共享链接", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			if len(arg) == 0 {
 				fields := strings.Split(m.Conf("share", "meta.fields"), " ")
 				m.Grows("share", nil, func(meta map[string]interface{}, index int, value map[string]interface{}) {
@@ -505,14 +505,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				m.Table()
 				return
 			}
-			h := kit.Hashs("uniq")
-			m.Confv("share", []string{"hash", h}, map[string]interface{}{
-				"from": m.Option("username"),
-				"time": m.Time(),
-				"type": arg[0],
-				"code": arg[1],
+			h := kit.ShortKey(m.Confm(cmd, "hash"), 6)
+			m.Confv(cmd, []string{"hash", h}, map[string]interface{}{
+				"from":  m.Option("username"),
+				"time":  m.Time(),
+				"type":  arg[0],
+				"code":  arg[1],
+				"dream": kit.Select("", arg, 2),
 			})
-			m.Echo(h)
+			m.Echo("%s/chat/share/%s", m.Cmdx(".spide", "self", "client", "url"), h)
 			return
 		}},
 	},
