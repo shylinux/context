@@ -17,9 +17,10 @@
 
 # 应用配置
 ~code
-    config load tmp/code.json dream login
+    config load tmp/code.json login
+    config load tmp/dream.json dream
     config load tmp/zsh.json zsh
-    config load tmp/vim/vim.json vim
+    config load tmp/vim.json vim
 ~wiki
     config load tmp/story.json story
 ~chat

@@ -24,8 +24,8 @@ kit upgrade "升级" private "ssh._route" _ "cli.upgrade" \
 
 kit missyou "任务" private "ssh._route" _ "cli.missyou" \
 	text "" name pod imports plugin_pod \
-	text "" name see imports plugin_see \
 	text "" name you view long \
+	text "" name see imports plugin_see \
 	button "行动" action auto \
     exports you "" you
 

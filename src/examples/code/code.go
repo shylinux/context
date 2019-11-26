@@ -555,6 +555,13 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						m.Cmd("cli.system", m.Confv("package", "install"), v)
 					}
 
+				case "git":
+					if s, e := os.Stat(path.Join(p, ".git")); e == nil && s.IsDir() {
+						m.Cmdy(".git", p, arg[1:])
+						break
+					}
+
+					fallthrough
 				case "list":
 					m.Cmdy("nfs.dir", p, "time", "size", "path").Sort("time", "time_r").Table()
 

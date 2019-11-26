@@ -1322,7 +1322,7 @@ function Inputs(plugin, meta, item, target, option) {
         }, function(which, value) {var meta = arguments.callee.meta
             return (meta[which||"none"]||meta["none"])(value)
         }),
-        onimport: shy("导入数据", {}, [item.imports], function() {
+        onimport: shy("导入数据", {}, kit.Trans(item.imports), function() {
             kit.List(arguments.callee.list, function(imports) {
                 page.Sync(imports).change(function(value) {
                     plugin.History(target.value, target), target.value = value.trim()

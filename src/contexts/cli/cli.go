@@ -1207,15 +1207,9 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 			return
 		}},
-		"missyou": {Name: "missyou [topic] [name [action]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			// 任务主题
-			topic := "index"
-			if len(arg) > 0 && (arg[0] == "" || m.Cmds("nfs.path", path.Join(m.Conf("cli.project", "plugin.path"), arg[0]))) {
-				topic, arg = arg[0], arg[1:]
-			}
-
+		"missyou": {Name: "missyou [name [topic|action]]", Help: "任务管理", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 任务列表
-			if len(arg) == 0 {
+			if len(arg) == 0 || arg[0] == "" {
 				m.Cmd("nfs.dir", m.Conf("missyou", "path"), "time", "name").Table(func(value map[string]string) {
 					name := strings.TrimSuffix(value["name"], "/")
 					m.Push("create_time", value["time"])
@@ -1227,7 +1221,7 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 			}
 
 			// 任务命名
-			if m.Option("topic", topic); !strings.Contains(arg[0], "-") {
+			if !strings.Contains(arg[0], "-") {
 				arg[0] = m.Time("20060102-") + arg[0]
 			}
 
@@ -1252,8 +1246,8 @@ var Index = &ctx.Context{Name: "cli", Help: "管理中心",
 				"cmd_dir", p,
 				"cmd_daemon", "true",
 				"cmd_env", "PATH", os.Getenv("PATH"),
-				"cmd_env", "ctx_type", m.Option("topic"),
 				"cmd_env", "ctx_home", m.Conf("runtime", "boot.ctx_home"),
+				"cmd_env", "ctx_type", m.Option("topic", kit.Select("index", arg, 1)),
 				"cmd_env", "ctx_ups", fmt.Sprintf("127.0.0.1%s", m.Conf("runtime", "boot.ssh_port")),
 				"cmd_env", "ctx_box", fmt.Sprintf("http://127.0.0.1%s", m.Conf("runtime", "boot.web_port")),
 				"cmd_env", "ctx_bin", m.Conf("runtime", "boot.ctx_bin"),
