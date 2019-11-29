@@ -706,6 +706,9 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 				case "buffer":
 					// 操作缓存
+					if len(arg) > 5 {
+						m.Cmd(prefix, "set-buffer", "-b", arg[4], arg[5])
+					}
 					if len(arg) > 4 {
 						m.Cmdy(prefix, "show-buffer", "-b", arg[4])
 						return
