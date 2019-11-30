@@ -1,18 +1,17 @@
-kit dir "目录" private "_:web.code.zsh" \
-	text "" name pod imports "plugin_pod plugin_you" action auto \
+
+kit dir "目录" private "_:web.code.zsh" "@pod" \
 	text "" name dir imports plugin_path action auto \
-	select "" name cmd values list values find values tail values grep values init action auto \
+	select "" name cmd values "list find tail grep init" action auto \
 	text "" name txt \
     exports path path \
     feature display editor \
     button "搜索" action auto \
     button "返回" cb Last
 
-kit clip "粘贴板" private "web.code.tmux" "" "" "" "buffer" \
+kit clip "粘贴板" private "web.code.tmux" "" "buffer" \
 	text "" name tag imports plugin_buffer action auto \
 	text "" name txt \
     exports buffer buffer \
-    feature detail "复制" "下载" "修改" \
     button "查看" action auto \
     button "返回" cb Last
 
@@ -26,16 +25,13 @@ kit tmux "终端" private "web.code.tmux" \
 
 kit tmuxs "终端" private "web.code.tmux" \
 	text "" name session imports plugin_session \
-	text "" name window imports plugin_window \
-	text "" name pane imports plugin_pane view char \
-	select "" name cmd values "favor buffer pane run"\
+	select "" name cmd values "favor pane cmd"\
 	text "" name arg \
-    ueature detail "复制" "下载" "修改" \
     button "执行"
 
 kit image "镜像" private "web.code.docker" "image" \
-	text "" name pos imports plugin_REPOSITORY \
-	text "" name tag imports plugin_TAG \
+	text "" name pos \
+	text "" name tag \
     exports IMAGE_ID IMAGE_ID "" REPOSITORY REPOSITORY "" TAG TAG "" \
     feature detail "运行" "清理" "删除" "创建" \
     button "查看"
@@ -52,8 +48,8 @@ kit network "网络" private "web.code.docker" "network" \
 
 kit container "容器" private "web.code.docker" "container" \
 	text "" name arg imports plugin_CONTAINER_ID \
-    exports CONTAINER_ID CONTAINER_ID \
     feature detail "进入" "停止" "启动" "重启" "清理" "修改" "删除" \
+    exports CONTAINER_ID CONTAINER_ID "" CONTAINER_NAME NAMES "" \
     button "查看" action auto
 
 kit command "命令" private "web.code.docker" "command" \
@@ -63,8 +59,7 @@ kit command "命令" private "web.code.docker" "command" \
 	text "" name arg view long \
     button "执行"
 
-kit git "记录" private "_:web.code.zsh" \
-	text "" name pod imports "plugin_pod plugin_you" action auto \
+kit git "记录" private "_:web.code.zsh" "@pod"\
 	text "usr/local" name dir imports plugin_git_path action auto \
 	select "git" name cmd values git \
 	select "status" name cmd values "diff status commit branch remote pull push sum init" action auto \

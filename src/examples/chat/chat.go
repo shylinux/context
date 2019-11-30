@@ -336,12 +336,12 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			}
 			return
 		}},
-		"storm": &ctx.Command{Name: "storm [rid] [[delete] group [index [arg...]]]", Help: "风雨", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"storm": &ctx.Command{Name: "storm rid [[delete] group [index [arg...]]]", Help: "风雨", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			// 登录失败
-			arg, rid, ok := check(m, arg)
-			if !ok {
-				return
+			if len(arg[0]) != 32 {
+				arg[0] = m.Cmdx("aaa.short", arg[0])
 			}
+			rid, arg := arg[0], arg[1:]
 
 			m.Option("river", rid)
 			// 命令列表
@@ -373,9 +373,22 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				arg[2] = m.Conf("flow", []string{rid, "tool", arg[2], "status"})
 				fallthrough
 			case "save":
-				if m.Confv("flow", []string{rid, "tool", arg[1], "status"}, arg[2]); kit.Select("", arg, 3) != "" {
-					m.Confv("flow", []string{rid, "tool", arg[1], "list"}, kit.UnMarshal(arg[3]))
+				if arg[2] != "" {
+					m.Cmdy("ssh._route", arg[2], "web.chat.storm", rid, arg[:2], "", arg[3:])
+					break
 				}
+				if m.Confv("flow", []string{rid, "tool", arg[1], "status"}, arg[3]); kit.Select("", arg, 4) != "" {
+					m.Confv("flow", []string{rid, "tool", arg[1], "list"}, kit.UnMarshal(arg[4]))
+				}
+			case "load":
+				if len(arg) > 2 {
+					m.Cmdy("ssh._route", arg[2], "web.chat.storm", rid, arg[:2])
+					break
+				}
+				m.Confm("flow", []string{rid, "tool", arg[1]}, func(value map[string]interface{}) {
+					m.Append("status", kit.Format(value["status"]))
+					m.Append("list", kit.Format(value["list"]))
+				})
 
 			default:
 				// 命令列表
@@ -383,8 +396,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				m.Set("option", "init")
 				m.Set("option", "view")
 				if len(arg) == 1 {
+					list := m.Confv("flow", []string{rid, "tool", arg[0], "list"})
+					if m.Option("you") != "" {
+						if msg := m.Cmd("ssh._route", m.Option("you"), "web.chat.storm", rid, "load", arg[0]); msg.Appends("list") {
+							list = kit.UnMarshal(msg.Append("list"))
+						}
+					}
+
 					short := m.Cmdx("aaa.short", rid)
-					m.Confm("flow", []string{rid, "tool", arg[0], "list"}, func(index int, tool map[string]interface{}) {
+					kit.Map(list, "", func(index int, tool map[string]interface{}) {
 						m.Push("river", short)
 						m.Push("storm", arg[0])
 						m.Push("action", index)

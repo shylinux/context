@@ -811,7 +811,7 @@ function Pane(page, field) {
             pane.Event(event, {}, {name: pane.Zone("click", value)})
             page.script("record", [name, value])
 
-            var cb = function() {}
+            var cb = pane.Action.option || function() {}
             if (pane.Action && pane.Action.meta && typeof pane.Action.meta[value] == "function") {
                 cb = pane.Action.meta[value]
             } else if (pane.Action && typeof pane.Action[value] == "function") {
@@ -1001,7 +1001,10 @@ function Pane(page, field) {
             })})
         }),
         Run: shy("执行命令", function(event, cmds, cb) {
-            pane.Event(event, null, {name: pane.Zone(cmds[0])})
+            var msg = pane.Event(event, null, {name: pane.Zone(cmds[0])})
+            kit.Selector(action, "input", function(item, index) {
+                msg.Option(item.name, item.value)
+            })
             ctx.Run(event, option.dataset, cmds, cb||pane.ondaemon)
         }),
 
@@ -1236,7 +1239,7 @@ function Plugin(page, pane, field, inits, runs) {
                 return name == "status" || line.status == "stop" ? undefined: line.you
             },
             pod: function(value, name, line, list) {
-                return (option[list[0]].value? option[list[0]].value+".": "")+line.pod
+                return (option[list[0]].value? option[list[0]].value+".": "")+value
             },
             dir: function(value, name, line) {
                 name != "path" && (value = line.path)
@@ -1480,51 +1483,66 @@ function Output(plugin, type, msg, cb, target, option) {
         onimport: shy("导入数据", {
             _table: function(msg, list) {
                 return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport, function(event, value, name, line, index) {
-                    var td = event.target;
+                    var td = event.target
                     plugin.oncarte(event, shy("菜单列表", {
+                            "选择": "select",
                             "修改": "modify",
-                            "删除": "delete",
-                            "下载": "Download",
                             "复制": function(event, text) {kit.CopyText(text), plugin.ontoast(text, "Copy to ClipBoard!")},
-                        }, feature.detail||["复制", "下载"], function(event, item, meta) {
+                            "下载": "Download",
+                            "删除": "delete",
+                        }, feature.detail||["选择", "修改", "复制", "下载", "删除"], function(event, item, meta) {
                             var text = td.innerText.trim()
                             if (typeof meta[item] == "function") {meta[item](event, text); return}
 
+                            // 选项
                             var msg = plugin.Event(event)
                             kit.Selector(option, ".args", function(item) {
-                                msg.Option(item.name, item.value)
+                                msg.Option(item.name, item.value||"")
                             })
-                            var cmd = []
+
+                            // 参数
+                            var cmd = [], id = ""
                             option.dream && cmd.push(option.dream.value)
                             option.table && cmd.push(option.table.value)
-                            if (item == "修改") {
-                                text = kit.AppendChilds(td, [{type: "input", value: text, style: {width: td.clientWidth+"px"}, data: {onkeydown: function(event) {
-                                    if (event.key == "Enter") {
-                                        var id = ""
-                                        for (var i = 0; i < exports.length-1; i += 3) {
-                                            id = (id || line[exports[i+1]] || "").trim()
-                                        }
-
-                                        var msg = plugin.Event(event)
-                                        kit.Selector(option, ".args", function(item) {
-                                            msg.Option(item.name, item.value)
-                                        })
-                                        if (name == "value") {
-                                            name = line.key
-                                            id = option.index.value
-                                        }
-                                        cmd.push(id, meta[item], name, event.target.value)
-                                        plugin.Run(event, cmd, function(msg) {
-                                            td.innerHTML = event.target.value
-                                            plugin.ontoast("修改成功")
-                                        }, true)
-                                        return
-                                    }
-                                }}}]).input, text.focus(), text.setSelectionRange(0, -1)
-                            } else if (output[meta[item]]) {
-                                output[meta[item]](event)
+                            if (td.dataset && td.dataset.id) {
+                                id = td.dataset.id
+                            } else if (name == "value") {
+                                id = option.index.value, name = line.key
                             } else {
-                                cmd.push(td.dataset.id||(line[exports[1]]||"").trim(), meta[item]||item)
+                                for (var i = 0; i < exports.length-1; i += 3) {
+                                    line[exports[i+1]] && msg.Option(exports[i], line[exports[i+1]].trim())
+                                    id = (id || line[exports[i+1]] || "").trim()
+                                }
+                            }
+                            cmd.push(id, meta[item]||item)
+
+                            // 命令
+                            if (item == "修改") {
+                                // 交互命令
+                                text = kit.AppendChilds(td, [{type: "input", value: text, style: {width: td.clientWidth+"px"}, data: {onkeydown: function(event) {
+                                    if (event.key != "Enter") {return}
+
+                                    // 选项
+                                    var msg = plugin.Event(event)
+                                    kit.Selector(option, ".args", function(item) {
+                                        msg.Option(item.name, item.value)
+                                    })
+
+                                    // 后端命令
+                                    cmd.push(name, event.target.value)
+                                    plugin.Run(event, cmd, function(msg) {
+                                        td.innerHTML = event.target.value
+                                        plugin.ontoast("修改成功")
+                                    }, true)
+                                }}}]).input, text.focus(), text.setSelectionRange(0, -1)
+
+                            } else if (output[meta[item]]) {
+                                // 前端命令
+                                output[meta[item]](event)
+
+                            } else {
+                                // 后端命令
+                                cmd.push(name, text)
                                 plugin.Run(event, cmd, function(msg) {
                                     console.log(msg)
                                 })

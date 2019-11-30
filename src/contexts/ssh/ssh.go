@@ -167,10 +167,10 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 			if len(arg) == 0 {
 				m.Confm("ssh.node", func(key string, value map[string]interface{}) {
 					m.Push("create_time", value["create_time"])
-					m.Push("pod", key)
+					m.Push("node", key)
 					m.Push("type", value["type"])
 				})
-				m.Sort("pod").Table()
+				m.Sort("node").Table()
 				return
 			}
 
@@ -358,9 +358,6 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				})
 
 				arg = arg[4:]
-				if len(prefix) > 0 && prefix[1] == "_" {
-					prefix[1], arg = arg[0], arg[1:]
-				}
 				args := []string{}
 				for _, v := range kit.Trans(tool["args"]) {
 					if strings.HasPrefix(v, "__") {
@@ -377,6 +374,17 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 						args = append(args, msg.Parse(v))
 					}
 				}
+
+				if len(prefix) > 0 && prefix[1] == "_" {
+					if len(args) > 0 {
+						prefix[1], args = args[0], args[1:]
+					} else if len(arg) > 0 {
+						prefix[1], arg = arg[0], arg[1:]
+					} else {
+						prefix[1] = ""
+					}
+				}
+
 				msg.Cmd(prefix, tool["cmd"], args, arg)
 				msg.CopyTo(m)
 

@@ -49,6 +49,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
                 return msg.append && msg.append[0]? ["table", JSON.stringify(msg.Table())]: ["code", msg.result? msg.result.join(""): ""]
             },
             Option: function(key, val) {
+                if (val == undefined) {return msg[key]}
                 msg.option = msg.option || []
                 kit.List(msg.option, function(k) {
                     if (k == key) {return k}

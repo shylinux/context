@@ -1,14 +1,14 @@
 
 kit project "项目" private \
-    select "" values plugin values review values submit values trends values trend values stats values stat values init action auto \
+    select "" values "plugin review submit trends trend stats stat init" action auto \
 	text "" name see imports plugin_see action auto \
-	button "执行" \
-	button "返回" cb Last \
     feature detail "加载" "复制" "下载" \
-    exports see name see
+    exports see name see \
+	button "执行" action auto \
+	button "返回" cb Last
 
 kit compile "编译" private \
-    select "" values plugin values restart values windows values darwin values linux values self values all action auto \
+    select "" values "plugin restart windows darwin linux self all" action auto \
 	text "" name see imports plugin_see \
 	button "编译"
 
@@ -16,32 +16,32 @@ kit publish "发布" private \
 	text "" name see imports plugin_see \
 	button "发布"
 
-kit upgrade "升级" private "ssh._route" _ "cli.upgrade" \
+kit upgrade "升级" private "_:cli.upgrade" \
 	text "" name pod imports plugin_pod \
-    select "" values script values plugin values restart values package values system values portal values bench action auto \
+    select "" values "script plugin restart package system portal bench" action auto \
 	text "" name see imports plugin_see \
 	button "升级"
 
-kit missyou "任务" private "ssh._route" _ "cli.missyou" \
+kit missyou "任务" private "_:cli.missyou" \
 	text "" name pod imports plugin_pod \
 	text "" name you view long \
 	text "" name see imports plugin_see \
 	button "行动" action auto \
     exports you "" you
 
-kit pod "设备" private "ssh._route" _ "ssh.remote" __ \
-	text "" name pod \
+kit pod "设备" private "_:ssh.remote" \
+	text "" name pod imports plugin_pod \
 	button "查看" action auto \
 	button "返回" cb Last \
-    exports pod pod pod
+    exports pod node pod
 
-kit ctx "模块" private "ssh._route" _ context _ list __ \
+kit ctx "模块" private "_:context" _ _ list \
 	text "" name pod imports plugin_pod action auto \
 	text "cli" name ctx imports plugin_ctx action auto \
 	button "查看" \
     exports ctx names
 
-kit cmd "命令" private "ssh._route" _ context _ command __ \
+kit cmd "命令" private "_:context" _ _ command \
 	text "" name pod imports plugin_pod \
 	text "cli" name ctx imports plugin_ctx \
 	text "date" name cmd imports plugin_cmd \
@@ -49,7 +49,7 @@ kit cmd "命令" private "ssh._route" _ context _ command __ \
 	button "返回" cb Last \
     exports cmd cmd
 
-kit dir "目录" private "ssh._route" _ "nfs.dir" _ time size line path \
+kit dir "目录" private "_:nfs.dir" _ _ time size line path \
 	text "" name pod imports plugin_pod action auto \
 	text "usr/script" name dir imports plugin_dir action auto view long \
 	button "浏览" action auto \

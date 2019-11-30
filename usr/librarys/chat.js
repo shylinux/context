@@ -323,15 +323,25 @@ var page = Page({
     initAction: function(page, field, option, output) {
         var river = "", storm = 0, input = "", share = ""
         var temp = ""
+        var you = ""
         output.DisplayRaw = true
         page.Sync("plugin_you").change(function(value) {
             page.title(value)
+            kit.Selector(field, "div.action>input.you", function(item) {
+                item.value = value
+            })
+        })
+        page.Sync("plugin_pod").change(function(value) {
+            kit.Selector(field, "div.action>input.pod", function(item) {
+                item.value = value
+            })
         })
         return {
             Show: function() {var pane = field.Pane
                 if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}
 
-                pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
+                var msg = pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
+                msg.Option("you", you)
                 output.innerHTML = "", pane.Appends([river, storm], "plugin", ["name", "help"], "name", true, null, function() {
                 })
             },
@@ -341,6 +351,7 @@ var page = Page({
                 return layout.value
             },
             Listen: {
+                plugin_you: function(value, old) {you = value},
                 river: function(value, old) {temp = value},
                 storm: function(value, old) {
                     river && storm && field.Pane.Save(river+"."+storm, output)
@@ -348,6 +359,8 @@ var page = Page({
                 },
                 source: function(value, old) {input = value},
                 target: function(value, old) {share = value},
+            },
+            Option: {
             },
             Action: {
                 "刷新": function(event, value) {
@@ -412,12 +425,20 @@ var page = Page({
                 "调试": function(event, value) {
                     page.debug.Pane.Show()
                 },
+                option: function(event, value) {
+                    console.log(event, value)
+                },
+                refresh: function(event, value) {
+                    console.log(event, value)
+                },
             },
             Button: [["layout", "工作", "办公", "聊天", "最高", "最宽", "最大"],
                 "", "刷新", "清屏", "并行", "串行",
 				"", ["display", "表格", "编辑", "绘图"],
                 "", "复制", "删除", "加参", "减参",
                 "", "执行", "下载", "清空", "返回",
+				"", kit.CreateMeta("input", "pod"),
+				"", kit.CreateMeta("input", "you"),
             ],
             Choice: [
                 ["layout", "工作", "聊天", "最高"],
@@ -426,6 +447,7 @@ var page = Page({
         }
     },
     initStorm: function(page, field, option, output) {var river = ""
+        var you = ""
         return {
             Show: function(which) {var pane = field.Pane
                 var data = river && field.Pane.Load(river, output)
@@ -435,6 +457,7 @@ var page = Page({
                 output.innerHTML = "", pane.Appends([river], "text", ["key", "count"], "key", which||ctx.Search("storm")||true, null)
             },
             Listen: {
+                plugin_you: function(value, old) {you = value},
                 river: function(value, old) {var pane = field.Pane
                     river && pane.Save(river, output, {which: pane.which.get()})
                     river = value, pane.which.set(""), pane.Show()
@@ -467,22 +490,24 @@ var page = Page({
                         field.Pane.Show(name)
                     })
                 },
-                "恢复": function(event, value, meta, line) {
-                    var status = JSON.parse(line.status)
-                    kit.Selector(page.action, "fieldset.item", function(field, index) {
-                        var args = status[index].args
-                        args = args.slice(kit.Selector(field, ".args", function(input, index) {
-                            return input.value = args[index]||""
-                        }).length)
+                "恢复": function(event, value, meta, line) {var pane = field.Pane
+                    field.Pane.Run(event, [river, "load", pane.which.get(), you], function(msg) {
+                        if (!msg.status || msg.status.length == 0) {return}
+                        var status = JSON.parse(msg.status[0])
+                        kit.Selector(page.action, "fieldset.item", function(field, index) {
+                            var args = status[index].args
+                            args = args.slice(kit.Selector(field, ".args", function(input, index) {
+                                return input.value = args[index]||""
+                            }).length)
 
-                        kit.List(args, function(arg) {
-                            field.Plugin.Append({type: "text"}, "", arg)
-
+                            kit.List(args, function(arg) {
+                                field.Plugin.Append({type: "text"}, "", arg)
+                            })
                         })
                     })
                 },
                 "保存": function(event, value, meta, line) {var pane = field.Pane
-                    field.Pane.Run(event, [river, "save", pane.which.get(),
+                    field.Pane.Run(event, [river, "save", pane.which.get(), you,
                         line.status=JSON.stringify(kit.Selector(page.action, "fieldset.item", function(field) {
                             return {name: field.Meta.name, args: kit.Selector(field, ".args", function(input) {
                                 return input.value
@@ -490,7 +515,7 @@ var page = Page({
                         })), JSON.stringify(kit.Selector(page.action, "fieldset.item", function(field) {
                             return {group: field.Meta.group, index: field.Meta.index, name: field.Meta.name, node: field.Meta.node}
                         }))], function(msg) {
-                            page.toast.Pane.Show("保存成功")
+                            page.toast.Pane.Show("保存成功", you)
                         })
                 },
                 "创建": function(event) {

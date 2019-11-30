@@ -1,6 +1,5 @@
 
-kit file "文件" private "_:web.code.favor" file \
-    text "" name dream imports plugin_you action auto \
+kit file "文件" private "_:web.code.favor" "@you" file \
     text "file" name table view tiny \
     text "" name index imports plugin_zsh_block action auto view tiny \
     text "" name limit view tiny \
@@ -9,8 +8,7 @@ kit file "文件" private "_:web.code.favor" file \
     button "查看" action auto \
     button "返回" cb Last
 
-kit tips "便签" private "_:web.code.favor" list \
-    text "" name dream imports plugin_you action auto \
+kit tips "便签" private "_:web.code.favor" "@you" list \
     text "tip" name table view tiny \
     text "" name index imports plugin_zsh_favor view tiny action auto \
     text "" name limit view tiny \
@@ -20,8 +18,7 @@ kit tips "便签" private "_:web.code.favor" list \
     button "查看" action auto \
     button "返回" cb Last
 
-kit favor "收藏" private "_:web.code.favor" post \
-    text "" name dream imports plugin_you \
+kit favor "收藏" private "_:web.code.favor" "@you" post \
     text "tip" name table view tiny \
     text "" name tab \
     text "" name note \

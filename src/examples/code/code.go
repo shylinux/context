@@ -64,6 +64,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					"ctx_dev ctx_share",
 					"curl -s $ctx_dev/publish/auto.sh >auto.sh",
 					"source auto.sh",
+					"ShyLogin",
 				},
 			},
 		}},
@@ -139,7 +140,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 		"login": {Name: "login", Value: map[string]interface{}{"check": false, "local": true, "expire": "720h", "meta": map[string]interface{}{
 			"fields": "time sid type status ship.dream ship.stage pwd pid pane hostname username",
 			"script": "usr/script",
-		}}, Help: "用户登录"},
+		}, "hash": map[string]interface{}{}}, Help: "用户登录"},
 		"dream": {Name: "dream", Help: "使命必达", Value: map[string]interface{}{
 			"layout": map[string]interface{}{
 				"three": []interface{}{
@@ -161,19 +162,17 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			},
 			"topic": map[string]interface{}{
 				"index": map[string]interface{}{
-					"ship":   []interface{}{"tip", "miss.md", "task", "feed"},
-					"git":    []interface{}{"clone https://github.com/shylinux/context"},
+					"ship": []interface{}{"tip", "miss.md", "task", "feed"},
+					"git":  []interface{}{},
+					// "git":    []interface{}{"clone https://github.com/shylinux/context"},
 					"layout": []interface{}{"three"}, "tmux": []interface{}{
 						"send-keys -t $dream.1.1 pwd",
 					},
 				},
 			},
-			"session": map[string]interface{}{"meta": map[string]interface{}{
-				"fields": "river dream favor story stage order expire",
-			}},
 			"share": map[string]interface{}{"meta": map[string]interface{}{
 				"fields": "river dream favor story stage order expire",
-			}},
+			}, "hash": map[string]interface{}{}},
 			"favor": map[string]interface{}{"meta": map[string]interface{}{
 				"fields": "tab note word file line col",
 			}},
@@ -216,7 +215,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					value = strings.Replace(value, "$dream", arg[1], -1)
 					m.Cmd(tmux, strings.Split(value, " "), "cmd_dir", home)
 				})
-				m.Conf("dream", "session."+m.Option("dream")+"."+"share", share)
 				m.Echo(share)
 
 			case "share":
@@ -436,7 +434,6 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						return
 					}
 					if value["sid"] = key; len(arg) < 6 || arg[4] == "" || strings.HasPrefix(kit.Format(value[arg[4]]), arg[5]) {
-						m.Push("sid", key)
 						m.Push(fields, value)
 					}
 				})
@@ -620,25 +617,147 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				}
 				return
 			}},
-		"tmux": {Name: "tmux [session [window [pane cmd]]]", Help: "窗口", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"tmux": {Name: "tmux [session [window [pane cmd]]]", Help: "窗口", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			prefix := kit.Trans(m.Confv("prefix", "tmux"))
-			// 修改信息
 			if len(arg) > 1 {
 				switch arg[1] {
+				case "cmd":
+
+				case "pane":
+					prefix = append(prefix, "list-panes")
+					if arg[0] == "" {
+						prefix = append(prefix, "-a")
+					} else {
+						prefix = append(prefix, "-s", "-t", arg[0])
+					}
+					m.Cmdy(prefix, "cmd_parse", "cut", " ", "8", "pane_name size some lines bytes haha pane_id tag")
+
+					m.Meta["append"] = []string{"pane_id", "pane_name", "size", "lines", "bytes", "tag"}
+					m.Table(func(index int, value map[string]string) {
+						m.Meta["pane_name"][index] = strings.TrimSuffix(value["pane_name"], ":")
+						m.Meta["pane_id"][index] = strings.TrimPrefix(value["pane_id"], "%")
+						m.Meta["lines"][index] = strings.TrimSuffix(value["lines"], ",")
+						m.Meta["bytes"][index] = kit.FmtSize(kit.Int64(value["bytes"]))
+					})
+					m.Sort("pane_name")
+					m.Table()
+					return
+
+				case "favor":
+					env := m.Cmdx(prefix, "show-environment", "-g") + m.Cmdx(prefix, "show-environment")
+					for _, l := range strings.Split(env, "\n") {
+						if strings.HasPrefix(l, "ctx_") {
+							v := strings.SplitN(l, "=", 2)
+							m.Option(v[0], v[1])
+						}
+					}
+					m.Option("ctx_dev", m.Option("ctx_self"))
+
+					m.Confm("tmux", "favor."+kit.Select("index", arg, 4), func(index int, value string) {
+						if index == 0 {
+							keys := strings.Split(value, " ")
+							value = "export"
+							for _, k := range keys {
+								value += " " + k + "=" + m.Option(k)
+							}
+
+						}
+						m.Cmdy(prefix, "send-keys", "-t", arg[0], value, "Enter")
+						time.Sleep(100 * time.Millisecond)
+					})
+					m.Echo(strings.TrimSpace(m.Cmdx(prefix, "capture-pane", "-pt", arg[0])))
+					return
+
+				case "buffer":
+					// 写缓存
+					if len(arg) > 5 {
+						switch arg[3] {
+						case "modify":
+							switch arg[4] {
+							case "text":
+								m.Cmdy(prefix, "set-buffer", "-b", arg[2], arg[5])
+							}
+						}
+					} else if len(arg) > 3 {
+						m.Cmd(prefix, "set-buffer", "-b", arg[2], arg[3])
+					}
+
+					// 读缓存
+					if len(arg) > 2 {
+						m.Cmdy(prefix, "show-buffer", "-b", arg[2])
+						return
+					}
+
+					m.Cmdy(prefix, "list-buffers", "cmd_parse", "cut", ": ", "3", "buffer size text")
+					for i, v := range m.Meta["text"] {
+						if i < 3 {
+							m.Meta["text"][i] = m.Cmdx(prefix, "show-buffer", "-b", m.Meta["buffer"][i])
+						} else {
+							m.Meta["text"][i] = v[2 : len(v)-1]
+						}
+					}
+					return
+
+				case "select":
+					// 切换会话
+					if !m.Has("session") {
+						m.Cmd(prefix, "switch-client", "-t", arg[0])
+						arg = arg[:0]
+						break
+					}
+					m.Cmd(prefix, "switch-client", "-t", m.Option("session"))
+
+					// 切换窗口
+					if !m.Has("window") {
+						m.Cmd(prefix, "select-window", "-t", m.Option("session")+":"+arg[0])
+						arg = []string{m.Option("session")}
+						break
+					}
+					m.Cmd(prefix, "select-window", "-t", m.Option("session")+":"+m.Option("window"))
+
+					// 切换终端
+					m.Cmd(prefix, "select-pane", "-t", m.Option("session")+":"+m.Option("window")+"."+arg[0])
+					arg = []string{m.Option("session"), m.Option("window")}
+
 				case "modify":
 					switch arg[2] {
 					case "session":
+						// 重命名会话
 						m.Cmdy(prefix, "rename-session", "-t", arg[0], arg[3])
+						arg = arg[:0]
+
 					case "window":
-						m.Cmdy(prefix, "rename-window", "-t", arg[0], arg[3])
+						// 重命名窗口
+						m.Cmdy(prefix, "rename-window", "-t", m.Option("session")+":"+arg[0], arg[3])
+						arg = []string{m.Option("session")}
+
+					default:
+						return
 					}
-					return
+				case "delete":
+					// 删除会话
+					if !m.Has("session") {
+						m.Cmdy(prefix, "kill-session", "-t", arg[0])
+						arg = arg[:0]
+						break
+					}
+
+					// 删除窗口
+					if !m.Has("window") {
+						m.Cmdy(prefix, "kill-window", "-t", m.Option("session")+":"+arg[0])
+						arg = []string{m.Option("session")}
+						break
+					}
+
+					// 删除终端
+					m.Cmd(prefix, "kill-pane", "-t", m.Option("session")+":"+m.Option("window")+"."+arg[3])
+					arg = []string{m.Option("session"), m.Option("window")}
 				}
 			}
 
 			// 查看会话
-			if m.Cmdy(prefix, "list-session", "-F", "#{session_id},#{session_name},#{session_windows},#{session_height},#{session_width}",
-				"cmd_parse", "cut", ",", "5", "id session windows height width"); len(arg) == 0 {
+			if m.Cmdy(prefix, "list-session", "-F", "#{session_id},#{session_attached},#{session_name},#{session_windows},#{session_height},#{session_width}",
+				"cmd_parse", "cut", ",", "6", "id tag session windows height width"); len(arg) == 0 {
 				return
 			}
 
@@ -649,8 +768,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			m.Set("append").Set("result")
 
 			// 查看窗口
-			if m.Cmdy(prefix, "list-windows", "-t", arg[0], "-F", "#{window_id},#{window_name},#{window_panes},#{window_height},#{window_width}",
-				"cmd_parse", "cut", ",", "5", "id window panes height width"); len(arg) == 1 {
+			if m.Cmdy(prefix, "list-windows", "-t", arg[0], "-F", "#{window_id},#{window_active},#{window_name},#{window_panes},#{window_height},#{window_width}",
+				"cmd_parse", "cut", ",", "6", "id tag window panes height width"); len(arg) == 1 {
 				return
 			}
 
@@ -662,89 +781,16 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 			// 查看面板
 			if len(arg) == 2 {
-				m.Cmdy(prefix, "list-panes", "-t", arg[0]+":"+arg[1], "-F", "#{pane_id},#{pane_index},#{pane_tty},#{pane_height},#{pane_width}",
-					"cmd_parse", "cut", ",", "5", "id pane tty height width")
+				m.Cmdy(prefix, "list-panes", "-t", arg[0]+":"+arg[1], "-F", "#{pane_id},#{pane_active},#{pane_index},#{pane_tty},#{pane_height},#{pane_width}",
+					"cmd_parse", "cut", ",", "6", "id tag pane tty height width")
 				return
 			}
 
 			// 执行命令
 			target := arg[0] + ":" + arg[1] + "." + arg[2]
 			if len(arg) > 3 {
-				// 修改缓存
-				if len(arg) > 5 {
-					switch arg[5] {
-					case "modify":
-						switch arg[6] {
-						case "text":
-							m.Cmdy(prefix, "set-buffer", "-b", arg[4], arg[7])
-						}
-						return
-					}
-				}
-
-				switch arg[3] {
-				case "favor":
-					env := m.Cmdx(prefix, "show-environment", "-g") + m.Cmdx(prefix, "show-environment")
-					for _, l := range strings.Split(env, "\n") {
-						if strings.HasPrefix(l, "ctx_") {
-							v := strings.SplitN(l, "=", 2)
-							m.Option(v[0], v[1])
-						}
-					}
-
-					m.Confm("tmux", "favor."+kit.Select("index", arg, 4), func(index int, value string) {
-						if index == 0 {
-							keys := strings.Split(value, " ")
-							value = "export"
-							for _, k := range keys {
-								value += " " + k + "=" + m.Option(k)
-							}
-
-						}
-						m.Cmdy(prefix, "send-keys", "-t", target, value, "Enter")
-					})
-
-				case "buffer":
-					// 操作缓存
-					if len(arg) > 5 {
-						m.Cmd(prefix, "set-buffer", "-b", arg[4], arg[5])
-					}
-					if len(arg) > 4 {
-						m.Cmdy(prefix, "show-buffer", "-b", arg[4])
-						return
-					}
-					m.Cmdy(prefix, "list-buffers", "cmd_parse", "cut", ": ", "3", "buffer size text")
-					for i, v := range m.Meta["text"] {
-						if i < 3 {
-							m.Meta["text"][i] = m.Cmdx(prefix, "show-buffer", "-b", m.Meta["buffer"][i])
-						} else {
-							m.Meta["text"][i] = v[2 : len(v)-1]
-						}
-					}
-					return
-				case "pane":
-					// 面板列表
-					m.Cmdy(prefix, "list-panes", "-a", "cmd_parse", "cut", " ", "8", "pane_name size some lines bytes haha pane_id tag")
-					m.Meta["append"] = []string{"pane_id", "pane_name", "size", "lines", "bytes", "tag"}
-					m.Table(func(index int, value map[string]string) {
-						m.Meta["pane_name"][index] = strings.TrimSuffix(value["pane_name"], ":")
-						m.Meta["pane_id"][index] = strings.TrimPrefix(value["pane_id"], "%")
-						m.Meta["lines"][index] = strings.TrimSuffix(value["lines"], ",")
-						m.Meta["bytes"][index] = kit.FmtSize(kit.Int64(value["bytes"]))
-					})
-					m.Sort("pane_name")
-					m.Table()
-					return
-				case "run":
-					// 运行命令
-					arg = arg[1:]
-					fallthrough
-				default:
-					if len(arg) > 3 {
-						m.Cmdy(prefix, "send-keys", "-t", target, strings.Join(arg[3:], " "), "Enter")
-						time.Sleep(1 * time.Second)
-					}
-				}
+				m.Cmdy(prefix, "send-keys", "-t", target, strings.Join(arg[3:], " "), "Enter")
+				time.Sleep(1 * time.Second)
 			}
 
 			// 查看终端
@@ -755,53 +801,37 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			prefix := kit.Trans(m.Confv("prefix", "docker"))
 			switch arg[0] {
 			case "image":
-				prefix = append(prefix, "image")
-				pos := kit.Select(m.Conf("runtime", "boot.ctx_app"), arg, 1)
-				tag := kit.Select(m.Conf("runtime", "boot.version"), arg, 2)
-
-				// 查看镜像
-				if m.Cmdy(prefix, "ls", "cmd_parse", "cut", "cmd_headers", "IMAGE ID", "IMAGE_ID"); len(arg) == 1 {
-					return
-				} else if i := kit.IndexOf(m.Meta["IMAGE_ID"], arg[1]); i > -1 {
-					arg, pos, tag = arg[2:], strings.TrimSpace(m.Meta["REPOSITORY"][i]), strings.TrimSpace(m.Meta["TAG"][i])
-				} else {
-					arg = arg[3:]
+				if prefix = append(prefix, "image"); len(arg) < 3 {
+					m.Cmdy(prefix, "ls", "cmd_parse", "cut", "cmd_headers", "IMAGE ID", "IMAGE_ID")
+					break
 				}
 
-				// 拉取镜像
-				if len(arg) == 0 {
-					m.Cmdy(prefix, "pull", pos+":"+tag)
-					return
-				}
-
-				switch arg[0] {
-				// 启动容器
+				switch arg[2] {
 				case "运行":
-					m.Set("append").Set("result")
-					m.Cmdy(prefix[:2], "run", "-dt", pos+":"+tag)
-					return
-				// 清理镜像
+					m.Cmdy(prefix[:2], "run", "-dt", m.Option("REPOSITORY")+":"+m.Option("TAG"))
 				case "清理":
-					m.Cmd(prefix, "prune", "-f")
-
-				// 删除镜像
+					m.Cmdy(prefix, "prune", "-f")
 				case "delete":
-					m.Cmd(prefix, "rm", pos+":"+tag)
-
-				// 创建镜像
-				default:
-					m.Option("base", pos+":"+tag)
-					pos = kit.Select(m.Conf("runtime", "boot.ctx_app"), arg, 0)
-					m.Option("name", pos+":"+m.Time("20060102"))
+					m.Cmdy(prefix, "rm", m.Option("IMAGE_ID"))
+				case "创建":
+					m.Option("base", m.Option("REPOSITORY")+":"+m.Option("TAG"))
+					app := m.Conf("runtime", "boot.ctx_app")
+					m.Option("name", app+":"+m.Time("20060102"))
 					m.Option("file", m.Conf("docker", "output"))
-					m.Option("user", kit.Select(m.Conf("runtime", "boot.username"), arg, 1))
+					m.Option("user", m.Conf("runtime", "boot.username"))
 					m.Option("host", "http://"+m.Conf("runtime", "boot.hostname")+".local"+m.Conf("runtime", "boot.web_port"))
 
 					if f, _, e := kit.Create(m.Option("file")); m.Assert(e) {
 						defer f.Close()
-						if m.Assert(ctx.ExecuteStr(m, f, m.Conf("docker", "template."+arg[0]))) {
+						if m.Assert(ctx.ExecuteStr(m, f, m.Conf("docker", "template."+app))) {
 							m.Cmdy(prefix, "build", "-f", m.Option("file"), "-t", m.Option("name"), ".")
 						}
+					}
+
+				default:
+					if len(arg) == 3 {
+						m.Cmdy(prefix, "pull", arg[1]+":"+arg[2])
+						break
 					}
 				}
 
@@ -830,7 +860,8 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				if prefix = append(prefix, "container"); len(arg) > 1 {
 					switch arg[2] {
 					case "进入":
-						m.Cmdy(m.Confv("prefix", "tmux"), "new-window", "-dPF", "#{session_name}:#{window_name}.1", "docker exec -it "+arg[1]+" sh")
+						m.Cmdy(m.Confv("prefix", "tmux"), "new-window", "-t", "", "-n", m.Option("CONTAINER_NAME"),
+							"-PF", "#{session_name}:#{window_name}.1", "docker exec -it "+arg[1]+" sh")
 						return
 
 					case "停止":
@@ -852,7 +883,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 						}
 
 					case "delete":
-						m.Cmd(prefix, "rm", arg[1])
+						m.Cmdy(prefix, "rm", arg[1])
 
 					default:
 						if len(arg) == 2 {

@@ -4,16 +4,14 @@ kit share "共享" public "web.chat.share" \
 	text "" name dream imports plugin_you \
 	button "共享"
 
-kit note "记事本" public "ssh._route" _ "web.wiki.note" \
-	text "" name dream imports plugin_you action auto \
+kit note "记事本" public "_:web.wiki.note" "@you" \
 	text "miss.md" name story imports plugin_story view long action auto \
 	button "查看" action auto \
 	button "返回" cb Last \
     exports story file \
     feature display inner
 
-kit favor "收藏夹" public "ssh._route" _ "web.wiki.story" favor \
-    text "" name dream imports plugin_you action auto \
+kit favor "收藏夹" public "_:web.wiki.story" "@you" favor \
     text "see" name table imports plugin_story_table action auto \
     text "" name index imports plugin_story_id view tiny action auto \
     feature detail "修改" "复制" "下载" \
@@ -21,8 +19,7 @@ kit favor "收藏夹" public "ssh._route" _ "web.wiki.story" favor \
     button "记录" action auto \
     button "返回" cb Last
 
-kit commit "记录" public "ssh._route" _ "web.wiki.story" commit \
-	text "" name dream imports plugin_you \
+kit commit "记录" public "_:web.wiki.story" "@you" commit \
 	text "miss.md" name story imports plugin_story \
 	text "table" name sence \
 	text "hello" name enjoy \

@@ -274,6 +274,20 @@ kit = toolkit = (function() {var kit = {__proto__: document,
         kit.AppendChild(elm, children)
         return parent.insertBefore(elm, position || parent.firstElementChild)
     },
+    CreateMeta: function(type, name, meta) {
+        meta = meta || {}
+        meta.data = meta.data || {}
+        switch (type) {
+            case "input":
+                meta.type = type
+                meta.name = name
+                kit.classList.add(meta, name)
+                kit.SetDefault(meta.data, "title", name)
+                kit.SetDefault(meta.data, "placeholder", name)
+        }
+        return meta
+    },
+    
     // HTML控件操作
     AppendActions: function(parent, list, cb, diy) {
         parent.innerHTML = "", kit.AppendAction(parent, list, cb, diy)
@@ -531,6 +545,12 @@ kit = toolkit = (function() {var kit = {__proto__: document,
             list.pop()
         }
         return list
+    },
+    SetDefault: function(obj, key, value) {
+        if (obj[key] == undefined) {
+            obj[key] = value
+        }
+        return
     },
     // 数据类型转换
     Trans: function(c) {
