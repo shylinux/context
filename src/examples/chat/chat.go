@@ -4,7 +4,11 @@ import (
 	"contexts/ctx"
 	"contexts/web"
 
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 	"toolkit"
 )
@@ -500,8 +504,27 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				case "file":
 					m.Cmdy("/download/" + h)
 				case "wiki":
+					p := path.Join(path.Join("var/share", h))
+					if _, e := os.Stat(p); e == nil {
+						m.Log("info", "read cache %v", p)
+						r := m.Optionv("request").(*http.Request)
+						w := m.Optionv("response").(http.ResponseWriter)
+						http.ServeFile(w, r, p)
+						break
+					}
+
+					if b, e := ioutil.ReadFile("usr/template/share.tmpl"); e == nil {
+						m.Echo(string(b))
+					}
 					m.Cmdy("ssh._route", value["dream"], "web.wiki.note", value["code"])
+					if f, _, e := kit.Create(p); e == nil {
+						defer f.Close()
+						for _, v := range m.Meta["result"] {
+							f.WriteString(v)
+						}
+					}
 				}
+
 				m.Grow("share", nil, map[string]interface{}{
 					"time":      m.Time(),
 					"share":     h,
@@ -517,10 +540,13 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			return
 		}},
 		"share": &ctx.Command{Name: "share type code", Help: "共享链接", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
-			if len(arg) == 0 {
-				fields := strings.Split(m.Conf("share", "meta.fields"), " ")
-				m.Grows("share", nil, func(meta map[string]interface{}, index int, value map[string]interface{}) {
-					m.Push(fields, value)
+			if len(arg) < 2 {
+				m.Confm("share", "hash", func(key string, value map[string]interface{}) {
+					m.Push("key", key)
+					m.Push("type", value["type"])
+					m.Push("code", value["code"])
+					m.Push("dream", value["dream"])
+					m.Push("link", fmt.Sprintf("%s/chat/share/%s", m.Cmdx(".spide", "self", "client", "url"), key))
 				})
 				m.Table()
 				return
@@ -531,7 +557,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				"time":  m.Time(),
 				"type":  arg[0],
 				"code":  arg[1],
-				"dream": kit.Select("", arg, 2),
+				"dream": m.Option("you"),
 			})
 			m.Echo("%s/chat/share/%s", m.Cmdx(".spide", "self", "client", "url"), h)
 			return
