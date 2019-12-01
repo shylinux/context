@@ -17,6 +17,50 @@ import (
 	"text/template"
 )
 
+type opt struct {
+	font_size  int
+	font_color string
+	background string
+	padding    int
+	margin     int
+}
+
+func size(m *ctx.Message, root map[string]interface{}, depth int, width map[int]int) int {
+	text := kit.Format(kit.Chain(root, "meta.text"))
+	if len(text) > width[depth] {
+		width[depth] = len(text)
+	}
+
+	if _, ok := root["list"]; !ok {
+		kit.Chain(root, "meta.height", 1)
+		m.Log("fuck", "hi %v %d", kit.Chain(root, "meta.text"), 1)
+		return 1
+	}
+
+	height := 0
+	kit.Map(root["list"], "", func(index int, value map[string]interface{}) {
+		height += size(m, value, depth+1, width)
+	})
+	kit.Chain(root, "meta.height", height)
+	m.Log("fuck", "hi %v %d", kit.Chain(root, "meta.text"), height)
+	return height
+}
+func draw(m *ctx.Message, root map[string]interface{}, depth int, width map[int]int, x int, y int, opt *opt) {
+	m.Log("fuck", "hi %v %d", kit.Chain(root, "meta.text"), y)
+	height := kit.Int(kit.Chain(root, "meta.height"))
+	p := (height - 1) * (opt.font_size + opt.margin + opt.padding)
+
+	m.Echo(`<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>`,
+		x, y+p/2, width[depth]*opt.font_size/2+opt.padding, opt.font_size+opt.padding, opt.background)
+	m.Echo(`<text x="%d" y="%d" font-size="%d" text-anchor="middle" fill="%s">%v</text>`,
+		x+width[depth]*opt.font_size/2/2+opt.padding/2, y+p/2+opt.font_size-opt.padding/2, opt.font_size, opt.font_color, kit.Chain(root, "meta.text"))
+
+	kit.Map(root["list"], "", func(index int, value map[string]interface{}) {
+		draw(m, value, depth+1, width, x+width[depth]*opt.font_size/2+opt.margin+opt.padding, y, opt)
+		y += kit.Int(kit.Chain(value, "meta.height")) * (opt.font_size + opt.margin + opt.padding)
+	})
+}
+
 var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
@@ -328,7 +372,46 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 		}},
 
 		"svg": {Name: "svg", Help: "绘图", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Echo(arg[0])
+			data := map[string]interface{}{"meta": map[string]interface{}{"text": "chat"}, "list": []interface{}{
+				map[string]interface{}{"meta": map[string]interface{}{"text": "ocean"}},
+				map[string]interface{}{"meta": map[string]interface{}{"text": "river"}},
+				map[string]interface{}{"meta": map[string]interface{}{"text": "dream"}, "list": []interface{}{
+					map[string]interface{}{"meta": map[string]interface{}{"text": "zsh"}, "list": []interface{}{
+						map[string]interface{}{"meta": map[string]interface{}{"text": "auto.sh"}},
+					}},
+					map[string]interface{}{"meta": map[string]interface{}{"text": "tmux"}},
+					map[string]interface{}{"meta": map[string]interface{}{"text": "docker"}},
+					map[string]interface{}{"meta": map[string]interface{}{"text": "git"}},
+					map[string]interface{}{"meta": map[string]interface{}{"text": "vim"}, "list": []interface{}{
+						map[string]interface{}{"meta": map[string]interface{}{"text": "auto.vim"}},
+					}},
+				}},
+				map[string]interface{}{"meta": map[string]interface{}{"text": "storm"}},
+				map[string]interface{}{"meta": map[string]interface{}{"text": "steam"}},
+			}}
+
+			opt := &opt{
+				font_size:  kit.Int(kit.Select("60", arg, 0)),
+				font_color: kit.Select("red", arg, 1),
+				background: kit.Select("green", arg, 2),
+				padding:    10,
+				margin:     20,
+			}
+			max := map[int]int{}
+			num := size(m, data, 0, max)
+			width := 0
+			for _, v := range max {
+				width += v*opt.font_size/2 + opt.margin
+			}
+
+			m.Echo(`<svg vertion="1.1" xmlns="http://www.w3.org/2000/svg" width="%d", height="%d">`,
+				width, num*(opt.font_size+opt.padding+opt.margin)-opt.margin)
+			draw(m, data, 0, max, 0, 0, opt)
+			m.Echo(`</svg>`)
+
+			// m.Echo(`<rect width="100%" height="100%" fill="red"/>`)
+			// m.Echo(`<circle cx="150" cy="100" r="80" fill="green"/>`)
+			// m.Echo(`<text x="150" y="100" font-size="60" text-anchor="middle" fill="black">SVG</text>`)
 			return
 		}},
 		"xls": {Name: "xls", Help: "表格", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

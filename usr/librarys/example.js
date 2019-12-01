@@ -1570,10 +1570,13 @@ function Output(plugin, type, msg, cb, target, option) {
             _svg: function(width, height, src) {
                 kit.AppendChild(target, '<embed src="'+src+'" width="'+width+'" height="'+height+'" type="image/svg+xml" pluginspage="http://www.adobe.com/svg/viewer/install/" />')
             },
+            _svg2: function(msg, width, height) {
+                target.innerHTML = msg.result.join("")
+            },
 
             svg: function(msg, cb) {var meta = output.onimport.meta
                 plugin.onfigure.meta.size(function(width, height) {
-                    meta._svg(output.target, width, height*1.6, msg.result.join(""))
+                    meta._svg2(msg, width, height*1.6)
                 })
             },
             code: function(msg, cb) {var meta = output.onimport.meta
