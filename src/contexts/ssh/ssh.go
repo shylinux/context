@@ -434,6 +434,13 @@ var Index = &ctx.Context{Name: "ssh", Help: "集群中心",
 				arg = append(arg, "show")
 			}
 
+			if m.Conf("data", "local") == "single" {
+				m.Confm("flow", func(key string, value map[string]interface{}) {
+					m.Log("info", "river map %v->%v", m.Option("river"), key)
+					m.Option("river", key)
+				})
+			}
+
 			switch arg[0] {
 			case "show":
 				if len(arg) > 1 && arg[1] == "" {

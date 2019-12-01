@@ -397,6 +397,18 @@ var page = Page({
                 "绘图": function(event, value) {
                     page.plugin && page.plugin.Plugin.onfigure("canvas")
                 },
+                "视频": function(event, value) {
+                    page.plugin && page.plugin.Plugin.onfigure("video")
+                },
+                "音频": function(event, value) {
+                    page.plugin && page.plugin.Plugin.onfigure("audio")
+                },
+                "相册": function(event, value) {
+                    page.plugin && page.plugin.Plugin.onfigure("album")
+                },
+                "媒体": function(event, value) {
+                    page.plugin && page.plugin.Plugin.onfigure("media")
+                },
 
                 "复制": function(event, value) {
                     page.plugin && page.plugin.Plugin.Clone()
@@ -434,7 +446,7 @@ var page = Page({
             },
             Button: [["layout", "工作", "办公", "聊天", "最高", "最宽", "最大"],
                 "", "刷新", "清屏", "并行", "串行",
-				"", ["display", "表格", "编辑", "绘图"],
+				"", ["display", "表格", "编辑", "绘图", "媒体"],
                 "", "复制", "删除", "加参", "减参",
                 "", "执行", "下载", "清空", "返回",
 				"", kit.CreateMeta("input", "pod"),

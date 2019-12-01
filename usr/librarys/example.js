@@ -1480,7 +1480,19 @@ function Output(plugin, type, msg, cb, target, option) {
             return (target.value = args[0]) || plugin.Zone("value", args[0])
         },
 
+        size: function(cb, ncol, nrow) {ncol = ncol || 1, nrow = nrow || 1
+            plugin.onfigure.meta.size(function(width, height) {
+                cb(width/ncol-10, height/nrow-10)
+            })
+        },
         onimport: shy("导入数据", {
+            _video: function(msg, line, width, height) {
+                kit.AppendChild(target, [{type: "video", style: {width: width},
+                    data: {controls: "controls", autoplay: false, loop: true, src: line.file}}])
+            },
+            _image: function(msg, line, width, height) {
+                kit.AppendChild(target, [{type: "img", data: {src: line.file}, style: {width: width}}])
+            },
             _table: function(msg, list) {
                 return list && list.length > 0 && kit.OrderTable(kit.AppendTable(kit.AppendChild(target, "table"), msg.Table(), list), "", output.onexport, function(event, value, name, line, index) {
                     var td = event.target
@@ -1552,19 +1564,49 @@ function Output(plugin, type, msg, cb, target, option) {
                     )
                 })
             },
-            _code: function(msg) {
+            _code: function(msg, line) {
                 return msg.result && msg.result.length > 0 && kit.OrderCode(kit.AppendChild(target, [{view: ["code", "div", msg.Results()]}]).first)
             },
-            code: function(msg, cb) {
+            _svg: function(width, height, src) {
+                kit.AppendChild(target, '<embed src="'+src+'" width="'+width+'" height="'+height+'" type="image/svg+xml" pluginspage="http://www.adobe.com/svg/viewer/install/" />')
+            },
+
+            svg: function(msg, cb) {var meta = output.onimport.meta
+                plugin.onfigure.meta.size(function(width, height) {
+                    meta._svg(output.target, width, height*1.6, msg.result.join(""))
+                })
+            },
+            code: function(msg, cb) {var meta = output.onimport.meta
                 target.innerHTML = "", output.onimport.meta._code(msg)
                 typeof cb == "function" && cb(msg)
             },
-            table: function(msg, cb) {
+            table: function(msg, cb) {var meta = output.onimport.meta
                 target.innerHTML = ""
                 output.onimport.meta._table(msg, msg.append) || output.onimport.meta._code(msg)
                 typeof cb == "function" && cb(msg)
             },
-            inner: function(msg, cb) {
+            album: function(msg, cb) {var meta = output.onimport.meta
+                target.innerHTML = "", msg.Table(function(line) {meta._image(msg, line)})
+            },
+            video: function(msg, cb) {var meta = output.onimport.meta
+                target.innerHTML = "", msg.Table(function(line) {meta._video(msg, line)})
+            },
+            audio: function(msg, cb) {var meta = output.onimport.meta
+                target.innerHTML = "", msg.Table(function(line) {meta._audio(msg, line)})
+            },
+            media: function(msg, cb) {var meta = output.onimport.meta
+                output.size(function(width, height) {
+                    target.innerHTML = "", msg.Table(function(line) {var ls = (line.file||line.path).split(".")
+                        line.file = line.file? line.file: "/download/"+line.path
+                        switch (ls[ls.length-1].toLowerCase()) {
+                            case "mp4": meta._video(msg, line, width, height); break
+                            case "png": meta._image(msg, line, width, height); break
+                            case "svg": meta._svg(msg, line, width, height); break
+                        }
+                    })
+                }, 3)
+            },
+            inner: function(msg, cb) {var meta = output.onimport.meta
                 target.innerHTML = "", plugin.onfigure.meta.max(target)
                 output.onimport.meta._table(msg, msg.append) || kit.OrderCode(kit.ModifyNode(target, msg.result.join("")))
                 kit._call(cb, [msg])
@@ -1596,15 +1638,7 @@ function Output(plugin, type, msg, cb, target, option) {
                     }
                 })
             },
-            _svg: function(target, width, height, src) {
-                target.innerHTML = '<embed src="'+src+'" width="'+width+'" height="'+height+'" type="image/svg+xml" pluginspage="http://www.adobe.com/svg/viewer/install/" />'
-            },
-            svg: function(msg, cb) {
-                plugin.onfigure.meta.size(function(width, height) {
-                    output.onimport.meta._svg(output.target, width, height*1.6, msg.result.join(""))
-                })
-            },
-            editor: function(msg, cb) {
+            editor: function(msg, cb) {var meta = output.onimport.meta
                 output.onimport.meta.table(msg, cb)
 
                 var current = page.Sync("plugin_editor_index").get()
@@ -1625,14 +1659,13 @@ function Output(plugin, type, msg, cb, target, option) {
                     })
                 }
             },
-            canvas: function(msg, cb) {
+            canvas: function(msg, cb) {var meta = output.onimport.meta
                 target.innerHTML = "", plugin.onfigure.meta.size(function(width, height) {
                     Canvas(plugin, option, target, width-45, height-175, 10, msg)
                 })
             },
-        }, function(type, msg, cb) {var meta = arguments.callee.meta
-            page.output = target
-            meta[type](msg, cb)
+        }, function(type, msg, cb) {var meta = output.onimport.meta
+            page.output = target, meta[type](msg, cb)
         }),
         ondetail: shy("菜单列表", {
             "删除": "_table",
@@ -1646,9 +1679,10 @@ function Output(plugin, type, msg, cb, target, option) {
             "清空": "clear",
             "复制": "Copy",
             "下载": "Download",
-            "绘图": function() {plugin.onfigure("canvas")},
             "表格": function() {plugin.onfigure("table")},
-        }, ["返回", "清空", "复制", "下载", "绘图", "表格"], function(event, value, meta) {
+            "媒体": function() {plugin.onfigure("media")},
+            "绘图": function() {plugin.onfigure("canvas")},
+        }, ["返回", "清空", "复制", "下载", "表格", "媒体", "绘图"], function(event, value, meta) {
             return output._call(meta[value], event)
         }),
         onaction: shy("事件列表", {

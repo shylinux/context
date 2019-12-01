@@ -1,16 +1,22 @@
 
-{{define "table"}}<table class="story" data-scene='{{options . "scene"}}'
-        data-enjoy='{{options . "enjoy"}}' data-happy='{{options . "happy"}}'>{{range $i, $line := .|trans}}
+{{define "table"}}
+<table class="story" data-scene='{{options . "scene"}}' data-enjoy='{{options . "enjoy"}}' data-happy='{{options . "happy"}}'>
+{{range $i, $line := .|trans}}
     {{if eq $i 0}}
-    <tr>{{range $i, $v := $line}}<th>{{$v}}</th>{{end}}</tr>
+        <tr>{{range $i, $v := $line}}<th>{{$v}}</th>{{end}}</tr>
     {{else}}
-    <tr>{{range $i, $v := $line}}<td>{{$v}}</td>{{end}}</tr>
+        <tr>{{range $i, $v := $line}}<td>{{$v}}</td>{{end}}</tr>
     {{end}}
-{{end}}</table>{{end}}
+{{end}}
+</table>
+{{end}}
 
-{{define "order"}}<ul class="story" data-scene='{{options . "scene"}}'
-        data-enjoy='{{options . "enjoy"}}' data-happy='{{options . "happy"}}'>
+{{define "order"}}
+<ul class="story" data-scene='{{options . "scene"}}' data-enjoy='{{options . "enjoy"}}' data-happy='{{options . "happy"}}'>
 {{range $i, $line := .Meta.list}}<li>{{$line}}</li>{{end}}
-</ul>{{end}}
+</ul>
+{{end}}
 
-{{define "code"}}<div class="story">{{results .}}</div>{{end}}
+{{define "code"}}
+<div class="story code">{{results .}}</div>
+{{end}}

@@ -1,6 +1,6 @@
 
 kit tips "便签" private "_:web.code.favor" "@you" list \
-    text "tip" name favor view tiny \
+    text "tip" name table view tiny \
     text "" name index imports plugin_vim_favor view tiny action auto \
     text "" name limit view tiny \
     text "" name offend view tiny \

@@ -9,6 +9,8 @@ import (
 
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"path"
 	"strconv"
 	"strings"
@@ -18,7 +20,9 @@ import (
 var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	Caches: map[string]*ctx.Cache{},
 	Configs: map[string]*ctx.Config{
-		"login": {Name: "login", Value: map[string]interface{}{"check": "false"}, Help: "用户登录"},
+		"login": {Name: "login", Value: map[string]interface{}{"check": "false", "meta": map[string]interface{}{
+			"script": "usr/script",
+		}}, Help: "用户登录"},
 		"componet": {Name: "componet", Value: map[string]interface{}{
 			"index": []interface{}{
 				map[string]interface{}{"name": "wiki",
@@ -239,12 +243,58 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			return
 		}},
 		"refer": {Name: "refer", Help: "链接地址", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
-			m.Set("option", "render", "raw").Echo(`%s: <a href="%s" target="_blank">%s</a>`, arg[0], arg[1], arg[1])
+			if len(arg) == 1 {
+				cmd, arg = arg[0], arg[1:]
+				for _, l := range strings.Split(strings.TrimSpace(cmd), "\n") {
+					if l = strings.TrimSpace(l); len(l) > 0 {
+						arg = append(arg, kit.Split(l, ' ', 2)...)
+					}
+				}
+			}
+
+			m.Set("option", "render", "order")
+			for i := 0; i < len(arg)-1; i += 2 {
+				m.Push("list", fmt.Sprintf(`%s: <a href="%s" target="_blank">%s</a>`, arg[i], arg[i+1], arg[i+1]))
+			}
+			return
+		}},
+		"favor": {Name: "favor type tab", Help: "链接地址", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			msg := m.Cmd("ssh.data", "show", "tip", "", "1000", "0", "tab", arg[1])
+
+			switch arg[0] {
+			case "script":
+				m.Set("option", "render", "code")
+				if b, e := ioutil.ReadFile(path.Join(m.Conf("login", "meta.script"), arg[1])); e == nil {
+					m.Echo(string(b))
+				}
+
+			case "li":
+				m.Set("option", "render", "order")
+				msg.Table(func(index int, value map[string]string) {
+					m.Push("list", fmt.Sprintf(`%s: <a href="%s" target="_blank">%s</a>`, value["note"], value["word"], value["word"]))
+				})
+
+			case "sh":
+				m.Set("option", "render", "code")
+				m.Echo("#! /bin/sh\n")
+				m.Echo("# %v\n", arg[1])
+				m.Echo("\n")
+				msg.Table(func(index int, value map[string]string) {
+					m.Echo("# %d %v\n%v\n\n", index, value["note"], value["word"])
+				})
+			}
+			return
+		}},
+		"shell": {Name: "shell dir cmd", Help: "命令行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Option("render", "code")
+			m.Echo("$ %v\n", strings.Join(arg[1:], " "))
+			m.Cmdy("cli.system", "cmd_dir", arg[0], "bash", "-c", strings.Join(arg[1:], " "))
 			return
 		}},
 
 		"title": {Name: "title text", Help: "一级标题", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
-			m.Set("option", "render", cmd).Echo(kit.Select("", arg, 0))
+			ns := strings.Split(m.Conf("runtime", "node.name"), "-")
+			m.Set("option", "render", cmd).Echo(kit.Select(ns[len(ns)-1], arg, 0))
 			return
 		}},
 		"chapter": {Name: "chaper text", Help: "二级标题", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
@@ -267,11 +317,6 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			return
 		}},
 
-		"runs": {Name: "run", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
-			m.Option("render", "code")
-			m.Cmdy(arg).Set("append")
-			return
-		}},
 		"run": {Name: "run", Help: "便签", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Option("render", "raw")
 			m.Cmdy(arg)

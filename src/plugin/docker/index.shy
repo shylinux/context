@@ -59,7 +59,7 @@ kit command "命令" private "web.code.docker" "command" \
 	text "" name arg view long \
     button "执行"
 
-kit git "记录" private "_:web.code.zsh" "@pod"\
+kit git "记录" private "_:web.code.zsh" "@you"\
 	text "usr/local" name dir imports plugin_git_path action auto \
 	select "git" name cmd values git \
 	select "status" name cmd values "diff status commit branch remote pull push sum init" action auto \

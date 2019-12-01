@@ -51,7 +51,7 @@ kit cmd "命令" private "_:context" _ _ command \
 
 kit dir "目录" private "_:nfs.dir" _ _ time size line path \
 	text "" name pod imports plugin_pod action auto \
-	text "usr/script" name dir imports plugin_dir action auto view long \
+	text "usr/local" name dir imports plugin_dir action auto view long \
 	button "浏览" action auto \
 	button "返回" cb Last \
     feature display editor \

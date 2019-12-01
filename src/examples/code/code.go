@@ -356,7 +356,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 				if m.Cmd("/upload"); m.Options("dream") {
 					// 下发文件
 					m.Cmd("ssh._route", m.Option("dream"), "web.get", "dev", "/download/"+m.Append("hash"),
-						"save", m.Conf("login", "script")+"/"+m.Append("name"))
+						"save", m.Conf("login", "meta.script")+"/"+m.Append("name"))
 				}
 				m.Echo("code: %s\n", m.Append("code"))
 				m.Echo("hash: %s\n", m.Append("hash"))
@@ -497,7 +497,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 				// 生成脚本
 				m.Echo("#/bin/sh\n\n")
-				m.Cmd(prefix, "list", m.Option("favor"), "", kit.Select("10", m.Option("limit")), "0", "tab", m.Option("tab")).Table(func(index int, value map[string]string) {
+				m.Cmd(prefix, "list", m.Option("favor"), "", kit.Select("1000", m.Option("limit")), "0", "tab", m.Option("tab")).Table(func(index int, value map[string]string) {
 					m.Echo("# %v:%v\n%v\n\n", value["tab"], value["note"], value["word"])
 				})
 
@@ -553,7 +553,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					}
 
 				case "git":
-					if s, e := os.Stat(path.Join(p, ".git")); e == nil && s.IsDir() {
+					if s, e := os.Stat(path.Join(p, ".git")); e == nil && s.IsDir() || arg[1] == "init" {
 						m.Cmdy(".git", p, arg[1:])
 						break
 					}
@@ -644,7 +644,7 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 					return
 
 				case "favor":
-					env := m.Cmdx(prefix, "show-environment", "-g") + m.Cmdx(prefix, "show-environment")
+					env := m.Cmdx(prefix, "show-environment", "-g") + m.Cmdx(prefix, "show-environment", "-t", arg[0])
 					for _, l := range strings.Split(env, "\n") {
 						if strings.HasPrefix(l, "ctx_") {
 							v := strings.SplitN(l, "=", 2)
@@ -917,14 +917,12 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 
 			switch arg[0] {
 			case "init":
-				if s, e := os.Stat(path.Join(prefix[len(prefix)-1], ".git")); e == nil && s.IsDir() {
-					if len(arg) > 1 {
-						m.Cmdy(prefix, "remote", "add", "-f", kit.Select("origin", arg, 2), arg[1])
-					}
-				} else if len(arg) > 1 {
-					m.Cmdy(prefix, "clone", arg[1], ".")
-				} else {
+				if _, e := os.Stat(path.Join(prefix[len(prefix)-1], ".git")); e != nil {
 					m.Cmdy(prefix, "init")
+				}
+				if len(arg) > 1 {
+					m.Cmdy(prefix, "remote", "add", "-f", kit.Select("origin", arg, 2), arg[1])
+					m.Cmdy(prefix, "pull", kit.Select("origin", arg, 2), kit.Select("master", arg, 3))
 				}
 
 				m.Confm("git", "alias", func(key string, value string) {

@@ -42,3 +42,15 @@ kit xls "表格" "index.js" "index.css" private "web.wiki.xls" \
     feature style "mind" \
     exports xls_id id
 
+kit audio "" public "web.wiki.audio" \
+	text "" name dream imports plugin_you \
+	button "查看"
+
+kit vedio "视频" public "web.wiki.vedio" \
+	text "" name dream imports plugin_you \
+	button "查看"
+
+kit vedio "视频" public "web.wiki.vedio" \
+	text "usr/local/vedio/5b58edd8b722c7ac7d86c5281276b7ed_wm.mp4" name file \
+    feature display video \
+	button "查看"
