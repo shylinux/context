@@ -440,11 +440,11 @@ var Index = &ctx.Context{Name: "code", Help: "代码中心",
 			}
 			return
 		}},
-		"prune": {Name: "prune type sid...", Help: "清理", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+		"prune": {Name: "prune type all|sid...", Help: "清理", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			ps := arg[1:]
-			if len(ps) == 0 {
+			if len(ps) == 0 || ps[0] == "all" {
 				m.Confm("login", "hash", func(key string, value map[string]interface{}) {
-					if value["type"] == arg[0] && kit.Format(value["status"]) == "logout" {
+					if value["type"] == arg[0] && (kit.Format(value["status"]) == "logout" || len(ps) > 0) {
 						ps = append(ps, key)
 					}
 				})
