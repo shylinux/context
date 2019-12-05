@@ -45,6 +45,7 @@ kit svg "" public "web.wiki.svg" \
     select "" name type values "16 30 48 60" action auto \
     select "" name type values "white red yellow green blue black" action auto \
     select "" name type values "black blue green yellow red white" action auto \
+	textarea "" name happy half 4 height "200px" \
     feature display svg \
 	button "查看"
 

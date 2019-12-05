@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"github.com/gomarkdown/markdown"
+	mis "github.com/shylinux/toolkits"
 
 	"contexts/ctx"
 	"contexts/web"
@@ -25,15 +26,64 @@ type opt struct {
 	margin     int
 }
 
+func show(m *ctx.Message, str string) (res []string) {
+	miss := []int{}
+	list := mis.Split(str, "\n")
+	for _, line := range list {
+		dep := 0
+	loop:
+		for _, v := range []rune(line) {
+			switch v {
+			case ' ':
+				dep++
+			case '\t':
+				dep += 4
+			default:
+				break loop
+			}
+		}
+		if len(miss) > 0 {
+			if miss[len(miss)-1] > dep {
+				for i := len(miss) - 1; i >= 0; i-- {
+					if miss[i] < dep {
+						break
+					}
+					m.Log("show", "pop %d %v %v", dep, mis.Format(miss), line)
+					res = append(res, "]", "}")
+					miss = miss[:i]
+				}
+				m.Log("show", "push %d %v %v", dep, mis.Format(miss), line)
+				miss = append(miss, dep)
+			} else if miss[len(miss)-1] < dep {
+				m.Log("show", "push %d %v %v", dep, mis.Format(miss), line)
+				miss = append(miss, dep)
+			} else {
+				res = append(res, "]", "}")
+			}
+		} else {
+			m.Log("show", "push %d %v", dep, mis.Format(miss))
+			miss = append(miss, dep)
+		}
+
+		word := mis.Split(line)
+		res = append(res, "{", "meta", "{", "text")
+		res = append(res, word...)
+		res = append(res, "}", "list", "[")
+
+	}
+	m.Log("haha", "%v %v", str, res)
+	return
+}
+
 func size(m *ctx.Message, root map[string]interface{}, depth int, width map[int]int) int {
 	text := kit.Format(kit.Chain(root, "meta.text"))
 	if len(text) > width[depth] {
 		width[depth] = len(text)
 	}
 
-	if _, ok := root["list"]; !ok {
+	if list, ok := root["list"].([]interface{}); !ok || len(list) == 0 {
 		kit.Chain(root, "meta.height", 1)
-		m.Log("fuck", "hi %v %d", kit.Chain(root, "meta.text"), 1)
+		m.Log("fuck", "size %v %d", kit.Chain(root, "meta.text"), 1)
 		return 1
 	}
 
@@ -42,18 +92,19 @@ func size(m *ctx.Message, root map[string]interface{}, depth int, width map[int]
 		height += size(m, value, depth+1, width)
 	})
 	kit.Chain(root, "meta.height", height)
-	m.Log("fuck", "hi %v %d", kit.Chain(root, "meta.text"), height)
+	m.Log("fuck", "size %v %d", kit.Chain(root, "meta.text"), height)
 	return height
 }
 func draw(m *ctx.Message, root map[string]interface{}, depth int, width map[int]int, x int, y int, opt *opt) {
-	m.Log("fuck", "hi %v %d", kit.Chain(root, "meta.text"), y)
-	height := kit.Int(kit.Chain(root, "meta.height"))
+	meta := root["meta"].(map[string]interface{})
+	m.Log("fuck", "draw %v %d", meta["text"], y)
+	height := kit.Int(meta["height"])
 	p := (height - 1) * (opt.font_size + opt.margin + opt.padding)
 
 	m.Echo(`<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>`,
-		x, y+p/2, width[depth]*opt.font_size/2+opt.padding, opt.font_size+opt.padding, opt.background)
+		x, y+p/2, width[depth]*opt.font_size/2+opt.padding, opt.font_size+opt.padding, kit.Select(opt.background, meta["bg"]))
 	m.Echo(`<text x="%d" y="%d" font-size="%d" text-anchor="middle" fill="%s">%v</text>`,
-		x+width[depth]*opt.font_size/2/2+opt.padding/2, y+p/2+opt.font_size-opt.padding/2, opt.font_size, opt.font_color, kit.Chain(root, "meta.text"))
+		x+width[depth]*opt.font_size/2/2+opt.padding/2, y+p/2+opt.font_size-opt.padding/2, opt.font_size, kit.Select(opt.font_color, meta["fg"]), meta["text"])
 
 	kit.Map(root["list"], "", func(index int, value map[string]interface{}) {
 		draw(m, value, depth+1, width, x+width[depth]*opt.font_size/2+opt.margin+opt.padding, y, opt)
@@ -397,6 +448,11 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 				padding:    10,
 				margin:     20,
 			}
+			if len(arg) > 3 {
+				data = mis.Parse(nil, "", show(m, arg[3])...).(map[string]interface{})
+				m.Log("what", "%v", mis.Formats(data))
+			}
+
 			max := map[int]int{}
 			num := size(m, data, 0, max)
 			width := 0
