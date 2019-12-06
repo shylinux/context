@@ -14,12 +14,11 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 		"task": {Name: "task create table level class status begin_time close_time target detail arg...", Help: "任务", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			switch arg[0] {
 			case "progress":
-				if len(arg) > 2 && arg[1] != "" {
-					switch arg[2] {
+				if len(arg) > 3 && arg[1] != "" {
+					switch arg[3] {
 					case "prepare", "action", "cancel", "finish":
-						prefix := []string{"ssh._route", m.Option("dream"), "ssh.data", "update"}
 						time := "close_time"
-						switch arg[2] {
+						switch arg[3] {
 						case "prepare", "action":
 							time = "begin_time"
 						case "cancel", "finish":
@@ -29,7 +28,7 @@ var Index = &ctx.Context{Name: "team", Help: "团队中心",
 						}
 
 						// 更新任务
-						m.Cmd(prefix, m.Option("table"), arg[1], "status", arg[2], time, m.Time())
+						m.Cmd("ssh.data", "update", arg[1], arg[2], "status", arg[3], time, m.Time())
 						arg = []string{arg[0], m.Option("table")}
 					}
 				}

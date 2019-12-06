@@ -20,6 +20,7 @@ type Chart interface {
 type Block struct {
 	Text       string
 	FontColor  string
+	FontFamily string
 	BackGround string
 
 	FontSize int
@@ -33,11 +34,38 @@ type Block struct {
 	RectData string
 }
 
+func (b *Block) Init(m *ctx.Message, arg ...string) Chart {
+	b.Text = kit.Select(b.Text, arg, 0)
+	b.FontColor = kit.Select("white", kit.Select(b.FontColor, arg, 1))
+	b.BackGround = kit.Select("red", kit.Select(b.BackGround, arg, 2))
+	b.FontSize = kit.Int(kit.Select("24", kit.Select(kit.Format(b.FontSize), arg, 3)))
+	b.LineSize = kit.Int(kit.Select("12", kit.Select(kit.Format(b.LineSize), arg, 4)))
+	return b
+}
+func (b *Block) Draw(m *ctx.Message, x, y int) Chart {
+	m.Echo(`<rect x="%d" y="%d" width="%d" height="%d" fill="%s" %v/>`,
+		x+b.Margin/2, y+b.Margin/2, b.GetWidth(), b.GetHeight(), b.BackGround, b.RectData)
+	m.Echo("\n")
+	m.Echo(`<text x="%d" y="%d" font-size="%d" style="dominant-baseline:middle;text-anchor:middle;" fill="%s" %v>%v</text>`,
+		x+b.GetWidths()/2, y+b.GetHeights()/2, b.FontSize, b.FontColor, b.TextData, b.Text)
+	m.Echo("\n")
+	return b
+}
+func (b *Block) Data(root interface{}) {
+	mis.Table(mis.Value(root, "data"), 0, 100, func(key string, value string) {
+		b.TextData += key + "='" + value + "' "
+	})
+	mis.Table(mis.Value(root, "rect"), 0, 100, func(key string, value string) {
+		b.RectData += key + "='" + value + "' "
+	})
+	b.FontColor = kit.Select(b.FontColor, mis.Value(root, "fg"))
+	b.BackGround = kit.Select(b.BackGround, mis.Value(root, "bg"))
+}
 func (b *Block) GetWidth(str ...string) int {
 	if b.Width != 0 {
 		return b.Width
 	}
-	return len(kit.Select(b.Text, str, 0))*b.FontSize/2 + b.Padding
+	return len(kit.Select(b.Text, str, 0))*b.FontSize*6/10 + b.Padding
 }
 func (b *Block) GetHeight(str ...string) int {
 	if b.Height != 0 {
@@ -51,32 +79,8 @@ func (b *Block) GetWidths(str ...string) int {
 func (b *Block) GetHeights(str ...string) int {
 	return b.GetHeight() + b.Margin
 }
-func (b *Block) Init(m *ctx.Message, arg ...string) Chart {
-	b.Text = kit.Select(b.Text, arg, 0)
-	b.FontColor = kit.Select("white", kit.Select(b.FontColor, arg, 1))
-	b.BackGround = kit.Select("red", kit.Select(b.BackGround, arg, 2))
-	b.FontSize = kit.Int(kit.Select("24", kit.Select(kit.Format(b.FontSize), arg, 3)))
-	b.LineSize = kit.Int(kit.Select("12", kit.Select(kit.Format(b.LineSize), arg, 4)))
-	return b
-}
-func (b *Block) Draw(m *ctx.Message, x, y int) Chart {
-	m.Echo(`<rect x="%d" y="%d" width="%d" height="%d" fill="%s" %v/>`,
-		x+b.Margin/2, y+b.Margin/2, b.GetWidth(), b.GetHeight(), b.BackGround, b.RectData)
-	m.Echo(`<text x="%d" y="%d" font-size="%d" style="dominant-baseline:middle;text-anchor:middle;" fill="%s" %v>%v</text>`,
-		x+b.GetWidths()/2, y+b.GetHeights()/2, b.FontSize, b.FontColor, b.TextData, b.Text)
-	return b
-}
-func (b *Block) Data(root interface{}) {
-	mis.Table(mis.Value(root, "data"), 0, 100, func(key string, value string) {
-		b.TextData += key + "='" + value + "' "
-	})
-	mis.Table(mis.Value(root, "rect"), 0, 100, func(key string, value string) {
-		b.RectData += key + "='" + value + "' "
-	})
-	b.FontColor = kit.Select(b.FontColor, mis.Value(root, "fg"))
-	b.BackGround = kit.Select(b.BackGround, mis.Value(root, "bg"))
-}
 
+// 树
 type Chain struct {
 	data map[string]interface{}
 	max  map[int]int
@@ -92,6 +96,7 @@ func (b *Chain) Init(m *ctx.Message, arg ...string) Chart {
 	b.LineSize = kit.Int(kit.Select("12", arg, 4))
 	b.Padding = kit.Int(kit.Select("8", arg, 5))
 	b.Margin = kit.Int(kit.Select("8", arg, 6))
+	m.Log("info", "data %v", kit.Formats(b.data))
 
 	// 计算尺寸
 	b.max = map[int]int{}
@@ -103,6 +108,9 @@ func (b *Chain) Init(m *ctx.Message, arg ...string) Chart {
 	b.Width = width
 	m.Log("info", "data %v", kit.Formats(b.data))
 	return b
+}
+func (b *Chain) Draw(m *ctx.Message, x, y int) Chart {
+	return b.draw(m, b.data, 0, b.max, x, y)
 }
 func (b *Chain) show(m *ctx.Message, str string) (res []string) {
 	miss := []int{}
@@ -197,10 +205,8 @@ func (b *Chain) draw(m *ctx.Message, root map[string]interface{}, depth int, wid
 	})
 	return b
 }
-func (b *Chain) Draw(m *ctx.Message, x, y int) Chart {
-	return b.draw(m, b.data, 0, b.max, x, y)
-}
 
+// 表
 type Table struct {
 	data [][]string
 	max  map[int]int

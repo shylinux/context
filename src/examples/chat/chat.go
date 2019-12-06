@@ -3,6 +3,7 @@ package chat
 import (
 	"contexts/ctx"
 	"contexts/web"
+	mis "github.com/shylinux/toolkits"
 
 	"fmt"
 	"io/ioutil"
@@ -502,10 +503,14 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			m.Confm("share", []string{"hash", h}, func(value map[string]interface{}) {
 				switch kit.Format(value["type"]) {
 				case "file":
+					// 下载文件
 					m.Cmdy("/download/" + h)
+
 				case "wiki":
+					// 查看文档
 					p := path.Join(path.Join("var/share", h))
 					if _, e := os.Stat(p); e == nil {
+						// 读取缓存
 						m.Log("info", "read cache %v", p)
 						r := m.Optionv("request").(*http.Request)
 						w := m.Optionv("response").(http.ResponseWriter)
@@ -513,9 +518,11 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 						break
 					}
 
+					// 生成模板
 					if b, e := ioutil.ReadFile("usr/template/share.tmpl"); e == nil {
 						m.Echo(string(b))
 					}
+					// 生成文档
 					m.Cmdy("ssh._route", value["dream"], "web.wiki.note", value["code"])
 					if f, _, e := kit.Create(p); e == nil {
 						defer f.Close()
@@ -525,6 +532,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					}
 				}
 
+				// 访问记录
 				m.Grow("share", nil, map[string]interface{}{
 					"time":      m.Time(),
 					"share":     h,
@@ -540,17 +548,34 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			return
 		}},
 		"share": &ctx.Command{Name: "share type code", Help: "共享链接", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
+			if len(arg) > 2 {
+				switch arg[1] {
+				case "delete":
+					// 删除共享
+					switch arg[2] {
+					case "key":
+						m.Log("info", "delete share %v %v", arg[3], mis.Formats(m.Conf("share", "hash."+arg[3])))
+						m.Conf("share", "hash."+arg[3], "")
+					}
+					return
+				}
+			}
+
 			if len(arg) < 2 {
+				// 共享列表
 				m.Confm("share", "hash", func(key string, value map[string]interface{}) {
 					m.Push("key", key)
+					m.Push("time", value["time"])
 					m.Push("type", value["type"])
 					m.Push("code", value["code"])
 					m.Push("dream", value["dream"])
 					m.Push("link", fmt.Sprintf("%s/chat/share/%s", m.Cmdx(".spide", "self", "client", "url"), key))
 				})
-				m.Table()
+				m.Sort("time", "time_r")
 				return
 			}
+
+			// 共享链接
 			h := kit.ShortKey(m.Confm(cmd, "hash"), 6)
 			m.Confv(cmd, []string{"hash", h}, map[string]interface{}{
 				"from":  m.Option("username"),

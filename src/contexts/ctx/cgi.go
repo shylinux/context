@@ -199,7 +199,8 @@ func LocalCGI(m *Message, c *Context) *template.FuncMap {
 		func(k string, v *Command) {
 			cgi[k] = func(arg ...interface{}) (res interface{}) {
 				m.TryCatch(m.Spawn(), true, func(msg *Message) {
-					v.Hand(msg, c, k, kit.Trans(arg)...)
+
+					v.Hand(msg, c, k, msg.Form(v, kit.Trans(arg))...)
 
 					buffer := bytes.NewBuffer([]byte{})
 					m.Assert(m.Optionv("tmpl").(*template.Template).ExecuteTemplate(buffer,

@@ -380,13 +380,13 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			}
 			return
 		}},
-		"shell": {Name: "shell dir cmd", Help: "命令行", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"shell": {Name: "shell dir cmd", Help: "命令行", Form: map[string]int{"style": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Option("render", "code")
 			m.Echo("$ %v\n", strings.Join(arg[1:], " "))
 			m.Cmdy("cli.system", "cmd_dir", arg[0], "bash", "-c", strings.Join(arg[1:], " "))
 			return
 		}},
-		"chart": {Name: "chart type text", Help: "绘图", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+		"chart": {Name: "chart type text", Help: "绘图", Form: map[string]int{"style": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Option("render", "raw")
 			var chart Chart
 			switch arg[0] {
@@ -400,10 +400,12 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			arg[1] = strings.TrimSpace(arg[1])
 
 			chart.Init(m, arg[1:]...)
-			m.Echo(`<svg vertion="1.1" xmlns="http://www.w3.org/2000/svg" width="%d", height="%d">`,
-				chart.GetWidth(), chart.GetHeight())
+			m.Echo(`<svg vertion="1.1" xmlns="http://www.w3.org/2000/svg" width="%d", height="%d" style="%s">`,
+				chart.GetWidth(), chart.GetHeight(), m.Option("style"))
+			m.Echo("\n")
 			chart.Draw(m, 0, 0)
 			m.Echo(`</svg>`)
+			m.Echo("\n")
 			return
 		}},
 
