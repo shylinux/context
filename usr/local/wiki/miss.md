@@ -1,6 +1,35 @@
 # {{title "Hello World"}}
 
-{{runs "help"}}
+{{chart "block" `hello 慕尼黑 world` "white" "red" "32"}}
+{{chart "block" `hello world` "red" "green"}}
+
+{{chart "chain" `
+chat
+    ocean
+    river
+    dream fg red bg white
+        zsh
+            auto.sh
+        tmux
+        docker
+        git
+        vim data { hi hello } rect { nice world }
+            auto.vim
+    storm
+    steam
+`}}
+
+{{chart "table" `
+'{ text 宇宙 fg white bg green }' '{ text 天文 fg red bg white }' 气象 地质
+'{ text 物理 fg white bg blue' 物质 '{ text 能量 fg red bg white }' 信息
+'{ text 数学 fg white bg green }' '{ text 代数 fg red bg white }' 函数 几何
+'{ text 生命 fg white bg blue' 基因 '{ text 组织 fg red bg white }' 系统
+`}}
+
+{{chart "table" `
+'{ text 编程 fg white bg green }' '{ text 语言 fg red bg white }' 框架 平台
+'{ text 设计 fg white bg blue' 功能 '{ text 性能 fg red bg white }' 智能
+`}}
 
 命令 参数 选项 配置
 

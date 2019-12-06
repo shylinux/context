@@ -41,11 +41,11 @@ kit xls "表格" "index.js" "index.css" private "web.wiki.xls" \
     feature style "mind" \
     exports xls_id id
 
-kit svg "" public "web.wiki.svg" \
-    select "" name type values "16 30 48 60" action auto \
+kit chart "图表" public "web.wiki.chart" \
+    select "" name type values "chain block" action auto \
+	textarea "" name happy half 4 height "200px" \
     select "" name type values "white red yellow green blue black" action auto \
     select "" name type values "black blue green yellow red white" action auto \
-	textarea "" name happy half 4 height "200px" \
     feature display svg \
 	button "查看"
 

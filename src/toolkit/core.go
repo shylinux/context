@@ -79,13 +79,13 @@ func Select(value string, args ...interface{}) string {
 		if len(args) > 1 {
 			switch b := args[1].(type) {
 			case bool:
-				if b && arg != "" {
+				if b && Right(arg) {
 					return arg
 				}
 				return value
 			}
 		}
-		if arg != "" {
+		if Right(arg) {
 			return arg
 		}
 	case []interface{}:

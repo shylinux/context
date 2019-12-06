@@ -386,6 +386,26 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			m.Cmdy("cli.system", "cmd_dir", arg[0], "bash", "-c", strings.Join(arg[1:], " "))
 			return
 		}},
+		"chart": {Name: "chart type text", Help: "绘图", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Option("render", "raw")
+			var chart Chart
+			switch arg[0] {
+			case "block":
+				chart = &Block{}
+			case "chain":
+				chart = &Chain{}
+			case "table":
+				chart = &Table{}
+			}
+			arg[1] = strings.TrimSpace(arg[1])
+
+			chart.Init(m, arg[1:]...)
+			m.Echo(`<svg vertion="1.1" xmlns="http://www.w3.org/2000/svg" width="%d", height="%d">`,
+				chart.GetWidth(), chart.GetHeight())
+			chart.Draw(m, 0, 0)
+			m.Echo(`</svg>`)
+			return
+		}},
 
 		"title": {Name: "title text", Help: "一级标题", Hand: func(m *ctx.Message, c *ctx.Context, cmd string, arg ...string) (e error) {
 			ns := strings.Split(m.Conf("runtime", "node.name"), "-")
@@ -450,7 +470,6 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 			}
 			if len(arg) > 3 {
 				data = mis.Parse(nil, "", show(m, arg[3])...).(map[string]interface{})
-				m.Log("what", "%v", mis.Formats(data))
 			}
 
 			max := map[int]int{}
