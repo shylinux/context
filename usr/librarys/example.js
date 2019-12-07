@@ -1219,7 +1219,11 @@ function Plugin(page, pane, field, inits, runs) {
             },
         }, function(type, msg, cb) {var meta = arguments.callee.meta
             type != meta.type && plugin.Save(meta.type, output), meta.type = type
-            !plugin.Load(type, output) && Output(plugin, type || feature.display, msg || plugin.msg, cb, output, option)
+            if (type == "chart") {
+                can.chat.Output(can, plugin, type || feature.display, msg || plugin.msg, cb, output, option)
+                return
+            } 
+            !plugin.Load(type, output) && (type=="chart"? can.chat.Output: Output)(plugin, type || feature.display, msg || plugin.msg, cb, output, option)
         }),
         onexport: shy("导出数据", {
             "": function(value, name, line) {
@@ -1698,3 +1702,40 @@ function Output(plugin, type, msg, cb, target, option) {
     output.onimport(type, msg, cb)
     return plugin.Outputs[type] = target, target.Output = output
 }
+
+var can = Volcanos("chat", {
+    Plugin: shy("构造插件", function(can) {}),
+    Output: shy("构造组件", function(can, plugin, type, msg, cb, target, option) {
+        type = "table"
+        var output = Volcanos(type, {
+            user: can.user, node: can.node,
+            core: can.core, type: can.type,
+            oncarte: plugin.oncarte,
+            run: plugin.run,
+            size: function(cb) {
+                plugin.onfigure.meta.size(function(width, height) {
+                    cb(width, height)
+                })
+            }
+        }, [type], function(output) {
+            target.oncontextmenu = function(event) {
+                plugin.oncarte(event, shy("", output.onchoice, output.onchoice.list, function(event, value, meta) {
+                    typeof meta[value] == "function"? meta[value](event, can, msg, cb, target, option):
+                        typeof output[value] == "function"? output[value](event, can, msg, cb, target, option):
+                            typeof plugin[value] == "function"? plugin[value](event, can, msg, cb, target, option): null
+                    return true
+                }))
+                event.stopPropagation()
+                event.preventDefault()
+                return true
+            }
+            output.load().onimport.init(output, msg, cb, target, option)
+        })
+        kit.Item(output.onaction, function(key, cb) {target[key] = function(event) {
+            output.onaction(event, can, msg, cb, target, option)
+        }})
+        plugin[type] = output, output.target = target, target.Output = output
+    }),
+    Input: shy("构造控件", function(can, plugin, type, meta, target, option) {
+    }),
+}, [], function(can) {can.load()})

@@ -6,7 +6,6 @@ import (
 	mis "github.com/shylinux/toolkits"
 
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -98,7 +97,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				},
 				map[string]interface{}{"name": "tail",
 					"tmpl": "tail", "scripts": []interface{}{
-						"toolkit.js", "context.js", "example.js", "chat.js",
+						"volcanos.js", "toolkit.js", "context.js", "example.js", "chat.js",
 					},
 				},
 			},
@@ -509,19 +508,22 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				case "wiki":
 					// 查看文档
 					p := path.Join(path.Join("var/share", h))
-					if _, e := os.Stat(p); e == nil {
-						// 读取缓存
-						m.Log("info", "read cache %v", p)
-						r := m.Optionv("request").(*http.Request)
-						w := m.Optionv("response").(http.ResponseWriter)
-						http.ServeFile(w, r, p)
-						break
+					if !m.Options("force") {
+						if _, e := os.Stat(p); e == nil {
+							// 读取缓存
+							m.Log("info", "read cache %v", p)
+							r := m.Optionv("request").(*http.Request)
+							w := m.Optionv("response").(http.ResponseWriter)
+							http.ServeFile(w, r, p)
+							break
+						}
 					}
 
+					m.Option("title", fmt.Sprintf("%v:%v", value["dream"], value["code"]))
+					m.Option("favicon", "favicon.ico")
 					// 生成模板
-					if b, e := ioutil.ReadFile("usr/template/share.tmpl"); e == nil {
-						m.Echo(string(b))
-					}
+					m.Echo(ctx.Execute(m, "share.tmpl"))
+
 					// 生成文档
 					m.Cmdy("ssh._route", value["dream"], "web.wiki.note", value["code"])
 					if f, _, e := kit.Create(p); e == nil {

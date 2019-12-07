@@ -226,3 +226,15 @@ func ExecuteStr(m *Message, w io.Writer, p string) error {
 	tmpl, _ = tmpl.Parse(p)
 	return tmpl.Execute(w, m)
 }
+func Execute(m *Message, p string) string {
+	m.Log("fuck", "waht %v", path.Join(m.Conf("route", "template_dir"), "/*.tmpl"))
+	t := template.Must(template.New("render").Funcs(CGI).ParseGlob(path.Join(m.Conf("route", "template_dir"), "/*.tmpl")))
+	for _, v := range t.Templates() {
+		m.Log("fuck", "waht %v", v.Name())
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+	t.ExecuteTemplate(buf, p, m)
+	m.Log("fuck", "waht %v", p)
+	m.Log("fuck", "waht %v", buf)
+	return buf.String()
+}
