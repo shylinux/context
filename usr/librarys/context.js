@@ -23,7 +23,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
         kit.History("run", -1, option)
         this.POST("", option, function(msg) {
             kit.Log("run", what, "result", msg.result? msg.result[0]: "", msg)
-            kit._call(cb, [msg])
+            typeof cb == "function" && cb(msg)
         }, msg), delete(event.msg)
     }),
     Event: shy("封装事件", {order: 0}, function(event, msg, proto) {
@@ -163,7 +163,7 @@ ctx = context = (function(kit) {var ctx = {__proto__: kit,
                 var res = {"result": [xhr.responseText]}
             }
 
-            kit._call(cb, [msg.Copy(res)])
+            typeof cb == "function" && cb(msg.Copy(res))
         }
 
         xhr.open("POST", url)

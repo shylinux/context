@@ -684,6 +684,11 @@ function Pane(page, field) {
             if (type == "plugin" && line.name || type == "field") {
                 page.Require(line.init? line.group+"/"+line.init: "", function(init) {
                     page.Require(line.view? line.group+"/"+line.view: "", function(view) {
+                        can.user.carte = page.carte.Pane.Show
+                        can.user.toast = page.toast.Pane.Show
+                        line.group == "favor" && can.Plugin(can, ui.item.Meta, function(event, cmds, cbs) {
+                            ctx.Run(event, option.dataset, [line.river, line.storm, line.action].concat(cmds), cbs)
+                        }, ui.item) ||
                         pane.Plugin(page, pane, ui.item, init, function(event, cmds, cbs) {
                             kit._call(cb||pane.Core, [event, line, cmds, cbs])
                         })
@@ -987,7 +992,7 @@ function Pane(page, field) {
                 },
             }
 
-            var Meta = plugin && plugin.target && plugin.target.Meta || {}
+            var Meta = plugin && plugin.target && plugin.target.Meta || line || {}
             kit.Log(["cmd"].concat(kit.List([Meta.river, Meta.storm, Meta.action])).concat(args[0] == "_cmd"? args[1]: args))
 
             page.Status("ncmd", kit.History("cmd", -1, {args: args, meta: Meta}))
@@ -1030,6 +1035,7 @@ function Pane(page, field) {
     kit.Item(pane.Listen, function(key, cb) {page.Sync(key).change(cb)})
     return page[name] = field, field.Pane = pane
 }
+
 function Plugin(page, pane, field, inits, runs) {
     var option = field.querySelector("form.option")
     var action = field.querySelector("div.action")
@@ -1703,39 +1709,3 @@ function Output(plugin, type, msg, cb, target, option) {
     return plugin.Outputs[type] = target, target.Output = output
 }
 
-var can = Volcanos("chat", {
-    Plugin: shy("构造插件", function(can) {}),
-    Output: shy("构造组件", function(can, plugin, type, msg, cb, target, option) {
-        type = "table"
-        var output = Volcanos(type, {
-            user: can.user, node: can.node,
-            core: can.core, type: can.type,
-            oncarte: plugin.oncarte,
-            run: plugin.run,
-            size: function(cb) {
-                plugin.onfigure.meta.size(function(width, height) {
-                    cb(width, height)
-                })
-            }
-        }, [type], function(output) {
-            target.oncontextmenu = function(event) {
-                plugin.oncarte(event, shy("", output.onchoice, output.onchoice.list, function(event, value, meta) {
-                    typeof meta[value] == "function"? meta[value](event, can, msg, cb, target, option):
-                        typeof output[value] == "function"? output[value](event, can, msg, cb, target, option):
-                            typeof plugin[value] == "function"? plugin[value](event, can, msg, cb, target, option): null
-                    return true
-                }))
-                event.stopPropagation()
-                event.preventDefault()
-                return true
-            }
-            output.load().onimport.init(output, msg, cb, target, option)
-        })
-        kit.Item(output.onaction, function(key, cb) {target[key] = function(event) {
-            output.onaction(event, can, msg, cb, target, option)
-        }})
-        plugin[type] = output, output.target = target, target.Output = output
-    }),
-    Input: shy("构造控件", function(can, plugin, type, meta, target, option) {
-    }),
-}, [], function(can) {can.load()})
