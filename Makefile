@@ -9,6 +9,7 @@ install:prepare
 	@bin/boot.sh restart && date
 
 prepare:
+	@go get github.com/shylinux/icebergs
 	@go get github.com/shylinux/toolkits
 	@go get github.com/nsf/termbox-go
 	@go get github.com/gorilla/websocket

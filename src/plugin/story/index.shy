@@ -1,7 +1,6 @@
 kit share "共享" public "web.chat.share" \
-    select "" name type values "wiki file" \
+    select "" name kind values "wiki file" \
 	text "miss.md" name story imports plugin_story view long \
-    feature display chart \
 	button "共享"
 
 kit note "记事本" public "_:web.wiki.note" "@you" \
@@ -43,10 +42,10 @@ kit xls "表格" "index.js" "index.css" private "web.wiki.xls" \
     exports xls_id id
 
 kit chart "图表" public "web.wiki.chart" \
-    select "" name type values "chain block" action auto \
+    select "" name kind values "chain block" action auto \
 	textarea "" name happy half 4 height "200px" \
-    select "" name type values "white red yellow green blue black" action auto \
-    select "" name type values "black blue green yellow red white" action auto \
-    feature display chart \
+    select "" name kind values "white red yellow green blue black" action auto \
+    select "" name kind values "black blue green yellow red white" action auto \
+    feature display inner \
 	button "查看"
 

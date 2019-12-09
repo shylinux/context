@@ -684,9 +684,18 @@ function Pane(page, field) {
             if (type == "plugin" && line.name || type == "field") {
                 page.Require(line.init? line.group+"/"+line.init: "", function(init) {
                     page.Require(line.view? line.group+"/"+line.view: "", function(view) {
-                        can.user.carte = page.carte.Pane.Show
-                        can.user.toast = page.toast.Pane.Show
-                        line.group == "favor" && can.Plugin(can, ui.item.Meta, function(event, cmds, cbs) {
+                        can.user.carte = page.carte.Pane.Show;
+                        can.user.toast = page.toast.Pane.Show;
+                        (
+                            line.group == "docker" ||
+                            line.group == "story" ||
+                            line.group == "favor"
+                        ) && can.Plugin(can, ui.item.Meta, function(event, cmds, cbs) {
+                            var msg = ctx.Event(event)
+                            kit.Selector(action, "input", function(item, index) {
+                                item.value && msg.Option(item.name, item.value)
+                            })
+
                             ctx.Run(event, option.dataset, [line.river, line.storm, line.action].concat(cmds), cbs)
                         }, ui.item) ||
                         pane.Plugin(page, pane, ui.item, init, function(event, cmds, cbs) {
