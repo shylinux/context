@@ -340,6 +340,10 @@ var page = Page({
             Show: function() {var pane = field.Pane
                 if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}
 
+                return can.Page(can, "chat", ["Action"], function(page) {
+                    page.Action.Show(river, storm)
+                }, document.body)
+
                 var msg = pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
                 msg.Option("you", you)
                 output.innerHTML = "", pane.Appends([river, storm], "plugin", ["name", "help"], "name", true, null, function() {
@@ -355,7 +359,7 @@ var page = Page({
                 river: function(value, old) {temp = value},
                 storm: function(value, old) {
                     river && storm && field.Pane.Save(river+"."+storm, output)
-                    ;(river = page.river.Pane.which.get(), storm = value) && field.Pane.Show()
+                    ;(river = page.river.Pane.which.get(), storm = value) && field.Pane.Show(river, storm)
                 },
                 source: function(value, old) {input = value},
                 target: function(value, old) {share = value},

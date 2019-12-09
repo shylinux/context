@@ -690,7 +690,7 @@ function Pane(page, field) {
                             line.group == "docker" ||
                             line.group == "story" ||
                             line.group == "favor"
-                        ) && can.Plugin(can, ui.item.Meta, function(event, cmds, cbs) {
+                        ) && can.Plugin(can.action||can, ui.item.Meta, "state", function(event, cmds, cbs) {
                             var msg = ctx.Event(event)
                             kit.Selector(action, "input", function(item, index) {
                                 item.value && msg.Option(item.name, item.value)
@@ -1718,3 +1718,7 @@ function Output(plugin, type, msg, cb, target, option) {
     return plugin.Outputs[type] = target, target.Output = output
 }
 
+
+var Config = {main: "chat",
+    list: ["toast", "carte"],
+}
