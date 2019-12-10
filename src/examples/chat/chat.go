@@ -98,7 +98,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				map[string]interface{}{"name": "tail",
 					"tmpl": "tail", "scripts": []interface{}{
 						"toolkit.js", "context.js", "example.js", "chat.js",
-						"can_proto.js", "can_frame.js",
+						"can_proto.js", "can_order.js", "can_frame.js",
 					},
 				},
 			},

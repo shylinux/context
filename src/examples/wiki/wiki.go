@@ -171,7 +171,7 @@ var Index = &ctx.Context{Name: "wiki", Help: "文档中心",
 	Commands: map[string]*ctx.Command{
 		"tree": {Name: "tree", Help: "目录", Form: map[string]int{"level": 1, "class": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
 			m.Cmdy("nfs.dir", path.Join(m.Confx("level"), m.Confx("class", arg, 0)),
-				"time", "size", "line", "file", "dir_sort", "time", "time_r")
+				"time", "size", "line", "file", "dir_sort", "time", "time_r").Set("result")
 			return
 		}},
 		"text": {Name: "text", Help: "文章", Form: map[string]int{"level": 1, "class": 1, "favor": 1}, Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {

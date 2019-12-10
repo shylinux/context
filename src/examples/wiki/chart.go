@@ -88,7 +88,7 @@ type Chain struct {
 }
 
 func (b *Chain) Init(m *ctx.Message, arg ...string) Chart {
-	// 解析数据
+	// 解数据
 	b.data = mis.Parse(nil, "", b.show(m, arg[0])...).(map[string]interface{})
 	b.FontColor = kit.Select("white", arg, 1)
 	b.BackGround = kit.Select("red", arg, 2)

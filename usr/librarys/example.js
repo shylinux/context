@@ -634,7 +634,7 @@ function Pane(page, field) {
     var pane = Meta(page.Zone(name), field, (page[field.dataset.init] || function() {})(page, field, option, output) || {}, {
         Appends: shy("添加列表", function(cmds, type, key, which, first, cb, cbs) {
             var list = []
-            pane.Runs(event, cmds, function(line, index, msg) {
+            pane.Runs(event||{}, cmds, function(line, index, msg) {
                 var ui = pane.Append(type, line, key, which, cb)
                 list.push(ui)
                 if (typeof first == "string") {
@@ -684,20 +684,6 @@ function Pane(page, field) {
             if (type == "plugin" && line.name || type == "field") {
                 page.Require(line.init? line.group+"/"+line.init: "", function(init) {
                     page.Require(line.view? line.group+"/"+line.view: "", function(view) {
-                        can.user.carte = page.carte.Pane.Show;
-                        can.user.toast = page.toast.Pane.Show;
-                        (
-                            line.group == "docker" ||
-                            line.group == "story" ||
-                            line.group == "favor"
-                        ) && can.Plugin(can.action||can, ui.item.Meta, "state", function(event, cmds, cbs) {
-                            var msg = ctx.Event(event)
-                            kit.Selector(action, "input", function(item, index) {
-                                item.value && msg.Option(item.name, item.value)
-                            })
-
-                            ctx.Run(event, option.dataset, [line.river, line.storm, line.action].concat(cmds), cbs)
-                        }, ui.item) ||
                         pane.Plugin(page, pane, ui.item, init, function(event, cmds, cbs) {
                             kit._call(cb||pane.Core, [event, line, cmds, cbs])
                         })

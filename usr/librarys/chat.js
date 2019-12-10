@@ -220,6 +220,10 @@ var page = Page({
     initRiver: function(page, field, option, output) {
         return {
             Show: function(which) {var pane = field.Pane
+                if (ctx.Search("feature") != "") {
+                    return
+                }
+
                 pane.Event(event, {}, {name: pane.Zone("show", page.who.get())})
                 output.innerHTML = "", pane.Appends([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true, function(event, line) {
                     page.title(line.nick)
@@ -339,10 +343,6 @@ var page = Page({
         return {
             Show: function() {var pane = field.Pane
                 if (river && storm && field.Pane.Load(river+"."+storm, output)) {return}
-
-                return can.Page(can, "chat", ["Action"], function(page) {
-                    page.Action.Show(river, storm)
-                }, document.body)
 
                 var msg = pane.Event(event, {}, {name: pane.Zone("show", river, storm)})
                 msg.Option("you", you)
