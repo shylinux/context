@@ -140,6 +140,7 @@ var page = Page({
     }),
 
     initOcean: function(page, field, option, output) {
+        if (ctx.Search("feature") != "") {return}
         var table = kit.AppendChild(output, "table")
         var ui = kit.AppendChild(field, [{view: ["create"], list: [
             {title: "群聊名称", input: ["name", function(event) {
@@ -203,6 +204,7 @@ var page = Page({
                 })
             },
             Show: function(name) {var pane = field.Pane
+                if (ctx.Search("feature") != "") {return}
                 pane.Dialog(), ui.name.focus(), ui.name.value = name||"good", pane.Run(event, [], pane.Append)
             },
             Action: {
@@ -220,9 +222,7 @@ var page = Page({
     initRiver: function(page, field, option, output) {
         return {
             Show: function(which) {var pane = field.Pane
-                if (ctx.Search("feature") != "") {
-                    return
-                }
+                if (ctx.Search("feature") != "") {return}
 
                 pane.Event(event, {}, {name: pane.Zone("show", page.who.get())})
                 output.innerHTML = "", pane.Appends([], "text", ["nick", "count"], "key", which||ctx.Search("river")||true, function(event, line) {
@@ -244,8 +244,8 @@ var page = Page({
                     })
                 },
             },
-            Button: ["创建", "共享"],
-            Choice: ["创建", "共享"],
+            // Button: ["创建", "共享"],
+            // Choice: ["创建", "共享"],
         }
     },
     initTarget: function(page, field, option, output) {
@@ -541,12 +541,13 @@ var page = Page({
                     pane.Save(""), field.Pane.Show()
                 },
             },
-            Button: ["刷新", "创建"],
-            Choice: ["刷新", "创建"],
-            Detail: ["恢复", "保存", "复制", "共享", "删除"],
+            // Button: ["刷新", "创建"],
+            // Choice: ["刷新", "创建"],
+            // Detail: ["恢复", "保存", "复制", "共享", "删除"],
         }
     },
     initSteam: function(page, field, option, output) {
+        if (ctx.Search("feature") != "") {return}
         var table = kit.AppendChild(output, "table")
         var device = kit.AppendChild(field, [{"view": ["device", "table"]}]).last
         var ui = kit.AppendChild(field, [{view: ["create"], list: [
