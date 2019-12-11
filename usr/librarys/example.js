@@ -154,16 +154,20 @@ function Page(page) {
                 page.Status()
             }
 
+
             // 事件回调
-            window.onresize = function(event) {
-                page.onlayout(event)
-            }, document.body.onkeydown = function(event) {
+            document.body.onkeydown = function(event) {
                 // page.oncontrol(event) || page.onscroll(event)
             }, document.body.onkeyup = function(event) {
             }, document.body.oncontextmenu = function(event) {
             }, document.body.onmousewheel = function(event) {
             }, document.body.onmousedown = function(event) {
             }, document.body.onmouseup = function(event) {
+            }
+
+            if (ctx.Search("feature") != "") {return}
+            window.onresize = function(event) {
+                page.onlayout(event)
             }
         },
         oninput: function(event, local) {var target = event.target
