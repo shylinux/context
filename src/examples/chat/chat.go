@@ -52,6 +52,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				map[string]interface{}{"name": "debug",
 					"tmpl": "fieldset", "view": "Debug dialog", "init": "initDebug",
 				},
+				map[string]interface{}{"name": "favor",
+					"tmpl": "fieldset", "view": "Favor dialog", "init": "initFavor",
+					"ctx": "web.chat", "cmd": "favor",
+				},
+				map[string]interface{}{"name": "tutor",
+					"tmpl": "fieldset", "view": "Tutor dialog", "init": "initTutor",
+					"ctx": "web.chat", "cmd": "tutor",
+				},
+
 				map[string]interface{}{"name": "login",
 					"tmpl": "fieldset", "view": "Login dialog", "init": "initLogin",
 					"ctx": "web.chat", "cmd": "login",
@@ -495,6 +504,15 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 			default:
 				m.Cmdy("ssh._route", arg[1], "tool")
 			}
+			return
+		}},
+
+		"favor": &ctx.Command{Name: "favor", Help: "命令", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy(arg)
+			return
+		}},
+		"tutor": &ctx.Command{Name: "tutor", Help: "向导", Hand: func(m *ctx.Message, c *ctx.Context, key string, arg ...string) (e error) {
+			m.Cmdy(arg)
 			return
 		}},
 

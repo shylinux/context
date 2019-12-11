@@ -184,7 +184,16 @@ fieldset.dialog.Favor input.cmd {
     font-weight:bold;
     font-family:monospace;
     background-color:black;
-    width:388px;
+    border:solid 1px white;
+    padding:4px;
+    width:383px;
+}
+fieldset.dialog.Favor div.output {
+    color:white;
+    white-space:pre;
+    max-height: 200px;
+    overflow:auto;
+    width:400px;
 }
 
 fieldset.dialog.Toast {
@@ -192,7 +201,7 @@ fieldset.dialog.Toast {
     background-color:#ffffff;
     position:absolute;
     display:none;
-    z-index:100;
+    z-index:200;
 }
 fieldset.dialog.Toast>div.action {
     padding:0 0px;
