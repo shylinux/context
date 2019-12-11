@@ -154,6 +154,7 @@ function Page(page) {
                 page.Status()
             }
 
+            if (ctx.Search("feature") != "") {return}
 
             // 事件回调
             document.body.onkeydown = function(event) {
@@ -165,7 +166,6 @@ function Page(page) {
             }, document.body.onmouseup = function(event) {
             }
 
-            if (ctx.Search("feature") != "") {return}
             window.onresize = function(event) {
                 page.onlayout(event)
             }
@@ -552,6 +552,7 @@ function Page(page) {
             }
         },
         initHeader: function(page, field, option, output) {
+            if (ctx.Search("feature") != "") {return}
             var cb = function(event, item, value) {kit._call(page.Action[item], [event, item, value, page])}
             field.onclick = function(event) {page.pane && page.pane.scrollTo(0, 0)}
             page.who.change(function(value, old) {page.Button("user", value)})

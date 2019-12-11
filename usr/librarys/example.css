@@ -171,6 +171,22 @@ fieldset.dialog>div.create table {
     min-width:240px;
 }
 
+fieldset.dialog.Favor {
+    border:solid 2px red;
+    background-color:rgba(100,100,100,0.8);
+    position:absolute;
+    display:none;
+    z-index:100;
+}
+fieldset.dialog.Favor input.cmd {
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+    font-family:monospace;
+    background-color:black;
+    width:388px;
+}
+
 fieldset.dialog.Toast {
     border:solid 2px red;
     background-color:#ffffff;
@@ -183,6 +199,7 @@ fieldset.dialog.Toast>div.action {
 }
 fieldset.dialog.Toast>div.output {
     padding:0 10px;
+    text-align:center;
 }
 fieldset.dialog.Toast>div.output>div.title {
     font-size:12px;

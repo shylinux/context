@@ -325,6 +325,7 @@ var page = Page({
         }
     },
     initAction: function(page, field, option, output) {
+        if (ctx.Search("feature") != "") {return}
         var river = "", storm = 0, input = "", share = ""
         var temp = ""
         var you = ""

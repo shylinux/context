@@ -43,7 +43,7 @@ volcanos
 
 ` "" "" 16}}
 
-## {{chapter "原型"}}
+## {{chapter "原型 proto.js"}}
 ### {{section "ID 生成器"}}
 ### {{section "Log 日志器"}}
 ### {{section "Conf 配置器"}}
@@ -54,28 +54,28 @@ volcanos
 ### {{section "Cache 缓存器"}}
 ### {{section "Story 存储器"}}
 
-## {{chapter "框架"}}
+## {{chapter "框架 frame.js"}}
 ### {{section "Page 页面"}}
 ### {{section "Pane 面板"}}
 ### {{section "Plugin 插件"}}
 ### {{section "Inputs 控件"}}
 ### {{section "Output 组件"}}
 
-## {{chapter "核心模块"}}
+## {{chapter "核心模块 lib/"}}
 ### {{section "base 模块"}}
 ### {{section "core 模块"}}
 ### {{section "misc 模块"}}
 ### {{section "page 模块"}}
 ### {{section "user 模块"}}
 
-## {{chapter "事件模块"}}
+## {{chapter "事件模块 pane/"}}
 ### {{section "onimport 模块"}}
 ### {{section "onaction 模块"}}
 ### {{section "onchoice 模块"}}
 ### {{section "ondetail 模块"}}
 ### {{section "onexport 模块"}}
 
-## {{chapter "配置"}}
+## {{chapter "配置 order.js"}}
 ### {{section "Header"}}
 ### {{section "Ocean"}}
 ### {{section "River"}}
