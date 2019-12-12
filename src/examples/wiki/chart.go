@@ -110,7 +110,7 @@ func (b *Chain) Init(m *ctx.Message, arg ...string) Chart {
 	return b
 }
 func (b *Chain) Draw(m *ctx.Message, x, y int) Chart {
-	return b.draw(m, b.data, 0, b.max, x, y)
+	return b.draw(m, b.data, 0, b.max, x, y, &Block{})
 }
 func (b *Chain) show(m *ctx.Message, str string) (res []string) {
 	miss := []int{}
@@ -180,14 +180,14 @@ func (b *Chain) size(m *ctx.Message, root map[string]interface{}, depth int, wid
 	meta["height"] = height
 	return height
 }
-func (b *Chain) draw(m *ctx.Message, root map[string]interface{}, depth int, width map[int]int, x int, y int) Chart {
+func (b *Chain) draw(m *ctx.Message, root map[string]interface{}, depth int, width map[int]int, x, y int, p *Block) Chart {
 	meta := root["meta"].(map[string]interface{})
 	b.Width, b.Height = 0, 0
 
 	// 当前节点
 	block := &Block{
-		BackGround: kit.Select(b.BackGround, meta["bg"]),
-		FontColor:  kit.Select(b.FontColor, meta["fg"]),
+		BackGround: kit.Select(b.BackGround, kit.Select(p.BackGround, meta["bg"])),
+		FontColor:  kit.Select(b.FontColor, kit.Select(p.FontColor, meta["fg"])),
 		FontSize:   b.FontSize,
 		LineSize:   b.LineSize,
 		Padding:    b.Padding,
@@ -200,7 +200,7 @@ func (b *Chain) draw(m *ctx.Message, root map[string]interface{}, depth int, wid
 
 	// 递归节点
 	kit.Map(root["list"], "", func(index int, value map[string]interface{}) {
-		b.draw(m, value, depth+1, width, x+b.GetWidths(strings.Repeat(" ", width[depth])), y)
+		b.draw(m, value, depth+1, width, x+b.GetWidths(strings.Repeat(" ", width[depth])), y, block)
 		y += kit.Int(kit.Chain(value, "meta.height")) * b.GetHeights()
 	})
 	return b

@@ -41,7 +41,8 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 					"tmpl": "head", "metas": []interface{}{map[string]interface{}{
 						"name": "viewport", "content": "width=device-width, initial-scale=0.7, user-scalable=no",
 					}}, "favicon": "favicon.ico", "styles": []interface{}{
-						"example.css", "chat.css",
+						// "example.css", "chat.css",
+						"can_style.css",
 					}},
 				map[string]interface{}{"name": "toast",
 					"tmpl": "fieldset", "view": "Toast dialog", "init": "initToast",
@@ -106,7 +107,7 @@ var Index = &ctx.Context{Name: "chat", Help: "会议中心",
 				},
 				map[string]interface{}{"name": "tail",
 					"tmpl": "tail", "scripts": []interface{}{
-						"toolkit.js", "context.js", "example.js", "chat.js",
+						// "toolkit.js", "context.js", "example.js", "chat.js",
 						"can_proto.js", "can_order.js", "can_frame.js",
 					},
 				},

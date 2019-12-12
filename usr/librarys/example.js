@@ -136,6 +136,7 @@ function Page(page) {
     var script = {}, record = ""
     page = Meta([document.title], document.body, page, {check: true,
         onload: function(event) {
+            if (ctx.Search("feature") != "") {return}
             // Event入口 0
             if (page.Event(event, {}) && page.check && !ctx.Cookie("sessid")) {
                 // 用户登录
@@ -153,8 +154,6 @@ function Page(page) {
                 page.Button()
                 page.Status()
             }
-
-            if (ctx.Search("feature") != "") {return}
 
             // 事件回调
             document.body.onkeydown = function(event) {
