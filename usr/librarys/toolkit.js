@@ -370,7 +370,8 @@ kit = toolkit = (function() {var kit = {__proto__: document,
     OrderTable: function(table, field, cb, cbs) {if (!table) {return}
         table.oncontextmenu = table.onclick = function(event) {var target = event.target
             target.parentElement.childNodes.forEach(function(item, i) {if (item != target) {return}
-                if (target.tagName == "TH") {var dataset = target.dataset
+                if (target.tagName == "TH") {
+                    var dataset = target.dataset
                     dataset["sort_asc"] = (dataset["sort_asc"] == "1") ? 0: 1
                     kit.RangeTable(table, i, dataset["sort_asc"] == "1")
                 } else if (target.tagName == "TD") {var index = 0

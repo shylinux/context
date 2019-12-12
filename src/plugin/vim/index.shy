@@ -20,7 +20,7 @@ kit favor "收藏" private "_:web.code.favor" "@you" post \
     button "添加" 
 
 kit editor "编辑器" private "web.code.login" list vim \
-    text "" name sid imports plugin_vim_sid action auto \
+    text "" name vim_sid action auto \
     text "" name dream imports plugin_you \
     text "" name topic imports plugin_see \
     feature detail "prune" "复制" "下载" \
@@ -53,35 +53,35 @@ kit txts "插入记录" private "web.code.trend" list "vim.txts" \
     button "返回" cb Last
 
 kit bufs "文件缓存" private "web.code.state" list vim bufs \
-    text "" name sid imports plugin_vim_sid action auto \
+    text "" name vim_sid action auto \
     text "tag" name match view tiny \
     text "" name value view tiny \
     exports vim_file file "" vim_line line \
     button "查看" action auto
 
 kit regs "粘贴缓存" private "web.code.state" list vim regs \
-    text "" name sid imports plugin_vim_sid action auto \
+    text "" name vim_sid action auto \
     text "reg" name match view tiny \
     text "" name value view tiny \
     exports vim_word word \
     button "查看" action auto
 
 kit marks "文件标记" private "web.code.state" list vim marks \
-    text "" name sid imports plugin_vim_sid action auto \
+    text "" name vim_sid action auto \
     text "mark" name match view tiny \
     text "" name value view tiny \
     exports vim_file file "" vim_line line "" vim_col col "" \
     button "查看" action auto
 
 kit tags "语法标记" private "web.code.state" list vim tags \
-    text "" name sid imports plugin_vim_sid action auto \
+    text "" name vim_sid action auto \
     text "tag" name match view tiny \
     text "" name value view tiny \
     exports vim_file file "" vim_line line "" vim_word tag "" \
     button "查看" action auto
 
 kit fixs "项目索引" private "web.code.state" list vim fixs \
-    text "" name sid imports plugin_vim_sid action auto \
+    text "" name vim_sid action auto \
     text "files" name value view tiny \
     text "" name value view tiny \
     exports vim_file file "" vim_line line "" vim_word word "" \

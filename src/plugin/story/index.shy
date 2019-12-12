@@ -4,7 +4,7 @@ kit share "共享" public "web.chat.share" \
 	button "共享"
 
 kit note "记事本" public "_:web.wiki.note" "@you" \
-	text "volcano.md" name story imports path view long action auto \
+	text "miss.md" name story imports path view long action auto \
 	button "查看" action auto \
 	button "返回" cb Last \
     exports story file \
