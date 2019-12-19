@@ -163,7 +163,7 @@ endif
 cnoremap RR :source ~/.vimrc<CR>
 
 colorscheme torte
-highlight Comment cterm=reverse ctermfg=yellow
+highlight Comment ctermfg=cyan ctermbg=darkblue
 "}}}
 "
 nnoremap <F3> :NERDTreeToggle<CR>
