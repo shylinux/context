@@ -9,7 +9,7 @@ kit dir "目录" private "_:web.code.zsh" "@pod" \
     button "返回" cb Last
 
 kit clip "粘贴板" private "web.code.tmux" "" "buffer" \
-	text "" name tag imports plugin_buffer action auto \
+	text "" name buffer action auto \
 	text "" name txt \
     exports buffer buffer \
     button "查看" action auto \
